@@ -1,5 +1,6 @@
 #include "Renderer.h"
 #include "Win32Application.h"
+#include "D3DHelper.h"
 #include <D3Dcompiler.h>
 #include <string>
 
@@ -38,9 +39,7 @@ void Renderer::OnRender()
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     // Present the frame.
-    if (FAILED(m_swapChain->Present(1, 0))) {
-        exit(1);
-    }
+    ThrowIfFailed(m_swapChain->Present(1, 0));
 
     WaitForPreviousFrame();
 }
@@ -139,41 +138,29 @@ void Renderer::LoadPipeline()
 
     // Create factory
     ComPtr<IDXGIFactory4> factory;
-    if (FAILED(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)))) {
-        MessageBox(nullptr, L"DXGI Factory Creation Failed!", L"Error", MB_OK | MB_ICONERROR);
-        exit(1);
-    }
+    ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
 
     // Create device using appropriate adapter
     if (m_useWarpDevice)
     {
         ComPtr<IDXGIAdapter> warpAdapter;
-        if (FAILED(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)))) {
-            MessageBox(nullptr, L"EnumWarpAdapter Failed!", L"Error", MB_OK | MB_ICONERROR);
-            exit(1);
-        }
+        ThrowIfFailed(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
 
-        if (FAILED(D3D12CreateDevice(
+        ThrowIfFailed(D3D12CreateDevice(
             warpAdapter.Get(),
             D3D_FEATURE_LEVEL_11_0,
-            IID_PPV_ARGS(&m_device)
-        ))) {
-            MessageBox(nullptr, L"Device Creation Failed!", L"Error", MB_OK | MB_ICONERROR);
-            exit(1);
-        };
+            IID_PPV_ARGS(&m_device)));
     }
     else
     {
         ComPtr<IDXGIAdapter1> hardwareAdapter;
         GetHardwareAdapter(factory.Get(), &hardwareAdapter);
 
-        if (FAILED(D3D12CreateDevice(
+        ThrowIfFailed(D3D12CreateDevice(
             hardwareAdapter.Get(),
             D3D_FEATURE_LEVEL_11_0,
             IID_PPV_ARGS(&m_device)
-        ))) {
-            MessageBox(nullptr, L"Device Creation Failed!", L"Error", MB_OK | MB_ICONERROR);
-        };
+        ));
     }
 
     // Describe and create the command queue
@@ -181,10 +168,7 @@ void Renderer::LoadPipeline()
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 
-    if (FAILED(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)))) {
-        MessageBox(nullptr, L"Command Queue Creation Failed!", L"Error", MB_OK | MB_ICONERROR);
-        exit(1);
-    }
+    ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 
     // Describe and create the swap chain.
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
@@ -197,29 +181,20 @@ void Renderer::LoadPipeline()
     swapChainDesc.SampleDesc.Count = 1;
 
     ComPtr<IDXGISwapChain1> swapChain;
-    if (FAILED(factory->CreateSwapChainForHwnd(
+    ThrowIfFailed(factory->CreateSwapChainForHwnd(
         m_commandQueue.Get(),        // Swap chain needs the queue so that it can force a flush on it
         Win32Application::GetHwnd(),
         &swapChainDesc,
         nullptr,
         nullptr,
         swapChain.GetAddressOf()
-    ))) {
-        MessageBox(nullptr, L"Swap Chain Creation Failed!", L"Error", MB_OK | MB_ICONERROR);
-        exit(1);
-    }
+    ));
 
-    if (FAILED(swapChain.As(&m_swapChain))) {
-        MessageBox(nullptr, L"Swap chain Query Failed!", L"Error", MB_OK | MB_ICONERROR);
-        exit(1);
-    }
+    ThrowIfFailed(swapChain.As(&m_swapChain));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
     // fullscreen transition
-    if (FAILED(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_VALID))) {
-        MessageBox(nullptr, L"Alt-Enter key monitoring Failed!", L"Error", MB_OK | MB_ICONERROR);
-        exit(1);
-    }
+    ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_VALID));
 
     // Create descriptor heaps
     {
@@ -228,10 +203,7 @@ void Renderer::LoadPipeline()
         rtvHeapDesc.NumDescriptors = FrameCount;
         rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
         rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-        if (FAILED(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)))) {
-            MessageBox(nullptr, L"Descriptor Heap Creation Failed!", L"Error", MB_OK | MB_ICONERROR);
-            exit(1);
-        }
+        ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
 
         m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     }
@@ -244,10 +216,7 @@ void Renderer::LoadPipeline()
         // Create a RTV for each frame.
         for (UINT n = 0; n < FrameCount; n++)
         {
-            if (FAILED(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])))) {
-                MessageBox(nullptr, L"Getting BackBuffer Failed!", L"Error", MB_OK | MB_ICONERROR);
-                exit(1);
-            }
+            ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
             m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
             //rtvHandle.Offset(1, m_rtvDescriptorSize);
             rtvHandle.ptr = SIZE_T(INT64(rtvHandle.ptr) + INT64(m_rtvDescriptorSize));
@@ -255,10 +224,7 @@ void Renderer::LoadPipeline()
         }
     }
 
-    if (FAILED(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)))) {
-        MessageBox(nullptr, L"Command Allocator Creation Failed!", L"Error", MB_OK | MB_ICONERROR);
-        exit(1);
-    }
+    ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
 }
 
 // Load the sample assets.
@@ -278,12 +244,8 @@ void Renderer::LoadAssets()
 
         ComPtr<ID3DBlob> signature;
         ComPtr<ID3DBlob> error;
-        if (FAILED(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error))) {
-            exit(1);
-        }
-        if (FAILED(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)))) {
-            exit(1);
-        }
+        ThrowIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
+        ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
     }
 
     // Create the pipeline state, which includes compiling and loading shaders.
@@ -300,12 +262,8 @@ void Renderer::LoadAssets()
         std::wstring vsName = L"vs.hlsl";
         std::wstring psName = L"ps.hlsl";
 
-        if (FAILED(D3DCompileFromFile(vsName.c_str(), nullptr, nullptr, "main", "vs_5_0", compileFlags, 0, &vertexShader, nullptr))) {
-            exit(1);
-        }
-        if (FAILED(D3DCompileFromFile(psName.c_str(), nullptr, nullptr, "main", "ps_5_0", compileFlags, 0, &pixelShader, nullptr))) {
-            exit(1);
-        }
+        ThrowIfFailed(D3DCompileFromFile(vsName.c_str(), nullptr, nullptr, "main", "vs_5_0", compileFlags, 0, &vertexShader, nullptr));
+        ThrowIfFailed(D3DCompileFromFile(psName.c_str(), nullptr, nullptr, "main", "ps_5_0", compileFlags, 0, &pixelShader, nullptr));
 
         // Define the vertex input layout.
         D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
@@ -365,21 +323,15 @@ void Renderer::LoadAssets()
         psoDesc.NumRenderTargets = 1;
         psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
         psoDesc.SampleDesc.Count = 1;
-        if (FAILED(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)))) {
-            exit(1);
-        }
+        ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
     }
 
     // Create the command list.
-    if (FAILED(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)))) {
-        exit(1);
-    }
+    ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
 
     // Command lists are created in the recording state, but there is nothing
     // to record yet. The main loop expects it to be closed, so close it now.
-    if (FAILED(m_commandList->Close())) {
-        exit(1);
-    }
+    ThrowIfFailed(m_commandList->Close());
 
     // Create the vertex buffer.
     {
@@ -417,23 +369,19 @@ void Renderer::LoadAssets()
         resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
         resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-        if (FAILED(m_device->CreateCommittedResource(
+        ThrowIfFailed(m_device->CreateCommittedResource(
             &heapProperties,
             D3D12_HEAP_FLAG_NONE,
             &resourceDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr,
-            IID_PPV_ARGS(&m_vertexBuffer)))) {
-            exit(1);
-        }
+            IID_PPV_ARGS(&m_vertexBuffer)));
 
         // Copy the triangle data to the vertex buffer.
         UINT8* pVertexDataBegin;
         D3D12_RANGE readRange = { 0, 0 };
         //CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-        if (FAILED(m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)))) {
-            exit(1);
-        }
+        ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
         memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
         m_vertexBuffer->Unmap(0, nullptr);
 
@@ -445,18 +393,14 @@ void Renderer::LoadAssets()
 
     // Create synchronization objects and wait until assets have been uploaded to the GPU.
     {
-        if (FAILED(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)))) {
-            exit(1);
-        }
+        ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
         m_fenceValue = 1;
 
         // Create an event handle to use for frame synchronization.
         m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
         if (m_fenceEvent == nullptr)
         {
-            if (FAILED(HRESULT_FROM_WIN32(GetLastError()))) {
-                exit(1);
-            }
+            ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
         }
 
         // Wait for the command list to execute; we are reusing the same command 
@@ -471,16 +415,12 @@ void Renderer::PopulateCommandList()
     // Command list allocators can only be reset when the associated 
     // command lists have finished execution on the GPU; apps should use 
     // fences to determine GPU execution progress.
-    if (FAILED(m_commandAllocator->Reset())) {
-        exit(1);
-    }
+    ThrowIfFailed(m_commandAllocator->Reset());
 
     // However, when ExecuteCommandList() is called on a particular command 
     // list, that command list can then be reset at any time and must be before 
     // re-recording.
-    if (FAILED(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()))) {
-        exit(1);
-    }
+    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()));
 
     // Set necessary state.
     m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
@@ -496,7 +436,6 @@ void Renderer::PopulateCommandList()
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
     m_commandList->ResourceBarrier(1, &barrier);
-
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = {};
     D3D12_CPU_DESCRIPTOR_HANDLE start = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
@@ -516,9 +455,7 @@ void Renderer::PopulateCommandList()
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
     m_commandList->ResourceBarrier(1, &barrier);
 
-    if (FAILED(m_commandList->Close())) {
-        exit(1);
-    }
+    ThrowIfFailed(m_commandList->Close());
 }
 
 void Renderer::WaitForPreviousFrame()
@@ -530,17 +467,13 @@ void Renderer::WaitForPreviousFrame()
 
     // Signal and increment the fence value.
     const UINT64 fence = m_fenceValue;
-    if (FAILED(m_commandQueue->Signal(m_fence.Get(), fence))) {
-        exit(1);
-    }
+    ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), fence));
     m_fenceValue++;
 
     // Wait until the previous frame is finished.
     if (m_fence->GetCompletedValue() < fence)
     {
-        if (FAILED(m_fence->SetEventOnCompletion(fence, m_fenceEvent))) {
-            exit(1);
-        }
+        ThrowIfFailed(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
 

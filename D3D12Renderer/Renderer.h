@@ -45,7 +45,7 @@ private:
     };
 
     // Adapter info
-    bool m_useWarpDevice;
+    bool m_useWarpDevice = false;
 
     // Pipeline objects
     D3D12_VIEWPORT m_viewport;
