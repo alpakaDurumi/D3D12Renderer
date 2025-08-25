@@ -35,7 +35,7 @@ int Win32Application::Run(Renderer* renderer, HINSTANCE hInstance, int nCmdShow)
         return 1;
     }
 
-    //renderer->OnInit();
+    renderer->OnInit();
     
     ShowWindow(m_hwnd, nCmdShow);
     
@@ -48,12 +48,16 @@ int Win32Application::Run(Renderer* renderer, HINSTANCE hInstance, int nCmdShow)
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
+        else {
+            //renderer->OnUpdate();
+            renderer->OnRender();
+        }
     }
 
-    //renderer->OnDestroy();
+    renderer->OnDestroy();
 
-    // Return this part of the WM_QUIT message to Windows.
-    return static_cast<char>(msg.wParam);
+    // return exit code that delivered by PostQuitMessage()
+    return static_cast<int>(msg.wParam);
 }
 
 LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
