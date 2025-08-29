@@ -236,6 +236,7 @@ void Renderer::LoadPipeline()
     }
 
     ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
+    ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_BUNDLE, IID_PPV_ARGS(&m_bundleAllocator)));
 }
 
 // Load the sample assets.
@@ -453,6 +454,18 @@ void Renderer::LoadAssets()
         m_vertexBufferView.SizeInBytes = vertexBufferSize;
     }
 
+    // Create and record the bundle
+    {
+        ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_BUNDLE, m_bundleAllocator.Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_bundle)));
+        // 번들은 정적 디스크립터 혹은 정적 데이터를 가리키는 디스크립터를 갖는 파라미터가 포함된 루트 시그니처를 상속받지 못한다.
+        // 루트 시그니처 내에 D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC 플래그를 사용하는 SRV가 있기 때문에 루트 시그니처를 번들에서 다시 설정해줘야 한다. 
+        m_bundle->SetGraphicsRootSignature(m_rootSignature.Get());
+        m_bundle->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        m_bundle->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+        m_bundle->DrawInstanced(3, 1, 0, 0);
+        ThrowIfFailed(m_bundle->Close());
+    }
+
     // Note: ComPtr's are CPU objects but this resource needs to stay in scope until
     // the command list that references it has finished executing on the GPU.
     // We will flush the GPU at the end of this method to ensure the resource is not
@@ -658,9 +671,9 @@ void Renderer::PopulateCommandList()
     // Record commands.
     const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
     m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-    m_commandList->DrawInstanced(3, 1, 0, 0);
+
+    // Execute the commands stored in the bundle
+    m_commandList->ExecuteBundle(m_bundle.Get());
 
     // Indicate that the back buffer will now be used to present.
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;

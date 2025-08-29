@@ -8,7 +8,7 @@
 #include <dxgi1_6.h>    // DXGI 1.6
 #include <vector>
 
-using namespace Microsoft::WRL;
+using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
 class Renderer {
@@ -59,12 +59,14 @@ private:
     ComPtr<ID3D12Device> m_device;
     ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
+    ComPtr<ID3D12CommandAllocator> m_bundleAllocator;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12RootSignature> m_rootSignature;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     ComPtr<ID3D12DescriptorHeap> m_srvHeap;
     ComPtr<ID3D12PipelineState> m_pipelineState;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
+    ComPtr<ID3D12GraphicsCommandList> m_bundle;
     UINT m_rtvDescriptorSize;
 
     // App resources
