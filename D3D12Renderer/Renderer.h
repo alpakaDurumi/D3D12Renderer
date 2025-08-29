@@ -49,6 +49,13 @@ private:
         XMFLOAT2 uv;
     };
 
+    struct SceneConstantBuffer
+    {
+        XMFLOAT4 offset;
+        float padding[60];  // padding for 256-bytes alignment
+    };
+    static_assert((sizeof(SceneConstantBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
+
     // Adapter info
     bool m_useWarpDevice = false;
 
@@ -63,15 +70,19 @@ private:
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12RootSignature> m_rootSignature;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-    ComPtr<ID3D12DescriptorHeap> m_srvHeap;
+    ComPtr<ID3D12DescriptorHeap> m_srvCbvHeap;
     ComPtr<ID3D12PipelineState> m_pipelineState;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     ComPtr<ID3D12GraphicsCommandList> m_bundle;
     UINT m_rtvDescriptorSize;
+    UINT m_srvCbvDescriptorSize;
 
     // App resources
     ComPtr<ID3D12Resource> m_vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+    ComPtr<ID3D12Resource> m_constantBuffer;
+    SceneConstantBuffer m_constantBufferData;
+    UINT8* m_pCbvDataBegin;
     ComPtr<ID3D12Resource> m_texture;
 
     // Synchronization objects

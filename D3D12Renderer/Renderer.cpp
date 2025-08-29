@@ -12,10 +12,12 @@
 std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UINT texturePixelSize);
 
 Renderer::Renderer(UINT width, UINT height, std::wstring name)
-    : m_width(width), m_height(height), m_title(name), m_rtvDescriptorSize(0) {
+    : m_width(width), m_height(height), m_title(name), m_rtvDescriptorSize(0), m_srvCbvDescriptorSize(0), m_frameIndex(0) {
     m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
     m_viewport = { 0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height) };
     m_scissorRect = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
+    m_constantBufferData = {};
+    m_pCbvDataBegin = nullptr;
 }
 
 Renderer::~Renderer() {
@@ -28,7 +30,15 @@ void Renderer::OnInit() {
 }
 
 void Renderer::OnUpdate() {
+    const float translationSpeed = 0.005f;
+    const float offsetBounds = 1.25f;
 
+    m_constantBufferData.offset.x += translationSpeed;
+    if (m_constantBufferData.offset.x > offsetBounds)
+    {
+        m_constantBufferData.offset.x = -offsetBounds;
+    }
+    memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
 }
 
 // Render the scene.
@@ -208,15 +218,16 @@ void Renderer::LoadPipeline()
         rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
 
-        // Describe and create a shader resource view (SRV) descriptor heap
-        // for texture
+        m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+        // Describe and create a descriptor heap that contains shader resource view (SRV) and constant buffer view (CBV)
         D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-        srvHeapDesc.NumDescriptors = 1;
+        srvHeapDesc.NumDescriptors = 2;
         srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        ThrowIfFailed(m_device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvHeap)));
+        ThrowIfFailed(m_device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvCbvHeap)));
 
-        m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+        m_srvCbvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
     // Create frame resources
@@ -264,7 +275,8 @@ void Renderer::LoadAssets()
             featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
         }
 
-        D3D12_DESCRIPTOR_RANGE1 ranges[1];
+        // idx 0 for SRV, 1 for CBV
+        D3D12_DESCRIPTOR_RANGE1 ranges[2];
         ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
         ranges[0].NumDescriptors = 1;
         ranges[0].BaseShaderRegister = 0;
@@ -272,10 +284,22 @@ void Renderer::LoadAssets()
         ranges[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
         ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-        D3D12_ROOT_PARAMETER1 rootParameters[1];
+        ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+        ranges[1].NumDescriptors = 1;
+        ranges[1].BaseShaderRegister = 0;
+        ranges[1].RegisterSpace = 0;
+        ranges[1].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+        ranges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+        // idx 0 for SRV, 1 for CBV
+        D3D12_ROOT_PARAMETER1 rootParameters[2];
         rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         rootParameters[0].DescriptorTable = { 1, &ranges[0] };
         rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        rootParameters[1].DescriptorTable = { 1, &ranges[1] };
+        rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
         D3D12_STATIC_SAMPLER_DESC sampler = {};
         sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
@@ -294,7 +318,7 @@ void Renderer::LoadAssets()
 
         // Downgraded objects must not be destroyed until CreateRootSignature
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-        D3D12_ROOT_PARAMETER downgradedRootParameters[1];
+        D3D12_ROOT_PARAMETER downgradedRootParameters[_countof(rootParameters)];
         std::vector<D3D12_DESCRIPTOR_RANGE> convertedRanges;
         if (featureData.HighestVersion == D3D_ROOT_SIGNATURE_VERSION_1_1) {
             rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -550,7 +574,6 @@ void Renderer::LoadAssets()
         D3D12_RANGE readRange = { 0, 0 };   // do not read from CPU. only write
         UINT8* pData;
         ThrowIfFailed(textureUploadHeap->Map(0, &readRange, reinterpret_cast<void**>(&pData)));
-        //memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
 
         // Assume that NumSubResources is 1
         // Data need for memcpy
@@ -603,10 +626,55 @@ void Renderer::LoadAssets()
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         srvDesc.Texture2D.MipLevels = 1;
-        m_device->CreateShaderResourceView(m_texture.Get(), &srvDesc, m_srvHeap->GetCPUDescriptorHandleForHeapStart());
+        m_device->CreateShaderResourceView(m_texture.Get(), &srvDesc, m_srvCbvHeap->GetCPUDescriptorHandleForHeapStart());
     }
 
     ThrowIfFailed(m_commandList->Close());
+
+    // Create the constant buffer
+    {
+        D3D12_HEAP_PROPERTIES heapProperties = {};
+        heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProperties.CreationNodeMask = 1;
+        heapProperties.VisibleNodeMask = 1;
+
+        D3D12_RESOURCE_DESC resourceDesc = {};
+        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        resourceDesc.Alignment = 0;
+        resourceDesc.Width = sizeof(SceneConstantBuffer);
+        resourceDesc.Height = 1;
+        resourceDesc.DepthOrArraySize = 1;
+        resourceDesc.MipLevels = 1;
+        resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+        resourceDesc.SampleDesc = { 1, 0 };
+        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        ThrowIfFailed(m_device->CreateCommittedResource(
+            &heapProperties,
+            D3D12_HEAP_FLAG_NONE,
+            &resourceDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_constantBuffer)));
+
+        // Create constant buffer view
+        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+        cbvDesc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress();
+        cbvDesc.SizeInBytes = sizeof(SceneConstantBuffer);
+        D3D12_CPU_DESCRIPTOR_HANDLE start = m_srvCbvHeap->GetCPUDescriptorHandleForHeapStart();
+        D3D12_CPU_DESCRIPTOR_HANDLE next = {};
+        next.ptr = SIZE_T(INT64(start.ptr) + UINT64(m_srvCbvDescriptorSize));
+        m_device->CreateConstantBufferView(&cbvDesc, next);
+
+        // Do not unmap this until app close
+        D3D12_RANGE readRange = { 0, 0 };
+        ThrowIfFailed(m_constantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin)));
+        memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+    }
+
     ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
@@ -644,10 +712,13 @@ void Renderer::PopulateCommandList()
     // Set necessary state.
     m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 
-    ID3D12DescriptorHeap* ppHeaps[] = { m_srvHeap.Get() };
+    ID3D12DescriptorHeap* ppHeaps[] = { m_srvCbvHeap.Get() };
     m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-
-    m_commandList->SetGraphicsRootDescriptorTable(0, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+    
+    D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_srvCbvHeap->GetGPUDescriptorHandleForHeapStart();
+    m_commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
+    gpuHandle.ptr += UINT64(m_srvCbvDescriptorSize);
+    m_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
 
     m_commandList->RSSetViewports(1, &m_viewport);
     m_commandList->RSSetScissorRects(1, &m_scissorRect);

@@ -49,7 +49,7 @@ int Win32Application::Run(Renderer* renderer, HINSTANCE hInstance, int nCmdShow)
             DispatchMessage(&msg);
         }
         else {
-            //renderer->OnUpdate();
+            renderer->OnUpdate();
             renderer->OnRender();
         }
     }
