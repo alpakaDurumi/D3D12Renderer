@@ -65,7 +65,7 @@ private:
     ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12Device> m_device;
     ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
-    ComPtr<ID3D12CommandAllocator> m_commandAllocator;
+    ComPtr<ID3D12CommandAllocator> m_commandAllocators[FrameCount];
     ComPtr<ID3D12CommandAllocator> m_bundleAllocator;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12RootSignature> m_rootSignature;
@@ -89,12 +89,13 @@ private:
     UINT m_frameIndex;
     HANDLE m_fenceEvent;
     ComPtr<ID3D12Fence> m_fence;
-    UINT64 m_fenceValue;
+    UINT64 m_fenceValues[FrameCount];
 
     void LoadPipeline();
     void LoadAssets();
     void PopulateCommandList();
-    void WaitForPreviousFrame();
+    void WaitForGPU();
+    void MoveToNextFrame();
 
     void DowngradeRootParameters(D3D12_ROOT_PARAMETER1* src, UINT numParameters, D3D12_ROOT_PARAMETER* dst,
         std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges, UINT& offset);
