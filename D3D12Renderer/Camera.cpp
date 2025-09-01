@@ -1,6 +1,7 @@
 #include "Camera.h"
 
-Camera::Camera(float aspectRatio, XMFLOAT3 initialPosition) {
+Camera::Camera(float aspectRatio, XMFLOAT3 initialPosition)
+{
     m_position = initialPosition;
     m_orientation = { 0.0f, 0.0f, 1.0f };
     m_up = { 0.0f, 1.0f, 0.0f };
@@ -14,16 +15,42 @@ Camera::Camera(float aspectRatio, XMFLOAT3 initialPosition) {
     m_farPlane = 100.0f;
 }
 
-XMMATRIX Camera::GetViewMatrix() {
+XMMATRIX Camera::GetViewMatrix()
+{
     return XMMatrixLookToLH(XMLoadFloat3(&m_position), XMLoadFloat3(&m_orientation), XMLoadFloat3(&m_up));
 }
 
-XMMATRIX Camera::GetProjectionMatrix(bool usePerspectiveProjection) {
+XMMATRIX Camera::GetProjectionMatrix(bool usePerspectiveProjection)
+{
     return usePerspectiveProjection ?
         XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fov), m_aspectRatio, m_nearPlane, m_farPlane) :
         XMMatrixOrthographicLH(2 * m_aspectRatio, 2.0f, m_nearPlane, m_farPlane);
 }
 
-void Camera::SetAspectRatio(float aspectRatio) {
+void Camera::SetAspectRatio(float aspectRatio)
+{
     m_aspectRatio = aspectRatio;
+}
+
+void Camera::MoveForward(float speedScale)
+{
+    XMVECTOR position = XMLoadFloat3(&m_position);
+    XMVECTOR orientation = XMLoadFloat3(&m_orientation);
+
+    XMVECTOR nextPosition = position + orientation * speedScale;
+
+    XMStoreFloat3(&m_position, nextPosition);
+}
+
+void Camera::MoveRight(float speedScale)
+{
+    XMVECTOR position = XMLoadFloat3(&m_position);
+    XMVECTOR orientation = XMLoadFloat3(&m_orientation);
+    XMVECTOR up = XMLoadFloat3(&m_up);
+
+    XMVECTOR right = XMVector3Normalize(XMVector3Cross(up, orientation));
+
+    XMVECTOR nextPosition = position + right * speedScale;
+
+    XMStoreFloat3(&m_position, nextPosition);
 }

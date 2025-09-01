@@ -10,6 +10,8 @@ public:
     XMMATRIX GetViewMatrix();
     XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection);
     void SetAspectRatio(float aspectRatio);
+    void MoveForward(float speedScale);
+    void MoveRight(float speedScale);
 
 private:
     XMFLOAT3 m_position;

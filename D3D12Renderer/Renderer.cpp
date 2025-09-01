@@ -41,6 +41,11 @@ void Renderer::OnUpdate()
     //}
     //memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
 
+    if (m_inputManager.isKeyDown('W')) m_camera.MoveForward(0.01f);
+    if (m_inputManager.isKeyDown('A')) m_camera.MoveRight(-0.01f);
+    if (m_inputManager.isKeyDown('S')) m_camera.MoveForward(-0.01f);
+    if (m_inputManager.isKeyDown('D')) m_camera.MoveRight(0.01f);
+
     XMMATRIX world = XMMatrixRotationY(XMConvertToRadians(25.0f)) * XMMatrixRotationX(XMConvertToRadians(-25.0f));
 
     XMStoreFloat4x4(&m_constantBufferData.world, XMMatrixTranspose(world));
@@ -911,26 +916,26 @@ void Renderer::DowngradeRootParameters(D3D12_ROOT_PARAMETER1* src, UINT numParam
         const D3D12_ROOT_PARAMETER_TYPE& type = src[i].ParameterType;
         switch (type)
         {
-            case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
-            {
-                const UINT NumDescriptorRanges = src[i].DescriptorTable.NumDescriptorRanges;
-                DowngradeDescriptorRanges(src[i].DescriptorTable.pDescriptorRanges, NumDescriptorRanges, convertedRanges);
-                dst[i].DescriptorTable = { NumDescriptorRanges, convertedRanges.data() + offset };
-                offset += NumDescriptorRanges;
-                break;
-            }
-            case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
-            {
-                dst[i].Constants = src[i].Constants;
-                break;
-            }
-            case D3D12_ROOT_PARAMETER_TYPE_CBV:
-            case D3D12_ROOT_PARAMETER_TYPE_SRV:
-            case D3D12_ROOT_PARAMETER_TYPE_UAV:
-            {
-                DowngradeRootDescriptor(&src[i].Descriptor, &dst[i].Descriptor);
-                break;
-            }
+        case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
+        {
+            const UINT NumDescriptorRanges = src[i].DescriptorTable.NumDescriptorRanges;
+            DowngradeDescriptorRanges(src[i].DescriptorTable.pDescriptorRanges, NumDescriptorRanges, convertedRanges);
+            dst[i].DescriptorTable = { NumDescriptorRanges, convertedRanges.data() + offset };
+            offset += NumDescriptorRanges;
+            break;
+        }
+        case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
+        {
+            dst[i].Constants = src[i].Constants;
+            break;
+        }
+        case D3D12_ROOT_PARAMETER_TYPE_CBV:
+        case D3D12_ROOT_PARAMETER_TYPE_SRV:
+        case D3D12_ROOT_PARAMETER_TYPE_UAV:
+        {
+            DowngradeRootDescriptor(&src[i].Descriptor, &dst[i].Descriptor);
+            break;
+        }
         }
 
         dst[i].ShaderVisibility = src[i].ShaderVisibility;

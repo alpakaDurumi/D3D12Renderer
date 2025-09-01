@@ -14,6 +14,11 @@ public:
         if (key < 256) m_keyStates[key] = false;
     }
 
+    bool isKeyDown(WPARAM key) const
+    {
+        return m_keyStates[key];
+    }
+
 private:
     bool m_keyStates[256] = { false };
 };
