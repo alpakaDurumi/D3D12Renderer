@@ -6,7 +6,10 @@ using namespace DirectX;
 
 class Camera {
 public:
-    Camera(XMFLOAT3 initialPosition = { 0.0f, 0.0f, 0.0f });
+    Camera(float aspectRatio, XMFLOAT3 initialPosition = { 0.0f, 0.0f, 0.0f });
+    XMMATRIX GetViewMatrix();
+    XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection);
+    void SetAspectRatio(float aspectRatio);
 
 private:
     XMFLOAT3 m_position;
@@ -15,4 +18,9 @@ private:
 
     float m_yaw;
     float m_pitch;
+
+    float m_fov;
+    float m_aspectRatio;
+    float m_nearPlane;
+    float m_farPlane;
 };
