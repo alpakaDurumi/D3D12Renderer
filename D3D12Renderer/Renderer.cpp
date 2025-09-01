@@ -10,32 +10,43 @@
 std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UINT texturePixelSize);
 
 Renderer::Renderer(UINT width, UINT height, std::wstring name)
-    : m_width(width), m_height(height), m_title(name), m_rtvDescriptorSize(0), m_srvCbvDescriptorSize(0), m_frameIndex(0), m_fenceValues{ 0 } {
-    m_aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+    : m_width(width), m_height(height), m_title(name), m_rtvDescriptorSize(0), m_srvCbvDescriptorSize(0), m_frameIndex(0), m_fenceValues{ 0 },
+    m_camera(static_cast<float>(width) / static_cast<float>(height), { 0.0f, 0.0f, -5.0f })
+{
     m_viewport = { 0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height) };
     m_scissorRect = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
     m_constantBufferData = {};
     m_pCbvDataBegin = nullptr;
 }
 
-Renderer::~Renderer() {
-
+Renderer::~Renderer()
+{
 }
 
-void Renderer::OnInit() {
+void Renderer::OnInit()
+{
     LoadPipeline();
     LoadAssets();
 }
 
-void Renderer::OnUpdate() {
-    const float translationSpeed = 0.005f;
-    const float offsetBounds = 1.25f;
+void Renderer::OnUpdate()
+{
+    //const float translationSpeed = 0.005f;
+    //const float offsetBounds = 1.25f;
 
-    m_constantBufferData.offset.x += translationSpeed;
-    if (m_constantBufferData.offset.x > offsetBounds)
-    {
-        m_constantBufferData.offset.x = -offsetBounds;
-    }
+    //m_constantBufferData.offset.x += translationSpeed;
+    //if (m_constantBufferData.offset.x > offsetBounds)
+    //{
+    //    m_constantBufferData.offset.x = -offsetBounds;
+    //}
+    //memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+
+    XMMATRIX world = XMMatrixRotationY(XMConvertToRadians(25.0f)) * XMMatrixRotationX(XMConvertToRadians(-25.0f));
+
+    XMStoreFloat4x4(&m_constantBufferData.world, XMMatrixTranspose(world));
+    XMStoreFloat4x4(&m_constantBufferData.view, XMMatrixTranspose(m_camera.GetViewMatrix()));
+    XMStoreFloat4x4(&m_constantBufferData.projection, XMMatrixTranspose(m_camera.GetProjectionMatrix(true)));
+
     memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
 }
 
@@ -268,7 +279,8 @@ void Renderer::LoadAssets()
         // Use D3D_ROOT_SIGNATURE_VERSION_1_1 if current environment supports it
         D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
         featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-        if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData)))) {
+        if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+        {
             featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
         }
 
@@ -317,7 +329,8 @@ void Renderer::LoadAssets()
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
         D3D12_ROOT_PARAMETER downgradedRootParameters[_countof(rootParameters)];
         std::vector<D3D12_DESCRIPTOR_RANGE> convertedRanges;
-        if (featureData.HighestVersion == D3D_ROOT_SIGNATURE_VERSION_1_1) {
+        if (featureData.HighestVersion == D3D_ROOT_SIGNATURE_VERSION_1_1)
+        {
             rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
             rootSignatureDesc.Desc_1_1.NumParameters = _countof(rootParameters);
             rootSignatureDesc.Desc_1_1.pParameters = rootParameters;
@@ -325,7 +338,8 @@ void Renderer::LoadAssets()
             rootSignatureDesc.Desc_1_1.pStaticSamplers = &sampler;
             rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
         }
-        else {
+        else
+        {
             UINT offset = 0;
             DowngradeRootParameters(rootParameters, _countof(rootParameters), downgradedRootParameters, convertedRanges, offset);
 
@@ -364,7 +378,6 @@ void Renderer::LoadAssets()
         D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
         {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            //{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
         };
 
@@ -421,14 +434,54 @@ void Renderer::LoadAssets()
     // Create the vertex buffer.
     {
         // Define the geometry for a triangle.
-        Vertex triangleVertices[] =
+        //Vertex triangleVertices[] =
+        //{
+        //    { { 0.0f, 0.25f * m_aspectRatio, 0.0f }, { 0.5f, 0.0f } },
+        //    { { 0.25f, -0.25f * m_aspectRatio, 0.0f }, { 1.0f, 1.0f } },
+        //    { { -0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 1.0f } }
+        //};
+
+        Vertex cubeVertices[] =
         {
-            { { 0.0f, 0.25f * m_aspectRatio, 0.0f }, { 0.5f, 0.0f } },
-            { { 0.25f, -0.25f * m_aspectRatio, 0.0f }, { 1.0f, 1.0f } },
-            { { -0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 1.0f } }
+            // upper
+            {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f} },
+            {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f} },
+            {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f} },
+            {{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f} },
+
+            // lower
+            {{-1.0f, -1.0f, 1.0f}, {0.0f, 1.0f} },
+            {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f} },
+            {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f} },
+            {{1.0f, -1.0f, 1.0f}, {1.0f, 1.0f} },
+
+            // left
+            {{-1.0f, -1.0f, 1.0f}, {0.0f, 1.0f} },
+            {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f} },
+            {{-1.0f, 1.0f, -1.0f}, {1.0f, 0.0f} },
+            {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f} },
+
+            // right
+            {{1.0f, -1.0f, -1.0f}, {0.0f, 1.0f} },
+            {{1.0f, 1.0f, -1.0f}, {0.0f, 0.0f} },
+            {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f} },
+            {{1.0f, -1.0f, 1.0f}, {1.0f, 1.0f} },
+
+            // front
+            {{-1.0f, -1.0f, -1.0f}, {0.0f, 1.0f} },
+            {{-1.0f, 1.0f, -1.0f}, {0.0f, 0.0f} },
+            {{1.0f, 1.0f, -1.0f}, {1.0f, 0.0f} },
+            {{1.0f, -1.0f, -1.0f}, {1.0f, 1.0f} },
+
+            // back
+            {{1.0f, -1.0f, 1.0f}, {0.0f, 1.0f} },
+            {{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f} },
+            {{-1.0f, 1.0f, 1.0f}, {1.0f, 0.0f} },
+            {{-1.0f, -1.0f, 1.0f}, {1.0f, 1.0f} }
         };
 
-        const UINT vertexBufferSize = sizeof(triangleVertices);
+        //const UINT vertexBufferSize = sizeof(triangleVertices);
+        const UINT vertexBufferSize = sizeof(cubeVertices);
 
         // Note: using upload heaps to transfer static data like vert buffers is not 
         // recommended. Every time the GPU needs it, the upload heap will be marshalled 
@@ -466,13 +519,65 @@ void Renderer::LoadAssets()
         UINT8* pVertexDataBegin;
         D3D12_RANGE readRange = { 0, 0 };       // We do not intend to read from this resource on the CPU.
         ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
-        memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
+        memcpy(pVertexDataBegin, cubeVertices, sizeof(cubeVertices));
         m_vertexBuffer->Unmap(0, nullptr);
 
         // Initialize the vertex buffer view.
         m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
         m_vertexBufferView.StrideInBytes = sizeof(Vertex);
         m_vertexBufferView.SizeInBytes = vertexBufferSize;
+    }
+
+    // Create the index buffer
+    {
+        UINT32 cubeIndices[] =
+        {
+            0, 1, 2, 0, 2, 3,
+            4, 5, 6, 4, 6, 7,
+            8, 9, 10, 8, 10, 11,
+            12, 13, 14, 12, 14, 15,
+            16, 17, 18, 16, 18, 19,
+            20, 21, 22, 20, 22, 23
+        };
+
+        const UINT indexBufferSize = sizeof(cubeIndices);
+
+        D3D12_HEAP_PROPERTIES heapProperties = {};
+        heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProperties.CreationNodeMask = 1;
+        heapProperties.VisibleNodeMask = 1;
+
+        D3D12_RESOURCE_DESC resourceDesc = {};
+        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        resourceDesc.Alignment = 0;
+        resourceDesc.Width = indexBufferSize;
+        resourceDesc.Height = 1;
+        resourceDesc.DepthOrArraySize = 1;
+        resourceDesc.MipLevels = 1;
+        resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+        resourceDesc.SampleDesc = { 1, 0 };
+        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        ThrowIfFailed(m_device->CreateCommittedResource(
+            &heapProperties,
+            D3D12_HEAP_FLAG_NONE,
+            &resourceDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&m_indexBuffer)));
+
+        UINT8* pIndexDataBegin;
+        D3D12_RANGE readRange = { 0, 0 };
+        ThrowIfFailed(m_indexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pIndexDataBegin)));
+        memcpy(pIndexDataBegin, cubeIndices, sizeof(cubeIndices));
+        m_indexBuffer->Unmap(0, nullptr);
+
+        m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+        m_indexBufferView.SizeInBytes = indexBufferSize;
+        m_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
     }
 
     // Create and record the bundle
@@ -741,7 +846,11 @@ void Renderer::PopulateCommandList()
     m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
     // Execute the commands stored in the bundle
-    m_commandList->ExecuteBundle(m_bundle.Get());
+    //m_commandList->ExecuteBundle(m_bundle.Get());
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+    m_commandList->IASetIndexBuffer(&m_indexBufferView);
+    m_commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
 
     // Indicate that the back buffer will now be used to present.
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
@@ -752,7 +861,8 @@ void Renderer::PopulateCommandList()
 }
 
 // Wait for pending GPU work to complete
-void Renderer::WaitForGPU() {
+void Renderer::WaitForGPU()
+{
     ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), m_fenceValues[m_frameIndex]));
 
     ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValues[m_frameIndex], m_fenceEvent));
@@ -761,7 +871,8 @@ void Renderer::WaitForGPU() {
     m_fenceValues[m_frameIndex]++;
 }
 
-void Renderer::MoveToNextFrame() {
+void Renderer::MoveToNextFrame()
+{
     // 이전 프레임에 대한 fence 값
     const UINT64 currentFenceValue = m_fenceValues[m_frameIndex];
     ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), currentFenceValue));
@@ -770,48 +881,57 @@ void Renderer::MoveToNextFrame() {
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
     // 현재 프레임에 대한 GPU 작업이 끝나 있는지, 즉 작업할 준비가 되어있는지 검사
-    if (m_fence->GetCompletedValue() < m_fenceValues[m_frameIndex]) {
+    if (m_fence->GetCompletedValue() < m_fenceValues[m_frameIndex])
+    {
         ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValues[m_frameIndex], m_fenceEvent));
         WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
     }
-    
+
     // 현재 프레임에 대한 목표 fence 값 증가
     m_fenceValues[m_frameIndex] = currentFenceValue + 1;
 }
 
 void Renderer::DowngradeRootParameters(D3D12_ROOT_PARAMETER1* src, UINT numParameters, D3D12_ROOT_PARAMETER* dst,
-    std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges, UINT& offset) {
-    for (UINT i = 0; i < numParameters; i++) {
+    std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges, UINT& offset)
+{
+    for (UINT i = 0; i < numParameters; i++)
+    {
         dst[i].ParameterType = src[i].ParameterType;
 
         const D3D12_ROOT_PARAMETER_TYPE& type = src[i].ParameterType;
-        switch (type) {
-        case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE: {
-            const UINT NumDescriptorRanges = src[i].DescriptorTable.NumDescriptorRanges;
-            DowngradeDescriptorRanges(src[i].DescriptorTable.pDescriptorRanges, NumDescriptorRanges, convertedRanges);
-            dst[i].DescriptorTable = { NumDescriptorRanges, convertedRanges.data() + offset };
-            offset += NumDescriptorRanges;
-            break;
-        }
-        case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS: {
-            dst[i].Constants = src[i].Constants;
-            break;
-        }
-        case D3D12_ROOT_PARAMETER_TYPE_CBV:
-        case D3D12_ROOT_PARAMETER_TYPE_SRV:
-        case D3D12_ROOT_PARAMETER_TYPE_UAV: {
-            DowngradeRootDescriptor(&src[i].Descriptor, &dst[i].Descriptor);
-            break;
-        }
+        switch (type)
+        {
+            case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
+            {
+                const UINT NumDescriptorRanges = src[i].DescriptorTable.NumDescriptorRanges;
+                DowngradeDescriptorRanges(src[i].DescriptorTable.pDescriptorRanges, NumDescriptorRanges, convertedRanges);
+                dst[i].DescriptorTable = { NumDescriptorRanges, convertedRanges.data() + offset };
+                offset += NumDescriptorRanges;
+                break;
+            }
+            case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
+            {
+                dst[i].Constants = src[i].Constants;
+                break;
+            }
+            case D3D12_ROOT_PARAMETER_TYPE_CBV:
+            case D3D12_ROOT_PARAMETER_TYPE_SRV:
+            case D3D12_ROOT_PARAMETER_TYPE_UAV:
+            {
+                DowngradeRootDescriptor(&src[i].Descriptor, &dst[i].Descriptor);
+                break;
+            }
         }
 
         dst[i].ShaderVisibility = src[i].ShaderVisibility;
     }
 }
 void Renderer::DowngradeDescriptorRanges(const D3D12_DESCRIPTOR_RANGE1* src, UINT NumDescriptorRanges,
-    std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges) {
+    std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges)
+{
     D3D12_DESCRIPTOR_RANGE tempRange = {};
-    for (UINT i = 0; i < NumDescriptorRanges; i++) {
+    for (UINT i = 0; i < NumDescriptorRanges; i++)
+    {
         tempRange.RangeType = src[i].RangeType;
         tempRange.NumDescriptors = src[i].NumDescriptors;
         tempRange.BaseShaderRegister = src[i].BaseShaderRegister;
@@ -821,7 +941,8 @@ void Renderer::DowngradeDescriptorRanges(const D3D12_DESCRIPTOR_RANGE1* src, UIN
     }
 }
 
-void Renderer::DowngradeRootDescriptor(D3D12_ROOT_DESCRIPTOR1* src, D3D12_ROOT_DESCRIPTOR* dst) {
+void Renderer::DowngradeRootDescriptor(D3D12_ROOT_DESCRIPTOR1* src, D3D12_ROOT_DESCRIPTOR* dst)
+{
     dst->ShaderRegister = src->ShaderRegister;
     dst->RegisterSpace = src->RegisterSpace;
 }

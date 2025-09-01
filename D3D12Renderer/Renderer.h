@@ -7,6 +7,7 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>    // DXGI 1.6
 #include <vector>
+#include "Camera.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -33,7 +34,6 @@ private:
 
     UINT m_width;
     UINT m_height;
-    float m_aspectRatio;
 
     std::wstring m_title;
 
@@ -45,14 +45,15 @@ private:
     struct Vertex
     {
         XMFLOAT3 position;
-        //XMFLOAT4 color;
-        XMFLOAT2 uv;
+        XMFLOAT2 texCoord;
     };
 
     struct SceneConstantBuffer
     {
-        XMFLOAT4 offset;
-        float padding[60];  // padding for 256-bytes alignment
+        XMFLOAT4X4 world;
+        XMFLOAT4X4 view;
+        XMFLOAT4X4 projection;
+        float padding[16];
     };
     static_assert((sizeof(SceneConstantBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
@@ -80,10 +81,13 @@ private:
     // App resources
     ComPtr<ID3D12Resource> m_vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+    ComPtr<ID3D12Resource> m_indexBuffer;
+    D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
     ComPtr<ID3D12Resource> m_constantBuffer;
     SceneConstantBuffer m_constantBufferData;
     UINT8* m_pCbvDataBegin;
     ComPtr<ID3D12Resource> m_texture;
+    Camera m_camera;
 
     // Synchronization objects
     UINT m_frameIndex;
