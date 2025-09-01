@@ -8,11 +8,13 @@
 #include <dxgi1_6.h>    // DXGI 1.6
 #include <vector>
 #include "Camera.h"
+#include "InputManager.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
-class Renderer {
+class Renderer
+{
 public:
     Renderer(UINT width, UINT height, std::wstring name);
     ~Renderer();
@@ -25,6 +27,8 @@ public:
     void OnUpdate();
     void OnRender();
     void OnDestroy();
+    void OnKeyDown(WPARAM key);
+    void OnKeyUp(WPARAM key);
 
 private:
     void GetHardwareAdapter(
@@ -88,6 +92,7 @@ private:
     UINT8* m_pCbvDataBegin;
     ComPtr<ID3D12Resource> m_texture;
     Camera m_camera;
+    InputManager m_inputManager;
 
     // Synchronization objects
     UINT m_frameIndex;

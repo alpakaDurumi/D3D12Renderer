@@ -138,6 +138,7 @@
   <ItemGroup>
     <ClInclude Include="Camera.h" />
     <ClInclude Include="D3DHelper.h" />
+    <ClInclude Include="InputManager.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Win32Application.h" />

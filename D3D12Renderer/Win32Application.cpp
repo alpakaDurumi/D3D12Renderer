@@ -1,6 +1,7 @@
 #include "Win32Application.h"
 
-int Win32Application::Run(Renderer* renderer, HINSTANCE hInstance, int nCmdShow) {
+int Win32Application::Run(Renderer* renderer, HINSTANCE hInstance, int nCmdShow)
+{
     // Register the window class
     WNDCLASSEX windowClass = { 0 };
     windowClass.cbSize = sizeof(WNDCLASSEX);
@@ -9,7 +10,8 @@ int Win32Application::Run(Renderer* renderer, HINSTANCE hInstance, int nCmdShow)
     windowClass.hInstance = hInstance;
     windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
     windowClass.lpszClassName = L"DefaultWindowClass";
-    if (RegisterClassEx(&windowClass) == 0) {
+    if (RegisterClassEx(&windowClass) == 0)
+    {
         MessageBox(nullptr, L"Window Class Registration Failed!", L"Error", MB_OK | MB_ICONERROR);
         return 1;
     }
@@ -30,15 +32,16 @@ int Win32Application::Run(Renderer* renderer, HINSTANCE hInstance, int nCmdShow)
         nullptr,        // We aren't using menus.
         hInstance,
         renderer);
-    if (m_hwnd == 0) {
+    if (m_hwnd == 0)
+    {
         MessageBox(nullptr, L"Window Creation Failed!", L"Error", MB_OK | MB_ICONERROR);
         return 1;
     }
 
     renderer->OnInit();
-    
+
     ShowWindow(m_hwnd, nCmdShow);
-    
+
     // main loop
     MSG msg = {};
     while (msg.message != WM_QUIT)
@@ -48,7 +51,8 @@ int Win32Application::Run(Renderer* renderer, HINSTANCE hInstance, int nCmdShow)
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
-        else {
+        else
+        {
             renderer->OnUpdate();
             renderer->OnRender();
         }
@@ -60,7 +64,8 @@ int Win32Application::Run(Renderer* renderer, HINSTANCE hInstance, int nCmdShow)
     return static_cast<int>(msg.wParam);
 }
 
-LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
     Renderer* renderer = reinterpret_cast<Renderer*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 
     switch (message)
@@ -72,6 +77,18 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
         SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
     }
     return 0;
+    case WM_KEYDOWN:
+        if (renderer)
+        {
+            renderer->OnKeyDown(wParam);
+        }
+        return 0;
+    case WM_KEYUP:
+        if (renderer)
+        {
+            renderer->OnKeyUp(wParam);
+        }
+        return 0;
     case WM_SIZE:
     {
         // resize

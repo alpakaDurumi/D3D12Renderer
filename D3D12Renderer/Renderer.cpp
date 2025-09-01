@@ -75,6 +75,16 @@ void Renderer::OnDestroy()
     CloseHandle(m_fenceEvent);
 }
 
+void Renderer::OnKeyDown(WPARAM key)
+{
+    m_inputManager.SetKeyDown(key);
+}
+
+void Renderer::OnKeyUp(WPARAM key)
+{
+    m_inputManager.SetKeyUp(key);
+}
+
 // Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
 // If no such adapter can be found, *ppAdapter will be set to nullptr.
 void Renderer::GetHardwareAdapter(
