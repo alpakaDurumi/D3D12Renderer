@@ -9,6 +9,7 @@
 #include <vector>
 #include "Camera.h"
 #include "InputManager.h"
+#include "Mesh.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -43,24 +44,6 @@ private:
     std::wstring m_title;
 
     static const UINT FrameCount = 2;
-    static const UINT TextureWidth = 256;
-    static const UINT TextureHeight = 256;
-    static const UINT TexturePixelSize = 4;    // The number of bytes used to represent a pixel in the texture.
-
-    struct Vertex
-    {
-        XMFLOAT3 position;
-        XMFLOAT2 texCoord;
-    };
-
-    struct SceneConstantBuffer
-    {
-        XMFLOAT4X4 world;
-        XMFLOAT4X4 view;
-        XMFLOAT4X4 projection;
-        float padding[16];
-    };
-    static_assert((sizeof(SceneConstantBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
     // Adapter info
     bool m_useWarpDevice = false;
@@ -76,7 +59,7 @@ private:
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12RootSignature> m_rootSignature;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-    ComPtr<ID3D12DescriptorHeap> m_srvCbvHeap;
+    ComPtr<ID3D12DescriptorHeap> m_cbvSrvUavHeap;
     ComPtr<ID3D12PipelineState> m_pipelineState;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     ComPtr<ID3D12GraphicsCommandList> m_bundle;
@@ -84,16 +67,9 @@ private:
     UINT m_srvCbvDescriptorSize;
 
     // App resources
-    ComPtr<ID3D12Resource> m_vertexBuffer;
-    D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
-    ComPtr<ID3D12Resource> m_indexBuffer;
-    D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
-    ComPtr<ID3D12Resource> m_constantBuffer;
-    SceneConstantBuffer m_constantBufferData;
-    UINT8* m_pCbvDataBegin;
-    ComPtr<ID3D12Resource> m_texture;
     Camera m_camera;
     InputManager m_inputManager;
+    std::vector<Mesh> m_meshes;
 
     // Synchronization objects
     UINT m_frameIndex;
