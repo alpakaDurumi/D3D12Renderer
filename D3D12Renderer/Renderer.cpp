@@ -45,6 +45,8 @@ void Renderer::OnUpdate()
     if (m_inputManager.isKeyDown('A')) m_camera.MoveRight(-0.01f);
     if (m_inputManager.isKeyDown('S')) m_camera.MoveForward(-0.01f);
     if (m_inputManager.isKeyDown('D')) m_camera.MoveRight(0.01f);
+    if (m_inputManager.isKeyDown('Q')) m_camera.MoveUp(-0.01f);
+    if (m_inputManager.isKeyDown('E')) m_camera.MoveUp(0.01f);
 
     XMMATRIX world = XMMatrixRotationY(XMConvertToRadians(25.0f)) * XMMatrixRotationX(XMConvertToRadians(-25.0f));
 

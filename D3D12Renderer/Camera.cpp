@@ -54,3 +54,13 @@ void Camera::MoveRight(float speedScale)
 
     XMStoreFloat3(&m_position, nextPosition);
 }
+
+void Camera::MoveUp(float speedScale)
+{
+    XMVECTOR position = XMLoadFloat3(&m_position);
+    XMVECTOR up = XMLoadFloat3(&m_up);
+
+    XMVECTOR nextPosition = position + up * speedScale;
+
+    XMStoreFloat3(&m_position, nextPosition);
+}

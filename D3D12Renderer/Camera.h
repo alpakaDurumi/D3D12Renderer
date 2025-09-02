@@ -12,6 +12,7 @@ public:
     void SetAspectRatio(float aspectRatio);
     void MoveForward(float speedScale);
     void MoveRight(float speedScale);
+    void MoveUp(float speedScale);
 
 private:
     XMFLOAT3 m_position;
