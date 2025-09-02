@@ -48,6 +48,9 @@ void Renderer::OnUpdate()
     if (m_inputManager.isKeyDown('Q')) m_camera.MoveUp(-0.01f);
     if (m_inputManager.isKeyDown('E')) m_camera.MoveUp(0.01f);
 
+    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
+    m_camera.Rotate(mouseMove);
+
     XMMATRIX world = XMMatrixRotationY(XMConvertToRadians(25.0f)) * XMMatrixRotationX(XMConvertToRadians(-25.0f));
 
     XMStoreFloat4x4(&m_constantBufferData.world, XMMatrixTranspose(world));
@@ -90,6 +93,11 @@ void Renderer::OnKeyDown(WPARAM key)
 void Renderer::OnKeyUp(WPARAM key)
 {
     m_inputManager.SetKeyUp(key);
+}
+
+void Renderer::OnMouseMove(int xPos, int yPos)
+{
+    m_inputManager.CalcMouseMove(xPos, yPos);
 }
 
 // Helper function for acquiring the first available hardware adapter that supports Direct3D 12.

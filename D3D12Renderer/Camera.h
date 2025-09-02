@@ -13,6 +13,7 @@ public:
     void MoveForward(float speedScale);
     void MoveRight(float speedScale);
     void MoveUp(float speedScale);
+    void Rotate(XMINT2 mouseMove);
 
 private:
     XMFLOAT3 m_position;

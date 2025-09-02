@@ -29,6 +29,7 @@ public:
     void OnDestroy();
     void OnKeyDown(WPARAM key);
     void OnKeyUp(WPARAM key);
+    void OnMouseMove(int xPos, int yPos);
 
 private:
     void GetHardwareAdapter(
@@ -105,7 +106,7 @@ private:
     void PopulateCommandList();
     void WaitForGPU();
     void MoveToNextFrame();
-
+    
     void DowngradeRootParameters(D3D12_ROOT_PARAMETER1* src, UINT numParameters, D3D12_ROOT_PARAMETER* dst,
         std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges, UINT& offset);
     void DowngradeDescriptorRanges(const D3D12_DESCRIPTOR_RANGE1* src, UINT NumDescriptorRanges,

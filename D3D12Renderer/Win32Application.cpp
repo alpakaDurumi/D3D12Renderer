@@ -89,6 +89,14 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
             renderer->OnKeyUp(wParam);
         }
         return 0;
+    case WM_MOUSEMOVE:
+        if (renderer)
+        {
+            int xPos = LOWORD(lParam);
+            int yPos = HIWORD(lParam);
+            renderer->OnMouseMove(xPos, yPos);
+        }
+        return 0;
     case WM_SIZE:
     {
         // resize

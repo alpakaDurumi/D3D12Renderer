@@ -1,4 +1,5 @@
 #include "Camera.h"
+#include <algorithm>
 
 Camera::Camera(float aspectRatio, XMFLOAT3 initialPosition)
 {
@@ -63,4 +64,17 @@ void Camera::MoveUp(float speedScale)
     XMVECTOR nextPosition = position + up * speedScale;
 
     XMStoreFloat3(&m_position, nextPosition);
+}
+
+void Camera::Rotate(XMINT2 mouseMove)
+{
+    const float sensitivity = 0.005f;
+    
+    m_yaw += mouseMove.x * sensitivity * XM_PIDIV2;
+    m_pitch += mouseMove.y * sensitivity * XM_PIDIV2;
+
+    m_pitch = std::clamp(m_pitch, -XM_PIDIV2, XM_PIDIV2);
+
+    XMVECTOR lookDirection = XMVector3Transform(g_XMIdentityR2, XMMatrixRotationRollPitchYaw(m_pitch, m_yaw, 0.0f));
+    XMStoreFloat3(&m_orientation, lookDirection);
 }
