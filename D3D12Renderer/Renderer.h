@@ -33,11 +33,6 @@ public:
     void OnMouseMove(int xPos, int yPos);
 
 private:
-    void GetHardwareAdapter(
-        _In_ IDXGIFactory1* pFactory,
-        _Outptr_result_maybenull_ IDXGIAdapter1** ppAdapter,
-        bool requestHighPerformanceAdapter = false);
-
     UINT m_width;
     UINT m_height;
 
@@ -82,10 +77,4 @@ private:
     void PopulateCommandList();
     void WaitForGPU();
     void MoveToNextFrame();
-    
-    void DowngradeRootParameters(D3D12_ROOT_PARAMETER1* src, UINT numParameters, D3D12_ROOT_PARAMETER* dst,
-        std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges, UINT& offset);
-    void DowngradeDescriptorRanges(const D3D12_DESCRIPTOR_RANGE1* src, UINT NumDescriptorRanges,
-        std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges);
-    void DowngradeRootDescriptor(D3D12_ROOT_DESCRIPTOR1* src, D3D12_ROOT_DESCRIPTOR* dst);
 };

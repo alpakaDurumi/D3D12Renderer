@@ -7,7 +7,7 @@
 //#include <dxcapi.h>
 //#include <d3d12shader.h>
 
-std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UINT texturePixelSize);
+using namespace D3DHelper;
 
 Renderer::Renderer(UINT width, UINT height, std::wstring name)
     : m_width(width), m_height(height), m_title(name), m_rtvDescriptorSize(0), m_srvCbvDescriptorSize(0), m_frameIndex(0), m_fenceValues{ 0 },
@@ -87,73 +87,6 @@ void Renderer::OnKeyUp(WPARAM key)
 void Renderer::OnMouseMove(int xPos, int yPos)
 {
     m_inputManager.CalcMouseMove(xPos, yPos);
-}
-
-// Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
-// If no such adapter can be found, *ppAdapter will be set to nullptr.
-void Renderer::GetHardwareAdapter(
-    _In_ IDXGIFactory1* pFactory,
-    _Outptr_result_maybenull_ IDXGIAdapter1** ppAdapter,
-    bool requestHighPerformanceAdapter)
-{
-    *ppAdapter = nullptr;
-
-    ComPtr<IDXGIAdapter1> adapter;
-
-    ComPtr<IDXGIFactory6> factory6;
-    if (SUCCEEDED(pFactory->QueryInterface(IID_PPV_ARGS(&factory6))))
-    {
-        for (
-            UINT adapterIndex = 0;
-            SUCCEEDED(factory6->EnumAdapterByGpuPreference(
-                adapterIndex,
-                requestHighPerformanceAdapter == true ? DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE : DXGI_GPU_PREFERENCE_UNSPECIFIED,
-                IID_PPV_ARGS(&adapter)));
-                ++adapterIndex)
-        {
-            DXGI_ADAPTER_DESC1 desc;
-            adapter->GetDesc1(&desc);
-
-            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-            {
-                // Don't select the Basic Render Driver adapter.
-                // If you want a software adapter, pass in "/warp" on the command line.
-                continue;
-            }
-
-            // Check to see whether the adapter supports Direct3D 12, but don't create the
-            // actual device yet.
-            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
-            {
-                break;
-            }
-        }
-    }
-
-    if (adapter.Get() == nullptr)
-    {
-        for (UINT adapterIndex = 0; SUCCEEDED(pFactory->EnumAdapters1(adapterIndex, &adapter)); ++adapterIndex)
-        {
-            DXGI_ADAPTER_DESC1 desc;
-            adapter->GetDesc1(&desc);
-
-            if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-            {
-                // Don't select the Basic Render Driver adapter.
-                // If you want a software adapter, pass in "/warp" on the command line.
-                continue;
-            }
-
-            // Check to see whether the adapter supports Direct3D 12, but don't create the
-            // actual device yet.
-            if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
-            {
-                break;
-            }
-        }
-    }
-
-    *ppAdapter = adapter.Detach();
 }
 
 void Renderer::LoadPipeline()
@@ -261,7 +194,7 @@ void Renderer::LoadPipeline()
         {
             ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
             m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
-            rtvHandle.ptr = SIZE_T(INT64(rtvHandle.ptr) + INT64(m_rtvDescriptorSize));
+            MoveCPUDescriptorHandle(&rtvHandle, 1, m_rtvDescriptorSize);
 
             ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
         }
@@ -508,9 +441,8 @@ void Renderer::PopulateCommandList()
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
     m_commandList->ResourceBarrier(1, &barrier);
 
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = {};
-    D3D12_CPU_DESCRIPTOR_HANDLE start = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-    rtvHandle.ptr = SIZE_T(INT64(start.ptr) + INT64(m_frameIndex) * INT64(m_rtvDescriptorSize));
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+    MoveCPUDescriptorHandle(&rtvHandle, m_frameIndex, m_rtvDescriptorSize);
     m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
     const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
@@ -563,60 +495,4 @@ void Renderer::MoveToNextFrame()
 
     // 현재 프레임에 대한 목표 fence 값 증가
     m_fenceValues[m_frameIndex] = currentFenceValue + 1;
-}
-
-void Renderer::DowngradeRootParameters(D3D12_ROOT_PARAMETER1* src, UINT numParameters, D3D12_ROOT_PARAMETER* dst,
-    std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges, UINT& offset)
-{
-    for (UINT i = 0; i < numParameters; i++)
-    {
-        dst[i].ParameterType = src[i].ParameterType;
-
-        const D3D12_ROOT_PARAMETER_TYPE& type = src[i].ParameterType;
-        switch (type)
-        {
-        case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
-        {
-            const UINT NumDescriptorRanges = src[i].DescriptorTable.NumDescriptorRanges;
-            DowngradeDescriptorRanges(src[i].DescriptorTable.pDescriptorRanges, NumDescriptorRanges, convertedRanges);
-            dst[i].DescriptorTable = { NumDescriptorRanges, convertedRanges.data() + offset };
-            offset += NumDescriptorRanges;
-            break;
-        }
-        case D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
-        {
-            dst[i].Constants = src[i].Constants;
-            break;
-        }
-        case D3D12_ROOT_PARAMETER_TYPE_CBV:
-        case D3D12_ROOT_PARAMETER_TYPE_SRV:
-        case D3D12_ROOT_PARAMETER_TYPE_UAV:
-        {
-            DowngradeRootDescriptor(&src[i].Descriptor, &dst[i].Descriptor);
-            break;
-        }
-        }
-
-        dst[i].ShaderVisibility = src[i].ShaderVisibility;
-    }
-}
-void Renderer::DowngradeDescriptorRanges(const D3D12_DESCRIPTOR_RANGE1* src, UINT NumDescriptorRanges,
-    std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges)
-{
-    D3D12_DESCRIPTOR_RANGE tempRange = {};
-    for (UINT i = 0; i < NumDescriptorRanges; i++)
-    {
-        tempRange.RangeType = src[i].RangeType;
-        tempRange.NumDescriptors = src[i].NumDescriptors;
-        tempRange.BaseShaderRegister = src[i].BaseShaderRegister;
-        tempRange.RegisterSpace = src[i].RegisterSpace;
-        tempRange.OffsetInDescriptorsFromTableStart = src[i].OffsetInDescriptorsFromTableStart;
-        convertedRanges.push_back(tempRange);
-    }
-}
-
-void Renderer::DowngradeRootDescriptor(D3D12_ROOT_DESCRIPTOR1* src, D3D12_ROOT_DESCRIPTOR* dst)
-{
-    dst->ShaderRegister = src->ShaderRegister;
-    dst->RegisterSpace = src->RegisterSpace;
 }

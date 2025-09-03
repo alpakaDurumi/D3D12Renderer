@@ -9,6 +9,7 @@
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
+using namespace D3DHelper;
 
 struct Vertex
 {
@@ -71,7 +72,7 @@ public:
         ComPtr<ID3D12GraphicsCommandList>& commandList,
         D3D12_CPU_DESCRIPTOR_HANDLE cbvSrvUavHandle,
         D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle,
-        UINT srvCbvDescriptorSize,
+        UINT cbvSrvUavDescriptorSize,
         ComPtr<ID3D12Resource>& tempUploadHeap  // default 힙으로의 복사를 위해 임시로 사용하는 upload 힙
     )
     {
@@ -249,15 +250,10 @@ public:
             D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
             cbvDesc.BufferLocation = cube.m_constantBuffer->GetGPUVirtualAddress();
             cbvDesc.SizeInBytes = sizeof(SceneConstantBuffer);
-            //D3D12_CPU_DESCRIPTOR_HANDLE start = m_srvCbvHeap->GetCPUDescriptorHandleForHeapStart();
-            //D3D12_CPU_DESCRIPTOR_HANDLE next = {};
-            //next.ptr = SIZE_T(INT64(start.ptr) + UINT64(m_srvCbvDescriptorSize));
-            //device->CreateConstantBufferView(&cbvDesc, next);
 
             device->CreateConstantBufferView(&cbvDesc, cbvSrvUavHandle);
             cube.m_gpuHandles.push_back(gpuHandle);
-            cbvSrvUavHandle.ptr = SIZE_T(UINT64(cbvSrvUavHandle.ptr) + UINT64(srvCbvDescriptorSize));
-            gpuHandle.ptr = SIZE_T(UINT64(gpuHandle.ptr) + UINT64(srvCbvDescriptorSize));
+            MoveCPUAndGPUDescriptorHandle(&cbvSrvUavHandle, &gpuHandle, 1, cbvSrvUavDescriptorSize);
 
             // Do not unmap this until app close
             D3D12_RANGE readRange = { 0, 0 };
@@ -265,12 +261,7 @@ public:
             memcpy(cube.m_pCbvDataBegin, &cube.m_constantBufferData, sizeof(cube.m_constantBufferData));
         }
 
-        // Create the texture.
-        // Note: ComPtr's are CPU objects but this resource needs to stay in scope until
-        // the command list that references it has finished executing on the GPU.
-        // We will flush the GPU at the end of this method to ensure the resource is not
-        // prematurely destroyed.
-        ComPtr<ID3D12Resource> textureUploadHeap;
+        // Create the texture
         {
             D3D12_HEAP_PROPERTIES heapProperties = {};
             heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -403,8 +394,7 @@ public:
 
             device->CreateShaderResourceView(cube.m_texture.Get(), &srvDesc, cbvSrvUavHandle);
             cube.m_gpuHandles.push_back(gpuHandle);
-            cbvSrvUavHandle.ptr = SIZE_T(INT64(cbvSrvUavHandle.ptr) + UINT64(srvCbvDescriptorSize));
-            gpuHandle.ptr = SIZE_T(UINT64(gpuHandle.ptr) + UINT64(srvCbvDescriptorSize));
+            MoveCPUAndGPUDescriptorHandle(&cbvSrvUavHandle, &gpuHandle, 1, cbvSrvUavDescriptorSize);
         }
 
         return cube;
