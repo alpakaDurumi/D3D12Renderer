@@ -126,7 +126,7 @@ public:
             CreateDefaultHeapForBuffer(device, vertexBufferSize, cube.m_vertexBuffer);
 
             CreateUploadHeap(device, vertexBufferSize, vertexBufferUploadHeap);
-            
+
             D3D12_SUBRESOURCE_DATA vertexData = {};
             vertexData.pData = cubeVertices;
             vertexData.RowPitch = vertexBufferSize;
@@ -180,32 +180,7 @@ public:
 
         // Create the constant buffer
         {
-            D3D12_HEAP_PROPERTIES heapProperties = {};
-            heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-            heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-            heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-            heapProperties.CreationNodeMask = 1;
-            heapProperties.VisibleNodeMask = 1;
-
-            D3D12_RESOURCE_DESC resourceDesc = {};
-            resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            resourceDesc.Alignment = 0;
-            resourceDesc.Width = sizeof(SceneConstantBuffer);
-            resourceDesc.Height = 1;
-            resourceDesc.DepthOrArraySize = 1;
-            resourceDesc.MipLevels = 1;
-            resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-            resourceDesc.SampleDesc = { 1, 0 };
-            resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-            resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-            ThrowIfFailed(device->CreateCommittedResource(
-                &heapProperties,
-                D3D12_HEAP_FLAG_NONE,
-                &resourceDesc,
-                D3D12_RESOURCE_STATE_GENERIC_READ,
-                nullptr,
-                IID_PPV_ARGS(&cube.m_constantBuffer)));
+            CreateUploadHeap(device, sizeof(SceneConstantBuffer), cube.m_constantBuffer);
 
             // Create constant buffer view
             D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
