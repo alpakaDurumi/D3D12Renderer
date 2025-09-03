@@ -135,13 +135,7 @@ public:
             UpdateSubResources(device, commandList, cube.m_vertexBuffer, vertexBufferUploadHeap, &vertexData);
 
             // Change resource state
-            D3D12_RESOURCE_BARRIER barrier = {};
-            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-            barrier.Transition.pResource = cube.m_vertexBuffer.Get();
-            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(cube.m_vertexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             commandList->ResourceBarrier(1, &barrier);
 
             // Initialize the vertex buffer view.
@@ -176,13 +170,7 @@ public:
             UpdateSubResources(device, commandList, cube.m_indexBuffer, indexBufferUploadHeap, &indexData);
 
             // Change resource state
-            D3D12_RESOURCE_BARRIER barrier = {};
-            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-            barrier.Transition.pResource = cube.m_indexBuffer.Get();
-            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(cube.m_indexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             commandList->ResourceBarrier(1, &barrier);
 
             cube.m_indexBufferView.BufferLocation = cube.m_indexBuffer->GetGPUVirtualAddress();
@@ -258,13 +246,7 @@ public:
             UpdateSubResources(device, commandList, cube.m_texture, textureUploadHeap, &textureData);
 
             // Change resource state
-            D3D12_RESOURCE_BARRIER barrier = {};
-            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-            barrier.Transition.pResource = cube.m_texture.Get();
-            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(cube.m_texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             commandList->ResourceBarrier(1, &barrier);
 
             // Describe and create a SRV for the texture.
