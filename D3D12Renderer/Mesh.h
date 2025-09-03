@@ -73,7 +73,9 @@ public:
         D3D12_CPU_DESCRIPTOR_HANDLE cbvSrvUavHandle,
         D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle,
         UINT cbvSrvUavDescriptorSize,
-        ComPtr<ID3D12Resource>& tempUploadHeap  // default 힙으로의 복사를 위해 임시로 사용하는 upload 힙
+        ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
+        ComPtr<ID3D12Resource>& indexBufferUploadHeap,
+        ComPtr<ID3D12Resource>& textureUploadHeap
     )
     {
         Mesh cube;
@@ -119,47 +121,28 @@ public:
                 {{-1.0f, -1.0f, 1.0f}, {1.0f, 1.0f} }
             };
 
-            //const UINT vertexBufferSize = sizeof(triangleVertices);
             const UINT vertexBufferSize = sizeof(cubeVertices);
 
-            // Note: using upload heaps to transfer static data like vert buffers is not 
-            // recommended. Every time the GPU needs it, the upload heap will be marshalled 
-            // over. Please read up on Default Heap usage. An upload heap is used here for 
-            // code simplicity and because there are very few verts to actually transfer.
+            CreateDefaultHeapForBuffer(device, vertexBufferSize, cube.m_vertexBuffer);
 
-            D3D12_HEAP_PROPERTIES heapProperties = {};
-            heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-            heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-            heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-            heapProperties.CreationNodeMask = 1;
-            heapProperties.VisibleNodeMask = 1;
+            CreateUploadHeap(device, vertexBufferSize, vertexBufferUploadHeap);
+            
+            D3D12_SUBRESOURCE_DATA vertexData = {};
+            vertexData.pData = cubeVertices;
+            vertexData.RowPitch = vertexBufferSize;
+            vertexData.SlicePitch = vertexData.RowPitch;
 
-            D3D12_RESOURCE_DESC resourceDesc = {};
-            resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            resourceDesc.Alignment = 0;
-            resourceDesc.Width = vertexBufferSize;
-            resourceDesc.Height = 1;
-            resourceDesc.DepthOrArraySize = 1;
-            resourceDesc.MipLevels = 1;
-            resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-            resourceDesc.SampleDesc = { 1, 0 };
-            resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-            resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+            UpdateSubResources(device, commandList, cube.m_vertexBuffer, vertexBufferUploadHeap, &vertexData);
 
-            ThrowIfFailed(device->CreateCommittedResource(
-                &heapProperties,
-                D3D12_HEAP_FLAG_NONE,
-                &resourceDesc,
-                D3D12_RESOURCE_STATE_GENERIC_READ,
-                nullptr,
-                IID_PPV_ARGS(&cube.m_vertexBuffer)));
-
-            // Copy the triangle data to the vertex buffer.
-            UINT8* pVertexDataBegin;
-            D3D12_RANGE readRange = { 0, 0 };       // We do not intend to read from this resource on the CPU.
-            ThrowIfFailed(cube.m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
-            memcpy(pVertexDataBegin, cubeVertices, sizeof(cubeVertices));
-            cube.m_vertexBuffer->Unmap(0, nullptr);
+            // Change resource state
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+            barrier.Transition.pResource = cube.m_vertexBuffer.Get();
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            commandList->ResourceBarrier(1, &barrier);
 
             // Initialize the vertex buffer view.
             cube.m_vertexBufferView.BufferLocation = cube.m_vertexBuffer->GetGPUVirtualAddress();
@@ -167,8 +150,8 @@ public:
             cube.m_vertexBufferView.SizeInBytes = vertexBufferSize;
         }
 
+        // Create the index buffer
         {
-            // Create the index buffer
             UINT32 cubeIndices[] =
             {
                 0, 1, 2, 0, 2, 3,
@@ -181,38 +164,26 @@ public:
 
             const UINT indexBufferSize = sizeof(cubeIndices);
 
-            D3D12_HEAP_PROPERTIES heapProperties = {};
-            heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-            heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-            heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-            heapProperties.CreationNodeMask = 1;
-            heapProperties.VisibleNodeMask = 1;
+            CreateDefaultHeapForBuffer(device, indexBufferSize, cube.m_indexBuffer);
 
-            D3D12_RESOURCE_DESC resourceDesc = {};
-            resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            resourceDesc.Alignment = 0;
-            resourceDesc.Width = indexBufferSize;
-            resourceDesc.Height = 1;
-            resourceDesc.DepthOrArraySize = 1;
-            resourceDesc.MipLevels = 1;
-            resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-            resourceDesc.SampleDesc = { 1, 0 };
-            resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-            resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+            CreateUploadHeap(device, indexBufferSize, indexBufferUploadHeap);
 
-            ThrowIfFailed(device->CreateCommittedResource(
-                &heapProperties,
-                D3D12_HEAP_FLAG_NONE,
-                &resourceDesc,
-                D3D12_RESOURCE_STATE_GENERIC_READ,
-                nullptr,
-                IID_PPV_ARGS(&cube.m_indexBuffer)));
+            D3D12_SUBRESOURCE_DATA indexData = {};
+            indexData.pData = cubeIndices;
+            indexData.RowPitch = indexBufferSize;
+            indexData.SlicePitch = indexData.RowPitch;
 
-            UINT8* pIndexDataBegin;
-            D3D12_RANGE readRange = { 0, 0 };
-            ThrowIfFailed(cube.m_indexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pIndexDataBegin)));
-            memcpy(pIndexDataBegin, cubeIndices, sizeof(cubeIndices));
-            cube.m_indexBuffer->Unmap(0, nullptr);
+            UpdateSubResources(device, commandList, cube.m_indexBuffer, indexBufferUploadHeap, &indexData);
+
+            // Change resource state
+            D3D12_RESOURCE_BARRIER barrier = {};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+            barrier.Transition.pResource = cube.m_indexBuffer.Get();
+            barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+            barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            commandList->ResourceBarrier(1, &barrier);
 
             cube.m_indexBufferView.BufferLocation = cube.m_indexBuffer->GetGPUVirtualAddress();
             cube.m_indexBufferView.SizeInBytes = indexBufferSize;
@@ -275,8 +246,8 @@ public:
             UINT64 requiredSize = 0;
             device->GetCopyableFootprints(&desc, 0, 1, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
 
-            CreateUploadHeap(device, requiredSize, tempUploadHeap);
-            
+            CreateUploadHeap(device, requiredSize, textureUploadHeap);
+
             // 텍스처 데이터는 인자로 받도록 수정하기
             std::vector<UINT8> texture = GenerateTextureData(TextureWidth, TextureHeight, TexturePixelSize);
             D3D12_SUBRESOURCE_DATA textureData = {};
@@ -284,7 +255,7 @@ public:
             textureData.RowPitch = TextureWidth * TexturePixelSize;
             textureData.SlicePitch = textureData.RowPitch * TextureHeight;
 
-            UpdateSubResources(device, commandList, cube.m_texture, tempUploadHeap, &textureData);
+            UpdateSubResources(device, commandList, cube.m_texture, textureUploadHeap, &textureData);
 
             // Change resource state
             D3D12_RESOURCE_BARRIER barrier = {};

@@ -375,15 +375,18 @@ void Renderer::LoadAssets()
         //ThrowIfFailed(m_bundle->Close());
     }
 
-    ComPtr<ID3D12Resource> tempUploadHeap;
-
+    ComPtr<ID3D12Resource> vertexBufferUploadHeap;
+    ComPtr<ID3D12Resource> indexBufferUploadHeap;
+    ComPtr<ID3D12Resource> textureUploadHeap;
     Mesh cube = Mesh::MakeCube(
         m_device,
         m_commandList,
         m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart(),
         m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart(),
         m_srvCbvDescriptorSize,
-        tempUploadHeap);
+        vertexBufferUploadHeap,
+        indexBufferUploadHeap,
+        textureUploadHeap);
     m_meshes.push_back(cube);
 
     ThrowIfFailed(m_commandList->Close());
