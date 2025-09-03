@@ -77,6 +77,8 @@ public:
     )
     {
         Mesh cube;
+
+        // Create the vetex buffer
         {
             Vertex cubeVertices[] =
             {
@@ -166,7 +168,7 @@ public:
         }
 
         {
-            // Indices
+            // Create the index buffer
             UINT32 cubeIndices[] =
             {
                 0, 1, 2, 0, 2, 3,
@@ -263,117 +265,26 @@ public:
 
         // Create the texture
         {
-            D3D12_HEAP_PROPERTIES heapProperties = {};
-            heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-            heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-            heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-            heapProperties.CreationNodeMask = 1;
-            heapProperties.VisibleNodeMask = 1;
-
-            // Describe and create a Texture2D.
-            D3D12_RESOURCE_DESC textureDesc = {};
-            textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-            textureDesc.Alignment = 0;
-            textureDesc.Width = TextureWidth;
-            textureDesc.Height = TextureHeight;
-            textureDesc.DepthOrArraySize = 1;
-            textureDesc.MipLevels = 1;
-            textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            textureDesc.SampleDesc = { 1, 0 };
-            textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-            textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-            ThrowIfFailed(device->CreateCommittedResource(
-                &heapProperties,
-                D3D12_HEAP_FLAG_NONE,
-                &textureDesc,
-                D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr,
-                IID_PPV_ARGS(&cube.m_texture)));
+            CreateDefaultHeapForTexture(device, cube.m_texture, TextureWidth, TextureHeight);
 
             // Calculate required size for data upload
-            //const auto desc = m_texture->GetDesc();
-            // 나중에 Texture2D 클래스를 만들어서 이 정보들을 멤버로 유지하도록 하자
+            D3D12_RESOURCE_DESC desc = cube.m_texture->GetDesc();
             D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts = {};
             UINT numRows = 0;
             UINT64 rowSizeInBytes = 0;
             UINT64 requiredSize = 0;
-            //ID3D12Device* pDevice = nullptr;
-            //m_texture->GetDevice(IID_ID3D12Device, reinterpret_cast<void**>(&pDevice));
-            device->GetCopyableFootprints(&textureDesc, 0, 1, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
-            //pDevice->Release();
+            device->GetCopyableFootprints(&desc, 0, 1, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
 
-            heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-
-            D3D12_RESOURCE_DESC uploadDesc = {};
-            uploadDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            uploadDesc.Alignment = 0;
-            uploadDesc.Width = requiredSize;
-            uploadDesc.Height = 1;
-            uploadDesc.DepthOrArraySize = 1;
-            uploadDesc.MipLevels = 1;
-            uploadDesc.Format = DXGI_FORMAT_UNKNOWN;
-            uploadDesc.SampleDesc = { 1, 0 };
-            uploadDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-            uploadDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-            // Create the GPU upload buffer.
-            ThrowIfFailed(device->CreateCommittedResource(
-                &heapProperties,
-                D3D12_HEAP_FLAG_NONE,
-                &uploadDesc,
-                D3D12_RESOURCE_STATE_GENERIC_READ,
-                nullptr,
-                IID_PPV_ARGS(&tempUploadHeap)));
-
-            // Copy data to the intermediate upload heap and then schedule a copy 
-            // from the upload heap to the Texture2D.
+            CreateUploadHeap(device, requiredSize, tempUploadHeap);
+            
+            // 텍스처 데이터는 인자로 받도록 수정하기
             std::vector<UINT8> texture = GenerateTextureData(TextureWidth, TextureHeight, TexturePixelSize);
-
             D3D12_SUBRESOURCE_DATA textureData = {};
             textureData.pData = &texture[0];
             textureData.RowPitch = TextureWidth * TexturePixelSize;
             textureData.SlicePitch = textureData.RowPitch * TextureHeight;
 
-            //UpdateSubresources(m_commandList.Get(), m_texture.Get(), textureUploadHeap.Get(), 0, 0, 1, &textureData);
-            D3D12_RANGE readRange = { 0, 0 };   // do not read from CPU. only write
-            UINT8* pData;
-            ThrowIfFailed(tempUploadHeap->Map(0, &readRange, reinterpret_cast<void**>(&pData)));
-
-            // Assume that NumSubResources is 1
-            // Data need for memcpy
-            //D3D12_MEMCPY_DEST destData = {
-            //    pData + layouts.Offset,
-            //    layouts.Footprint.RowPitch,
-            //    SIZE_T(layouts.Footprint.RowPitch) * SIZE_T(numRows)
-            //};
-
-            for (UINT z = 0; z < layouts.Footprint.Depth; ++z)
-            {
-                auto pDestSlice = static_cast<BYTE*>(pData + layouts.Offset) + SIZE_T(layouts.Footprint.RowPitch) * SIZE_T(numRows) * z;
-                auto pSrcSlice = static_cast<const BYTE*>(textureData.pData) + textureData.SlicePitch * LONG_PTR(z);
-                for (UINT y = 0; y < numRows; ++y)
-                {
-                    memcpy(pDestSlice + layouts.Footprint.RowPitch * y,
-                        pSrcSlice + textureData.RowPitch * LONG_PTR(y),
-                        rowSizeInBytes);
-                }
-            }
-
-            tempUploadHeap->Unmap(0, nullptr);
-
-            // Copy from upload heap to default heap
-            D3D12_TEXTURE_COPY_LOCATION dst = {};
-            dst.pResource = cube.m_texture.Get();
-            dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-            dst.SubresourceIndex = 0;
-
-            D3D12_TEXTURE_COPY_LOCATION src = {};
-            src.pResource = tempUploadHeap.Get();
-            src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-            src.PlacedFootprint = layouts;
-
-            commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+            UpdateSubResources(device, commandList, cube.m_texture, tempUploadHeap, &textureData);
 
             // Change resource state
             D3D12_RESOURCE_BARRIER barrier = {};
@@ -387,7 +298,7 @@ public:
 
             // Describe and create a SRV for the texture.
             D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-            srvDesc.Format = textureDesc.Format;
+            srvDesc.Format = desc.Format;
             srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
             srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
             srvDesc.Texture2D.MipLevels = 1;

@@ -156,4 +156,152 @@ namespace D3DHelper
             dst[i].ShaderVisibility = src[i].ShaderVisibility;
         }
     }
+
+    inline void CreateUploadHeap(ComPtr<ID3D12Device>& device, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadHeap)
+    {
+        D3D12_HEAP_PROPERTIES heapProperties = {};
+        heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProperties.CreationNodeMask = 1;
+        heapProperties.VisibleNodeMask = 1;
+
+        D3D12_RESOURCE_DESC resourceDesc = {};
+        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        resourceDesc.Alignment = 0;
+        resourceDesc.Width = requiredSize;
+        resourceDesc.Height = 1;
+        resourceDesc.DepthOrArraySize = 1;
+        resourceDesc.MipLevels = 1;
+        resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+        resourceDesc.SampleDesc = { 1, 0 };
+        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        ThrowIfFailed(device->CreateCommittedResource(
+            &heapProperties,
+            D3D12_HEAP_FLAG_NONE,
+            &resourceDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr,
+            IID_PPV_ARGS(&uploadHeap)));
+    }
+
+    // For vertex buffer and index buffer
+    inline void CreateDefaultHeapForBuffer(ComPtr<ID3D12Device>& device, UINT64 size, ComPtr<ID3D12Resource>& defaultHeap)
+    {
+        D3D12_HEAP_PROPERTIES heapProperties = {};
+        heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProperties.CreationNodeMask = 1;
+        heapProperties.VisibleNodeMask = 1;
+
+        D3D12_RESOURCE_DESC resourceDesc = {};
+        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        resourceDesc.Alignment = 0;
+        resourceDesc.Width = size;
+        resourceDesc.Height = 1;
+        resourceDesc.DepthOrArraySize = 1;
+        resourceDesc.MipLevels = 1;
+        resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+        resourceDesc.SampleDesc = { 1, 0 };
+        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        ThrowIfFailed(device->CreateCommittedResource(
+            &heapProperties,
+            D3D12_HEAP_FLAG_NONE,
+            &resourceDesc,
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr,
+            IID_PPV_ARGS(&defaultHeap)));
+    }
+
+    inline void CreateDefaultHeapForTexture(ComPtr<ID3D12Device>& device, ComPtr<ID3D12Resource>& defaultHeap, UINT width, UINT height)
+    {
+        D3D12_HEAP_PROPERTIES heapProperties = {};
+        heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProperties.CreationNodeMask = 1;
+        heapProperties.VisibleNodeMask = 1;
+
+        D3D12_RESOURCE_DESC resourceDesc = {};
+        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        resourceDesc.Alignment = 0;
+        resourceDesc.Width = width;
+        resourceDesc.Height = height;
+        resourceDesc.DepthOrArraySize = 1;
+        resourceDesc.MipLevels = 1;
+        resourceDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        resourceDesc.SampleDesc = { 1, 0 };
+        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        ThrowIfFailed(device->CreateCommittedResource(
+            &heapProperties,
+            D3D12_HEAP_FLAG_NONE,
+            &resourceDesc,
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr,
+            IID_PPV_ARGS(&defaultHeap)));
+    }
+
+    inline void UpdateSubResources(
+        ComPtr<ID3D12Device>& device,
+        ComPtr<ID3D12GraphicsCommandList> commandList,
+        ComPtr<ID3D12Resource>& dest,
+        ComPtr<ID3D12Resource>& intermediate,
+        D3D12_SUBRESOURCE_DATA* pSrcData)
+    {
+        // Calculate required size for data upload
+        // 업데이트를 자주 한다면 이러한 정보를 객체에 멤버로 유지할 수도 있을 것 같다
+        D3D12_RESOURCE_DESC desc = dest->GetDesc();
+        D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts = {};
+        UINT numRows = 0;
+        UINT64 rowSizeInBytes = 0;
+        UINT64 requiredSize = 0;
+        // 서브리소스가 1개이면서 offset도 0이라고 가정
+        device->GetCopyableFootprints(&desc, 0, 1, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
+
+        // dest의 레이아웃에 맞춰서 intermediate로 데이터를 복사
+        D3D12_RANGE readRange = { 0, 0 };   // do not read from CPU. only write
+        UINT8* pData;
+        ThrowIfFailed(intermediate->Map(0, &readRange, reinterpret_cast<void**>(&pData)));
+        for (UINT z = 0; z < layouts.Footprint.Depth; ++z)
+        {
+            auto pDestSlice = static_cast<BYTE*>(pData + layouts.Offset) + SIZE_T(layouts.Footprint.RowPitch) * SIZE_T(numRows) * z;
+            auto pSrcSlice = static_cast<const BYTE*>(pSrcData->pData) + pSrcData->SlicePitch * LONG_PTR(z);
+            for (UINT y = 0; y < numRows; ++y)
+            {
+                memcpy(pDestSlice + layouts.Footprint.RowPitch * y,
+                    pSrcSlice + pSrcData->RowPitch * LONG_PTR(y),
+                    rowSizeInBytes);
+            }
+        }
+        intermediate->Unmap(0, nullptr);
+
+        // Copy from upload heap to default heap
+        // buffer
+        if (desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+        {
+            commandList->CopyBufferRegion(dest.Get(), 0, intermediate.Get(), layouts.Offset, layouts.Footprint.Width);
+        }
+        // texture
+        else
+        {
+            D3D12_TEXTURE_COPY_LOCATION dst = {};
+            dst.pResource = dest.Get();
+            dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+            dst.SubresourceIndex = 0;
+
+            D3D12_TEXTURE_COPY_LOCATION src = {};
+            src.pResource = intermediate.Get();
+            src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+            src.PlacedFootprint = layouts;
+
+            commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+        }
+    }
 }
