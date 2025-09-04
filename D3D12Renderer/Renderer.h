@@ -64,7 +64,7 @@ private:
     // App resources
     Camera m_camera;
     InputManager m_inputManager;
-    std::vector<Mesh> m_meshes;
+    std::vector<Mesh*> m_meshes;
 
     // Synchronization objects
     UINT m_frameIndex;

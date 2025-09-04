@@ -18,6 +18,11 @@ struct Vertex
     XMFLOAT3 normal;
 };
 
+struct InstanceData
+{
+    XMFLOAT4X4 world;
+};
+
 struct SceneConstantBuffer
 {
     XMFLOAT4X4 world;
@@ -67,7 +72,17 @@ inline std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHei
 class Mesh
 {
 public:
-    static Mesh MakeCube(
+    virtual void Render(ComPtr<ID3D12GraphicsCommandList>& commandList) const
+    {
+        commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+        commandList->IASetIndexBuffer(&m_indexBufferView);
+        for (int i = 0; i < m_gpuHandles.size(); i++)
+            commandList->SetGraphicsRootDescriptorTable(i, m_gpuHandles[i]);
+        commandList->DrawIndexedInstanced(m_numIndices, 1, 0, 0, 0);
+    }
+
+    inline static Mesh MakeCube(
         ComPtr<ID3D12Device>& device,
         ComPtr<ID3D12GraphicsCommandList>& commandList,
         D3D12_CPU_DESCRIPTOR_HANDLE cbvSrvUavHandle,
@@ -85,40 +100,40 @@ public:
             std::vector<Vertex> cubeVertices =
             {
                 // upper
-                {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f} },
-                {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f} },
-                {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f} },
-                {{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f} },
+                {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f}, {0.0f, 1.0f, 0.0f} },
+                {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 1.0f, 0.0f} },
+                {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f} },
+                {{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f}, {0.0f, 1.0f, 0.0f} },
 
                 // lower
-                {{-1.0f, -1.0f, 1.0f}, {0.0f, 1.0f} },
-                {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f} },
-                {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f} },
-                {{1.0f, -1.0f, 1.0f}, {1.0f, 1.0f} },
+                {{-1.0f, -1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, -1.0f, 0.0f} },
+                {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f}, {0.0f, -1.0f, 0.0f} },
+                {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f}, {0.0f, -1.0f, 0.0f} },
+                {{1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, -1.0f, 0.0f} },
 
                 // left
-                {{-1.0f, -1.0f, 1.0f}, {0.0f, 1.0f} },
-                {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f} },
-                {{-1.0f, 1.0f, -1.0f}, {1.0f, 0.0f} },
-                {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f} },
+                {{-1.0f, -1.0f, 1.0f}, {0.0f, 1.0f}, {-1.0f, 0.0f, 0.0f} },
+                {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f} },
+                {{-1.0f, 1.0f, -1.0f}, {1.0f, 0.0f}, {-1.0f, 0.0f, 0.0f} },
+                {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f} },
 
                 // right
-                {{1.0f, -1.0f, -1.0f}, {0.0f, 1.0f} },
-                {{1.0f, 1.0f, -1.0f}, {0.0f, 0.0f} },
-                {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f} },
-                {{1.0f, -1.0f, 1.0f}, {1.0f, 1.0f} },
+                {{1.0f, -1.0f, -1.0f}, {0.0f, 1.0f}, {1.0f, 0.0f, 0.0f} },
+                {{1.0f, 1.0f, -1.0f}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f} },
+                {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 0.0f, 0.0f} },
+                {{1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}, {1.0f, 0.0f, 0.0f} },
 
                 // front
-                {{-1.0f, -1.0f, -1.0f}, {0.0f, 1.0f} },
-                {{-1.0f, 1.0f, -1.0f}, {0.0f, 0.0f} },
-                {{1.0f, 1.0f, -1.0f}, {1.0f, 0.0f} },
-                {{1.0f, -1.0f, -1.0f}, {1.0f, 1.0f} },
+                {{-1.0f, -1.0f, -1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, -1.0f} },
+                {{-1.0f, 1.0f, -1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, -1.0f} },
+                {{1.0f, 1.0f, -1.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, -1.0f} },
+                {{1.0f, -1.0f, -1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, -1.0f} },
 
                 // back
-                {{1.0f, -1.0f, 1.0f}, {0.0f, 1.0f} },
-                {{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f} },
-                {{-1.0f, 1.0f, 1.0f}, {1.0f, 0.0f} },
-                {{-1.0f, -1.0f, 1.0f}, {1.0f, 1.0f} }
+                {{1.0f, -1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
+                {{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
+                {{-1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
+                {{-1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f} }
             };
             CreateVertexBuffer(device, commandList, cube.m_vertexBuffer, vertexBufferUploadHeap, &cube.m_vertexBufferView, cubeVertices);
         }
@@ -203,6 +218,7 @@ public:
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
     ComPtr<ID3D12Resource> m_indexBuffer;
     D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
+    UINT m_numIndices = 0;
 
     ComPtr<ID3D12Resource> m_constantBuffer;
     SceneConstantBuffer m_constantBufferData;
@@ -215,4 +231,64 @@ public:
     static const UINT TextureWidth = 256;
     static const UINT TextureHeight = 256;
     static const UINT TexturePixelSize = 4;    // The number of bytes used to represent a pixel in the texture.
+};
+
+class InstancedMesh : public Mesh
+{
+public:
+    InstancedMesh(const Mesh& mesh)
+        : Mesh(mesh)
+    {
+    }
+
+    void Render(ComPtr<ID3D12GraphicsCommandList>& commandList) const override
+    {
+        commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = {m_vertexBufferView, m_instanceBufferView};
+        commandList->IASetVertexBuffers(0, 2, pVertexBufferViews);
+        commandList->IASetIndexBuffer(&m_indexBufferView);
+        for (int i = 0; i < m_gpuHandles.size(); i++)
+            commandList->SetGraphicsRootDescriptorTable(i, m_gpuHandles[i]);
+        commandList->DrawIndexedInstanced(m_numIndices, m_instanceCount, 0, 0, 0);
+    }
+
+    inline static InstancedMesh MakeCubeInstanced(
+        ComPtr<ID3D12Device>& device,
+        ComPtr<ID3D12GraphicsCommandList>& commandList,
+        D3D12_CPU_DESCRIPTOR_HANDLE cbvSrvUavHandle,
+        D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle,
+        UINT cbvSrvUavDescriptorSize,
+        ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
+        ComPtr<ID3D12Resource>& indexBufferUploadHeap,
+        ComPtr<ID3D12Resource>& textureUploadHeap,
+        ComPtr<ID3D12Resource>& instanceUploadHeap
+    )
+    {
+        InstancedMesh cube = MakeCube(device, commandList, cbvSrvUavHandle, gpuHandle, cbvSrvUavDescriptorSize,
+            vertexBufferUploadHeap, indexBufferUploadHeap, textureUploadHeap);
+
+        std::vector<InstanceData> instances;
+
+        for (int i = 0; i < 100; i++)
+        {
+            for (int j = 0; j < 100; j++)
+            {
+                for (int k = 0; k < 100; k++)
+                {
+                    InstanceData data;
+                    XMStoreFloat4x4(&data.world, XMMatrixTranspose(XMMatrixTranslation((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, (k - 50.0f) * 4.0f)));
+                    instances.push_back(data);
+                }
+            }
+        }
+
+        CreateVertexBuffer(device, commandList, cube.m_instanceBuffer, instanceUploadHeap, &cube.m_instanceBufferView, instances);
+
+        return cube;
+    }
+
+    ComPtr<ID3D12Resource> m_instanceBuffer;
+    D3D12_VERTEX_BUFFER_VIEW m_instanceBufferView;
+    UINT m_instanceCount = 1'000'000;
 };

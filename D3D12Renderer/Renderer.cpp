@@ -41,11 +41,12 @@ void Renderer::OnUpdate()
     
     for (auto& mesh : m_meshes)
     {
-        XMMATRIX world = XMMatrixRotationY(XMConvertToRadians(25.0f)) * XMMatrixRotationX(XMConvertToRadians(-25.0f));
-        XMStoreFloat4x4(&mesh.m_constantBufferData.world, XMMatrixTranspose(world));
-        XMStoreFloat4x4(&mesh.m_constantBufferData.view, XMMatrixTranspose(m_camera.GetViewMatrix()));
-        XMStoreFloat4x4(&mesh.m_constantBufferData.projection, XMMatrixTranspose(m_camera.GetProjectionMatrix(true)));
-        memcpy(mesh.m_pCbvDataBegin, &mesh.m_constantBufferData, sizeof(mesh.m_constantBufferData));
+        //XMMATRIX world = XMMatrixRotationY(XMConvertToRadians(25.0f)) * XMMatrixRotationX(XMConvertToRadians(-25.0f));
+        XMMATRIX world = XMMatrixIdentity();
+        XMStoreFloat4x4(&mesh->m_constantBufferData.world, XMMatrixTranspose(world));
+        XMStoreFloat4x4(&mesh->m_constantBufferData.view, XMMatrixTranspose(m_camera.GetViewMatrix()));
+        XMStoreFloat4x4(&mesh->m_constantBufferData.projection, XMMatrixTranspose(m_camera.GetProjectionMatrix(true)));
+        memcpy(mesh->m_pCbvDataBegin, &mesh->m_constantBufferData, sizeof(mesh->m_constantBufferData));
     }
 }
 
@@ -310,7 +311,13 @@ void Renderer::LoadAssets()
         D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
         {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 20, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+
+            { "INSTANCE_TRANSFORM", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 0, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+            { "INSTANCE_TRANSFORM", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 16, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+            { "INSTANCE_TRANSFORM", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 32, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+            { "INSTANCE_TRANSFORM", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, 48, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
         };
 
         // Rasterizer State
@@ -378,7 +385,8 @@ void Renderer::LoadAssets()
     ComPtr<ID3D12Resource> vertexBufferUploadHeap;
     ComPtr<ID3D12Resource> indexBufferUploadHeap;
     ComPtr<ID3D12Resource> textureUploadHeap;
-    Mesh cube = Mesh::MakeCube(
+    ComPtr<ID3D12Resource> instanceUploadHeap;
+    InstancedMesh* cube = new InstancedMesh(InstancedMesh::MakeCubeInstanced(
         m_device,
         m_commandList,
         m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart(),
@@ -386,7 +394,8 @@ void Renderer::LoadAssets()
         m_srvCbvDescriptorSize,
         vertexBufferUploadHeap,
         indexBufferUploadHeap,
-        textureUploadHeap);
+        textureUploadHeap,
+        instanceUploadHeap));
     m_meshes.push_back(cube);
 
     ThrowIfFailed(m_commandList->Close());
@@ -447,12 +456,7 @@ void Renderer::PopulateCommandList()
 
     for (const auto& mesh : m_meshes)
     {
-        m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        m_commandList->IASetVertexBuffers(0, 1, &mesh.m_vertexBufferView);
-        m_commandList->IASetIndexBuffer(&mesh.m_indexBufferView);
-        for (int i = 0; i < mesh.m_gpuHandles.size(); i++)
-            m_commandList->SetGraphicsRootDescriptorTable(i, mesh.m_gpuHandles[i]);
-        m_commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
+        mesh->Render(m_commandList);
     }
 
     // Indicate that the back buffer will now be used to present.
