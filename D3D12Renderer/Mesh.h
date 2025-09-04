@@ -82,7 +82,7 @@ public:
 
         // Create the vetex buffer
         {
-            Vertex cubeVertices[] =
+            std::vector<Vertex> cubeVertices =
             {
                 // upper
                 {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f} },
@@ -120,33 +120,12 @@ public:
                 {{-1.0f, 1.0f, 1.0f}, {1.0f, 0.0f} },
                 {{-1.0f, -1.0f, 1.0f}, {1.0f, 1.0f} }
             };
-
-            const UINT vertexBufferSize = sizeof(cubeVertices);
-
-            CreateDefaultHeapForBuffer(device, vertexBufferSize, cube.m_vertexBuffer);
-
-            CreateUploadHeap(device, vertexBufferSize, vertexBufferUploadHeap);
-
-            D3D12_SUBRESOURCE_DATA vertexData = {};
-            vertexData.pData = cubeVertices;
-            vertexData.RowPitch = vertexBufferSize;
-            vertexData.SlicePitch = vertexData.RowPitch;
-
-            UpdateSubResources(device, commandList, cube.m_vertexBuffer, vertexBufferUploadHeap, &vertexData);
-
-            // Change resource state
-            D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(cube.m_vertexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            commandList->ResourceBarrier(1, &barrier);
-
-            // Initialize the vertex buffer view.
-            cube.m_vertexBufferView.BufferLocation = cube.m_vertexBuffer->GetGPUVirtualAddress();
-            cube.m_vertexBufferView.StrideInBytes = sizeof(Vertex);
-            cube.m_vertexBufferView.SizeInBytes = vertexBufferSize;
+            CreateVertexBuffer(device, commandList, cube.m_vertexBuffer, vertexBufferUploadHeap, &cube.m_vertexBufferView, cubeVertices);
         }
 
         // Create the index buffer
         {
-            UINT32 cubeIndices[] =
+            std::vector<UINT32> cubeIndices =
             {
                 0, 1, 2, 0, 2, 3,
                 4, 5, 6, 4, 6, 7,
@@ -155,27 +134,8 @@ public:
                 16, 17, 18, 16, 18, 19,
                 20, 21, 22, 20, 22, 23
             };
-
-            const UINT indexBufferSize = sizeof(cubeIndices);
-
-            CreateDefaultHeapForBuffer(device, indexBufferSize, cube.m_indexBuffer);
-
-            CreateUploadHeap(device, indexBufferSize, indexBufferUploadHeap);
-
-            D3D12_SUBRESOURCE_DATA indexData = {};
-            indexData.pData = cubeIndices;
-            indexData.RowPitch = indexBufferSize;
-            indexData.SlicePitch = indexData.RowPitch;
-
-            UpdateSubResources(device, commandList, cube.m_indexBuffer, indexBufferUploadHeap, &indexData);
-
-            // Change resource state
-            D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(cube.m_indexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            commandList->ResourceBarrier(1, &barrier);
-
-            cube.m_indexBufferView.BufferLocation = cube.m_indexBuffer->GetGPUVirtualAddress();
-            cube.m_indexBufferView.SizeInBytes = indexBufferSize;
-            cube.m_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+            CreateIndexBuffer(device, commandList, cube.m_indexBuffer, indexBufferUploadHeap, &cube.m_indexBufferView, cubeIndices);
+            cube.m_numIndices = UINT(cubeIndices.size());
         }
 
         // Create the constant buffer

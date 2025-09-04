@@ -316,4 +316,67 @@ namespace D3DHelper
         barrier.Transition.StateAfter = after;
         return barrier;
     }
+
+    template<typename T>
+    inline static void CreateVertexBuffer(
+        ComPtr<ID3D12Device>& device,
+        ComPtr<ID3D12GraphicsCommandList>& commandList,
+        ComPtr<ID3D12Resource>& vertexBuffer,
+        ComPtr<ID3D12Resource>& uploadHeap,
+        D3D12_VERTEX_BUFFER_VIEW* pvertexBufferView,
+        std::vector<T>& vertices)
+    {
+        const UINT vertexBufferSize = UINT(vertices.size()) * UINT(sizeof(T));
+
+        CreateDefaultHeapForBuffer(device, vertexBufferSize, vertexBuffer);
+
+        CreateUploadHeap(device, vertexBufferSize, uploadHeap);
+
+        D3D12_SUBRESOURCE_DATA vertexData = {};
+        vertexData.pData = vertices.data();
+        vertexData.RowPitch = vertexBufferSize;
+        vertexData.SlicePitch = vertexData.RowPitch;
+
+        UpdateSubResources(device, commandList, vertexBuffer, uploadHeap, &vertexData);
+
+        // Change resource state
+        D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(vertexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+        commandList->ResourceBarrier(1, &barrier);
+
+        // Initialize the vertex buffer view
+        pvertexBufferView->BufferLocation = vertexBuffer->GetGPUVirtualAddress();
+        pvertexBufferView->StrideInBytes = sizeof(T);
+        pvertexBufferView->SizeInBytes = vertexBufferSize;
+    }
+
+    inline static void CreateIndexBuffer(
+        ComPtr<ID3D12Device>& device,
+        ComPtr<ID3D12GraphicsCommandList>& commandList,
+        ComPtr<ID3D12Resource>& indexBuffer,
+        ComPtr<ID3D12Resource>& uploadHeap,
+        D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
+        std::vector<UINT32>& indices)
+    {
+        const UINT indexBufferSize = UINT(indices.size()) * UINT(sizeof(UINT32));
+
+        CreateDefaultHeapForBuffer(device, indexBufferSize, indexBuffer);
+
+        CreateUploadHeap(device, indexBufferSize, uploadHeap);
+
+        D3D12_SUBRESOURCE_DATA indexData = {};
+        indexData.pData = indices.data();
+        indexData.RowPitch = indexBufferSize;
+        indexData.SlicePitch = indexData.RowPitch;
+
+        UpdateSubResources(device, commandList, indexBuffer, uploadHeap, &indexData);
+
+        // Change resource state
+        D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(indexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        commandList->ResourceBarrier(1, &barrier);
+
+        // Initialize the index buffer view
+        pindexBufferView->BufferLocation = indexBuffer->GetGPUVirtualAddress();
+        pindexBufferView->SizeInBytes = indexBufferSize;
+        pindexBufferView->Format = DXGI_FORMAT_R32_UINT;
+    }
 }
