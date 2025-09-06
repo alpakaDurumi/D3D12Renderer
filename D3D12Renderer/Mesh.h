@@ -21,6 +21,7 @@ struct Vertex
 struct InstanceData
 {
     XMFLOAT4X4 world;
+    XMFLOAT4X4 inverseTranspose;
 };
 
 struct SceneConstantBuffer
@@ -28,7 +29,7 @@ struct SceneConstantBuffer
     XMFLOAT4X4 world;
     XMFLOAT4X4 view;
     XMFLOAT4X4 projection;
-    float padding[16];
+    XMFLOAT4X4 inverseTranspose;
 };
 static_assert((sizeof(SceneConstantBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
@@ -277,7 +278,10 @@ public:
                 for (int k = 0; k < 100; k++)
                 {
                     InstanceData data;
-                    XMStoreFloat4x4(&data.world, XMMatrixTranspose(XMMatrixTranslation((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, (k - 50.0f) * 4.0f)));
+                    XMMATRIX world = XMMatrixTranslation((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, (k - 50.0f) * 4.0f);
+                    XMStoreFloat4x4(&data.world, XMMatrixTranspose(world));
+                    world.r[3] = XMVectorZero();
+                    XMStoreFloat4x4(&data.inverseTranspose, XMMatrixInverse(nullptr, world));
                     instances.push_back(data);
                 }
             }
