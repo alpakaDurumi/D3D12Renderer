@@ -33,6 +33,16 @@ struct SceneConstantBuffer
 };
 static_assert((sizeof(SceneConstantBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
+struct MaterialConstantBuffer
+{
+    XMFLOAT3 materialAmbient;
+    float padding0;
+    XMFLOAT3 materialSpecular;
+    float shininess;
+    float padding[56];
+};
+static_assert((sizeof(MaterialConstantBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
+
 // Generate a simple black and white checkerboard texture.
 inline std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UINT texturePixelSize)
 {
@@ -73,13 +83,18 @@ inline std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHei
 class Mesh
 {
 public:
-    virtual void Render(ComPtr<ID3D12GraphicsCommandList>& commandList) const
+    virtual void Render(ComPtr<ID3D12GraphicsCommandList>& commandList)
     {
+        m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
+        m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
+        m_materialConstantBufferData.shininess = 10.0f;
+        memcpy(m_pMatCbvDataBegin, &m_materialConstantBufferData, sizeof(m_materialConstantBufferData));
+
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
         commandList->IASetIndexBuffer(&m_indexBufferView);
-        for (int i = 0; i < m_gpuHandles.size(); i++)
-            commandList->SetGraphicsRootDescriptorTable(i, m_gpuHandles[i]);
+        //for (int i = 0; i < m_gpuHandles.size(); i++)
+        //    commandList->SetGraphicsRootDescriptorTable(i, m_gpuHandles[i]);
         commandList->DrawIndexedInstanced(m_numIndices, 1, 0, 0, 0);
     }
 
@@ -156,21 +171,43 @@ public:
 
         // Create the constant buffer
         {
-            CreateUploadHeap(device, sizeof(SceneConstantBuffer), cube.m_constantBuffer);
+            {
+                // 1. SceneConstantBuffer
+                CreateUploadHeap(device, sizeof(SceneConstantBuffer), cube.m_constantBuffer);
 
-            // Create constant buffer view
-            D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-            cbvDesc.BufferLocation = cube.m_constantBuffer->GetGPUVirtualAddress();
-            cbvDesc.SizeInBytes = sizeof(SceneConstantBuffer);
+                // Create constant buffer view
+                D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+                cbvDesc.BufferLocation = cube.m_constantBuffer->GetGPUVirtualAddress();
+                cbvDesc.SizeInBytes = sizeof(SceneConstantBuffer);
 
-            device->CreateConstantBufferView(&cbvDesc, cbvSrvUavHandle);
-            cube.m_gpuHandles.push_back(gpuHandle);
-            MoveCPUAndGPUDescriptorHandle(&cbvSrvUavHandle, &gpuHandle, 1, cbvSrvUavDescriptorSize);
+                device->CreateConstantBufferView(&cbvDesc, cbvSrvUavHandle);
+                cube.m_gpuHandles.push_back(gpuHandle);
+                MoveCPUAndGPUDescriptorHandle(&cbvSrvUavHandle, &gpuHandle, 1, cbvSrvUavDescriptorSize);
 
-            // Do not unmap this until app close
-            D3D12_RANGE readRange = { 0, 0 };
-            ThrowIfFailed(cube.m_constantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&cube.m_pCbvDataBegin)));
-            memcpy(cube.m_pCbvDataBegin, &cube.m_constantBufferData, sizeof(cube.m_constantBufferData));
+                // Do not unmap this until app close
+                D3D12_RANGE readRange = { 0, 0 };
+                ThrowIfFailed(cube.m_constantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&cube.m_pCbvDataBegin)));
+                memcpy(cube.m_pCbvDataBegin, &cube.m_constantBufferData, sizeof(cube.m_constantBufferData));
+            }
+
+            {
+                // 2. MaterialConstantBuffer
+                CreateUploadHeap(device, sizeof(MaterialConstantBuffer), cube.m_materialConstantBuffer);
+
+                // Create constant buffer view
+                D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+                cbvDesc.BufferLocation = cube.m_materialConstantBuffer->GetGPUVirtualAddress();
+                cbvDesc.SizeInBytes = sizeof(MaterialConstantBuffer);
+
+                device->CreateConstantBufferView(&cbvDesc, cbvSrvUavHandle);
+                cube.m_gpuHandles.push_back(gpuHandle);
+                MoveCPUAndGPUDescriptorHandle(&cbvSrvUavHandle, &gpuHandle, 1, cbvSrvUavDescriptorSize);
+
+                // Do not unmap this until app close
+                D3D12_RANGE readRange = { 0, 0 };
+                ThrowIfFailed(cube.m_materialConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&cube.m_pMatCbvDataBegin)));
+                memcpy(cube.m_pMatCbvDataBegin, &cube.m_materialConstantBufferData, sizeof(cube.m_materialConstantBufferData));
+            }
         }
 
         // Create the texture
@@ -223,11 +260,14 @@ public:
 
     ComPtr<ID3D12Resource> m_constantBuffer;
     SceneConstantBuffer m_constantBufferData;
+    ComPtr<ID3D12Resource> m_materialConstantBuffer;
+    MaterialConstantBuffer m_materialConstantBufferData;
     UINT8* m_pCbvDataBegin;
+    UINT8* m_pMatCbvDataBegin;
 
     ComPtr<ID3D12Resource> m_texture;
 
-    std::vector< D3D12_GPU_DESCRIPTOR_HANDLE> m_gpuHandles;
+    std::vector<D3D12_GPU_DESCRIPTOR_HANDLE> m_gpuHandles;
 
     static const UINT TextureWidth = 256;
     static const UINT TextureHeight = 256;
@@ -242,15 +282,20 @@ public:
     {
     }
 
-    void Render(ComPtr<ID3D12GraphicsCommandList>& commandList) const override
+    void Render(ComPtr<ID3D12GraphicsCommandList>& commandList) override
     {
+        m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
+        m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
+        m_materialConstantBufferData.shininess = 10.0f;
+        memcpy(m_pMatCbvDataBegin, &m_materialConstantBufferData, sizeof(m_materialConstantBufferData));
+
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
         D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = {m_vertexBufferView, m_instanceBufferView};
         commandList->IASetVertexBuffers(0, 2, pVertexBufferViews);
         commandList->IASetIndexBuffer(&m_indexBufferView);
-        for (int i = 0; i < m_gpuHandles.size(); i++)
-            commandList->SetGraphicsRootDescriptorTable(i, m_gpuHandles[i]);
+        //for (int i = 0; i < m_gpuHandles.size(); i++)
+        //    commandList->SetGraphicsRootDescriptorTable(i, m_gpuHandles[i]);
         commandList->DrawIndexedInstanced(m_numIndices, m_instanceCount, 0, 0, 0);
     }
 
@@ -280,7 +325,7 @@ public:
                     InstanceData data;
                     XMMATRIX world = XMMatrixTranslation((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, (k - 50.0f) * 4.0f);
                     XMStoreFloat4x4(&data.world, XMMatrixTranspose(world));
-                    world.r[3] = XMVectorZero();
+                    world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
                     XMStoreFloat4x4(&data.inverseTranspose, XMMatrixInverse(nullptr, world));
                     instances.push_back(data);
                 }

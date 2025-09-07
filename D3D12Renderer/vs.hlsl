@@ -1,4 +1,4 @@
-	struct VSInput
+struct VSInput
 {
 	float3 pos : POSITION;
 	float2 texCoord : TEXCOORD;
@@ -9,12 +9,13 @@
 
 struct PSInput
 {
-	float4 position : SV_POSITION;
+	float4 pos : SV_POSITION;
+	float3 posWorld : POSITION;
 	float2 texCoord : TEXCOORD;
 	float3 normal : NORMAL;
 };
 
-cbuffer SceneConstantBuffer : register(b0)
+cbuffer SceneConstantBuffer : register(b2)
 {
 	float4x4 world;
 	float4x4 view;
@@ -26,8 +27,8 @@ PSInput main(VSInput input)
 {
 	PSInput output;
 	
-	output.position = mul(mul(mul(float4(input.pos, 1.0f), mul(world, input.instanceWorld)), view), projection);
-	//output.position = mul(mul(mul(float4(input.pos, 1.0f), world), view), projection);
+	output.posWorld = mul(float4(input.pos, 1.0f), mul(world, input.instanceWorld)).xyz;
+	output.pos = mul(mul(float4(output.posWorld, 1.0f), view), projection);
 	output.texCoord = input.texCoord;
 	output.normal = mul(float4(input.normal, 0.0f), mul(input.instanceInverseTranspose, inverseTranspose)).xyz;
 	

@@ -16,6 +16,11 @@ Camera::Camera(float aspectRatio, XMFLOAT3 initialPosition)
     m_farPlane = 100.0f;
 }
 
+XMFLOAT3 Camera::GetPosition()
+{
+    return m_position;
+}
+
 XMMATRIX Camera::GetViewMatrix()
 {
     return XMMatrixLookToLH(XMLoadFloat3(&m_position), XMLoadFloat3(&m_orientation), XMLoadFloat3(&m_up));

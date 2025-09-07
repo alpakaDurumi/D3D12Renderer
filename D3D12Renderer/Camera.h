@@ -7,6 +7,7 @@ using namespace DirectX;
 class Camera {
 public:
     Camera(float aspectRatio, XMFLOAT3 initialPosition = { 0.0f, 0.0f, 0.0f });
+    XMFLOAT3 GetPosition();
     XMMATRIX GetViewMatrix();
     XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection);
     void SetAspectRatio(float aspectRatio);

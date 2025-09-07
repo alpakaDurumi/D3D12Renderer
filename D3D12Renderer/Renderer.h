@@ -14,6 +14,25 @@
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
+struct LightConstantBuffer
+{
+    XMFLOAT3 lightPos;
+    float padding0;
+    XMFLOAT3 lightDir;
+    float padding1;
+    XMFLOAT3 lightColor;
+    float lightIntensity;
+    float padding[52];
+};
+static_assert((sizeof(LightConstantBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
+
+struct CameraConstantBuffer
+{
+    XMFLOAT3 cameraPos;
+    float padding[61];
+};
+static_assert((sizeof(CameraConstantBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
+
 class Renderer
 {
 public:
@@ -67,6 +86,14 @@ private:
     Camera m_camera;
     InputManager m_inputManager;
     std::vector<Mesh*> m_meshes;
+    ComPtr<ID3D12Resource> m_lightConstantBuffer;
+    LightConstantBuffer m_lightConstantBufferData;
+    D3D12_GPU_DESCRIPTOR_HANDLE m_lightGpuHandle;
+    UINT8* m_pLightDataBegin;
+    ComPtr<ID3D12Resource> m_cameraConstantBuffer;
+    CameraConstantBuffer m_cameraConstantBufferData;
+    D3D12_GPU_DESCRIPTOR_HANDLE m_cameraGpuHandle;
+    UINT8* m_pCameraDataBegin;
 
     // Synchronization objects
     UINT m_frameIndex;

@@ -3,11 +3,50 @@ SamplerState g_sampler : register(s0);
 
 struct PSInput
 {
-	float4 position : SV_POSITION;
+	float4 pos : SV_POSITION;
+	float3 posWorld : POSITION;
 	float2 texCoord : TEXCOORD;
+	float3 normal : NORMAL;
 };
+
+cbuffer LightConstantBuffer : register(b0)
+{
+	float3 lightPos;
+	float3 lightDir;
+	float3 lightColor;
+	float lightIntensity;
+}
+
+cbuffer CameraConstantBuffer : register(b1)
+{
+	float3 cameraPos;
+}
+
+cbuffer MaterialConstantBuffer : register(b3)
+{
+	float3 materialAmbient;
+	float3 materialSpecular;
+	float shininess;
+}
 
 float4 main(PSInput input) : SV_TARGET
 {
-	return g_texture.Sample(g_sampler, input.texCoord);
+	float3 toLight = normalize(lightPos - input.posWorld);
+	float3 toCamera = normalize(cameraPos - input.posWorld);
+	float3 halfWay = normalize(toLight + toCamera);
+	
+	float3 texColor = g_texture.Sample(g_sampler, input.texCoord).rgb;
+	
+	// Ambient
+	float3 ambient = materialAmbient * texColor;
+	
+	// Diffuse
+	float nDotL = max(dot(input.normal, toLight), 0.0f);
+	float3 diffuse = texColor * nDotL * lightColor;
+	
+	// Specular
+	float nDotH = max(dot(input.normal, halfWay), 0.0f);
+	float3 specular = pow(nDotH, shininess) * materialSpecular * lightColor;
+	
+	return float4(ambient + diffuse + specular, 1.0f);
 }

@@ -39,6 +39,15 @@ void Renderer::OnUpdate()
     XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
     m_camera.Rotate(mouseMove);
 
+    m_lightConstantBufferData.lightPos = { 0.0f, 100.0f, 0.0f };
+    m_lightConstantBufferData.lightDir = { -1.0f, -1.0f, 1.0f };
+    m_lightConstantBufferData.lightColor = { 1.0f, 1.0f, 1.0f };
+    m_lightConstantBufferData.lightIntensity = 1.0f;
+    memcpy(m_pLightDataBegin, &m_lightConstantBufferData, sizeof(m_lightConstantBufferData));
+
+    m_cameraConstantBufferData.cameraPos = m_camera.GetPosition();
+    memcpy(m_pCameraDataBegin, &m_cameraConstantBufferData, sizeof(m_cameraConstantBufferData));
+
     for (auto& mesh : m_meshes)
     {
         //XMMATRIX world = XMMatrixRotationY(XMConvertToRadians(25.0f)) * XMMatrixRotationX(XMConvertToRadians(-25.0f));
@@ -46,7 +55,7 @@ void Renderer::OnUpdate()
         XMStoreFloat4x4(&mesh->m_constantBufferData.world, XMMatrixTranspose(world));
         XMStoreFloat4x4(&mesh->m_constantBufferData.view, XMMatrixTranspose(m_camera.GetViewMatrix()));
         XMStoreFloat4x4(&mesh->m_constantBufferData.projection, XMMatrixTranspose(m_camera.GetProjectionMatrix(true)));
-        world.r[3] = XMVectorZero();
+        world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
         XMStoreFloat4x4(&mesh->m_constantBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
         memcpy(mesh->m_pCbvDataBegin, &mesh->m_constantBufferData, sizeof(mesh->m_constantBufferData));
     }
@@ -179,7 +188,7 @@ void Renderer::LoadPipeline()
 
         // Describe and create a descriptor heap for CBV, SRV, UAV
         D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-        srvHeapDesc.NumDescriptors = 2;
+        srvHeapDesc.NumDescriptors = 5;     // light + camera + transform + material + texture
         srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         ThrowIfFailed(m_device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_cbvSrvUavHeap)));
@@ -229,7 +238,7 @@ void Renderer::LoadAssets()
         // idx 0 for CBV, 1 for SRV
         D3D12_DESCRIPTOR_RANGE1 ranges[2];
         ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        ranges[0].NumDescriptors = 1;
+        ranges[0].NumDescriptors = 4;
         ranges[0].BaseShaderRegister = 0;
         ranges[0].RegisterSpace = 0;
         ranges[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
@@ -246,7 +255,7 @@ void Renderer::LoadAssets()
         D3D12_ROOT_PARAMETER1 rootParameters[2];
         rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         rootParameters[0].DescriptorTable = { 1, &ranges[0] };
-        rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+        rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         rootParameters[1].DescriptorTable = { 1, &ranges[1] };
@@ -451,6 +460,45 @@ void Renderer::LoadAssets()
         //ThrowIfFailed(m_bundle->Close());
     }
 
+    D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
+    D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
+
+    // Lights
+    {
+        CreateUploadHeap(m_device, sizeof(LightConstantBuffer), m_lightConstantBuffer);
+
+        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+        cbvDesc.BufferLocation = m_lightConstantBuffer->GetGPUVirtualAddress();
+        cbvDesc.SizeInBytes = sizeof(LightConstantBuffer);
+
+        m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
+        m_lightGpuHandle = gpuHandle;
+        MoveCPUAndGPUDescriptorHandle(&cpuHandle, &gpuHandle, 1, m_srvCbvDescriptorSize);
+
+        // Do not unmap this until app close
+        D3D12_RANGE readRange = { 0, 0 };
+        ThrowIfFailed(m_lightConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_pLightDataBegin)));
+        memcpy(m_pLightDataBegin, &m_lightConstantBufferData, sizeof(m_lightConstantBufferData));
+    }
+
+    // Camera
+    {
+        CreateUploadHeap(m_device, sizeof(CameraConstantBuffer), m_cameraConstantBuffer);
+
+        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+        cbvDesc.BufferLocation = m_cameraConstantBuffer->GetGPUVirtualAddress();
+        cbvDesc.SizeInBytes = sizeof(CameraConstantBuffer);
+
+        m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
+        m_cameraGpuHandle = gpuHandle;
+        MoveCPUAndGPUDescriptorHandle(&cpuHandle, &gpuHandle, 1, m_srvCbvDescriptorSize);
+
+        // Do not unmap this until app close
+        D3D12_RANGE readRange = { 0, 0 };
+        ThrowIfFailed(m_cameraConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_pCameraDataBegin)));
+        memcpy(m_pCameraDataBegin, &m_cameraConstantBufferData, sizeof(m_cameraConstantBufferData));
+    }
+
     ComPtr<ID3D12Resource> vertexBufferUploadHeap;
     ComPtr<ID3D12Resource> indexBufferUploadHeap;
     ComPtr<ID3D12Resource> textureUploadHeap;
@@ -458,8 +506,8 @@ void Renderer::LoadAssets()
     InstancedMesh* cube = new InstancedMesh(InstancedMesh::MakeCubeInstanced(
         m_device,
         m_commandList,
-        m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart(),
-        m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart(),
+        cpuHandle,
+        gpuHandle,
         m_srvCbvDescriptorSize,
         vertexBufferUploadHeap,
         indexBufferUploadHeap,
@@ -524,6 +572,11 @@ void Renderer::PopulateCommandList()
     const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
     m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     m_commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+    D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
+    m_commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
+    MoveGPUDescriptorHandle(&gpuHandle, 4, m_srvCbvDescriptorSize);
+    m_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
 
     for (const auto& mesh : m_meshes)
     {
