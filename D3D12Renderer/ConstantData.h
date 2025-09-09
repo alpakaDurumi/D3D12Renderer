@@ -4,16 +4,27 @@
 
 using namespace DirectX;
 
-struct SceneConstantData
+// CRTP for 256-byte alignment
+template<typename T>
+struct ConstantData
+{
+    // static_assert must be in in a member function (like the constructor)
+    // because the derived class T is an incomplete type at the point of inheritance
+    ConstantData()
+    {
+        static_assert((sizeof(T) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
+    }
+};
+
+struct SceneConstantData : public ConstantData<SceneConstantData>
 {
     XMFLOAT4X4 world;
     XMFLOAT4X4 view;
     XMFLOAT4X4 projection;
     XMFLOAT4X4 inverseTranspose;
 };
-static_assert((sizeof(SceneConstantData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
-struct MaterialConstantData
+struct MaterialConstantData : public ConstantData<MaterialConstantData>
 {
     XMFLOAT3 materialAmbient;
     float padding0;
@@ -21,9 +32,8 @@ struct MaterialConstantData
     float shininess;
     float padding[56];
 };
-static_assert((sizeof(MaterialConstantData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
-struct LightConstantData
+struct LightConstantData : public ConstantData<LightConstantData>
 {
     XMFLOAT3 lightPos;
     float padding0;
@@ -33,11 +43,9 @@ struct LightConstantData
     float lightIntensity;
     float padding[52];
 };
-static_assert((sizeof(LightConstantData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
-struct CameraConstantData
+struct CameraConstantData : public ConstantData<CameraConstantData>
 {
     XMFLOAT3 cameraPos;
     float padding[61];
 };
-static_assert((sizeof(CameraConstantData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
