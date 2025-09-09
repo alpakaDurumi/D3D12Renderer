@@ -1,37 +1,23 @@
 #pragma once
 
-#include <string>
 #include <Windows.h>
 #include <wrl/client.h>
-#include <DirectXMath.h>
+
 #include <d3d12.h>
 #include <dxgi1_6.h>    // DXGI 1.6
+#include <DirectXMath.h>
+
+#include <string>
 #include <vector>
+
 #include "Camera.h"
 #include "InputManager.h"
 #include "Mesh.h"
+#include "FrameResource.h"
+#include "ConstantData.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
-
-struct LightConstantBuffer
-{
-    XMFLOAT3 lightPos;
-    float padding0;
-    XMFLOAT3 lightDir;
-    float padding1;
-    XMFLOAT3 lightColor;
-    float lightIntensity;
-    float padding[52];
-};
-static_assert((sizeof(LightConstantBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
-
-struct CameraConstantBuffer
-{
-    XMFLOAT3 cameraPos;
-    float padding[61];
-};
-static_assert((sizeof(CameraConstantBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
 class Renderer
 {
@@ -59,6 +45,10 @@ private:
 
     static const UINT FrameCount = 2;
 
+    static const UINT TextureWidth = 256;
+    static const UINT TextureHeight = 256;
+    static const UINT TexturePixelSize = 4;    // The number of bytes used to represent a pixel in the texture.
+
     // Adapter info
     bool m_useWarpDevice = false;
 
@@ -67,10 +57,9 @@ private:
     D3D12_RECT m_scissorRect;
     ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12Device> m_device;
-    ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
     ComPtr<ID3D12Resource> m_depthStencil;
-    ComPtr<ID3D12CommandAllocator> m_commandAllocators[FrameCount];
-    ComPtr<ID3D12CommandAllocator> m_bundleAllocator;
+    ComPtr<ID3D12CommandAllocator> m_commandAllocator;      // For frame-independent job
+    //ComPtr<ID3D12CommandAllocator> m_bundleAllocator;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12RootSignature> m_rootSignature;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
@@ -78,22 +67,19 @@ private:
     ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
     ComPtr<ID3D12PipelineState> m_pipelineState;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
-    ComPtr<ID3D12GraphicsCommandList> m_bundle;
+    //ComPtr<ID3D12GraphicsCommandList> m_bundle;
     UINT m_rtvDescriptorSize;
-    UINT m_srvCbvDescriptorSize;
+    UINT m_cbvSrvUavDescriptorSize;
 
     // App resources
     Camera m_camera;
     InputManager m_inputManager;
     std::vector<Mesh*> m_meshes;
-    ComPtr<ID3D12Resource> m_lightConstantBuffer;
-    LightConstantBuffer m_lightConstantBufferData;
-    D3D12_GPU_DESCRIPTOR_HANDLE m_lightGpuHandle;
-    UINT8* m_pLightDataBegin;
-    ComPtr<ID3D12Resource> m_cameraConstantBuffer;
-    CameraConstantBuffer m_cameraConstantBufferData;
-    D3D12_GPU_DESCRIPTOR_HANDLE m_cameraGpuHandle;
-    UINT8* m_pCameraDataBegin;
+    LightConstantData m_lightConstantData;
+    CameraConstantData m_cameraConstantData;
+    ComPtr<ID3D12Resource> m_texture;
+
+    std::vector<FrameResource*> m_frameResources;
 
     // Synchronization objects
     UINT m_frameIndex;

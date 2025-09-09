@@ -9,7 +9,14 @@ struct PSInput
 	float3 normal : NORMAL;
 };
 
-cbuffer LightConstantBuffer : register(b0)
+cbuffer MaterialConstantBuffer : register(b1)
+{
+	float3 materialAmbient;
+	float3 materialSpecular;
+	float shininess;
+}
+
+cbuffer LightConstantBuffer : register(b2)
 {
 	float3 lightPos;
 	float3 lightDir;
@@ -17,16 +24,9 @@ cbuffer LightConstantBuffer : register(b0)
 	float lightIntensity;
 }
 
-cbuffer CameraConstantBuffer : register(b1)
+cbuffer CameraConstantBuffer : register(b3)
 {
 	float3 cameraPos;
-}
-
-cbuffer MaterialConstantBuffer : register(b3)
-{
-	float3 materialAmbient;
-	float3 materialSpecular;
-	float shininess;
 }
 
 float4 main(PSInput input) : SV_TARGET

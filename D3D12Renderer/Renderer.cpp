@@ -10,7 +10,7 @@
 using namespace D3DHelper;
 
 Renderer::Renderer(UINT width, UINT height, std::wstring name)
-    : m_width(width), m_height(height), m_title(name), m_rtvDescriptorSize(0), m_srvCbvDescriptorSize(0), m_frameIndex(0), m_fenceValues{ 0 },
+    : m_width(width), m_height(height), m_title(name), m_rtvDescriptorSize(0), m_cbvSrvUavDescriptorSize(0), m_frameIndex(0), m_fenceValues{ 0 },
     m_camera(static_cast<float>(width) / static_cast<float>(height), { 0.0f, 0.0f, -5.0f })
 {
     m_viewport = { 0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f };
@@ -19,6 +19,10 @@ Renderer::Renderer(UINT width, UINT height, std::wstring name)
 
 Renderer::~Renderer()
 {
+    for (auto* pFrameResource : m_frameResources)
+        delete pFrameResource;
+    for (auto* pMesh : m_meshes)
+        delete pMesh;
 }
 
 void Renderer::OnInit()
@@ -39,26 +43,34 @@ void Renderer::OnUpdate()
     XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
     m_camera.Rotate(mouseMove);
 
-    m_lightConstantBufferData.lightPos = { 0.0f, 100.0f, 0.0f };
-    m_lightConstantBufferData.lightDir = { -1.0f, -1.0f, 1.0f };
-    m_lightConstantBufferData.lightColor = { 1.0f, 1.0f, 1.0f };
-    m_lightConstantBufferData.lightIntensity = 1.0f;
-    memcpy(m_pLightDataBegin, &m_lightConstantBufferData, sizeof(m_lightConstantBufferData));
+    // 이번에 드로우할 프레임에 대해 constant buffers 업데이트
+    FrameResource* pFrameResource = m_frameResources[m_frameIndex];
 
-    m_cameraConstantBufferData.cameraPos = m_camera.GetPosition();
-    memcpy(m_pCameraDataBegin, &m_cameraConstantBufferData, sizeof(m_cameraConstantBufferData));
-
-    for (auto& mesh : m_meshes)
+    for (auto* pMesh : m_meshes)
     {
         //XMMATRIX world = XMMatrixRotationY(XMConvertToRadians(25.0f)) * XMMatrixRotationX(XMConvertToRadians(-25.0f));
         XMMATRIX world = XMMatrixIdentity();
-        XMStoreFloat4x4(&mesh->m_constantBufferData.world, XMMatrixTranspose(world));
-        XMStoreFloat4x4(&mesh->m_constantBufferData.view, XMMatrixTranspose(m_camera.GetViewMatrix()));
-        XMStoreFloat4x4(&mesh->m_constantBufferData.projection, XMMatrixTranspose(m_camera.GetProjectionMatrix(true)));
+        XMStoreFloat4x4(&pMesh->m_constantBufferData.world, XMMatrixTranspose(world));
+        XMStoreFloat4x4(&pMesh->m_constantBufferData.view, XMMatrixTranspose(m_camera.GetViewMatrix()));
+        XMStoreFloat4x4(&pMesh->m_constantBufferData.projection, XMMatrixTranspose(m_camera.GetProjectionMatrix(true)));
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        XMStoreFloat4x4(&mesh->m_constantBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
-        memcpy(mesh->m_pCbvDataBegin, &mesh->m_constantBufferData, sizeof(mesh->m_constantBufferData));
+        XMStoreFloat4x4(&pMesh->m_constantBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
+        memcpy(pFrameResource->m_pSceneBufferBegin, &pMesh->m_constantBufferData, sizeof(SceneConstantData));
+
+        pMesh->m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
+        pMesh->m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
+        pMesh->m_materialConstantBufferData.shininess = 10.0f;
+        memcpy(pFrameResource->m_pMaterialBufferBegin, &pMesh->m_materialConstantBufferData, sizeof(MaterialConstantData));
     }
+
+    m_lightConstantData.lightPos = { 0.0f, 100.0f, 0.0f };
+    m_lightConstantData.lightDir = { -1.0f, -1.0f, 1.0f };
+    m_lightConstantData.lightColor = { 1.0f, 1.0f, 1.0f };
+    m_lightConstantData.lightIntensity = 1.0f;
+    memcpy(pFrameResource->m_pLightBufferBegin, &m_lightConstantData, sizeof(LightConstantData));
+
+    m_cameraConstantData.cameraPos = m_camera.GetPosition();
+    memcpy(pFrameResource->m_pCameraBufferBegin, &m_cameraConstantData, sizeof(CameraConstantData));
 }
 
 // Render the scene.
@@ -171,6 +183,7 @@ void Renderer::LoadPipeline()
         swapChain.GetAddressOf()
     ));
 
+    // GetCurrentBackBufferIndex을 사용하기 위해 IDXGISwapChain3로 쿼리
     ThrowIfFailed(swapChain.As(&m_swapChain));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
@@ -188,7 +201,7 @@ void Renderer::LoadPipeline()
 
         // Describe and create a descriptor heap for CBV, SRV, UAV
         D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-        srvHeapDesc.NumDescriptors = 5;     // light + camera + transform + material + texture
+        srvHeapDesc.NumDescriptors = FrameCount * 4 + 1;     // (light + camera + transform + material) * FrameCount + texture
         srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         ThrowIfFailed(m_device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_cbvSrvUavHeap)));
@@ -201,25 +214,25 @@ void Renderer::LoadPipeline()
         ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap)));
 
         m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-        m_srvCbvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        m_cbvSrvUavDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
     // Create frame resources
     {
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
 
-        // Create a RTV for each frame.
-        for (UINT n = 0; n < FrameCount; n++)
+        // Create a RTV and command allocator for each frame
+        for (UINT i = 0; i < FrameCount; i++)
         {
-            ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
-            m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
+            FrameResource* pFrameResource = new FrameResource(m_device, m_swapChain, i, rtvHandle);
             MoveCPUDescriptorHandle(&rtvHandle, 1, m_rtvDescriptorSize);
-
-            ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
+            m_frameResources.push_back(pFrameResource);
         }
     }
 
-    ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_BUNDLE, IID_PPV_ARGS(&m_bundleAllocator)));
+    // 프레임에 독립적인 command allocator를 하나 생성. 프레임과 무관한 작업을 할 때 사용
+    ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
+    //ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_BUNDLE, IID_PPV_ARGS(&m_bundleAllocator)));
 }
 
 // Load the sample assets.
@@ -238,7 +251,7 @@ void Renderer::LoadAssets()
         // idx 0 for CBV, 1 for SRV
         D3D12_DESCRIPTOR_RANGE1 ranges[2];
         ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        ranges[0].NumDescriptors = 4;
+        ranges[0].NumDescriptors = 4;       // light + camera + transform + material
         ranges[0].BaseShaderRegister = 0;
         ranges[0].RegisterSpace = 0;
         ranges[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
@@ -446,7 +459,7 @@ void Renderer::LoadAssets()
     }
 
     // Create the command list.
-    ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[m_frameIndex].Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
+    ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
 
     // Create and record the bundle
     {
@@ -460,60 +473,143 @@ void Renderer::LoadAssets()
         //ThrowIfFailed(m_bundle->Close());
     }
 
-    D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
-    D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
-
-    // Lights
-    {
-        CreateUploadHeap(m_device, sizeof(LightConstantBuffer), m_lightConstantBuffer);
-
-        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-        cbvDesc.BufferLocation = m_lightConstantBuffer->GetGPUVirtualAddress();
-        cbvDesc.SizeInBytes = sizeof(LightConstantBuffer);
-
-        m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
-        m_lightGpuHandle = gpuHandle;
-        MoveCPUAndGPUDescriptorHandle(&cpuHandle, &gpuHandle, 1, m_srvCbvDescriptorSize);
-
-        // Do not unmap this until app close
-        D3D12_RANGE readRange = { 0, 0 };
-        ThrowIfFailed(m_lightConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_pLightDataBegin)));
-        memcpy(m_pLightDataBegin, &m_lightConstantBufferData, sizeof(m_lightConstantBufferData));
-    }
-
-    // Camera
-    {
-        CreateUploadHeap(m_device, sizeof(CameraConstantBuffer), m_cameraConstantBuffer);
-
-        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-        cbvDesc.BufferLocation = m_cameraConstantBuffer->GetGPUVirtualAddress();
-        cbvDesc.SizeInBytes = sizeof(CameraConstantBuffer);
-
-        m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
-        m_cameraGpuHandle = gpuHandle;
-        MoveCPUAndGPUDescriptorHandle(&cpuHandle, &gpuHandle, 1, m_srvCbvDescriptorSize);
-
-        // Do not unmap this until app close
-        D3D12_RANGE readRange = { 0, 0 };
-        ThrowIfFailed(m_cameraConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_pCameraDataBegin)));
-        memcpy(m_pCameraDataBegin, &m_cameraConstantBufferData, sizeof(m_cameraConstantBufferData));
-    }
-
+    // 프레임과 무관한 정적 데이터를 먼저 생성
     ComPtr<ID3D12Resource> vertexBufferUploadHeap;
     ComPtr<ID3D12Resource> indexBufferUploadHeap;
     ComPtr<ID3D12Resource> textureUploadHeap;
     ComPtr<ID3D12Resource> instanceUploadHeap;
+
     InstancedMesh* cube = new InstancedMesh(InstancedMesh::MakeCubeInstanced(
         m_device,
         m_commandList,
-        cpuHandle,
-        gpuHandle,
-        m_srvCbvDescriptorSize,
         vertexBufferUploadHeap,
         indexBufferUploadHeap,
-        textureUploadHeap,
         instanceUploadHeap));
     m_meshes.push_back(cube);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
+    D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
+
+    // Create constant buffers for each frame
+    for (UINT i = 0; i < FrameCount; i++)
+    {
+        FrameResource* pFrameResource = m_frameResources[i];
+
+        // Meshes
+        {
+            for (auto* pMesh : m_meshes)
+            {
+                {
+                    // Scene
+                    CreateUploadHeap(m_device, sizeof(SceneConstantData), pFrameResource->m_sceneConstantBuffer);
+
+                    // Create constant buffer view
+                    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+                    cbvDesc.BufferLocation = pFrameResource->m_sceneConstantBuffer->GetGPUVirtualAddress();
+                    cbvDesc.SizeInBytes = sizeof(SceneConstantData);
+
+                    m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
+                    MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
+
+                    // Do not unmap this until app close
+                    D3D12_RANGE readRange = { 0, 0 };
+                    ThrowIfFailed(pFrameResource->m_sceneConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pFrameResource->m_pSceneBufferBegin)));
+                    memcpy(pFrameResource->m_pSceneBufferBegin, &pMesh->m_constantBufferData, sizeof(SceneConstantData));
+                }
+
+                {
+                    // Material
+                    CreateUploadHeap(m_device, sizeof(MaterialConstantData), pFrameResource->m_materialConstantBuffer);
+
+                    // Create constant buffer view
+                    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+                    cbvDesc.BufferLocation = pFrameResource->m_materialConstantBuffer->GetGPUVirtualAddress();
+                    cbvDesc.SizeInBytes = sizeof(MaterialConstantData);
+
+                    m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
+                    MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
+
+                    // Do not unmap this until app close
+                    D3D12_RANGE readRange = { 0, 0 };
+                    ThrowIfFailed(pFrameResource->m_materialConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pFrameResource->m_pMaterialBufferBegin)));
+                    memcpy(pFrameResource->m_pMaterialBufferBegin, &pMesh->m_materialConstantBufferData, sizeof(MaterialConstantData));
+                }
+            }
+        }
+
+        // Lights
+        {
+            CreateUploadHeap(m_device, sizeof(LightConstantData), pFrameResource->m_lightConstantBuffer);
+
+            D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+            cbvDesc.BufferLocation = pFrameResource->m_lightConstantBuffer->GetGPUVirtualAddress();
+            cbvDesc.SizeInBytes = sizeof(LightConstantData);
+
+            m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
+            MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
+
+            // Do not unmap this until app close
+            D3D12_RANGE readRange = { 0, 0 };
+            ThrowIfFailed(pFrameResource->m_lightConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pFrameResource->m_pLightBufferBegin)));
+            memcpy(pFrameResource->m_pLightBufferBegin, &m_lightConstantData, sizeof(LightConstantData));
+        }
+
+        // Camera
+        {
+            CreateUploadHeap(m_device, sizeof(CameraConstantData), pFrameResource->m_cameraConstantBuffer);
+
+            D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+            cbvDesc.BufferLocation = pFrameResource->m_cameraConstantBuffer->GetGPUVirtualAddress();
+            cbvDesc.SizeInBytes = sizeof(CameraConstantData);
+
+            m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
+            MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
+
+            // Do not unmap this until app close
+            D3D12_RANGE readRange = { 0, 0 };
+            ThrowIfFailed(pFrameResource->m_cameraConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pFrameResource->m_pCameraBufferBegin)));
+            memcpy(pFrameResource->m_pCameraBufferBegin, &m_cameraConstantData, sizeof(CameraConstantData));
+        }
+    }
+
+    // Create the texture
+    // 일단은 디스크립터 힙 마지막에 넣는 방법을 임시로 사용
+    {
+        CreateDefaultHeapForTexture(m_device, m_texture, TextureWidth, TextureHeight);
+
+        // Calculate required size for data upload
+        D3D12_RESOURCE_DESC desc = m_texture->GetDesc();
+        D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts = {};
+        UINT numRows = 0;
+        UINT64 rowSizeInBytes = 0;
+        UINT64 requiredSize = 0;
+        m_device->GetCopyableFootprints(&desc, 0, 1, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
+
+        CreateUploadHeap(m_device, requiredSize, textureUploadHeap);
+
+        // 텍스처 데이터는 인자로 받도록 수정하기
+        std::vector<UINT8> texture = GenerateTextureData(TextureWidth, TextureHeight, TexturePixelSize);
+        D3D12_SUBRESOURCE_DATA textureData = {};
+        textureData.pData = &texture[0];
+        textureData.RowPitch = TextureWidth * TexturePixelSize;
+        textureData.SlicePitch = textureData.RowPitch * TextureHeight;
+
+        UpdateSubResources(m_device, m_commandList, m_texture, textureUploadHeap, &textureData);
+
+        // Change resource state
+        D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(m_texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        m_commandList->ResourceBarrier(1, &barrier);
+
+        // Describe and create a SRV for the texture.
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = desc.Format;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels = 1;
+
+        m_device->CreateShaderResourceView(m_texture.Get(), &srvDesc, cpuHandle);
+        MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
+    }
 
     ThrowIfFailed(m_commandList->Close());
 
@@ -522,8 +618,8 @@ void Renderer::LoadAssets()
 
     // Create synchronization objects and wait until assets have been uploaded to the GPU.
     {
-        ThrowIfFailed(m_device->CreateFence(m_fenceValues[m_frameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
-        m_fenceValues[m_frameIndex]++;
+        ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+        m_frameResources[m_frameIndex]->m_fenceValue++;
 
         // Create an event handle to use for frame synchronization.
         m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
@@ -541,15 +637,17 @@ void Renderer::LoadAssets()
 
 void Renderer::PopulateCommandList()
 {
+    FrameResource* pFrameResource = m_frameResources[m_frameIndex];
+
     // Command list allocators can only be reset when the associated 
     // command lists have finished execution on the GPU; apps should use 
     // fences to determine GPU execution progress.
-    ThrowIfFailed(m_commandAllocators[m_frameIndex]->Reset());
+    ThrowIfFailed(pFrameResource->m_commandAllocator->Reset());
 
     // However, when ExecuteCommandList() is called on a particular command 
     // list, that command list can then be reset at any time and must be before 
     // re-recording.
-    ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), m_pipelineState.Get()));
+    ThrowIfFailed(m_commandList->Reset(pFrameResource->m_commandAllocator.Get(), m_pipelineState.Get()));
 
     // Set necessary state.
     m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
@@ -561,7 +659,7 @@ void Renderer::PopulateCommandList()
     m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
     // Indicate that the back buffer will be used as a render target.
-    D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(pFrameResource->m_renderTarget, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
     m_commandList->ResourceBarrier(1, &barrier);
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
@@ -573,18 +671,22 @@ void Renderer::PopulateCommandList()
     m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     m_commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
+    // 각 프레임의 디스크립터를 쓰도록 인덱싱
     D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
+    MoveGPUDescriptorHandle(&gpuHandle, m_frameIndex * 4, m_cbvSrvUavDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
-    MoveGPUDescriptorHandle(&gpuHandle, 4, m_srvCbvDescriptorSize);
+    // 핸들을 다시 처음으로 이동시킨 후, 맨 끝의 SRV 디스크립터를 가리키도록 이동
+    gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
+    MoveGPUDescriptorHandle(&gpuHandle, FrameCount * 4, m_cbvSrvUavDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
 
-    for (const auto& mesh : m_meshes)
+    for (const auto* pMesh : m_meshes)
     {
-        mesh->Render(m_commandList);
+        pMesh->Render(m_commandList);
     }
 
     // Indicate that the back buffer will now be used to present.
-    barrier = GetTransitionBarrier(m_renderTargets[m_frameIndex], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+    barrier = GetTransitionBarrier(pFrameResource->m_renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
     m_commandList->ResourceBarrier(1, &barrier);
 
     ThrowIfFailed(m_commandList->Close());
@@ -593,30 +695,30 @@ void Renderer::PopulateCommandList()
 // Wait for pending GPU work to complete
 void Renderer::WaitForGPU()
 {
-    ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), m_fenceValues[m_frameIndex]));
-
-    ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValues[m_frameIndex], m_fenceEvent));
+    ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), m_frameResources[m_frameIndex]->m_fenceValue));
+    
+    ThrowIfFailed(m_fence->SetEventOnCompletion(m_frameResources[m_frameIndex]->m_fenceValue, m_fenceEvent));
     WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
 
-    m_fenceValues[m_frameIndex]++;
+    m_frameResources[m_frameIndex]->m_fenceValue++;
 }
 
 void Renderer::MoveToNextFrame()
 {
     // 이전 프레임에 대한 fence 값
-    const UINT64 currentFenceValue = m_fenceValues[m_frameIndex];
+    const UINT64 currentFenceValue = m_frameResources[m_frameIndex]->m_fenceValue;
     ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), currentFenceValue));
 
-    // 현재 프레임에 대한 fence 값. Present를 했기 때문에 인덱스가 바뀌어있음
+    // 현재 프레임 인덱스. Present를 했기 때문에 인덱스가 업데이트되어있다.
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
     // 현재 프레임에 대한 GPU 작업이 끝나 있는지, 즉 작업할 준비가 되어있는지 검사
-    if (m_fence->GetCompletedValue() < m_fenceValues[m_frameIndex])
+    if (m_fence->GetCompletedValue() < m_frameResources[m_frameIndex]->m_fenceValue)
     {
-        ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValues[m_frameIndex], m_fenceEvent));
+        ThrowIfFailed(m_fence->SetEventOnCompletion(m_frameResources[m_frameIndex]->m_fenceValue, m_fenceEvent));
         WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
     }
 
     // 현재 프레임에 대한 목표 fence 값 증가
-    m_fenceValues[m_frameIndex] = currentFenceValue + 1;
+    m_frameResources[m_frameIndex]->m_fenceValue = currentFenceValue + 1;
 }

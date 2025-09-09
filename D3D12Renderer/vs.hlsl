@@ -15,7 +15,7 @@ struct PSInput
 	float3 normal : NORMAL;
 };
 
-cbuffer SceneConstantBuffer : register(b2)
+cbuffer SceneConstantBuffer : register(b0)
 {
 	float4x4 world;
 	float4x4 view;
