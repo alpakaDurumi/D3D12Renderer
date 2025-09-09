@@ -45,10 +45,6 @@ private:
 
     static const UINT FrameCount = 2;
 
-    static const UINT TextureWidth = 256;
-    static const UINT TextureHeight = 256;
-    static const UINT TexturePixelSize = 4;    // The number of bytes used to represent a pixel in the texture.
-
     // Adapter info
     bool m_useWarpDevice = false;
 
@@ -70,6 +66,8 @@ private:
     //ComPtr<ID3D12GraphicsCommandList> m_bundle;
     UINT m_rtvDescriptorSize;
     UINT m_cbvSrvUavDescriptorSize;
+    UINT m_srvDescriptorOffset;         // m_cbvSrvUavHeap 내에서 SRV가 시작되는 부분
+    UINT m_numConstantBuffers = 4;      // light + camera + transform + material
 
     // App resources
     Camera m_camera;

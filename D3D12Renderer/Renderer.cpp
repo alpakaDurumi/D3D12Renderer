@@ -192,7 +192,7 @@ void Renderer::LoadPipeline()
 
     // Create descriptor heaps
     {
-        // Describe and create a render target view (RTV) descriptor heap
+        // RTV descriptor heap
         D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
         rtvHeapDesc.NumDescriptors = FrameCount;
         rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
@@ -200,13 +200,13 @@ void Renderer::LoadPipeline()
         ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
 
         // Describe and create a descriptor heap for CBV, SRV, UAV
-        D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-        srvHeapDesc.NumDescriptors = FrameCount * 4 + 1;     // (light + camera + transform + material) * FrameCount + texture
-        srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        ThrowIfFailed(m_device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_cbvSrvUavHeap)));
+        D3D12_DESCRIPTOR_HEAP_DESC cbvSrvUavDesc = {};
+        cbvSrvUavDesc.NumDescriptors = FrameCount * m_numConstantBuffers + 1;     // (light + camera + transform + material) * FrameCount + texture
+        cbvSrvUavDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        cbvSrvUavDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        ThrowIfFailed(m_device->CreateDescriptorHeap(&cbvSrvUavDesc, IID_PPV_ARGS(&m_cbvSrvUavHeap)));
 
-        // Depth stencil view heap
+        // DSV descriptor heap
         D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
         dsvHeapDesc.NumDescriptors = 1;
         dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
@@ -215,6 +215,7 @@ void Renderer::LoadPipeline()
 
         m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
         m_cbvSrvUavDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        m_srvDescriptorOffset = FrameCount * m_numConstantBuffers;
     }
 
     // Create frame resources
@@ -251,7 +252,7 @@ void Renderer::LoadAssets()
         // idx 0 for CBV, 1 for SRV
         D3D12_DESCRIPTOR_RANGE1 ranges[2];
         ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        ranges[0].NumDescriptors = 4;       // light + camera + transform + material
+        ranges[0].NumDescriptors = m_numConstantBuffers;
         ranges[0].BaseShaderRegister = 0;
         ranges[0].RegisterSpace = 0;
         ranges[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
@@ -479,16 +480,24 @@ void Renderer::LoadAssets()
     ComPtr<ID3D12Resource> textureUploadHeap;
     ComPtr<ID3D12Resource> instanceUploadHeap;
 
-    InstancedMesh* cube = new InstancedMesh(InstancedMesh::MakeCubeInstanced(
+    // 디스크립터 힙 내에서 SRV 구역을 가리키는 handle 생성
+    // 여러 SRV를 쓰도록 확장하게 되면 빈 자리를 받아서 사용하도록 해야한다
+    // 해당 빈자리에 대한 인덱스(오프셋)을 메쉬 생성 함수로 전달해서 멤버로 저장하도록 해야 함
+    D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
+    MoveCPUDescriptorHandle(&cpuHandle, m_srvDescriptorOffset, m_cbvSrvUavDescriptorSize);
+
+    InstancedMesh* pCube = new InstancedMesh(InstancedMesh::MakeCubeInstanced(
         m_device,
         m_commandList,
         vertexBufferUploadHeap,
         indexBufferUploadHeap,
-        instanceUploadHeap));
-    m_meshes.push_back(cube);
+        instanceUploadHeap,
+        textureUploadHeap,
+        cpuHandle));
+    m_meshes.push_back(pCube);
 
-    D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
-    D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
+    // CBV를 생성하기 위해 다시 시작 지점으로 복귀
+    cpuHandle = m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
 
     // Create constant buffers for each frame
     for (UINT i = 0; i < FrameCount; i++)
@@ -499,8 +508,8 @@ void Renderer::LoadAssets()
         {
             for (auto* pMesh : m_meshes)
             {
+                // Scene
                 {
-                    // Scene
                     CreateUploadHeap(m_device, sizeof(SceneConstantData), pFrameResource->m_sceneConstantBuffer);
 
                     // Create constant buffer view
@@ -517,8 +526,8 @@ void Renderer::LoadAssets()
                     memcpy(pFrameResource->m_pSceneBufferBegin, &pMesh->m_constantBufferData, sizeof(SceneConstantData));
                 }
 
+                // Material
                 {
-                    // Material
                     CreateUploadHeap(m_device, sizeof(MaterialConstantData), pFrameResource->m_materialConstantBuffer);
 
                     // Create constant buffer view
@@ -570,45 +579,6 @@ void Renderer::LoadAssets()
             ThrowIfFailed(pFrameResource->m_cameraConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pFrameResource->m_pCameraBufferBegin)));
             memcpy(pFrameResource->m_pCameraBufferBegin, &m_cameraConstantData, sizeof(CameraConstantData));
         }
-    }
-
-    // Create the texture
-    // 일단은 디스크립터 힙 마지막에 넣는 방법을 임시로 사용
-    {
-        CreateDefaultHeapForTexture(m_device, m_texture, TextureWidth, TextureHeight);
-
-        // Calculate required size for data upload
-        D3D12_RESOURCE_DESC desc = m_texture->GetDesc();
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts = {};
-        UINT numRows = 0;
-        UINT64 rowSizeInBytes = 0;
-        UINT64 requiredSize = 0;
-        m_device->GetCopyableFootprints(&desc, 0, 1, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
-
-        CreateUploadHeap(m_device, requiredSize, textureUploadHeap);
-
-        // 텍스처 데이터는 인자로 받도록 수정하기
-        std::vector<UINT8> texture = GenerateTextureData(TextureWidth, TextureHeight, TexturePixelSize);
-        D3D12_SUBRESOURCE_DATA textureData = {};
-        textureData.pData = &texture[0];
-        textureData.RowPitch = TextureWidth * TexturePixelSize;
-        textureData.SlicePitch = textureData.RowPitch * TextureHeight;
-
-        UpdateSubResources(m_device, m_commandList, m_texture, textureUploadHeap, &textureData);
-
-        // Change resource state
-        D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(m_texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        m_commandList->ResourceBarrier(1, &barrier);
-
-        // Describe and create a SRV for the texture.
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = desc.Format;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2D.MipLevels = 1;
-
-        m_device->CreateShaderResourceView(m_texture.Get(), &srvDesc, cpuHandle);
-        MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
     }
 
     ThrowIfFailed(m_commandList->Close());
@@ -671,13 +641,14 @@ void Renderer::PopulateCommandList()
     m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     m_commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-    // 각 프레임의 디스크립터를 쓰도록 인덱싱
+    // 아래 view 지정 부분도 각 메쉬에 대해 알맞게 지정하도록 확장해야 함
+    // CBV 지정
     D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
-    MoveGPUDescriptorHandle(&gpuHandle, m_frameIndex * 4, m_cbvSrvUavDescriptorSize);
+    MoveGPUDescriptorHandle(&gpuHandle, m_frameIndex * m_numConstantBuffers, m_cbvSrvUavDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
-    // 핸들을 다시 처음으로 이동시킨 후, 맨 끝의 SRV 디스크립터를 가리키도록 이동
+    // SRV 지정
     gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
-    MoveGPUDescriptorHandle(&gpuHandle, FrameCount * 4, m_cbvSrvUavDescriptorSize);
+    MoveGPUDescriptorHandle(&gpuHandle, m_srvDescriptorOffset, m_cbvSrvUavDescriptorSize);
     m_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
 
     for (const auto* pMesh : m_meshes)
@@ -696,7 +667,7 @@ void Renderer::PopulateCommandList()
 void Renderer::WaitForGPU()
 {
     ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), m_frameResources[m_frameIndex]->m_fenceValue));
-    
+
     ThrowIfFailed(m_fence->SetEventOnCompletion(m_frameResources[m_frameIndex]->m_fenceValue, m_fenceEvent));
     WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
 
