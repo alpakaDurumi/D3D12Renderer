@@ -55,22 +55,22 @@ void Renderer::OnUpdate()
         XMStoreFloat4x4(&pMesh->m_constantBufferData.projection, XMMatrixTranspose(m_camera.GetProjectionMatrix(true)));
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
         XMStoreFloat4x4(&pMesh->m_constantBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
-        memcpy(pFrameResource->m_pSceneBufferBegin, &pMesh->m_constantBufferData, sizeof(SceneConstantData));
+        pFrameResource->m_sceneConstantBuffers[pMesh->m_sceneConstantBufferIndex]->Update(&pMesh->m_constantBufferData);
 
         pMesh->m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
         pMesh->m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
         pMesh->m_materialConstantBufferData.shininess = 10.0f;
-        memcpy(pFrameResource->m_pMaterialBufferBegin, &pMesh->m_materialConstantBufferData, sizeof(MaterialConstantData));
+        pFrameResource->m_materialConstantBuffers[pMesh->m_materialConstantBufferIndex]->Update(&pMesh->m_materialConstantBufferData);
     }
 
     m_lightConstantData.lightPos = { 0.0f, 100.0f, 0.0f };
     m_lightConstantData.lightDir = { -1.0f, -1.0f, 1.0f };
     m_lightConstantData.lightColor = { 1.0f, 1.0f, 1.0f };
     m_lightConstantData.lightIntensity = 1.0f;
-    memcpy(pFrameResource->m_pLightBufferBegin, &m_lightConstantData, sizeof(LightConstantData));
+    pFrameResource->m_lightConstantBuffer->Update(&m_lightConstantData);
 
     m_cameraConstantData.cameraPos = m_camera.GetPosition();
-    memcpy(pFrameResource->m_pCameraBufferBegin, &m_cameraConstantData, sizeof(CameraConstantData));
+    pFrameResource->m_cameraConstantBuffer->Update(&m_cameraConstantData);
 }
 
 // Render the scene.
@@ -510,11 +510,13 @@ void Renderer::LoadAssets()
             {
                 // Scene
                 {
-                    CreateUploadHeap(m_device, sizeof(SceneConstantData), pFrameResource->m_sceneConstantBuffer);
+                    ConstantBuffer<SceneConstantData>* sceneCB = new ConstantBuffer<SceneConstantData>();
+
+                    CreateUploadHeap(m_device, sizeof(SceneConstantData), sceneCB->m_buffer);
 
                     // Create constant buffer view
                     D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-                    cbvDesc.BufferLocation = pFrameResource->m_sceneConstantBuffer->GetGPUVirtualAddress();
+                    cbvDesc.BufferLocation = sceneCB->m_buffer->GetGPUVirtualAddress();
                     cbvDesc.SizeInBytes = sizeof(SceneConstantData);
 
                     m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
@@ -522,17 +524,22 @@ void Renderer::LoadAssets()
 
                     // Do not unmap this until app close
                     D3D12_RANGE readRange = { 0, 0 };
-                    ThrowIfFailed(pFrameResource->m_sceneConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pFrameResource->m_pSceneBufferBegin)));
-                    memcpy(pFrameResource->m_pSceneBufferBegin, &pMesh->m_constantBufferData, sizeof(SceneConstantData));
+                    ThrowIfFailed(sceneCB->m_buffer->Map(0, &readRange, reinterpret_cast<void**>(&sceneCB->m_pBufferBegin)));
+                    memcpy(sceneCB->m_pBufferBegin, &pMesh->m_constantBufferData, sizeof(SceneConstantData));
+
+                    pMesh->m_sceneConstantBufferIndex = UINT(pFrameResource->m_sceneConstantBuffers.size());
+                    pFrameResource->m_sceneConstantBuffers.push_back(sceneCB);
                 }
 
                 // Material
                 {
-                    CreateUploadHeap(m_device, sizeof(MaterialConstantData), pFrameResource->m_materialConstantBuffer);
+                    ConstantBuffer<MaterialConstantData>* matCB = new ConstantBuffer<MaterialConstantData>();
+
+                    CreateUploadHeap(m_device, sizeof(MaterialConstantData), matCB->m_buffer);
 
                     // Create constant buffer view
                     D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-                    cbvDesc.BufferLocation = pFrameResource->m_materialConstantBuffer->GetGPUVirtualAddress();
+                    cbvDesc.BufferLocation = matCB->m_buffer->GetGPUVirtualAddress();
                     cbvDesc.SizeInBytes = sizeof(MaterialConstantData);
 
                     m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
@@ -540,18 +547,23 @@ void Renderer::LoadAssets()
 
                     // Do not unmap this until app close
                     D3D12_RANGE readRange = { 0, 0 };
-                    ThrowIfFailed(pFrameResource->m_materialConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pFrameResource->m_pMaterialBufferBegin)));
-                    memcpy(pFrameResource->m_pMaterialBufferBegin, &pMesh->m_materialConstantBufferData, sizeof(MaterialConstantData));
+                    ThrowIfFailed(matCB->m_buffer->Map(0, &readRange, reinterpret_cast<void**>(&matCB->m_pBufferBegin)));
+                    memcpy(matCB->m_pBufferBegin, &pMesh->m_materialConstantBufferData, sizeof(MaterialConstantData));
+
+                    pMesh->m_materialConstantBufferIndex = UINT(pFrameResource->m_materialConstantBuffers.size());
+                    pFrameResource->m_materialConstantBuffers.push_back(matCB);
                 }
             }
         }
 
         // Lights
         {
-            CreateUploadHeap(m_device, sizeof(LightConstantData), pFrameResource->m_lightConstantBuffer);
+            ConstantBuffer<LightConstantData>* lightCB = new ConstantBuffer<LightConstantData>();
+
+            CreateUploadHeap(m_device, sizeof(LightConstantData), lightCB->m_buffer);
 
             D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-            cbvDesc.BufferLocation = pFrameResource->m_lightConstantBuffer->GetGPUVirtualAddress();
+            cbvDesc.BufferLocation = lightCB->m_buffer->GetGPUVirtualAddress();
             cbvDesc.SizeInBytes = sizeof(LightConstantData);
 
             m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
@@ -559,16 +571,20 @@ void Renderer::LoadAssets()
 
             // Do not unmap this until app close
             D3D12_RANGE readRange = { 0, 0 };
-            ThrowIfFailed(pFrameResource->m_lightConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pFrameResource->m_pLightBufferBegin)));
-            memcpy(pFrameResource->m_pLightBufferBegin, &m_lightConstantData, sizeof(LightConstantData));
+            ThrowIfFailed(lightCB->m_buffer->Map(0, &readRange, reinterpret_cast<void**>(&lightCB->m_pBufferBegin)));
+            memcpy(lightCB->m_pBufferBegin, &m_lightConstantData, sizeof(LightConstantData));
+
+            pFrameResource->m_lightConstantBuffer = lightCB;
         }
 
         // Camera
         {
-            CreateUploadHeap(m_device, sizeof(CameraConstantData), pFrameResource->m_cameraConstantBuffer);
+            ConstantBuffer<CameraConstantData>* cameraCB = new ConstantBuffer<CameraConstantData>();
+
+            CreateUploadHeap(m_device, sizeof(CameraConstantData), cameraCB->m_buffer);
 
             D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-            cbvDesc.BufferLocation = pFrameResource->m_cameraConstantBuffer->GetGPUVirtualAddress();
+            cbvDesc.BufferLocation = cameraCB->m_buffer->GetGPUVirtualAddress();
             cbvDesc.SizeInBytes = sizeof(CameraConstantData);
 
             m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
@@ -576,8 +592,10 @@ void Renderer::LoadAssets()
 
             // Do not unmap this until app close
             D3D12_RANGE readRange = { 0, 0 };
-            ThrowIfFailed(pFrameResource->m_cameraConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pFrameResource->m_pCameraBufferBegin)));
-            memcpy(pFrameResource->m_pCameraBufferBegin, &m_cameraConstantData, sizeof(CameraConstantData));
+            ThrowIfFailed(cameraCB->m_buffer->Map(0, &readRange, reinterpret_cast<void**>(&cameraCB->m_pBufferBegin)));
+            memcpy(cameraCB->m_pBufferBegin, &m_cameraConstantData, sizeof(CameraConstantData));
+
+            pFrameResource->m_cameraConstantBuffer = cameraCB;
         }
     }
 

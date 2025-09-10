@@ -197,6 +197,8 @@ public:
 
     SceneConstantData m_constantBufferData;
     MaterialConstantData m_materialConstantBufferData;
+    UINT m_sceneConstantBufferIndex;
+    UINT m_materialConstantBufferIndex;
 
     ComPtr<ID3D12Resource> m_texture;
 };

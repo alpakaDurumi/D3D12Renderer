@@ -15,6 +15,7 @@
 #include "Mesh.h"
 #include "FrameResource.h"
 #include "ConstantData.h"
+#include "ConstantBuffer.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;

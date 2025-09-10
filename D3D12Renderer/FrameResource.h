@@ -6,7 +6,10 @@
 #include <dxgi1_6.h>    // DXGI 1.6
 #include <DirectXMath.h>
 
+#include <vector>
+
 #include "D3DHelper.h"
+#include "ConstantBuffer.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -23,23 +26,26 @@ public:
 
         ThrowIfFailed(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
     }
+    
+    ~FrameResource()
+    {
+        for (auto* pSceneCB : m_sceneConstantBuffers)
+            delete pSceneCB;
+        for (auto* pMatCB : m_materialConstantBuffers)
+            delete pMatCB;
+        delete m_lightConstantBuffer;
+        delete m_cameraConstantBuffer;
+    }
 
 //private:
     ComPtr<ID3D12Resource> m_renderTarget;
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
 
-    // 전역적으로 쓰이는 constant buffer와 그렇지 않은 constant buffer를 따로 관리해야 할 것 같다.
-    ComPtr<ID3D12Resource> m_sceneConstantBuffer;
-    UINT8* m_pSceneBufferBegin;
-
-    ComPtr<ID3D12Resource> m_materialConstantBuffer;
-    UINT8* m_pMaterialBufferBegin;
-
-    ComPtr<ID3D12Resource> m_lightConstantBuffer;
-    UINT8* m_pLightBufferBegin;
-
-    ComPtr<ID3D12Resource> m_cameraConstantBuffer;
-    UINT8* m_pCameraBufferBegin;
+    std::vector<ConstantBuffer<SceneConstantData>*> m_sceneConstantBuffers;
+    std::vector<ConstantBuffer<MaterialConstantData>*> m_materialConstantBuffers;
+    // 아래 CB들도 개수가 늘어나면 배열로 관리하게 될 수 있음
+    ConstantBuffer<LightConstantData>* m_lightConstantBuffer;
+    ConstantBuffer<CameraConstantData>* m_cameraConstantBuffer;
 
     UINT64 m_fenceValue = 0;
 };
