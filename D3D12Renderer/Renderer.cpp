@@ -322,6 +322,7 @@ void Renderer::LoadAssets()
     // Create the pipeline state, which includes compiling and loading shaders.
     {
         ComPtr<ID3DBlob> vertexShader;
+        ComPtr<ID3DBlob> instancedVertexShader;
         ComPtr<ID3DBlob> pixelShader;
 
         UINT compileFlags = 0;
@@ -333,11 +334,21 @@ void Renderer::LoadAssets()
         std::wstring vsName = L"vs.hlsl";
         std::wstring psName = L"ps.hlsl";
 
+        // conditional compilation for instancing
+        D3D_SHADER_MACRO shaderMacros[] = { { "INSTANCED", "1" }, { NULL, NULL } };
         ThrowIfFailed(D3DCompileFromFile(vsName.c_str(), nullptr, nullptr, "main", "vs_5_0", compileFlags, 0, &vertexShader, nullptr));
+        ThrowIfFailed(D3DCompileFromFile(vsName.c_str(), shaderMacros, nullptr, "main", "vs_5_0", compileFlags, 0, &instancedVertexShader, nullptr));
         ThrowIfFailed(D3DCompileFromFile(psName.c_str(), nullptr, nullptr, "main", "ps_5_0", compileFlags, 0, &pixelShader, nullptr));
 
         // Define the vertex input layout.
-        D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
+        D3D12_INPUT_ELEMENT_DESC inputElementDescs0[] =
+        {
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 20, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+        };
+
+        D3D12_INPUT_ELEMENT_DESC inputElementDescs1[] =
         {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -397,7 +408,7 @@ void Renderer::LoadAssets()
 
         // Describe and create the graphics pipeline state object (PSO).
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-        psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };   // std::size()를 대신 쓰기?
+        psoDesc.InputLayout = { inputElementDescs0, _countof(inputElementDescs0) };   // std::size()를 대신 쓰기?
         psoDesc.pRootSignature = m_rootSignature.Get();
         psoDesc.VS = { vertexShader->GetBufferPointer(), vertexShader->GetBufferSize() };
         psoDesc.PS = { pixelShader->GetBufferPointer(), pixelShader->GetBufferSize() };
@@ -410,7 +421,11 @@ void Renderer::LoadAssets()
         psoDesc.NumRenderTargets = 1;
         psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
         psoDesc.SampleDesc.Count = 1;
-        ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
+        ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_defaultPipelineState)));
+
+        psoDesc.VS = { instancedVertexShader->GetBufferPointer(), instancedVertexShader->GetBufferSize() };
+        psoDesc.InputLayout = { inputElementDescs1, _countof(inputElementDescs1) };
+        ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_instancedPipelineState)));
     }
 
     // Create the depth stencil view
@@ -457,7 +472,7 @@ void Renderer::LoadAssets()
     }
 
     // Create the command list.
-    ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
+    ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), m_defaultPipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
 
     // Create and record the bundle
     {
@@ -483,15 +498,29 @@ void Renderer::LoadAssets()
     D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
     MoveCPUDescriptorHandle(&cpuHandle, m_srvDescriptorOffset, m_cbvSrvUavDescriptorSize);
 
-    InstancedMesh* pCube = new InstancedMesh(InstancedMesh::MakeCubeInstanced(
+    //InstancedMesh* pCube = new InstancedMesh(InstancedMesh::MakeCubeInstanced(
+    //    m_device,
+    //    m_commandList,
+    //    vertexBufferUploadHeap,
+    //    indexBufferUploadHeap,
+    //    instanceUploadHeap,
+    //    textureUploadHeap,
+    //    cpuHandle));
+    //m_meshes.push_back(pCube);
+
+    ComPtr<ID3D12Resource> vertexBufferUploadHeap1;
+    ComPtr<ID3D12Resource> indexBufferUploadHeap1;
+    ComPtr<ID3D12Resource> textureUploadHeap1;
+    ComPtr<ID3D12Resource> instanceUploadHeap1;
+
+    Mesh* pSphere = new Mesh(Mesh::MakeSphere(
         m_device,
         m_commandList,
-        vertexBufferUploadHeap,
-        indexBufferUploadHeap,
-        instanceUploadHeap,
-        textureUploadHeap,
+        vertexBufferUploadHeap1,
+        indexBufferUploadHeap1,
+        textureUploadHeap1,
         cpuHandle));
-    m_meshes.push_back(pCube);
+    m_meshes.push_back(pSphere);
 
     // CBV를 생성하기 위해 다시 시작 지점으로 복귀
     cpuHandle = m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
@@ -582,7 +611,8 @@ void Renderer::PopulateCommandList()
     // However, when ExecuteCommandList() is called on a particular command 
     // list, that command list can then be reset at any time and must be before 
     // re-recording.
-    ThrowIfFailed(m_commandList->Reset(pFrameResource->m_commandAllocator.Get(), m_pipelineState.Get()));
+    // 일단은 구를 렌더링하기 위해 default PSO를 쓰지만, 실제로는 어떤 것을 렌더링하느냐에 따라 다르게 설정해줘야 한다.
+    ThrowIfFailed(m_commandList->Reset(pFrameResource->m_commandAllocator.Get(), m_defaultPipelineState.Get()));
 
     // Set necessary state.
     m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());

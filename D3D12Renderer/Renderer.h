@@ -61,7 +61,8 @@ private:
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     ComPtr<ID3D12DescriptorHeap> m_cbvSrvUavHeap;
     ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
-    ComPtr<ID3D12PipelineState> m_pipelineState;
+    ComPtr<ID3D12PipelineState> m_defaultPipelineState;
+    ComPtr<ID3D12PipelineState> m_instancedPipelineState;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     //ComPtr<ID3D12GraphicsCommandList> m_bundle;
     UINT m_rtvDescriptorSize;
