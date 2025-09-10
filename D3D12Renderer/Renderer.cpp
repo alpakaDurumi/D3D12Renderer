@@ -510,46 +510,20 @@ void Renderer::LoadAssets()
             {
                 // Scene
                 {
-                    ConstantBuffer<SceneConstantData>* sceneCB = new ConstantBuffer<SceneConstantData>();
+                    ConstantBuffer<SceneConstantData>* sceneCB = new ConstantBuffer<SceneConstantData>(m_device, cpuHandle);
 
-                    CreateUploadHeap(m_device, sizeof(SceneConstantData), sceneCB->m_buffer);
-
-                    // Create constant buffer view
-                    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-                    cbvDesc.BufferLocation = sceneCB->m_buffer->GetGPUVirtualAddress();
-                    cbvDesc.SizeInBytes = sizeof(SceneConstantData);
-
-                    m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
                     MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
-
-                    // Do not unmap this until app close
-                    D3D12_RANGE readRange = { 0, 0 };
-                    ThrowIfFailed(sceneCB->m_buffer->Map(0, &readRange, reinterpret_cast<void**>(&sceneCB->m_pBufferBegin)));
                     memcpy(sceneCB->m_pBufferBegin, &pMesh->m_constantBufferData, sizeof(SceneConstantData));
-
                     pMesh->m_sceneConstantBufferIndex = UINT(pFrameResource->m_sceneConstantBuffers.size());
                     pFrameResource->m_sceneConstantBuffers.push_back(sceneCB);
                 }
 
                 // Material
                 {
-                    ConstantBuffer<MaterialConstantData>* matCB = new ConstantBuffer<MaterialConstantData>();
+                    ConstantBuffer<MaterialConstantData>* matCB = new ConstantBuffer<MaterialConstantData>(m_device, cpuHandle);
 
-                    CreateUploadHeap(m_device, sizeof(MaterialConstantData), matCB->m_buffer);
-
-                    // Create constant buffer view
-                    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-                    cbvDesc.BufferLocation = matCB->m_buffer->GetGPUVirtualAddress();
-                    cbvDesc.SizeInBytes = sizeof(MaterialConstantData);
-
-                    m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
                     MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
-
-                    // Do not unmap this until app close
-                    D3D12_RANGE readRange = { 0, 0 };
-                    ThrowIfFailed(matCB->m_buffer->Map(0, &readRange, reinterpret_cast<void**>(&matCB->m_pBufferBegin)));
                     memcpy(matCB->m_pBufferBegin, &pMesh->m_materialConstantBufferData, sizeof(MaterialConstantData));
-
                     pMesh->m_materialConstantBufferIndex = UINT(pFrameResource->m_materialConstantBuffers.size());
                     pFrameResource->m_materialConstantBuffers.push_back(matCB);
                 }
@@ -558,43 +532,19 @@ void Renderer::LoadAssets()
 
         // Lights
         {
-            ConstantBuffer<LightConstantData>* lightCB = new ConstantBuffer<LightConstantData>();
+            ConstantBuffer<LightConstantData>* lightCB = new ConstantBuffer<LightConstantData>(m_device, cpuHandle);
 
-            CreateUploadHeap(m_device, sizeof(LightConstantData), lightCB->m_buffer);
-
-            D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-            cbvDesc.BufferLocation = lightCB->m_buffer->GetGPUVirtualAddress();
-            cbvDesc.SizeInBytes = sizeof(LightConstantData);
-
-            m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
             MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
-
-            // Do not unmap this until app close
-            D3D12_RANGE readRange = { 0, 0 };
-            ThrowIfFailed(lightCB->m_buffer->Map(0, &readRange, reinterpret_cast<void**>(&lightCB->m_pBufferBegin)));
             memcpy(lightCB->m_pBufferBegin, &m_lightConstantData, sizeof(LightConstantData));
-
             pFrameResource->m_lightConstantBuffer = lightCB;
         }
 
         // Camera
         {
-            ConstantBuffer<CameraConstantData>* cameraCB = new ConstantBuffer<CameraConstantData>();
+            ConstantBuffer<CameraConstantData>* cameraCB = new ConstantBuffer<CameraConstantData>(m_device, cpuHandle);
 
-            CreateUploadHeap(m_device, sizeof(CameraConstantData), cameraCB->m_buffer);
-
-            D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-            cbvDesc.BufferLocation = cameraCB->m_buffer->GetGPUVirtualAddress();
-            cbvDesc.SizeInBytes = sizeof(CameraConstantData);
-
-            m_device->CreateConstantBufferView(&cbvDesc, cpuHandle);
             MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
-
-            // Do not unmap this until app close
-            D3D12_RANGE readRange = { 0, 0 };
-            ThrowIfFailed(cameraCB->m_buffer->Map(0, &readRange, reinterpret_cast<void**>(&cameraCB->m_pBufferBegin)));
             memcpy(cameraCB->m_pBufferBegin, &m_cameraConstantData, sizeof(CameraConstantData));
-
             pFrameResource->m_cameraConstantBuffer = cameraCB;
         }
     }
