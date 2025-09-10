@@ -24,7 +24,6 @@ class Renderer
 {
 public:
     Renderer(UINT width, UINT height, std::wstring name);
-    ~Renderer();
 
     UINT GetWidth() const { return m_width; }
     UINT GetHeight() const { return m_height; }
@@ -84,7 +83,6 @@ private:
     UINT m_frameIndex;
     HANDLE m_fenceEvent;
     ComPtr<ID3D12Fence> m_fence;
-    UINT64 m_fenceValues[FrameCount];
 
     void LoadPipeline();
     void LoadAssets();

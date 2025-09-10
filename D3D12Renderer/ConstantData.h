@@ -30,7 +30,7 @@ struct MaterialConstantData : public ConstantData<MaterialConstantData>
     float padding0;
     XMFLOAT3 materialSpecular;
     float shininess;
-    float padding[56];
+    float padding1[56];
 };
 
 struct LightConstantData : public ConstantData<LightConstantData>
@@ -41,7 +41,7 @@ struct LightConstantData : public ConstantData<LightConstantData>
     float padding1;
     XMFLOAT3 lightColor;
     float lightIntensity;
-    float padding[52];
+    float padding2[52];
 };
 
 struct CameraConstantData : public ConstantData<CameraConstantData>

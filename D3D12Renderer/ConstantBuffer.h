@@ -3,6 +3,8 @@
 #include <wrl/client.h>
 #include <d3d12.h>
 
+#include "D3DHelper.h"
+
 using Microsoft::WRL::ComPtr;
 
 template<typename T>

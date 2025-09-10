@@ -10,19 +10,11 @@
 using namespace D3DHelper;
 
 Renderer::Renderer(UINT width, UINT height, std::wstring name)
-    : m_width(width), m_height(height), m_title(name), m_rtvDescriptorSize(0), m_cbvSrvUavDescriptorSize(0), m_frameIndex(0), m_fenceValues{ 0 },
+    : m_width(width), m_height(height), m_title(name), m_rtvDescriptorSize(0), m_cbvSrvUavDescriptorSize(0), m_frameIndex(0),
     m_camera(static_cast<float>(width) / static_cast<float>(height), { 0.0f, 0.0f, -5.0f })
 {
     m_viewport = { 0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f };
     m_scissorRect = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
-}
-
-Renderer::~Renderer()
-{
-    for (auto* pFrameResource : m_frameResources)
-        delete pFrameResource;
-    for (auto* pMesh : m_meshes)
-        delete pMesh;
 }
 
 void Renderer::OnInit()
@@ -94,6 +86,11 @@ void Renderer::OnDestroy()
     // Ensure that the GPU is no longer referencing resources that are about to be
     // cleaned up by the destructor.
     WaitForGPU();
+
+    for (auto* pFrameResource : m_frameResources)
+        delete pFrameResource;
+    for (auto* pMesh : m_meshes)
+        delete pMesh;
 
     CloseHandle(m_fenceEvent);
 }
@@ -510,41 +507,41 @@ void Renderer::LoadAssets()
             {
                 // Scene
                 {
-                    ConstantBuffer<SceneConstantData>* sceneCB = new ConstantBuffer<SceneConstantData>(m_device, cpuHandle);
+                    SceneCB* sceneCB = new SceneCB(m_device, cpuHandle);
+                    sceneCB->Update(&pMesh->m_constantBufferData);
 
                     MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
-                    memcpy(sceneCB->m_pBufferBegin, &pMesh->m_constantBufferData, sizeof(SceneConstantData));
                     pMesh->m_sceneConstantBufferIndex = UINT(pFrameResource->m_sceneConstantBuffers.size());
                     pFrameResource->m_sceneConstantBuffers.push_back(sceneCB);
                 }
 
                 // Material
                 {
-                    ConstantBuffer<MaterialConstantData>* matCB = new ConstantBuffer<MaterialConstantData>(m_device, cpuHandle);
+                    MaterialCB* materialCB = new MaterialCB(m_device, cpuHandle);
+                    materialCB->Update(&pMesh->m_materialConstantBufferData);
 
                     MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
-                    memcpy(matCB->m_pBufferBegin, &pMesh->m_materialConstantBufferData, sizeof(MaterialConstantData));
                     pMesh->m_materialConstantBufferIndex = UINT(pFrameResource->m_materialConstantBuffers.size());
-                    pFrameResource->m_materialConstantBuffers.push_back(matCB);
+                    pFrameResource->m_materialConstantBuffers.push_back(materialCB);
                 }
             }
         }
 
         // Lights
         {
-            ConstantBuffer<LightConstantData>* lightCB = new ConstantBuffer<LightConstantData>(m_device, cpuHandle);
+            LightCB* lightCB = new LightCB(m_device, cpuHandle);
+            lightCB->Update(&m_lightConstantData);
 
             MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
-            memcpy(lightCB->m_pBufferBegin, &m_lightConstantData, sizeof(LightConstantData));
             pFrameResource->m_lightConstantBuffer = lightCB;
         }
 
         // Camera
         {
-            ConstantBuffer<CameraConstantData>* cameraCB = new ConstantBuffer<CameraConstantData>(m_device, cpuHandle);
+            CameraCB* cameraCB = new CameraCB(m_device, cpuHandle);
+            cameraCB->Update(&m_cameraConstantData);
 
             MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
-            memcpy(cameraCB->m_pBufferBegin, &m_cameraConstantData, sizeof(CameraConstantData));
             pFrameResource->m_cameraConstantBuffer = cameraCB;
         }
     }

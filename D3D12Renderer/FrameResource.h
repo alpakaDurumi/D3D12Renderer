@@ -9,11 +9,18 @@
 #include <vector>
 
 #include "D3DHelper.h"
+#include "ConstantData.h"
 #include "ConstantBuffer.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 using namespace D3DHelper;
+
+// aliasing
+using SceneCB = ConstantBuffer<SceneConstantData>;
+using MaterialCB = ConstantBuffer<MaterialConstantData>;
+using LightCB = ConstantBuffer<LightConstantData>;
+using CameraCB = ConstantBuffer<CameraConstantData>;
 
 // Dynamic Data for each frame
 class FrameResource
@@ -41,11 +48,11 @@ public:
     ComPtr<ID3D12Resource> m_renderTarget;
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
 
-    std::vector<ConstantBuffer<SceneConstantData>*> m_sceneConstantBuffers;
-    std::vector<ConstantBuffer<MaterialConstantData>*> m_materialConstantBuffers;
+    std::vector<SceneCB*> m_sceneConstantBuffers;
+    std::vector<MaterialCB*> m_materialConstantBuffers;
     // 아래 CB들도 개수가 늘어나면 배열로 관리하게 될 수 있음
-    ConstantBuffer<LightConstantData>* m_lightConstantBuffer;
-    ConstantBuffer<CameraConstantData>* m_cameraConstantBuffer;
+    LightCB* m_lightConstantBuffer;
+    CameraCB* m_cameraConstantBuffer;
 
     UINT64 m_fenceValue = 0;
 };
