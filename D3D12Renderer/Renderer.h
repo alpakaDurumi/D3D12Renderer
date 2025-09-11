@@ -67,13 +67,17 @@ private:
     //ComPtr<ID3D12GraphicsCommandList> m_bundle;
     UINT m_rtvDescriptorSize;
     UINT m_cbvSrvUavDescriptorSize;
-    UINT m_srvDescriptorOffset;         // m_cbvSrvUavHeap 내에서 SRV가 시작되는 부분
-    UINT m_numConstantBuffers = 4;      // light + camera + transform + material
+    UINT m_srvDescriptorOffsetInHeap;         // m_cbvSrvUavHeap 내에서 SRV가 시작되는 부분
+    UINT m_numDescriptorsPerFrame;
+
+    const UINT MaxDynamicCbvCountPerFrame = 128;
+    const UINT MaxStaticSrvCount = 64;
 
     // App resources
     Camera m_camera;
     InputManager m_inputManager;
     std::vector<Mesh*> m_meshes;
+    std::vector<InstancedMesh*> m_instancedMeshes;
     LightConstantData m_lightConstantData;
     CameraConstantData m_cameraConstantData;
     ComPtr<ID3D12Resource> m_texture;

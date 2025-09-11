@@ -29,43 +29,6 @@ struct InstanceData
     XMFLOAT4X4 inverseTranspose;
 };
 
-// Generate a simple black and white checkerboard texture.
-inline std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UINT texturePixelSize)
-{
-    const UINT rowPitch = textureWidth * texturePixelSize;
-    const UINT cellPitch = rowPitch >> 3;        // The width of a cell in the checkboard texture.
-    const UINT cellHeight = textureWidth >> 3;    // The height of a cell in the checkerboard texture.
-    const UINT textureSize = rowPitch * textureHeight;
-
-    std::vector<UINT8> data(textureSize);
-    UINT8* pData = &data[0];
-
-    for (UINT n = 0; n < textureSize; n += texturePixelSize)
-    {
-        UINT x = n % rowPitch;
-        UINT y = n / rowPitch;
-        UINT i = x / cellPitch;
-        UINT j = y / cellHeight;
-
-        if (i % 2 == j % 2)
-        {
-            pData[n] = 0x00;        // R
-            pData[n + 1] = 0x00;    // G
-            pData[n + 2] = 0x00;    // B
-            pData[n + 3] = 0xff;    // A
-        }
-        else
-        {
-            pData[n] = 0xff;        // R
-            pData[n + 1] = 0xff;    // G
-            pData[n + 2] = 0xff;    // B
-            pData[n + 3] = 0xff;    // A
-        }
-    }
-
-    return data;
-}
-
 class Mesh
 {
 public:
@@ -81,9 +44,7 @@ public:
         ComPtr<ID3D12Device>& device,
         ComPtr<ID3D12GraphicsCommandList>& commandList,
         ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
-        ComPtr<ID3D12Resource>& indexBufferUploadHeap,
-        ComPtr<ID3D12Resource>& textureUploadHeap,
-        D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle)
+        ComPtr<ID3D12Resource>& indexBufferUploadHeap)
     {
         Mesh cube;
 
@@ -145,44 +106,6 @@ public:
             cube.m_numIndices = UINT(cubeIndices.size());
         }
 
-        // Create the texture
-        {
-            CreateDefaultHeapForTexture(device, cube.m_texture, TextureWidth, TextureHeight);
-
-            // Calculate required size for data upload
-            D3D12_RESOURCE_DESC desc = cube.m_texture->GetDesc();
-            D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts = {};
-            UINT numRows = 0;
-            UINT64 rowSizeInBytes = 0;
-            UINT64 requiredSize = 0;
-            device->GetCopyableFootprints(&desc, 0, 1, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
-
-            CreateUploadHeap(device, requiredSize, textureUploadHeap);
-
-            // 텍스처 데이터는 인자로 받도록 수정하기
-            std::vector<UINT8> texture = GenerateTextureData(TextureWidth, TextureHeight, TexturePixelSize);
-            D3D12_SUBRESOURCE_DATA textureData = {};
-            textureData.pData = &texture[0];
-            textureData.RowPitch = TextureWidth * TexturePixelSize;
-            textureData.SlicePitch = textureData.RowPitch * TextureHeight;
-
-            UpdateSubResources(device, commandList, cube.m_texture, textureUploadHeap, &textureData);
-
-            // Change resource state
-            D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(cube.m_texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            commandList->ResourceBarrier(1, &barrier);
-
-            // Describe and create a SRV for the texture.
-            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-            srvDesc.Format = desc.Format;
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srvDesc.Texture2D.MipLevels = 1;
-
-            device->CreateShaderResourceView(cube.m_texture.Get(), &srvDesc, srvCpuHandle);
-            //MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
-        }
-
         return cube;
     }
 
@@ -190,9 +113,7 @@ public:
         ComPtr<ID3D12Device>& device,
         ComPtr<ID3D12GraphicsCommandList>& commandList,
         ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
-        ComPtr<ID3D12Resource>& indexBufferUploadHeap,
-        ComPtr<ID3D12Resource>& textureUploadHeap,
-        D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle)
+        ComPtr<ID3D12Resource>& indexBufferUploadHeap)
     {
         Mesh sphere;
 
@@ -251,50 +172,8 @@ public:
             sphere.m_numIndices = UINT(sphereIndices.size());
         }
 
-        // Create the texture
-        {
-            CreateDefaultHeapForTexture(device, sphere.m_texture, TextureWidth, TextureHeight);
-
-            // Calculate required size for data upload
-            D3D12_RESOURCE_DESC desc = sphere.m_texture->GetDesc();
-            D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts = {};
-            UINT numRows = 0;
-            UINT64 rowSizeInBytes = 0;
-            UINT64 requiredSize = 0;
-            device->GetCopyableFootprints(&desc, 0, 1, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
-
-            CreateUploadHeap(device, requiredSize, textureUploadHeap);
-
-            // 텍스처 데이터는 인자로 받도록 수정하기
-            std::vector<UINT8> texture = GenerateTextureData(TextureWidth, TextureHeight, TexturePixelSize);
-            D3D12_SUBRESOURCE_DATA textureData = {};
-            textureData.pData = &texture[0];
-            textureData.RowPitch = TextureWidth * TexturePixelSize;
-            textureData.SlicePitch = textureData.RowPitch * TextureHeight;
-
-            UpdateSubResources(device, commandList, sphere.m_texture, textureUploadHeap, &textureData);
-
-            // Change resource state
-            D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(sphere.m_texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            commandList->ResourceBarrier(1, &barrier);
-
-            // Describe and create a SRV for the texture.
-            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-            srvDesc.Format = desc.Format;
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srvDesc.Texture2D.MipLevels = 1;
-
-            device->CreateShaderResourceView(sphere.m_texture.Get(), &srvDesc, srvCpuHandle);
-            //MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
-        }
-
         return sphere;
     }
-
-    static const UINT TextureWidth = 256;
-    static const UINT TextureHeight = 256;
-    static const UINT TexturePixelSize = 4;    // The number of bytes used to represent a pixel in the texture
 
     ComPtr<ID3D12Resource> m_vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
@@ -307,7 +186,11 @@ public:
     UINT m_sceneConstantBufferIndex;
     UINT m_materialConstantBufferIndex;
 
-    ComPtr<ID3D12Resource> m_texture;
+    // 디스크립터 힙 내 CBV 구역에서 각 프레임에 대한 영역이 있을 때, 해당 영역의 시작 지점 기준 오프셋
+    UINT m_perMeshCbvDescriptorOffset;
+    UINT m_defaultCbvDescriptorOffset;
+    // 디스크립터 힙 내 SRV 구역에서 디스크립터에 대한 오프셋
+    UINT m_srvDescriptorOffset;
 };
 
 class InstancedMesh : public Mesh
@@ -332,12 +215,9 @@ public:
         ComPtr<ID3D12GraphicsCommandList>& commandList,
         ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
         ComPtr<ID3D12Resource>& indexBufferUploadHeap,
-        ComPtr<ID3D12Resource>& textureUploadHeap,
-        ComPtr<ID3D12Resource>& instanceUploadHeap,
-        D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle
-    )
+        ComPtr<ID3D12Resource>& instanceUploadHeap)
     {
-        InstancedMesh cube = MakeCube(device, commandList, vertexBufferUploadHeap, indexBufferUploadHeap, textureUploadHeap, srvCpuHandle);
+        InstancedMesh cube = MakeCube(device, commandList, vertexBufferUploadHeap, indexBufferUploadHeap);
 
         std::vector<InstanceData> instances;
 

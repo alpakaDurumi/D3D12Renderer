@@ -379,4 +379,48 @@ namespace D3DHelper
         pindexBufferView->SizeInBytes = indexBufferSize;
         pindexBufferView->Format = DXGI_FORMAT_R32_UINT;
     }
+
+    inline static void CreateTexture(
+        ComPtr<ID3D12Device>& device,
+        ComPtr<ID3D12GraphicsCommandList>& commandList,
+        ComPtr<ID3D12Resource>& texture,
+        ComPtr<ID3D12Resource>& uploadHeap,
+        std::vector<UINT8>& textureSrc,
+        UINT width,
+        UINT height,
+        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
+    {
+        CreateDefaultHeapForTexture(device, texture, width, height);
+
+        // Calculate required size for data upload
+        D3D12_RESOURCE_DESC desc = texture->GetDesc();
+        D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts = {};
+        UINT numRows = 0;
+        UINT64 rowSizeInBytes = 0;
+        UINT64 requiredSize = 0;
+        device->GetCopyableFootprints(&desc, 0, 1, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
+
+        CreateUploadHeap(device, requiredSize, uploadHeap);
+
+        // 텍스처 데이터는 인자로 받도록 수정하기
+        D3D12_SUBRESOURCE_DATA textureData = {};
+        textureData.pData = textureSrc.data();
+        textureData.RowPitch = width * 4;   // 4 bytes per pixel (RGBA)
+        textureData.SlicePitch = textureData.RowPitch * height;
+
+        UpdateSubResources(device, commandList, texture, uploadHeap, &textureData);
+
+        // Change resource state
+        D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        commandList->ResourceBarrier(1, &barrier);
+
+        // Describe and create a SRV for the texture.
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = desc.Format;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels = 1;
+
+        device->CreateShaderResourceView(texture.Get(), &srvDesc, cpuHandle);
+    }
 }
