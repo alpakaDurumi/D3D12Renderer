@@ -16,6 +16,7 @@
 #include "FrameResource.h"
 #include "ConstantData.h"
 #include "ConstantBuffer.h"
+#include "DescriptorHeapManager.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -59,16 +60,13 @@ private:
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12RootSignature> m_rootSignature;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-    ComPtr<ID3D12DescriptorHeap> m_cbvSrvUavHeap;
+    DescriptorHeapManager m_cbvSrvUavHeap;
     ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
     ComPtr<ID3D12PipelineState> m_defaultPipelineState;
     ComPtr<ID3D12PipelineState> m_instancedPipelineState;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
     //ComPtr<ID3D12GraphicsCommandList> m_bundle;
     UINT m_rtvDescriptorSize;
-    UINT m_cbvSrvUavDescriptorSize;
-    UINT m_srvDescriptorOffsetInHeap;         // m_cbvSrvUavHeap 내에서 SRV가 시작되는 부분
-    UINT m_numDescriptorsPerFrame;
 
     const UINT MaxDynamicCbvCountPerFrame = 128;
     const UINT MaxStaticSrvCount = 64;

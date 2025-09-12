@@ -47,7 +47,7 @@ std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UI
 }
 
 Renderer::Renderer(UINT width, UINT height, std::wstring name)
-    : m_width(width), m_height(height), m_title(name), m_rtvDescriptorSize(0), m_cbvSrvUavDescriptorSize(0), m_frameIndex(0),
+    : m_width(width), m_height(height), m_title(name), m_rtvDescriptorSize(0), m_frameIndex(0),
     m_camera(static_cast<float>(width) / static_cast<float>(height), { 0.0f, 0.0f, -5.0f })
 {
     m_viewport = { 0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f };
@@ -248,12 +248,8 @@ void Renderer::LoadPipeline()
         rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
 
-        // Describe and create a descriptor heap for CBV, SRV, UAV
-        D3D12_DESCRIPTOR_HEAP_DESC cbvSrvUavDesc = {};
-        cbvSrvUavDesc.NumDescriptors = (FrameCount * MaxDynamicCbvCountPerFrame) + MaxStaticSrvCount;
-        cbvSrvUavDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        cbvSrvUavDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        ThrowIfFailed(m_device->CreateDescriptorHeap(&cbvSrvUavDesc, IID_PPV_ARGS(&m_cbvSrvUavHeap)));
+        // CBV_SRV_UAV descriptor heap is managed by DescriptorHeapManager
+        m_cbvSrvUavHeap.Init(m_device, FrameCount, MaxDynamicCbvCountPerFrame, MaxStaticSrvCount);
 
         // DSV descriptor heap
         D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
@@ -263,8 +259,6 @@ void Renderer::LoadPipeline()
         ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap)));
 
         m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-        m_cbvSrvUavDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        m_srvDescriptorOffsetInHeap = FrameCount * MaxDynamicCbvCountPerFrame;
     }
 
     // Create frame resources
@@ -572,9 +566,6 @@ void Renderer::LoadAssets()
         indexBufferUploadHeap1));
     m_meshes.push_back(pSphere);
 
-    // CBV를 생성하기 위해 초기 지점 설정
-    D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
-
     // Create constant buffers for each frame
     for (UINT i = 0; i < FrameCount; i++)
     {
@@ -586,14 +577,13 @@ void Renderer::LoadAssets()
             {
                 // 디스크립터 힙 내 per-frame 디스크립터의 상대적인 오프셋 설정은 첫 한번만 수행해야 함
                 if (i == 0)
-                    pMesh->m_perMeshCbvDescriptorOffset = (cpuHandle.ptr - m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart().ptr) / m_cbvSrvUavDescriptorSize;
+                    pMesh->m_perMeshCbvDescriptorOffset = m_cbvSrvUavHeap.GetNumCbvAllocated();
 
                 // Scene
                 {
-                    SceneCB* sceneCB = new SceneCB(m_device, cpuHandle);
+                    SceneCB* sceneCB = new SceneCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
                     sceneCB->Update(&pMesh->m_constantBufferData);
 
-                    MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
                     // 각 FrameResource에서 동일한 인덱스긴 하지만, 한 번만 수행하도록 하였음
                     if (i == 0)
                         pMesh->m_sceneConstantBufferIndex = UINT(pFrameResource->m_sceneConstantBuffers.size());
@@ -602,10 +592,9 @@ void Renderer::LoadAssets()
 
                 // Material
                 {
-                    MaterialCB* materialCB = new MaterialCB(m_device, cpuHandle);
+                    MaterialCB* materialCB = new MaterialCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
                     materialCB->Update(&pMesh->m_materialConstantBufferData);
 
-                    MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
                     if (i == 0)
                         pMesh->m_materialConstantBufferIndex = UINT(pFrameResource->m_materialConstantBuffers.size());
                     pFrameResource->m_materialConstantBuffers.push_back(materialCB);
@@ -615,14 +604,13 @@ void Renderer::LoadAssets()
             for (auto* pMesh : m_instancedMeshes)
             {
                 if (i == 0)
-                    pMesh->m_perMeshCbvDescriptorOffset = (cpuHandle.ptr - m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart().ptr) / m_cbvSrvUavDescriptorSize;
+                    pMesh->m_perMeshCbvDescriptorOffset = m_cbvSrvUavHeap.GetNumCbvAllocated();
 
                 // Scene
                 {
-                    SceneCB* sceneCB = new SceneCB(m_device, cpuHandle);
+                    SceneCB* sceneCB = new SceneCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
                     sceneCB->Update(&pMesh->m_constantBufferData);
 
-                    MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
                     if (i == 0)
                         pMesh->m_sceneConstantBufferIndex = UINT(pFrameResource->m_sceneConstantBuffers.size());
                     pFrameResource->m_sceneConstantBuffers.push_back(sceneCB);
@@ -630,10 +618,9 @@ void Renderer::LoadAssets()
 
                 // Material
                 {
-                    MaterialCB* materialCB = new MaterialCB(m_device, cpuHandle);
+                    MaterialCB* materialCB = new MaterialCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
                     materialCB->Update(&pMesh->m_materialConstantBufferData);
 
-                    MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
                     if (i == 0)
                         pMesh->m_materialConstantBufferIndex = UINT(pFrameResource->m_materialConstantBuffers.size());
                     pFrameResource->m_materialConstantBuffers.push_back(materialCB);
@@ -644,46 +631,43 @@ void Renderer::LoadAssets()
         // 모든 메쉬에서 공통으로 사용하는 CBV에 대한 오프셋
         if (i == 0)
         {
+            UINT idx = m_cbvSrvUavHeap.GetNumCbvAllocated();
+
             for (auto* pMesh : m_meshes)
-                pMesh->m_defaultCbvDescriptorOffset = (cpuHandle.ptr - m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart().ptr) / m_cbvSrvUavDescriptorSize;
+                pMesh->m_defaultCbvDescriptorOffset = idx;
             for (auto* pMesh : m_instancedMeshes)
-                pMesh->m_defaultCbvDescriptorOffset = (cpuHandle.ptr - m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart().ptr) / m_cbvSrvUavDescriptorSize;
+                pMesh->m_defaultCbvDescriptorOffset = idx;
         }
 
         // Lights
         {
-            LightCB* lightCB = new LightCB(m_device, cpuHandle);
+            LightCB* lightCB = new LightCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
             lightCB->Update(&m_lightConstantData);
 
-            MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
             pFrameResource->m_lightConstantBuffer = lightCB;
         }
 
         // Camera
         {
-            CameraCB* cameraCB = new CameraCB(m_device, cpuHandle);
+            CameraCB* cameraCB = new CameraCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
             cameraCB->Update(&m_cameraConstantData);
 
-            MoveCPUDescriptorHandle(&cpuHandle, 1, m_cbvSrvUavDescriptorSize);
             pFrameResource->m_cameraConstantBuffer = cameraCB;
         }
 
         if (i == 0)
-            m_numDescriptorsPerFrame = (cpuHandle.ptr - m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart().ptr) / m_cbvSrvUavDescriptorSize;
+            m_cbvSrvUavHeap.m_numCbvPerFrame = m_cbvSrvUavHeap.GetNumCbvAllocated();
     }
 
     ComPtr<ID3D12Resource> textureUploadHeap;
 
     std::vector<UINT8> simpleTextureData = GenerateTextureData(256, 256, 4);
 
-    // 디스크립터 힙 내에서 SRV 구역을 가리키는 handle 생성
-    cpuHandle = m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
-    MoveCPUDescriptorHandle(&cpuHandle, m_srvDescriptorOffsetInHeap, m_cbvSrvUavDescriptorSize);
-
     // 텍스처 생성, Mesh에 할당
-    CreateTexture(m_device, m_commandList, m_texture, textureUploadHeap, simpleTextureData, 256, 256, cpuHandle);
-    pCube->m_srvDescriptorOffset = m_srvDescriptorOffsetInHeap;
-    pSphere->m_srvDescriptorOffset = m_srvDescriptorOffsetInHeap;
+    UINT idx = m_cbvSrvUavHeap.GetNumSrvAllocated();
+    CreateTexture(m_device, m_commandList, m_texture, textureUploadHeap, simpleTextureData, 256, 256, m_cbvSrvUavHeap.GetFreeHandleForSrv());
+    pCube->m_srvDescriptorOffset = idx;
+    pSphere->m_srvDescriptorOffset = idx;
 
     ThrowIfFailed(m_commandList->Close());
 
@@ -727,7 +711,7 @@ void Renderer::PopulateCommandList()
     // Set necessary state.
     m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 
-    ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvUavHeap.Get() };
+    ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvUavHeap.m_heap.Get() };
     m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     m_commandList->RSSetViewports(1, &m_viewport);
@@ -749,23 +733,20 @@ void Renderer::PopulateCommandList()
     m_commandList->SetPipelineState(m_defaultPipelineState.Get());
     for (const auto* pMesh : m_meshes)
     {
-        D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
+        D3D12_GPU_DESCRIPTOR_HANDLE handle;
 
         // per-mesh CBVs
-        gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
         // 각 프레임이 사용하는 디스크립터를 인덱싱
-        MoveGPUDescriptorHandle(&gpuHandle, m_frameIndex * m_numDescriptorsPerFrame + pMesh->m_perMeshCbvDescriptorOffset, m_cbvSrvUavDescriptorSize);
-        m_commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
+        handle = m_cbvSrvUavHeap.GetCbvHandle(m_frameIndex, pMesh->m_perMeshCbvDescriptorOffset);
+        m_commandList->SetGraphicsRootDescriptorTable(0, handle);
 
         // default CBV
-        gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
-        MoveGPUDescriptorHandle(&gpuHandle, m_frameIndex * m_numDescriptorsPerFrame + pMesh->m_defaultCbvDescriptorOffset, m_cbvSrvUavDescriptorSize);
-        m_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
+        handle = m_cbvSrvUavHeap.GetCbvHandle(0, pMesh->m_defaultCbvDescriptorOffset);
+        m_commandList->SetGraphicsRootDescriptorTable(1, handle);
 
         // SRV
-        gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
-        MoveGPUDescriptorHandle(&gpuHandle, pMesh->m_srvDescriptorOffset, m_cbvSrvUavDescriptorSize);
-        m_commandList->SetGraphicsRootDescriptorTable(2, gpuHandle);
+        handle = m_cbvSrvUavHeap.GetSrvHandle(pMesh->m_srvDescriptorOffset);
+        m_commandList->SetGraphicsRootDescriptorTable(2, handle);
 
         pMesh->Render(m_commandList);
     }
@@ -773,22 +754,20 @@ void Renderer::PopulateCommandList()
     m_commandList->SetPipelineState(m_instancedPipelineState.Get());
     for (const auto* pMesh : m_instancedMeshes)
     {
-        D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
+        D3D12_GPU_DESCRIPTOR_HANDLE handle;
 
         // per-mesh CBVs
-        gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
-        MoveGPUDescriptorHandle(&gpuHandle, m_frameIndex * m_numDescriptorsPerFrame + pMesh->m_perMeshCbvDescriptorOffset, m_cbvSrvUavDescriptorSize);
-        m_commandList->SetGraphicsRootDescriptorTable(0, gpuHandle);
+        // 각 프레임이 사용하는 디스크립터를 인덱싱
+        handle = m_cbvSrvUavHeap.GetCbvHandle(m_frameIndex, pMesh->m_perMeshCbvDescriptorOffset);
+        m_commandList->SetGraphicsRootDescriptorTable(0, handle);
 
         // default CBV
-        gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
-        MoveGPUDescriptorHandle(&gpuHandle, m_frameIndex * m_numDescriptorsPerFrame + pMesh->m_defaultCbvDescriptorOffset, m_cbvSrvUavDescriptorSize);
-        m_commandList->SetGraphicsRootDescriptorTable(1, gpuHandle);
+        handle = m_cbvSrvUavHeap.GetCbvHandle(0, pMesh->m_defaultCbvDescriptorOffset);
+        m_commandList->SetGraphicsRootDescriptorTable(1, handle);
 
         // SRV
-        gpuHandle = m_cbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart();
-        MoveGPUDescriptorHandle(&gpuHandle, pMesh->m_srvDescriptorOffset, m_cbvSrvUavDescriptorSize);
-        m_commandList->SetGraphicsRootDescriptorTable(2, gpuHandle);
+        handle = m_cbvSrvUavHeap.GetSrvHandle(pMesh->m_srvDescriptorOffset);
+        m_commandList->SetGraphicsRootDescriptorTable(2, handle);
 
         pMesh->Render(m_commandList);
     }
