@@ -159,6 +159,80 @@ void Renderer::OnMouseMove(int xPos, int yPos)
     m_inputManager.CalcMouseMove(xPos, yPos);
 }
 
+void Renderer::OnResize(UINT width, UINT height)
+{
+    if (width == m_width && height == m_height) return;
+
+    // Wait till GPU complete currently queued works
+    WaitForGPU();
+
+    m_width = width;
+    m_height = height;
+
+    m_viewport = { 0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f };
+    m_scissorRect = { 0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
+    m_camera.SetAspectRatio(static_cast<float>(m_width) / static_cast<float>(m_height));
+
+    // Release resources
+    for (UINT i = 0; i < FrameCount; i++)
+        m_frameResources[i]->m_renderTarget.Reset();
+    m_depthStencil.Reset();
+
+    // Preserve existing format
+    m_swapChain->ResizeBuffers(FrameCount, m_width, m_height, DXGI_FORMAT_UNKNOWN, 0);
+    m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+    // Recreate RTVs
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+    for (UINT i = 0; i < FrameCount; i++)
+    {
+        ThrowIfFailed(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_frameResources[i]->m_renderTarget)));
+        m_device->CreateRenderTargetView(m_frameResources[i]->m_renderTarget.Get(), nullptr, rtvHandle);
+        MoveCPUDescriptorHandle(&rtvHandle, 1, m_rtvDescriptorSize);
+    }
+
+    // Recreate DSV
+    D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc = {};
+    depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
+    depthStencilViewDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    depthStencilViewDesc.Flags = D3D12_DSV_FLAG_NONE;
+
+    D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
+    depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+    depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
+    depthOptimizedClearValue.DepthStencil.Stencil = 0;
+
+    D3D12_HEAP_PROPERTIES heapProperties = {};
+    heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProperties.CreationNodeMask = 1;
+    heapProperties.VisibleNodeMask = 1;
+
+    D3D12_RESOURCE_DESC resourceDesc = {};
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resourceDesc.Alignment = 0;
+    resourceDesc.Width = m_width;
+    resourceDesc.Height = m_height;
+    resourceDesc.DepthOrArraySize = 1;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.Format = DXGI_FORMAT_D32_FLOAT;
+    resourceDesc.SampleDesc = { 1, 0 };
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+    ThrowIfFailed(m_device->CreateCommittedResource(
+        &heapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &resourceDesc,
+        D3D12_RESOURCE_STATE_DEPTH_WRITE,
+        &depthOptimizedClearValue,
+        IID_PPV_ARGS(&m_depthStencil)
+    ));
+
+    m_device->CreateDepthStencilView(m_depthStencil.Get(), &depthStencilViewDesc, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+}
+
 void Renderer::LoadPipeline()
 {
     UINT dxgiFactoryFlags = 0;

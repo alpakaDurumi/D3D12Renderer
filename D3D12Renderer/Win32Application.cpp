@@ -99,7 +99,12 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
         return 0;
     case WM_SIZE:
     {
-        // resize
+        if (renderer)
+        {
+            int width = LOWORD(lParam);
+            int height = HIWORD(lParam);
+            renderer->OnResize(width, height);
+        }
         return 0;
     }
     case WM_DESTROY:

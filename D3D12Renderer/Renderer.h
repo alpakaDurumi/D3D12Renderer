@@ -37,6 +37,7 @@ public:
     void OnKeyDown(WPARAM key);
     void OnKeyUp(WPARAM key);
     void OnMouseMove(int xPos, int yPos);
+    void OnResize(UINT width, UINT height);
 
 private:
     UINT m_width;
