@@ -17,13 +17,17 @@ struct PSInput
 	float3 normal : NORMAL;
 };
 
-cbuffer SceneConstantBuffer : register(b0)
+cbuffer MeshConstantBuffer : register(b0)
 {
 	float4x4 world;
-	float4x4 view;
-	float4x4 projection;
 	float4x4 inverseTranspose;
 };
+
+cbuffer CameraConstantBuffer : register(b3)
+{
+	float3 cameraPos;
+	float4x4 viewProjection;
+}
 
 PSInput main(VSInput input)
 {
@@ -34,7 +38,7 @@ PSInput main(VSInput input)
 #else
 	output.posWorld = mul(float4(input.pos, 1.0f), world).xyz;
 #endif
-	output.pos = mul(mul(float4(output.posWorld, 1.0f), view), projection);
+	output.pos = mul(float4(output.posWorld, 1.0f), viewProjection);
 	output.texCoord = input.texCoord;
 #ifdef INSTANCED
 	output.normal = mul(float4(input.normal, 0.0f), mul(input.instanceInverseTranspose, inverseTranspose)).xyz;

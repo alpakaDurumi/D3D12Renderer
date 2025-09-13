@@ -17,7 +17,7 @@ using namespace DirectX;
 using namespace D3DHelper;
 
 // aliasing
-using SceneCB = ConstantBuffer<SceneConstantData>;
+using MeshCB = ConstantBuffer<MeshConstantData>;
 using MaterialCB = ConstantBuffer<MaterialConstantData>;
 using LightCB = ConstantBuffer<LightConstantData>;
 using CameraCB = ConstantBuffer<CameraConstantData>;
@@ -36,8 +36,8 @@ public:
     
     ~FrameResource()
     {
-        for (auto* pSceneCB : m_sceneConstantBuffers)
-            delete pSceneCB;
+        for (auto* pMeshCB : m_meshConstantBuffers)
+            delete pMeshCB;
         for (auto* pMatCB : m_materialConstantBuffers)
             delete pMatCB;
         delete m_lightConstantBuffer;
@@ -48,7 +48,7 @@ public:
     ComPtr<ID3D12Resource> m_renderTarget;
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
 
-    std::vector<SceneCB*> m_sceneConstantBuffers;
+    std::vector<MeshCB*> m_meshConstantBuffers;
     std::vector<MaterialCB*> m_materialConstantBuffers;
     // 아래 CB들도 개수가 늘어나면 배열로 관리하게 될 수 있음
     LightCB* m_lightConstantBuffer;

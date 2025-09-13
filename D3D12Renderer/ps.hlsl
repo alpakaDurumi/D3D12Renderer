@@ -27,6 +27,7 @@ cbuffer LightConstantBuffer : register(b2)
 cbuffer CameraConstantBuffer : register(b3)
 {
 	float3 cameraPos;
+	float4x4 viewProjection;
 }
 
 float4 main(PSInput input) : SV_TARGET

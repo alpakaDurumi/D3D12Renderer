@@ -16,12 +16,11 @@ struct ConstantData
     }
 };
 
-struct SceneConstantData : public ConstantData<SceneConstantData>
+struct MeshConstantData : public ConstantData<MeshConstantData>
 {
     XMFLOAT4X4 world;
-    XMFLOAT4X4 view;
-    XMFLOAT4X4 projection;
     XMFLOAT4X4 inverseTranspose;
+    XMFLOAT4X4 padding[2];
 };
 
 struct MaterialConstantData : public ConstantData<MaterialConstantData>
@@ -47,5 +46,7 @@ struct LightConstantData : public ConstantData<LightConstantData>
 struct CameraConstantData : public ConstantData<CameraConstantData>
 {
     XMFLOAT3 cameraPos;
-    float padding[61];
+    float padding0;
+    XMFLOAT4X4 viewProjection;
+    float padding1[44];
 };

@@ -181,9 +181,9 @@ public:
     D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
     UINT m_numIndices = 0;
 
-    SceneConstantData m_constantBufferData;
+    MeshConstantData m_meshBufferData;
     MaterialConstantData m_materialConstantBufferData;
-    UINT m_sceneConstantBufferIndex;
+    UINT m_meshConstantBufferIndex;
     UINT m_materialConstantBufferIndex;
 
     // 디스크립터 힙 내 CBV 구역에서 각 프레임에 대한 영역이 있을 때, 해당 영역의 시작 지점 기준 오프셋

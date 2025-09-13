@@ -78,12 +78,10 @@ void Renderer::OnUpdate()
     for (auto* pMesh : m_meshes)
     {
         XMMATRIX world = XMMatrixTranslation(1.0f, 0.0f, -1.0f);
-        XMStoreFloat4x4(&pMesh->m_constantBufferData.world, XMMatrixTranspose(world));
-        XMStoreFloat4x4(&pMesh->m_constantBufferData.view, XMMatrixTranspose(m_camera.GetViewMatrix()));
-        XMStoreFloat4x4(&pMesh->m_constantBufferData.projection, XMMatrixTranspose(m_camera.GetProjectionMatrix(true)));
+        XMStoreFloat4x4(&pMesh->m_meshBufferData.world, XMMatrixTranspose(world));
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        XMStoreFloat4x4(&pMesh->m_constantBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
-        pFrameResource->m_sceneConstantBuffers[pMesh->m_sceneConstantBufferIndex]->Update(&pMesh->m_constantBufferData);
+        XMStoreFloat4x4(&pMesh->m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
+        pFrameResource->m_meshConstantBuffers[pMesh->m_meshConstantBufferIndex]->Update(&pMesh->m_meshBufferData);
 
         pMesh->m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
         pMesh->m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
@@ -94,12 +92,10 @@ void Renderer::OnUpdate()
     for (auto* pMesh : m_instancedMeshes)
     {
         XMMATRIX world = XMMatrixIdentity();
-        XMStoreFloat4x4(&pMesh->m_constantBufferData.world, XMMatrixTranspose(world));
-        XMStoreFloat4x4(&pMesh->m_constantBufferData.view, XMMatrixTranspose(m_camera.GetViewMatrix()));
-        XMStoreFloat4x4(&pMesh->m_constantBufferData.projection, XMMatrixTranspose(m_camera.GetProjectionMatrix(true)));
+        XMStoreFloat4x4(&pMesh->m_meshBufferData.world, XMMatrixTranspose(world));
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        XMStoreFloat4x4(&pMesh->m_constantBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
-        pFrameResource->m_sceneConstantBuffers[pMesh->m_sceneConstantBufferIndex]->Update(&pMesh->m_constantBufferData);
+        XMStoreFloat4x4(&pMesh->m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
+        pFrameResource->m_meshConstantBuffers[pMesh->m_meshConstantBufferIndex]->Update(&pMesh->m_meshBufferData);
 
         pMesh->m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
         pMesh->m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
@@ -114,6 +110,7 @@ void Renderer::OnUpdate()
     pFrameResource->m_lightConstantBuffer->Update(&m_lightConstantData);
 
     m_cameraConstantData.cameraPos = m_camera.GetPosition();
+    XMStoreFloat4x4(&m_cameraConstantData.viewProjection, XMMatrixTranspose(m_camera.GetViewMatrix() * m_camera.GetProjectionMatrix(true)));
     pFrameResource->m_cameraConstantBuffer->Update(&m_cameraConstantData);
 }
 
@@ -292,10 +289,10 @@ void Renderer::LoadAssets()
             featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
         }
 
-        // idx 0 for per-mesh CBV, 1 for default CBV, 1 for SRV
+        // idx 0 for per-mesh CBV, 1 for default CBV, 2 for SRV
         D3D12_DESCRIPTOR_RANGE1 ranges[3];
         ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        ranges[0].NumDescriptors = 2;   // Scene + Material
+        ranges[0].NumDescriptors = 2;   // Mesh + Material
         ranges[0].BaseShaderRegister = 0;
         ranges[0].RegisterSpace = 0;
         ranges[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
@@ -315,7 +312,7 @@ void Renderer::LoadAssets()
         ranges[2].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
         ranges[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-        // idx 0 for per-mesh CBV, 1 for default CBV, 1 for SRV
+        // idx 0 for per-mesh CBV, 1 for default CBV, 2 for SRV
         D3D12_ROOT_PARAMETER1 rootParameters[3];
         rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         rootParameters[0].DescriptorTable = { 1, &ranges[0] };
@@ -323,7 +320,7 @@ void Renderer::LoadAssets()
 
         rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         rootParameters[1].DescriptorTable = { 1, &ranges[1] };
-        rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
         rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         rootParameters[2].DescriptorTable = { 1, &ranges[2] };
@@ -579,15 +576,15 @@ void Renderer::LoadAssets()
                 if (i == 0)
                     pMesh->m_perMeshCbvDescriptorOffset = m_cbvSrvUavHeap.GetNumCbvAllocated();
 
-                // Scene
+                // Mesh
                 {
-                    SceneCB* sceneCB = new SceneCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
-                    sceneCB->Update(&pMesh->m_constantBufferData);
+                    MeshCB* meshCB = new MeshCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
+                    meshCB->Update(&pMesh->m_meshBufferData);
 
                     // 각 FrameResource에서 동일한 인덱스긴 하지만, 한 번만 수행하도록 하였음
                     if (i == 0)
-                        pMesh->m_sceneConstantBufferIndex = UINT(pFrameResource->m_sceneConstantBuffers.size());
-                    pFrameResource->m_sceneConstantBuffers.push_back(sceneCB);
+                        pMesh->m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
+                    pFrameResource->m_meshConstantBuffers.push_back(meshCB);
                 }
 
                 // Material
@@ -606,14 +603,14 @@ void Renderer::LoadAssets()
                 if (i == 0)
                     pMesh->m_perMeshCbvDescriptorOffset = m_cbvSrvUavHeap.GetNumCbvAllocated();
 
-                // Scene
+                // Mesh
                 {
-                    SceneCB* sceneCB = new SceneCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
-                    sceneCB->Update(&pMesh->m_constantBufferData);
+                    MeshCB* meshCB = new MeshCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
+                    meshCB->Update(&pMesh->m_meshBufferData);
 
                     if (i == 0)
-                        pMesh->m_sceneConstantBufferIndex = UINT(pFrameResource->m_sceneConstantBuffers.size());
-                    pFrameResource->m_sceneConstantBuffers.push_back(sceneCB);
+                        pMesh->m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
+                    pFrameResource->m_meshConstantBuffers.push_back(meshCB);
                 }
 
                 // Material
