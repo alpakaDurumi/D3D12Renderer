@@ -62,6 +62,11 @@ void Renderer::OnInit()
 
 void Renderer::OnUpdate()
 {
+    if (m_inputManager.isKeyDown(VK_ESCAPE))
+    {
+        PostQuitMessage(0);
+    }
+
     if (m_inputManager.isKeyDown('W')) m_camera.MoveForward(0.01f);
     if (m_inputManager.isKeyDown('A')) m_camera.MoveRight(-0.01f);
     if (m_inputManager.isKeyDown('S')) m_camera.MoveForward(-0.01f);
