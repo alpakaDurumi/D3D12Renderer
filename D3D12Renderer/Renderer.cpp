@@ -256,8 +256,8 @@ void Renderer::LoadPipeline()
     ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
     if (SUCCEEDED(DXGIGetDebugInterface1(NULL, IID_PPV_ARGS(&dxgiInfoQueue))))
     {
-        dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
-        dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
+        ThrowIfFailed(dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true));
+        ThrowIfFailed(dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true));
     }
 
     // Set the DXGI factory debug flag
@@ -290,6 +290,17 @@ void Renderer::LoadPipeline()
             IID_PPV_ARGS(&m_device)
         ));
     }
+
+#if defined(_DEBUG)
+    // Use ID3D12InfoQueue
+    ComPtr<ID3D12InfoQueue> d3d12InfoQueue;
+    if (SUCCEEDED(m_device.As(&d3d12InfoQueue)))
+    {
+        ThrowIfFailed(d3d12InfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE));
+        ThrowIfFailed(d3d12InfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE));
+        //ThrowIfFailed(d3d12InfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, TRUE));
+    }
+#endif
 
     // Describe and create the command queue
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
