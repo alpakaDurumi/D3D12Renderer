@@ -49,8 +49,6 @@ std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UI
 Renderer::Renderer(std::wstring name)
     : m_title(name), m_rtvDescriptorSize(0), m_frameIndex(0), m_camera({ 0.0f, 0.0f, -5.0f })
 {
-    m_viewport = { 0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f };
-    m_scissorRect = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
 }
 
 void Renderer::UpdateViewport()
@@ -276,7 +274,7 @@ void Renderer::LoadPipeline()
     else
     {
         ComPtr<IDXGIAdapter1> hardwareAdapter;
-        GetHardwareAdapter(factory.Get(), &hardwareAdapter);
+        GetHardwareAdapter(factory.Get(), hardwareAdapter.GetAddressOf());
 
         ThrowIfFailed(D3D12CreateDevice(
             hardwareAdapter.Get(),

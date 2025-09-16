@@ -44,7 +44,7 @@ namespace D3DHelper
                 if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
                 {
                     // Don't select the Basic Render Driver adapter.
-                    // If you want a software adapter, pass in "/warp" on the command line.
+                    // If you want a software adapter, pass in "-warp" or "--warp" on the command line.
                     continue;
                 }
 
@@ -57,6 +57,7 @@ namespace D3DHelper
             }
         }
 
+        // For backward compatibility
         if (adapter.Get() == nullptr)
         {
             for (UINT adapterIndex = 0; SUCCEEDED(pFactory->EnumAdapters1(adapterIndex, &adapter)); ++adapterIndex)
@@ -66,13 +67,9 @@ namespace D3DHelper
 
                 if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
                 {
-                    // Don't select the Basic Render Driver adapter.
-                    // If you want a software adapter, pass in "/warp" on the command line.
                     continue;
                 }
 
-                // Check to see whether the adapter supports Direct3D 12, but don't create the
-                // actual device yet.
                 if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
                 {
                     break;
