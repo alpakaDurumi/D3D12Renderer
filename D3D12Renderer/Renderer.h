@@ -5,6 +5,7 @@
 
 #include <d3d12.h>
 #include <dxgi1_6.h>    // DXGI 1.6
+#include <dxgidebug.h>
 #include <DirectXMath.h>
 
 #include <string>

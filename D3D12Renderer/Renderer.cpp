@@ -245,15 +245,23 @@ void Renderer::LoadPipeline()
     UINT dxgiFactoryFlags = 0;
 
 #if defined(_DEBUG)
-    // Enable the D3D12 debug layer and set the DXGI debug flag
+    // Enable the D3D12 debug layer
     {
         ComPtr<ID3D12Debug> debugController;
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
-        {
             debugController->EnableDebugLayer();
-            dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
         }
+
+    // Use IDXGIInfoQueue
+    ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
+    if (SUCCEEDED(DXGIGetDebugInterface1(NULL, IID_PPV_ARGS(&dxgiInfoQueue))))
+    {
+        dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
+        dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
     }
+
+    // Set the DXGI factory debug flag
+    dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
 #endif
 
     // Create factory
