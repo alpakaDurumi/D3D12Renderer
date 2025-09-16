@@ -6,14 +6,20 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     pRenderer->UpdateViewport();
 
     // Register the window class
-    WNDCLASSEX windowClass = { 0 };
-    windowClass.cbSize = sizeof(WNDCLASSEX);
+    WNDCLASSEXW windowClass = { 0 };
+    windowClass.cbSize = sizeof(WNDCLASSEXW);
     windowClass.style = CS_HREDRAW | CS_VREDRAW;
     windowClass.lpfnWndProc = WndProc;
+    windowClass.cbClsExtra = 0;
+    windowClass.cbWndExtra = 0;
     windowClass.hInstance = hInstance;
+    windowClass.hIcon = nullptr;
     windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+    windowClass.hbrBackground = nullptr;
+    windowClass.lpszMenuName = nullptr;
     windowClass.lpszClassName = L"DefaultWindowClass";
-    if (RegisterClassEx(&windowClass) == 0)
+    windowClass.hIconSm = nullptr;
+    if (RegisterClassExW(&windowClass) == 0)
     {
         MessageBox(nullptr, L"Window Class Registration Failed!", L"Error", MB_OK | MB_ICONERROR);
         return 1;
@@ -23,7 +29,8 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
 
     // Create the window and store a handle to it.
-    m_hwnd = CreateWindow(
+    m_hwnd = CreateWindowExW(
+        NULL,
         windowClass.lpszClassName,
         pRenderer->GetTitle(),
         WS_OVERLAPPEDWINDOW,
