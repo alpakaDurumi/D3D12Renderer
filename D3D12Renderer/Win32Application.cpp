@@ -1,7 +1,10 @@
 #include "Win32Application.h"
 
-int Win32Application::Run(Renderer* renderer, HINSTANCE hInstance, int nCmdShow)
+int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
+    ParseCommandLineArgs(pRenderer, lpCmdLine);
+    pRenderer->UpdateViewport();
+
     // Register the window class
     WNDCLASSEX windowClass = { 0 };
     windowClass.cbSize = sizeof(WNDCLASSEX);
@@ -16,13 +19,13 @@ int Win32Application::Run(Renderer* renderer, HINSTANCE hInstance, int nCmdShow)
         return 1;
     }
 
-    RECT windowRect = { 0, 0, static_cast<LONG>(renderer->GetWidth()), static_cast<LONG>(renderer->GetHeight()) };
+    RECT windowRect = { 0, 0, static_cast<LONG>(pRenderer->GetWidth()), static_cast<LONG>(pRenderer->GetHeight()) };
     AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
 
     // Create the window and store a handle to it.
     m_hwnd = CreateWindow(
         windowClass.lpszClassName,
-        renderer->GetTitle(),
+        pRenderer->GetTitle(),
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
@@ -31,14 +34,14 @@ int Win32Application::Run(Renderer* renderer, HINSTANCE hInstance, int nCmdShow)
         nullptr,        // We have no parent window.
         nullptr,        // We aren't using menus.
         hInstance,
-        renderer);
+        pRenderer);
     if (m_hwnd == 0)
     {
         MessageBox(nullptr, L"Window Creation Failed!", L"Error", MB_OK | MB_ICONERROR);
         return 1;
     }
 
-    renderer->OnInit();
+    pRenderer->OnInit();
 
     ShowWindow(m_hwnd, nCmdShow);
 
@@ -53,12 +56,12 @@ int Win32Application::Run(Renderer* renderer, HINSTANCE hInstance, int nCmdShow)
         }
         else
         {
-            renderer->OnUpdate();
-            renderer->OnRender();
+            pRenderer->OnUpdate();
+            pRenderer->OnRender();
         }
     }
 
-    renderer->OnDestroy();
+    pRenderer->OnDestroy();
 
     // return exit code that delivered by PostQuitMessage()
     return static_cast<int>(msg.wParam);
@@ -113,4 +116,22 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
     }
 
     return DefWindowProc(hWnd, message, wParam, lParam);
+}
+
+void Win32Application::ParseCommandLineArgs(Renderer* pRenderer, LPWSTR lpCmdLine)
+{
+    int argc;
+    WCHAR** argv = CommandLineToArgvW(lpCmdLine, &argc);
+
+    for (int i = 0; i < argc; i++)
+    {
+        if (wcscmp(argv[i], L"-w") == 0 || wcscmp(argv[i], L"--width") == 0)
+            pRenderer->SetWidth(wcstol(argv[++i], nullptr, 10));
+        if (wcscmp(argv[i], L"-h") == 0 || wcscmp(argv[i], L"--height") == 0)
+            pRenderer->SetHeight(wcstol(argv[++i], nullptr, 10));
+        if (wcscmp(argv[i], L"-warp") == 0 || wcscmp(argv[i], L"--warp") == 0)
+            pRenderer->SetWarp(true);
+    }
+
+    LocalFree(argv);
 }

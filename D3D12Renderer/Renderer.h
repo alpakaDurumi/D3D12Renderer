@@ -24,11 +24,16 @@ using namespace DirectX;
 class Renderer
 {
 public:
-    Renderer(UINT width, UINT height, std::wstring name);
+    Renderer(std::wstring name);
 
     UINT GetWidth() const { return m_width; }
     UINT GetHeight() const { return m_height; }
     const WCHAR* GetTitle() const { return m_title.c_str(); }
+
+    void SetWidth(UINT width) { m_width = width; }
+    void SetHeight(UINT height) { m_height = height; }
+    void SetWarp(bool value) { m_useWarpDevice = value; }
+    void UpdateViewport();
 
     void OnInit();
     void OnUpdate();
@@ -40,8 +45,8 @@ public:
     void OnResize(UINT width, UINT height);
 
 private:
-    UINT m_width;
-    UINT m_height;
+    UINT m_width = 1280;
+    UINT m_height = 720;
 
     std::wstring m_title;
 

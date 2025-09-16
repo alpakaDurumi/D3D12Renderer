@@ -1,7 +1,7 @@
 #include "Camera.h"
 #include <algorithm>
 
-Camera::Camera(float aspectRatio, XMFLOAT3 initialPosition)
+Camera::Camera(XMFLOAT3 initialPosition)
 {
     m_position = initialPosition;
     m_orientation = { 0.0f, 0.0f, 1.0f };
@@ -11,7 +11,7 @@ Camera::Camera(float aspectRatio, XMFLOAT3 initialPosition)
     m_pitch = 0.0f;
 
     m_fov = 90.0f * 0.5f;
-    m_aspectRatio = aspectRatio;
+    m_aspectRatio = 16.0f / 9.0f;
     m_nearPlane = 0.01f;
     m_farPlane = 100.0f;
 }

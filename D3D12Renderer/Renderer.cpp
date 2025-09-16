@@ -46,12 +46,18 @@ std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UI
     return data;
 }
 
-Renderer::Renderer(UINT width, UINT height, std::wstring name)
-    : m_width(width), m_height(height), m_title(name), m_rtvDescriptorSize(0), m_frameIndex(0),
-    m_camera(static_cast<float>(width) / static_cast<float>(height), { 0.0f, 0.0f, -5.0f })
+Renderer::Renderer(std::wstring name)
+    : m_title(name), m_rtvDescriptorSize(0), m_frameIndex(0), m_camera({ 0.0f, 0.0f, -5.0f })
 {
     m_viewport = { 0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f };
     m_scissorRect = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
+}
+
+void Renderer::UpdateViewport()
+{
+    m_camera.SetAspectRatio(static_cast<float>(m_width) / static_cast<float>(m_height));
+    m_viewport = { 0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f };
+    m_scissorRect = { 0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
 }
 
 void Renderer::OnInit()
@@ -65,6 +71,7 @@ void Renderer::OnUpdate()
     if (m_inputManager.isKeyDown(VK_ESCAPE))
     {
         PostQuitMessage(0);
+        return;
     }
 
     if (m_inputManager.isKeyDown('W')) m_camera.MoveForward(0.01f);
@@ -173,10 +180,7 @@ void Renderer::OnResize(UINT width, UINT height)
 
     m_width = width;
     m_height = height;
-
-    m_viewport = { 0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f };
-    m_scissorRect = { 0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
-    m_camera.SetAspectRatio(static_cast<float>(m_width) / static_cast<float>(m_height));
+    UpdateViewport();
 
     // Release resources
     for (UINT i = 0; i < FrameCount; i++)
