@@ -135,7 +135,9 @@ void Renderer::OnRender()
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     // Present the frame.
-    ThrowIfFailed(m_swapChain->Present(1, 0));
+    UINT syncInterval = m_vSync ? 1 : 0;
+    UINT presentFlags = m_tearingSupported && !m_vSync ? DXGI_PRESENT_ALLOW_TEARING : 0;
+    ThrowIfFailed(m_swapChain->Present(syncInterval, presentFlags));
 
     MoveToNextFrame();
 }
@@ -186,7 +188,7 @@ void Renderer::OnResize(UINT width, UINT height)
     m_depthStencil.Reset();
 
     // Preserve existing format
-    m_swapChain->ResizeBuffers(FrameCount, m_width, m_height, DXGI_FORMAT_UNKNOWN, 0);
+    m_swapChain->ResizeBuffers(FrameCount, m_width, m_height, DXGI_FORMAT_UNKNOWN, m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
     // Recreate RTVs
@@ -312,21 +314,25 @@ void Renderer::LoadPipeline()
     ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 
     // Check for Variable Refresh Rate(VRR)
-    m_allowTearing = CheckTearingSupport();
+    m_tearingSupported = CheckTearingSupport();
 
     // Describe and create the swap chain.
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-    swapChainDesc.BufferCount = FrameCount;
     swapChainDesc.Width = m_width;
     swapChainDesc.Height = m_height;
     swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    swapChainDesc.Stereo = FALSE;
+    swapChainDesc.SampleDesc = { 1, 0 };
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    swapChainDesc.BufferCount = FrameCount;
+    swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    swapChainDesc.SampleDesc.Count = 1;
+    swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
+    swapChainDesc.Flags = m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 
     ComPtr<IDXGISwapChain1> swapChain;
     ThrowIfFailed(factory->CreateSwapChainForHwnd(
-        m_commandQueue.Get(),        // Swap chain needs the queue so that it can force a flush on it
+        m_commandQueue.Get(),
         Win32Application::GetHwnd(),
         &swapChainDesc,
         nullptr,
@@ -338,8 +344,8 @@ void Renderer::LoadPipeline()
     ThrowIfFailed(swapChain.As(&m_swapChain));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-    // fullscreen transition
-    ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_VALID));
+    // Disable switching to fullscreen execlusive mode using ALT + ENTER
+    ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_NO_ALT_ENTER));
 
     // Create descriptor heaps
     {
