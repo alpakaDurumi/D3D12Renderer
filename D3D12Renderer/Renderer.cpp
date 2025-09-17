@@ -83,7 +83,8 @@ void Renderer::OnUpdate()
         {
             WCHAR buffer[500];
             auto fps = frameCounter / elapsedSeconds;
-            swprintf_s(buffer, L"FPS: %f\n", fps);
+            auto frameTime = 1000.0 / fps;
+            swprintf_s(buffer, L"FPS: %f, Frame Time: %fms\n", fps, frameTime);
             OutputDebugStringW(buffer);
 
             frameCounter = 0;
@@ -203,13 +204,17 @@ void Renderer::OnResize(UINT width, UINT height)
     // Wait till GPU complete currently queued works
     WaitForGPU();
 
-    m_width = width;
-    m_height = height;
+    // Size 0 is not allowed
+    m_width = std::max(1u, width);
+    m_height = std::max(1u, height);
     UpdateViewport();
 
-    // Release resources
+    // Release resources and set frame fence values to the current fence value
     for (UINT i = 0; i < FrameCount; i++)
+    {
         m_frameResources[i]->m_renderTarget.Reset();
+        m_frameResources[i]->m_fenceValue = m_frameResources[m_frameIndex]->m_fenceValue;
+    }
     m_depthStencil.Reset();
 
     // Preserve existing format
@@ -220,7 +225,7 @@ void Renderer::OnResize(UINT width, UINT height)
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
     for (UINT i = 0; i < FrameCount; i++)
     {
-        ThrowIfFailed(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_frameResources[i]->m_renderTarget)));
+        ThrowIfFailed(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&(m_frameResources[i]->m_renderTarget))));
         m_device->CreateRenderTargetView(m_frameResources[i]->m_renderTarget.Get(), nullptr, rtvHandle);
         MoveCPUDescriptorHandle(&rtvHandle, 1, m_rtvDescriptorSize);
     }
