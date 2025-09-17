@@ -66,6 +66,31 @@ void Renderer::OnInit()
 
 void Renderer::OnUpdate()
 {
+    // Calculate FPS
+    {
+        static UINT64 frameCounter = 0;
+        static double elapsedSeconds = 0.0;
+        static std::chrono::high_resolution_clock clock;
+        static auto t0 = clock.now();
+
+        frameCounter++;
+        auto t1 = clock.now();
+        auto deltaTime = t1 - t0;
+        t0 = t1;
+
+        elapsedSeconds += deltaTime.count() * 1e-9;
+        if (elapsedSeconds > 1.0)
+        {
+            WCHAR buffer[500];
+            auto fps = frameCounter / elapsedSeconds;
+            swprintf_s(buffer, L"FPS: %f\n", fps);
+            OutputDebugStringW(buffer);
+
+            frameCounter = 0;
+            elapsedSeconds = 0.0f;
+        }
+    }
+
     if (m_inputManager.isKeyDown(VK_ESCAPE))
     {
         PostQuitMessage(0);

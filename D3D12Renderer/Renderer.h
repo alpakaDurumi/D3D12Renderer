@@ -10,6 +10,7 @@
 
 #include <string>
 #include <vector>
+#include <chrono>
 
 #include "Camera.h"
 #include "InputManager.h"

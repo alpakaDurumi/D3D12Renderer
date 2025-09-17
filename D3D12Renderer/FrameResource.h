@@ -26,7 +26,7 @@ using CameraCB = ConstantBuffer<CameraConstantData>;
 class FrameResource
 {
 public:
-    FrameResource(ComPtr<ID3D12Device> device, ComPtr<IDXGISwapChain3> swapChain, UINT frameIndex, D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle)
+    FrameResource(ComPtr<ID3D12Device>& device, ComPtr<IDXGISwapChain3>& swapChain, UINT frameIndex, D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle)
     {
         ThrowIfFailed(swapChain->GetBuffer(frameIndex, IID_PPV_ARGS(&m_renderTarget)));
         device->CreateRenderTargetView(m_renderTarget.Get(), nullptr, rtvHandle);
