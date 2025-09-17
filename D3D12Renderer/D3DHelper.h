@@ -80,6 +80,23 @@ namespace D3DHelper
         *ppAdapter = adapter.Detach();
     }
 
+    inline bool CheckTearingSupport()
+    {
+        BOOL allowTearing = FALSE;
+
+        // Minimum DXGI version for Variable rate refresh is 1.5
+        ComPtr<IDXGIFactory5> factory;
+        if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
+        {
+            if (FAILED(factory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowTearing, sizeof(allowTearing))))
+            {
+                allowTearing = FALSE;
+            }
+        }
+
+        return allowTearing == TRUE;
+    }
+
     inline void MoveCPUDescriptorHandle(D3D12_CPU_DESCRIPTOR_HANDLE* handle, INT offsetInDescriptors, INT descriptorIncrementSize)
     {
         handle->ptr = SIZE_T(INT64(handle->ptr) + INT64(offsetInDescriptors) * INT64(descriptorIncrementSize));

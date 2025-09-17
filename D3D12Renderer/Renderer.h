@@ -53,6 +53,7 @@ private:
 
     static const UINT FrameCount = 2;
 
+    bool m_allowTearing = false;
     // Adapter info
     bool m_useWarpDevice = false;
 
