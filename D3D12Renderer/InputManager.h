@@ -6,17 +6,26 @@ class InputManager
 public:
     void SetKeyDown(WPARAM key)
     {
-        if (key < 256) m_keyStates[key] = true;
+        if (key < 256)
+        {
+            m_keyPressed[key] = true;
+            m_keyDown[key] = true;
+        }
     }
 
     void SetKeyUp(WPARAM key)
     {
-        if (key < 256) m_keyStates[key] = false;
+        if (key < 256) m_keyDown[key] = false;
     }
 
-    bool isKeyDown(WPARAM key) const
+    bool IsKeyDown(WPARAM key) const
     {
-        return m_keyStates[key];
+        return m_keyDown[key];
+    }
+
+    bool IsKeyPressed(WPARAM key) const
+    {
+        return m_keyPressed[key];
     }
 
     void CalcMouseMove(int posX, int posY)
@@ -35,8 +44,14 @@ public:
         return delta;
     }
 
+    void OnFrameEnd()
+    {
+        memset(m_keyPressed, false, sizeof(m_keyPressed));
+    }
+
 private:
-    bool m_keyStates[256] = { false };
+    bool m_keyDown[256] = { false };
+    bool m_keyPressed[256] = { false };
     int m_lastPosX = -1;
     int m_lastPosY = -1;
     XMINT2 m_mouseMove = { 0, 0 };

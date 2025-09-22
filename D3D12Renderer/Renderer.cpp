@@ -58,6 +58,60 @@ void Renderer::UpdateViewport()
     m_scissorRect = { 0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height) };
 }
 
+void Renderer::ToggleFullScreen()
+{
+    SetFullScreen(!m_fullScreen);
+}
+
+void Renderer::SetFullScreen(bool fullScreen)
+{
+    if (m_fullScreen != fullScreen)
+    {
+        m_fullScreen = fullScreen;
+        if (m_fullScreen)
+        {
+            // Before switching to fullscreen mode, save window RECT
+            GetWindowRect(Win32Application::GetHwnd(), &m_windowRect);
+
+            // fullscreen borderless
+            UINT windowStyle = WS_OVERLAPPEDWINDOW & ~(WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+            //UINT windowStyle = WS_OVERLAPPEDWINDOW;
+            SetWindowLongW(Win32Application::GetHwnd(), GWL_STYLE, windowStyle);
+
+            // Query the name of the nearest display device for the window.
+            // This is required to set the fullscreen dimensions of the window
+            // when using a multi-monitor setup.
+            HMONITOR hMonitor = MonitorFromWindow(Win32Application::GetHwnd(), MONITOR_DEFAULTTONEAREST);
+            MONITORINFOEXW monitorInfo = {};
+            monitorInfo.cbSize = sizeof(MONITORINFOEXW);
+            GetMonitorInfoW(hMonitor, &monitorInfo);
+
+            SetWindowPos(Win32Application::GetHwnd(), HWND_TOP,
+                monitorInfo.rcMonitor.left,
+                monitorInfo.rcMonitor.top,
+                monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
+                monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top,
+                SWP_FRAMECHANGED | SWP_NOACTIVATE);
+
+            ShowWindow(Win32Application::GetHwnd(), SW_MAXIMIZE);
+        }
+        else
+        {
+            // Restore all the window decorators.
+            SetWindowLongW(Win32Application::GetHwnd(), GWL_STYLE, WS_OVERLAPPEDWINDOW);
+
+            SetWindowPos(Win32Application::GetHwnd(), HWND_NOTOPMOST,
+                m_windowRect.left,
+                m_windowRect.top,
+                m_windowRect.right - m_windowRect.left,
+                m_windowRect.bottom - m_windowRect.top,
+                SWP_FRAMECHANGED | SWP_NOACTIVATE);
+
+            ShowWindow(Win32Application::GetHwnd(), SW_NORMAL);
+        }
+    }
+}
+
 void Renderer::OnInit()
 {
     LoadPipeline();
@@ -92,18 +146,31 @@ void Renderer::OnUpdate()
         }
     }
 
-    if (m_inputManager.isKeyDown(VK_ESCAPE))
+    if (m_inputManager.IsKeyPressed(VK_ESCAPE))
     {
         PostQuitMessage(0);
         return;
     }
 
-    if (m_inputManager.isKeyDown('W')) m_camera.MoveForward(0.01f);
-    if (m_inputManager.isKeyDown('A')) m_camera.MoveRight(-0.01f);
-    if (m_inputManager.isKeyDown('S')) m_camera.MoveForward(-0.01f);
-    if (m_inputManager.isKeyDown('D')) m_camera.MoveRight(0.01f);
-    if (m_inputManager.isKeyDown('Q')) m_camera.MoveUp(-0.01f);
-    if (m_inputManager.isKeyDown('E')) m_camera.MoveUp(0.01f);
+    if (m_inputManager.IsKeyPressed(VK_F11))
+    {
+        ToggleFullScreen();
+    }
+
+    if (m_inputManager.IsKeyPressed('V'))
+    {
+        m_vSync = !m_vSync;
+        WCHAR buffer[500];
+        swprintf_s(buffer, L"m_vSync : %d\n", m_vSync);
+        OutputDebugStringW(buffer);
+    }
+
+    if (m_inputManager.IsKeyDown('W')) m_camera.MoveForward(0.01f);
+    if (m_inputManager.IsKeyDown('A')) m_camera.MoveRight(-0.01f);
+    if (m_inputManager.IsKeyDown('S')) m_camera.MoveForward(-0.01f);
+    if (m_inputManager.IsKeyDown('D')) m_camera.MoveRight(0.01f);
+    if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-0.01f);
+    if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(0.01f);
 
     XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
     m_camera.Rotate(mouseMove);
@@ -164,6 +231,8 @@ void Renderer::OnRender()
     UINT syncInterval = m_vSync ? 1 : 0;
     UINT presentFlags = m_tearingSupported && !m_vSync ? DXGI_PRESENT_ALLOW_TEARING : 0;
     ThrowIfFailed(m_swapChain->Present(syncInterval, presentFlags));
+
+    m_inputManager.OnFrameEnd();
 
     MoveToNextFrame();
 }

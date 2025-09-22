@@ -87,10 +87,24 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
         SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
     }
     return 0;
+    case WM_SYSKEYDOWN:
+        if (renderer)
+        {
+            // ALT + ENTER. Only if prev key is up
+            if (wParam == VK_RETURN && lParam & (1 << 29) && !(lParam & (1 << 30)))
+            {
+                renderer->ToggleFullScreen();
+            }
+        }
+        return 0;
     case WM_KEYDOWN:
         if (renderer)
         {
+            // Only if prev key is up
+            if (!(lParam & (1 << 30)))
+            {
             renderer->OnKeyDown(wParam);
+        }
         }
         return 0;
     case WM_KEYUP:

@@ -37,6 +37,8 @@ public:
     void SetHeight(UINT height) { m_height = height; }
     void SetWarp(bool value) { m_useWarpDevice = value; }
     void UpdateViewport();
+    void ToggleFullScreen();
+    void SetFullScreen(bool fullScreen);
 
     void OnInit();
     void OnUpdate();
@@ -57,6 +59,8 @@ private:
 
     bool m_vSync = false;
     bool m_tearingSupported = false;
+    bool m_fullScreen = false;
+    RECT m_windowRect;
 
     // Adapter info
     bool m_useWarpDevice = false;
