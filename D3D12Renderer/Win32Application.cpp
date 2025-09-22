@@ -14,14 +14,14 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     windowClass.cbWndExtra = 0;
     windowClass.hInstance = hInstance;
     windowClass.hIcon = nullptr;
-    windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+    windowClass.hCursor = LoadCursorW(NULL, IDC_ARROW);
     windowClass.hbrBackground = nullptr;
     windowClass.lpszMenuName = nullptr;
     windowClass.lpszClassName = L"DefaultWindowClass";
     windowClass.hIconSm = nullptr;
     if (RegisterClassExW(&windowClass) == 0)
     {
-        MessageBox(nullptr, L"Window Class Registration Failed!", L"Error", MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, L"Window Class Registration Failed!", L"Error", MB_OK | MB_ICONERROR);
         return 1;
     }
 
@@ -44,7 +44,7 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
         pRenderer);
     if (m_hwnd == 0)
     {
-        MessageBox(nullptr, L"Window Creation Failed!", L"Error", MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, L"Window Creation Failed!", L"Error", MB_OK | MB_ICONERROR);
         return 1;
     }
 
@@ -56,10 +56,10 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     MSG msg = {};
     while (msg.message != WM_QUIT)
     {
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
         else
         {
@@ -76,7 +76,7 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
 
 LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    Renderer* renderer = reinterpret_cast<Renderer*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+    Renderer* renderer = reinterpret_cast<Renderer*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
 
     switch (message)
     {
@@ -84,7 +84,7 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
     {
         // Save the Renderer* passed in to CreateWindow.
         LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
-        SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
+        SetWindowLongPtrW(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
     }
     return 0;
     case WM_SYSKEYDOWN:
@@ -103,8 +103,8 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
             // Only if prev key is up
             if (!(lParam & (1 << 30)))
             {
-            renderer->OnKeyDown(wParam);
-        }
+                renderer->OnKeyDown(wParam);
+            }
         }
         return 0;
     case WM_KEYUP:
@@ -136,7 +136,7 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
         return 0;
     }
 
-    return DefWindowProc(hWnd, message, wParam, lParam);
+    return DefWindowProcW(hWnd, message, wParam, lParam);
 }
 
 void Win32Application::ParseCommandLineArgs(Renderer* pRenderer, LPWSTR lpCmdLine)

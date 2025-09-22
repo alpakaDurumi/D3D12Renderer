@@ -18,7 +18,12 @@ struct ConstantData
 
 struct MeshConstantData : public ConstantData<MeshConstantData>
 {
-    XMFLOAT4X4 world;
+    XMFLOAT4X4 world = {
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    };
     XMFLOAT4X4 inverseTranspose;
     XMFLOAT4X4 padding[2];
 };

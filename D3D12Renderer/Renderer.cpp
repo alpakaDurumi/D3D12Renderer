@@ -75,8 +75,7 @@ void Renderer::SetFullScreen(bool fullScreen)
 
             // fullscreen borderless
             UINT windowStyle = WS_OVERLAPPEDWINDOW & ~(WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
-            //UINT windowStyle = WS_OVERLAPPEDWINDOW;
-            SetWindowLongW(Win32Application::GetHwnd(), GWL_STYLE, windowStyle);
+            SetWindowLongPtrW(Win32Application::GetHwnd(), GWL_STYLE, windowStyle);
 
             // Query the name of the nearest display device for the window.
             // This is required to set the fullscreen dimensions of the window
