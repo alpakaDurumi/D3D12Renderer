@@ -193,7 +193,8 @@ void Renderer::OnUpdate()
 
     for (auto* pMesh : m_instancedMeshes)
     {
-        XMMATRIX world = XMMatrixIdentity();
+        XMMATRIX prevWorld = XMMatrixTranspose(XMLoadFloat4x4(&pMesh->m_meshBufferData.world));
+        XMMATRIX world = prevWorld * XMMatrixRotationRollPitchYaw(0.0f, 0.001f, 0.0f);
         XMStoreFloat4x4(&pMesh->m_meshBufferData.world, XMMatrixTranspose(world));
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
         XMStoreFloat4x4(&pMesh->m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
@@ -219,12 +220,13 @@ void Renderer::OnUpdate()
 // Render the scene.
 void Renderer::OnRender()
 {
-    // Record all the commands we need to render the scene into the command list.
-    PopulateCommandList();
+    auto [commandAllocator, commandList] = m_commandQueue->GetCommandList();
 
-    // Execute the command list.
-    ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
-    m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+    // Record all the commands we need to render the scene into the command list
+    PopulateCommandList(commandList);
+
+    // Execute the command lists and store the fence value
+    m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList);
 
     // Present the frame.
     UINT syncInterval = m_vSync ? 1 : 0;
@@ -246,8 +248,6 @@ void Renderer::OnDestroy()
         delete pFrameResource;
     for (auto* pMesh : m_meshes)
         delete pMesh;
-
-    CloseHandle(m_fenceEvent);
 }
 
 void Renderer::OnKeyDown(WPARAM key)
@@ -350,7 +350,7 @@ void Renderer::LoadPipeline()
         ComPtr<ID3D12Debug> debugController;
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
             debugController->EnableDebugLayer();
-        }
+    }
 
     // Use IDXGIInfoQueue
     ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
@@ -409,7 +409,8 @@ void Renderer::LoadPipeline()
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
     queueDesc.NodeMask = 0;
 
-    ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
+    // Create CommandQueue
+    m_commandQueue = std::make_unique<CommandQueue>(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
 
     // Check for Variable Refresh Rate(VRR)
     m_tearingSupported = CheckTearingSupport();
@@ -430,7 +431,7 @@ void Renderer::LoadPipeline()
 
     ComPtr<IDXGISwapChain1> swapChain;
     ThrowIfFailed(factory->CreateSwapChainForHwnd(
-        m_commandQueue.Get(),
+        m_commandQueue->GetCommandQueue().Get(),
         Win32Application::GetHwnd(),
         &swapChainDesc,
         nullptr,
@@ -479,10 +480,6 @@ void Renderer::LoadPipeline()
             m_frameResources.push_back(pFrameResource);
         }
     }
-
-    // 프레임에 독립적인 command allocator를 하나 생성. 프레임과 무관한 작업을 할 때 사용
-    ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
-    //ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_BUNDLE, IID_PPV_ARGS(&m_bundleAllocator)));
 }
 
 // Load the sample assets.
@@ -499,7 +496,7 @@ void Renderer::LoadAssets()
         }
 
         // idx 0 for per-mesh CBV, 1 for default CBV, 2 for SRV
-        D3D12_DESCRIPTOR_RANGE1 ranges[3];
+        D3D12_DESCRIPTOR_RANGE1 ranges[3] = {};
         ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
         ranges[0].NumDescriptors = 2;   // Mesh + Material
         ranges[0].BaseShaderRegister = 0;
@@ -522,7 +519,7 @@ void Renderer::LoadAssets()
         ranges[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
         // idx 0 for per-mesh CBV, 1 for default CBV, 2 for SRV
-        D3D12_ROOT_PARAMETER1 rootParameters[3];
+        D3D12_ROOT_PARAMETER1 rootParameters[3] = {};
         rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         rootParameters[0].DescriptorTable = { 1, &ranges[0] };
         rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -734,9 +731,6 @@ void Renderer::LoadAssets()
         m_device->CreateDepthStencilView(m_depthStencil.Get(), &depthStencilViewDesc, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
     }
 
-    // Create the command list.
-    ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), m_defaultPipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
-
     // Create and record the bundle
     {
         //ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_BUNDLE, m_bundleAllocator.Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_bundle)));
@@ -754,9 +748,12 @@ void Renderer::LoadAssets()
     ComPtr<ID3D12Resource> indexBufferUploadHeap0;
     ComPtr<ID3D12Resource> instanceUploadHeap;
 
+    // Get command allocator and list for loading assets
+    auto [commandAllocator, commandList] = m_commandQueue->GetCommandList();
+
     InstancedMesh* pCube = new InstancedMesh(InstancedMesh::MakeCubeInstanced(
         m_device,
-        m_commandList,
+        commandList,
         vertexBufferUploadHeap0,
         indexBufferUploadHeap0,
         instanceUploadHeap));
@@ -767,7 +764,7 @@ void Renderer::LoadAssets()
 
     Mesh* pSphere = new Mesh(Mesh::MakeSphere(
         m_device,
-        m_commandList,
+        commandList,
         vertexBufferUploadHeap1,
         indexBufferUploadHeap1));
     m_meshes.push_back(pSphere);
@@ -871,72 +868,44 @@ void Renderer::LoadAssets()
 
     // 텍스처 생성, Mesh에 할당
     UINT idx = m_cbvSrvUavHeap.GetNumSrvAllocated();
-    CreateTexture(m_device, m_commandList, m_texture, textureUploadHeap, simpleTextureData, 256, 256, m_cbvSrvUavHeap.GetFreeHandleForSrv());
+    CreateTexture(m_device, commandList, m_texture, textureUploadHeap, simpleTextureData, 256, 256, m_cbvSrvUavHeap.GetFreeHandleForSrv());
     pCube->m_srvDescriptorOffset = idx;
     pSphere->m_srvDescriptorOffset = idx;
 
-    ThrowIfFailed(m_commandList->Close());
+    // Execute commands for loading assets and store fence value
+    m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList);
 
-    ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
-    m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-
-    // Create synchronization objects and wait until assets have been uploaded to the GPU.
-    {
-        ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
-        m_frameResources[m_frameIndex]->m_fenceValue++;
-
-        // Create an event handle to use for frame synchronization.
-        m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-        if (m_fenceEvent == nullptr)
-        {
-            ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
-        }
-
-        // Wait for the command list to execute; we are reusing the same command 
-        // list in our main loop but for now, we just want to wait for setup to 
-        // complete before continuing.
-        WaitForGPU();
-    }
+    // Wait until assets have been uploaded to the GPU
+    WaitForGPU();
 }
 
-void Renderer::PopulateCommandList()
+void Renderer::PopulateCommandList(ComPtr<ID3D12GraphicsCommandList>& commandList)
 {
     FrameResource* pFrameResource = m_frameResources[m_frameIndex];
 
-    // Command list allocators can only be reset when the associated 
-    // command lists have finished execution on the GPU; apps should use 
-    // fences to determine GPU execution progress.
-    ThrowIfFailed(pFrameResource->m_commandAllocator->Reset());
-
-    // However, when ExecuteCommandList() is called on a particular command 
-    // list, that command list can then be reset at any time and must be before 
-    // re-recording.
-    // PSO는 미설정
-    ThrowIfFailed(m_commandList->Reset(pFrameResource->m_commandAllocator.Get(), nullptr));
-
     // Set necessary state.
-    m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+    commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 
     ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvUavHeap.m_heap.Get() };
-    m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-    m_commandList->RSSetViewports(1, &m_viewport);
-    m_commandList->RSSetScissorRects(1, &m_scissorRect);
+    commandList->RSSetViewports(1, &m_viewport);
+    commandList->RSSetScissorRects(1, &m_scissorRect);
 
     // Indicate that the back buffer will be used as a render target.
     D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(pFrameResource->m_renderTarget, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-    m_commandList->ResourceBarrier(1, &barrier);
+    commandList->ResourceBarrier(1, &barrier);
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
     MoveCPUDescriptorHandle(&rtvHandle, m_frameIndex, m_rtvDescriptorSize);
     D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
-    m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+    commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
     const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-    m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-    m_commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+    commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-    m_commandList->SetPipelineState(m_defaultPipelineState.Get());
+    commandList->SetPipelineState(m_defaultPipelineState.Get());
     for (const auto* pMesh : m_meshes)
     {
         D3D12_GPU_DESCRIPTOR_HANDLE handle;
@@ -944,20 +913,20 @@ void Renderer::PopulateCommandList()
         // per-mesh CBVs
         // 각 프레임이 사용하는 디스크립터를 인덱싱
         handle = m_cbvSrvUavHeap.GetCbvHandle(m_frameIndex, pMesh->m_perMeshCbvDescriptorOffset);
-        m_commandList->SetGraphicsRootDescriptorTable(0, handle);
+        commandList->SetGraphicsRootDescriptorTable(0, handle);
 
         // default CBV
         handle = m_cbvSrvUavHeap.GetCbvHandle(0, pMesh->m_defaultCbvDescriptorOffset);
-        m_commandList->SetGraphicsRootDescriptorTable(1, handle);
+        commandList->SetGraphicsRootDescriptorTable(1, handle);
 
         // SRV
         handle = m_cbvSrvUavHeap.GetSrvHandle(pMesh->m_srvDescriptorOffset);
-        m_commandList->SetGraphicsRootDescriptorTable(2, handle);
+        commandList->SetGraphicsRootDescriptorTable(2, handle);
 
-        pMesh->Render(m_commandList);
+        pMesh->Render(commandList);
     }
 
-    m_commandList->SetPipelineState(m_instancedPipelineState.Get());
+    commandList->SetPipelineState(m_instancedPipelineState.Get());
     for (const auto* pMesh : m_instancedMeshes)
     {
         D3D12_GPU_DESCRIPTOR_HANDLE handle;
@@ -965,53 +934,33 @@ void Renderer::PopulateCommandList()
         // per-mesh CBVs
         // 각 프레임이 사용하는 디스크립터를 인덱싱
         handle = m_cbvSrvUavHeap.GetCbvHandle(m_frameIndex, pMesh->m_perMeshCbvDescriptorOffset);
-        m_commandList->SetGraphicsRootDescriptorTable(0, handle);
+        commandList->SetGraphicsRootDescriptorTable(0, handle);
 
         // default CBV
         handle = m_cbvSrvUavHeap.GetCbvHandle(0, pMesh->m_defaultCbvDescriptorOffset);
-        m_commandList->SetGraphicsRootDescriptorTable(1, handle);
+        commandList->SetGraphicsRootDescriptorTable(1, handle);
 
         // SRV
         handle = m_cbvSrvUavHeap.GetSrvHandle(pMesh->m_srvDescriptorOffset);
-        m_commandList->SetGraphicsRootDescriptorTable(2, handle);
+        commandList->SetGraphicsRootDescriptorTable(2, handle);
 
-        pMesh->Render(m_commandList);
+        pMesh->Render(commandList);
     }
 
     // Indicate that the back buffer will now be used to present.
     barrier = GetTransitionBarrier(pFrameResource->m_renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-    m_commandList->ResourceBarrier(1, &barrier);
-
-    ThrowIfFailed(m_commandList->Close());
+    commandList->ResourceBarrier(1, &barrier);
 }
 
 // Wait for pending GPU work to complete
 void Renderer::WaitForGPU()
 {
-    ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), m_frameResources[m_frameIndex]->m_fenceValue));
-
-    ThrowIfFailed(m_fence->SetEventOnCompletion(m_frameResources[m_frameIndex]->m_fenceValue, m_fenceEvent));
-    WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
-
-    m_frameResources[m_frameIndex]->m_fenceValue++;
+    m_commandQueue->Flush();
 }
 
 void Renderer::MoveToNextFrame()
 {
-    // 이전 프레임에 대한 fence 값
-    const UINT64 currentFenceValue = m_frameResources[m_frameIndex]->m_fenceValue;
-    ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), currentFenceValue));
-
-    // 현재 프레임 인덱스. Present를 했기 때문에 인덱스가 업데이트되어있다.
+    // Update frame index and wait for fence value
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-
-    // 현재 프레임에 대한 GPU 작업이 끝나 있는지, 즉 작업할 준비가 되어있는지 검사
-    if (m_fence->GetCompletedValue() < m_frameResources[m_frameIndex]->m_fenceValue)
-    {
-        ThrowIfFailed(m_fence->SetEventOnCompletion(m_frameResources[m_frameIndex]->m_fenceValue, m_fenceEvent));
-        WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
-    }
-
-    // 현재 프레임에 대한 목표 fence 값 증가
-    m_frameResources[m_frameIndex]->m_fenceValue = currentFenceValue + 1;
+    m_commandQueue->WaitForFenceValue(m_frameResources[m_frameIndex]->m_fenceValue);
 }

@@ -14,6 +14,7 @@
 #include <vector>
 #include <chrono>
 #include <algorithm>
+#include <memory>
 
 #include "Camera.h"
 #include "InputManager.h"
@@ -74,16 +75,14 @@ private:
     ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12Device> m_device;
     ComPtr<ID3D12Resource> m_depthStencil;
-    ComPtr<ID3D12CommandAllocator> m_commandAllocator;      // For frame-independent job
     //ComPtr<ID3D12CommandAllocator> m_bundleAllocator;
-    ComPtr<ID3D12CommandQueue> m_commandQueue;
+    std::unique_ptr<CommandQueue> m_commandQueue;
     ComPtr<ID3D12RootSignature> m_rootSignature;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     DescriptorHeapManager m_cbvSrvUavHeap;
     ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
     ComPtr<ID3D12PipelineState> m_defaultPipelineState;
     ComPtr<ID3D12PipelineState> m_instancedPipelineState;
-    ComPtr<ID3D12GraphicsCommandList> m_commandList;
     //ComPtr<ID3D12GraphicsCommandList> m_bundle;
     UINT m_rtvDescriptorSize;
 
@@ -103,12 +102,10 @@ private:
 
     // Synchronization objects
     UINT m_frameIndex;
-    HANDLE m_fenceEvent;
-    ComPtr<ID3D12Fence> m_fence;
 
     void LoadPipeline();
     void LoadAssets();
-    void PopulateCommandList();
+    void PopulateCommandList(ComPtr<ID3D12GraphicsCommandList>& commandList);
     void WaitForGPU();
     void MoveToNextFrame();
 };

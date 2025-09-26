@@ -31,6 +31,11 @@ public:
         }
     }
 
+    ~CommandQueue()
+    {
+        CloseHandle(m_fenceEvent);
+    }
+
     ComPtr<ID3D12CommandQueue> GetCommandQueue() const
     {
         return m_commandQueue;
@@ -112,17 +117,17 @@ public:
 
     void WaitForFenceValue(UINT64 fenceValue)
     {
-        if (m_fence->GetCompletedValue() < fenceValue)
+        if (!IsFenceComplete(fenceValue))
         {
             ThrowIfFailed(m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent));
             WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
         }
     }
-
+     
     // Wait for pending GPU work to complete
     void Flush()
     {
-        UINT fenceValue = Signal();
+        UINT64 fenceValue = Signal();
         WaitForFenceValue(fenceValue);
     }
 
