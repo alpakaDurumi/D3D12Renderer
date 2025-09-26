@@ -22,6 +22,7 @@
 #include "ConstantData.h"
 #include "ConstantBuffer.h"
 #include "DescriptorHeapManager.h"
+#include "CommandQueue.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;

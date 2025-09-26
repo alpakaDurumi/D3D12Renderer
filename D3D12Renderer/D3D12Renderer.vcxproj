@@ -145,6 +145,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="CommandQueue.h" />
     <ClInclude Include="ConstantBuffer.h" />
     <ClInclude Include="ConstantData.h" />
     <ClInclude Include="D3DHelper.h" />
