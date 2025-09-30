@@ -3,7 +3,7 @@
 int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
     ParseCommandLineArgs(pRenderer, lpCmdLine);
-    pRenderer->UpdateViewport();
+    pRenderer->UpdateWidthHeight();
 
     // Register the window class
     WNDCLASSEXW windowClass = { 0 };

@@ -51,7 +51,7 @@ Renderer::Renderer(std::wstring name)
 {
 }
 
-void Renderer::UpdateViewport()
+void Renderer::UpdateWidthHeight()
 {
     m_camera.SetAspectRatio(static_cast<float>(m_width) / static_cast<float>(m_height));
     m_viewport = { 0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f };
@@ -275,7 +275,7 @@ void Renderer::OnResize(UINT width, UINT height)
     // Size 0 is not allowed
     m_width = std::max(1u, width);
     m_height = std::max(1u, height);
-    UpdateViewport();
+    UpdateWidthHeight();
 
     // Release resources and set frame fence values to the current fence value
     for (UINT i = 0; i < FrameCount; i++)
@@ -345,11 +345,18 @@ void Renderer::LoadPipeline()
     UINT dxgiFactoryFlags = 0;
 
 #if defined(_DEBUG)
-    // Enable the D3D12 debug layer
+    // Enable the D3D12 debug layer and GBV
     {
-        ComPtr<ID3D12Debug> debugController;
-        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
-            debugController->EnableDebugLayer();
+        ComPtr<ID3D12Debug> debugController0;
+        ComPtr<ID3D12Debug1> debugController1;
+        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController0))))
+        {
+            if (SUCCEEDED(debugController0.As(&debugController1)))
+            {
+                debugController1->EnableDebugLayer();
+                debugController1->SetEnableGPUBasedValidation(TRUE);
+    }
+        }
     }
 
     // Use IDXGIInfoQueue

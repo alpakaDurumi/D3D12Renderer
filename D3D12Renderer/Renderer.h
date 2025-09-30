@@ -40,7 +40,7 @@ public:
     void SetWidth(UINT width) { m_width = width; }
     void SetHeight(UINT height) { m_height = height; }
     void SetWarp(bool value) { m_useWarpDevice = value; }
-    void UpdateViewport();
+    void UpdateWidthHeight();
     void ToggleFullScreen();
     void SetFullScreen(bool fullScreen);
 
