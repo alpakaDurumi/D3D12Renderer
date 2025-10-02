@@ -273,6 +273,7 @@ namespace D3DHelper
         D3D12_SUBRESOURCE_DATA* pSrcData)
     {
         // Calculate required size for data upload and allocate heap memory for footprints
+        // Structure of Arrays
         UINT64 memToAlloc = static_cast<UINT64>(sizeof(D3D12_PLACED_SUBRESOURCE_FOOTPRINT) + sizeof(UINT) + sizeof(UINT64)) * numSubresources;
         void* pMem = HeapAlloc(GetProcessHeap(), 0, static_cast<SIZE_T>(memToAlloc));
         if (pMem == nullptr)
