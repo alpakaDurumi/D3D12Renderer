@@ -227,7 +227,7 @@ namespace D3DHelper
             &heapProperties,
             D3D12_HEAP_FLAG_NONE,
             &resourceDesc,
-            D3D12_RESOURCE_STATE_COPY_DEST,
+            D3D12_RESOURCE_STATE_COMMON,
             nullptr,
             IID_PPV_ARGS(&defaultHeap)));
     }
@@ -374,6 +374,10 @@ namespace D3DHelper
 
         CreateDefaultHeapForBuffer(device, vertexBufferSize, vertexBuffer);
 
+        // Change resource state
+        D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(vertexBuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+        commandList->ResourceBarrier(1, &barrier);
+
         CreateUploadHeap(device, vertexBufferSize, uploadHeap);
 
         D3D12_SUBRESOURCE_DATA vertexData = {};
@@ -384,7 +388,7 @@ namespace D3DHelper
         UpdateSubresources(device, commandList, vertexBuffer, uploadHeap, 0, 0, 1, &vertexData);
 
         // Change resource state
-        D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(vertexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+        barrier = GetTransitionBarrier(vertexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
         commandList->ResourceBarrier(1, &barrier);
 
         // Initialize the vertex buffer view
@@ -405,6 +409,10 @@ namespace D3DHelper
 
         CreateDefaultHeapForBuffer(device, indexBufferSize, indexBuffer);
 
+        // Change resource state
+        D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(indexBuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+        commandList->ResourceBarrier(1, &barrier);
+
         CreateUploadHeap(device, indexBufferSize, uploadHeap);
 
         D3D12_SUBRESOURCE_DATA indexData = {};
@@ -415,7 +423,7 @@ namespace D3DHelper
         UpdateSubresources(device, commandList, indexBuffer, uploadHeap, 0, 0, 1, &indexData);
 
         // Change resource state
-        D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(indexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        barrier = GetTransitionBarrier(indexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_INDEX_BUFFER);
         commandList->ResourceBarrier(1, &barrier);
 
         // Initialize the index buffer view
