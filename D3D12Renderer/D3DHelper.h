@@ -362,7 +362,7 @@ namespace D3DHelper
     }
 
     template<typename T>
-    inline static void CreateVertexBuffer(
+    inline void CreateVertexBuffer(
         ComPtr<ID3D12Device>& device,
         ComPtr<ID3D12GraphicsCommandList>& commandList,
         ComPtr<ID3D12Resource>& vertexBuffer,
@@ -397,7 +397,7 @@ namespace D3DHelper
         pvertexBufferView->SizeInBytes = vertexBufferSize;
     }
 
-    inline static void CreateIndexBuffer(
+    inline void CreateIndexBuffer(
         ComPtr<ID3D12Device>& device,
         ComPtr<ID3D12GraphicsCommandList>& commandList,
         ComPtr<ID3D12Resource>& indexBuffer,
@@ -432,7 +432,7 @@ namespace D3DHelper
         pindexBufferView->Format = DXGI_FORMAT_R32_UINT;
     }
 
-    inline static void CreateTexture(
+    inline void CreateTexture(
         ComPtr<ID3D12Device>& device,
         ComPtr<ID3D12GraphicsCommandList>& commandList,
         ComPtr<ID3D12Resource>& texture,
@@ -474,5 +474,53 @@ namespace D3DHelper
         srvDesc.Texture2D.MipLevels = 1;
 
         device->CreateShaderResourceView(texture.Get(), &srvDesc, cpuHandle);
+    }
+
+    inline void CreateDepthStencilBuffer(
+        ComPtr<ID3D12Device>& device,
+        UINT width,
+        UINT height,
+        ComPtr<ID3D12Resource>& depthStencilBuffer,
+        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
+    {
+        D3D12_HEAP_PROPERTIES heapProperties = {};
+        heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProperties.CreationNodeMask = 1;
+        heapProperties.VisibleNodeMask = 1;
+
+        D3D12_RESOURCE_DESC resourceDesc = {};
+        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        resourceDesc.Alignment = 0;
+        resourceDesc.Width = width;
+        resourceDesc.Height = height;
+        resourceDesc.DepthOrArraySize = 1;
+        resourceDesc.MipLevels = 1;
+        resourceDesc.Format = DXGI_FORMAT_D32_FLOAT;
+        resourceDesc.SampleDesc = { 1, 0 };
+        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+        D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
+        depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+        depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
+        depthOptimizedClearValue.DepthStencil.Stencil = 0;
+
+        ThrowIfFailed(device->CreateCommittedResource(
+            &heapProperties,
+            D3D12_HEAP_FLAG_NONE,
+            &resourceDesc,
+            D3D12_RESOURCE_STATE_DEPTH_WRITE,
+            &depthOptimizedClearValue,
+            IID_PPV_ARGS(&depthStencilBuffer)
+        ));
+
+        D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc = {};
+        depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
+        depthStencilViewDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+        depthStencilViewDesc.Flags = D3D12_DSV_FLAG_NONE;
+
+        device->CreateDepthStencilView(depthStencilBuffer.Get(), &depthStencilViewDesc, cpuHandle);
     }
 }

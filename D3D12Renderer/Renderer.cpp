@@ -283,7 +283,7 @@ void Renderer::OnResize(UINT width, UINT height)
         m_frameResources[i]->m_renderTarget.Reset();
         m_frameResources[i]->m_fenceValue = m_frameResources[m_frameIndex]->m_fenceValue;
     }
-    m_depthStencil.Reset();
+    m_depthStencilBuffer.Reset();
 
     // Preserve existing format
     m_swapChain->ResizeBuffers(FrameCount, m_width, m_height, DXGI_FORMAT_UNKNOWN, m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
@@ -299,45 +299,7 @@ void Renderer::OnResize(UINT width, UINT height)
     }
 
     // Recreate DSV
-    D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc = {};
-    depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
-    depthStencilViewDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-    depthStencilViewDesc.Flags = D3D12_DSV_FLAG_NONE;
-
-    D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
-    depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-    depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
-    depthOptimizedClearValue.DepthStencil.Stencil = 0;
-
-    D3D12_HEAP_PROPERTIES heapProperties = {};
-    heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-    heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProperties.CreationNodeMask = 1;
-    heapProperties.VisibleNodeMask = 1;
-
-    D3D12_RESOURCE_DESC resourceDesc = {};
-    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    resourceDesc.Alignment = 0;
-    resourceDesc.Width = m_width;
-    resourceDesc.Height = m_height;
-    resourceDesc.DepthOrArraySize = 1;
-    resourceDesc.MipLevels = 1;
-    resourceDesc.Format = DXGI_FORMAT_D32_FLOAT;
-    resourceDesc.SampleDesc = { 1, 0 };
-    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
-    ThrowIfFailed(m_device->CreateCommittedResource(
-        &heapProperties,
-        D3D12_HEAP_FLAG_NONE,
-        &resourceDesc,
-        D3D12_RESOURCE_STATE_DEPTH_WRITE,
-        &depthOptimizedClearValue,
-        IID_PPV_ARGS(&m_depthStencil)
-    ));
-
-    m_device->CreateDepthStencilView(m_depthStencil.Get(), &depthStencilViewDesc, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+    CreateDepthStencilBuffer(m_device, m_width, m_height, m_depthStencilBuffer, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
 }
 
 void Renderer::LoadPipeline()
@@ -555,6 +517,12 @@ void Renderer::LoadAssets()
         sampler.RegisterSpace = 0;
         sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
+        D3D12_ROOT_SIGNATURE_FLAGS flag =
+            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+            D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+            D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+            D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+
         // Downgraded objects must not be destroyed until CreateRootSignature
         D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
         D3D12_ROOT_PARAMETER downgradedRootParameters[_countof(rootParameters)];
@@ -566,7 +534,7 @@ void Renderer::LoadAssets()
             rootSignatureDesc.Desc_1_1.pParameters = rootParameters;
             rootSignatureDesc.Desc_1_1.NumStaticSamplers = 1;
             rootSignatureDesc.Desc_1_1.pStaticSamplers = &sampler;
-            rootSignatureDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+            rootSignatureDesc.Desc_1_1.Flags = flag;
         }
         else
         {
@@ -578,7 +546,7 @@ void Renderer::LoadAssets()
             rootSignatureDesc.Desc_1_0.pParameters = downgradedRootParameters;
             rootSignatureDesc.Desc_1_0.NumStaticSamplers = 1;
             rootSignatureDesc.Desc_1_0.pStaticSamplers = &sampler;
-            rootSignatureDesc.Desc_1_0.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+            rootSignatureDesc.Desc_1_0.Flags = flag;
         }
 
         ComPtr<ID3DBlob> signature;
@@ -699,47 +667,7 @@ void Renderer::LoadAssets()
     }
 
     // Create the depth stencil view
-    {
-        D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc = {};
-        depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT;
-        depthStencilViewDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-        depthStencilViewDesc.Flags = D3D12_DSV_FLAG_NONE;
-
-        D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
-        depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-        depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
-        depthOptimizedClearValue.DepthStencil.Stencil = 0;
-
-        D3D12_HEAP_PROPERTIES heapProperties = {};
-        heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProperties.CreationNodeMask = 1;
-        heapProperties.VisibleNodeMask = 1;
-
-        D3D12_RESOURCE_DESC resourceDesc = {};
-        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        resourceDesc.Alignment = 0;
-        resourceDesc.Width = m_width;
-        resourceDesc.Height = m_height;
-        resourceDesc.DepthOrArraySize = 1;
-        resourceDesc.MipLevels = 1;
-        resourceDesc.Format = DXGI_FORMAT_D32_FLOAT;
-        resourceDesc.SampleDesc = { 1, 0 };
-        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
-        ThrowIfFailed(m_device->CreateCommittedResource(
-            &heapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &resourceDesc,
-            D3D12_RESOURCE_STATE_DEPTH_WRITE,
-            &depthOptimizedClearValue,
-            IID_PPV_ARGS(&m_depthStencil)
-        ));
-
-        m_device->CreateDepthStencilView(m_depthStencil.Get(), &depthStencilViewDesc, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
-    }
+    CreateDepthStencilBuffer(m_device, m_width, m_height, m_depthStencilBuffer, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
 
     // Create and record the bundle
     {

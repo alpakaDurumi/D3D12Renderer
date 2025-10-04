@@ -74,7 +74,7 @@ private:
     D3D12_RECT m_scissorRect;
     ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12Device> m_device;
-    ComPtr<ID3D12Resource> m_depthStencil;
+    ComPtr<ID3D12Resource> m_depthStencilBuffer;
     //ComPtr<ID3D12CommandAllocator> m_bundleAllocator;
     std::unique_ptr<CommandQueue> m_commandQueue;
     ComPtr<ID3D12RootSignature> m_rootSignature;
