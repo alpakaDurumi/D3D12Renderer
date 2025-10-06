@@ -141,7 +141,7 @@ void Renderer::OnUpdate()
             OutputDebugStringW(buffer);
 
             frameCounter = 0;
-            elapsedSeconds = 0.0f;
+            elapsedSeconds = 0.0;
         }
     }
 
