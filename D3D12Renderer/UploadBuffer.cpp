@@ -23,6 +23,7 @@ UploadBuffer::Allocation UploadBuffer::Allocate(SIZE_T sizeInBytes, SIZE_T align
         throw std::bad_alloc();
     }
 
+    // 첫 할당이거나 현재 Page의 공간이 부족한 경우
     if (!m_currentPage || !m_currentPage->HasSpace(sizeInBytes, alignment))
     {
         m_currentPage = RequestPage();
@@ -52,8 +53,11 @@ std::shared_ptr<UploadBuffer::Page> UploadBuffer::RequestPage()
 void UploadBuffer::Reset()
 {
     m_currentPage = nullptr;
+
+    // Set all pages to available
     m_availablePages = m_pagePool;
 
+    // Set offset of all pages to 0
     for (auto page : m_availablePages)
     {
         page->Reset();
@@ -65,13 +69,14 @@ void UploadBuffer::Reset()
 UploadBuffer::Page::Page(ComPtr<ID3D12Device>& device, SIZE_T sizeInBytes)
     : m_pageSize(sizeInBytes),
     m_offset(0),
-    m_CPUPtr(nullptr),
-    m_GPUPtr(D3D12_GPU_VIRTUAL_ADDRESS(0))
+    m_CPUBasePtr(nullptr),
+    m_GPUBasePtr(D3D12_GPU_VIRTUAL_ADDRESS(0))
 {
     CreateUploadHeap(device, m_pageSize, m_resource);
-
-    m_GPUPtr = m_resource->GetGPUVirtualAddress();
-    m_resource->Map(0, nullptr, &m_CPUPtr);
+    
+    D3D12_RANGE readRange = { 0, 0 };
+    m_resource->Map(0, &readRange, &m_CPUBasePtr);
+    m_GPUBasePtr = m_resource->GetGPUVirtualAddress();
 }
 
 UploadBuffer::Page::~Page()
@@ -96,10 +101,10 @@ UploadBuffer::Allocation UploadBuffer::Page::Allocate(SIZE_T sizeInBytes, SIZE_T
 
     SIZE_T alignedSize = Align(sizeInBytes, alignment);
     m_offset = Align(m_offset, alignment);
-
+    
     Allocation allocation;
-    allocation.CPU = static_cast<uint8_t*>(m_CPUPtr) + m_offset;
-    allocation.GPU = m_GPUPtr + m_offset;
+    allocation.m_CPUPtr = static_cast<void*>(static_cast<UINT8*>(m_CPUBasePtr) + m_offset);
+    allocation.m_GPUPtr = m_GPUBasePtr + m_offset;
 
     m_offset += alignedSize;
 

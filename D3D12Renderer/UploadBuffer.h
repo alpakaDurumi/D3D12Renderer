@@ -12,8 +12,8 @@ class UploadBuffer
 public:
     struct Allocation
     {
-        void* CPU;
-        D3D12_GPU_VIRTUAL_ADDRESS GPU;
+        void* m_CPUPtr;
+        D3D12_GPU_VIRTUAL_ADDRESS m_GPUPtr;
     };
 
     UploadBuffer(ComPtr<ID3D12Device>& device, SIZE_T pageSize);
@@ -36,8 +36,8 @@ private:
     private:
         ComPtr<ID3D12Resource> m_resource;
 
-        void* m_CPUPtr;
-        D3D12_GPU_VIRTUAL_ADDRESS m_GPUPtr;
+        void* m_CPUBasePtr;
+        D3D12_GPU_VIRTUAL_ADDRESS m_GPUBasePtr;
 
         SIZE_T m_pageSize;
         SIZE_T m_offset;
@@ -45,7 +45,7 @@ private:
 
     std::shared_ptr<Page> RequestPage();
 
-    std::deque<std::shared_ptr<Page>> m_pagePool;
+    std::deque<std::shared_ptr<Page>> m_pagePool;           // ÀüÃ¼ Page
     std::deque<std::shared_ptr<Page>> m_availablePages;
     std::shared_ptr<Page> m_currentPage;
     SIZE_T m_pageSize;
