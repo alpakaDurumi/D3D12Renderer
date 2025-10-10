@@ -66,6 +66,7 @@ void UploadBuffer::Reset()
 
 // Page
 
+// Page가 살아있는 동안 한 Page 전체 영역에 대해 Mapping이 유지된다. 소멸자가 호출되면 Unmap을 통해 Mapping이 해제된다.
 UploadBuffer::Page::Page(ComPtr<ID3D12Device>& device, SIZE_T sizeInBytes)
     : m_pageSize(sizeInBytes),
     m_offset(0),
@@ -94,11 +95,6 @@ bool UploadBuffer::Page::HasSpace(SIZE_T sizeInBytes, SIZE_T alignment) const
 
 UploadBuffer::Allocation UploadBuffer::Page::Allocate(SIZE_T sizeInBytes, SIZE_T alignment)
 {
-    if (!HasSpace(sizeInBytes, alignment))
-    {
-        throw std::bad_alloc();
-    }
-
     SIZE_T alignedSize = Align(sizeInBytes, alignment);
     m_offset = Align(m_offset, alignment);
     
