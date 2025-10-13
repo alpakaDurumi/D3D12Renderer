@@ -58,12 +58,6 @@ void DescriptorAllocation::Free()
     if (!IsNull() && m_page)
     {
         m_page->Free(std::move(*this));
-
-        m_descriptor.ptr = 0;
-        m_numHandles = 0;
-        m_descriptorSize = 0;
-        m_fenceValue = 0;
-        m_page.reset();
     }
 }
 
