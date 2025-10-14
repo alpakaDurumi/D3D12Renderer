@@ -11,7 +11,7 @@ class DescriptorAllocatorPage;
 class DescriptorAllocation
 {
 public:
-    DescriptorAllocation();
+    DescriptorAllocation() = delete;
     DescriptorAllocation(D3D12_CPU_DESCRIPTOR_HANDLE baseDescriptor, UINT32 offsetInHeap, UINT32 numHandles, UINT32 descriptorSize, std::shared_ptr<DescriptorAllocatorPage> page);
 
     ~DescriptorAllocation();
@@ -23,8 +23,6 @@ public:
     // Only move is allowed
     DescriptorAllocation(DescriptorAllocation&& other);
     DescriptorAllocation& operator=(DescriptorAllocation&& other);
-
-    bool IsNull() const;
 
     // Get a descriptor at a particular offset in the allocation
     D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandle(UINT32 offsetInBlock = 0) const;

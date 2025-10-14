@@ -6,11 +6,6 @@
 
 using namespace D3DHelper;
 
-DescriptorAllocation::DescriptorAllocation()
-    : m_descriptor{ 0 }, m_offsetInHeap(0), m_numHandles(0), m_descriptorSize(0), m_fenceValue(0), m_page(nullptr)
-{
-}
-
 DescriptorAllocation::DescriptorAllocation(D3D12_CPU_DESCRIPTOR_HANDLE baseDescriptor, UINT32 offsetInHeap, UINT32 numHandles, UINT32 descriptorSize, std::shared_ptr<DescriptorAllocatorPage> page)
     : m_offsetInHeap(offsetInHeap), m_numHandles(numHandles), m_descriptorSize(descriptorSize), m_fenceValue(0), m_page(page)
 {
@@ -55,15 +50,8 @@ DescriptorAllocation& DescriptorAllocation::operator=(DescriptorAllocation&& oth
 
 void DescriptorAllocation::Free()
 {
-    if (!IsNull() && m_page)
-    {
+    if(m_page)
         m_page->Free(std::move(*this));
-    }
-}
-
-bool DescriptorAllocation::IsNull() const
-{
-    return m_descriptor.ptr == 0;
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE DescriptorAllocation::GetDescriptorHandle(UINT32 offsetInBlock) const

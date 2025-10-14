@@ -14,7 +14,7 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
 {
     std::lock_guard<std::mutex> lock(m_allocationMutex);
 
-    DescriptorAllocation allocation;
+    std::optional<DescriptorAllocation> allocation;
 
     auto it = m_availableHeaps.begin();
     while (it != m_availableHeaps.end())
@@ -24,7 +24,7 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
         allocation = allocatorPage->Allocate(numDescriptors);
 
         // A valid allocation has been found
-        if (!allocation.IsNull())
+        if (!allocation.has_value())
         {
             // DescriptorAllocatorPage::Allocate 내에서 m_numFreeHandles를 감소시킴에도 불구하고,
             // 다시 GetNumFreeHandles를 호출하여 개수를 확인하고 있다. DescriptorAllocatorPage::Allocate에서
@@ -44,7 +44,7 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
     }
 
     // No available heap could satisfy the requested number of descriptors
-    if (allocation.IsNull())
+    if (!allocation.has_value())
     {
         // Increase page size for demand
         m_numDescriptorsPerHeap = std::max(m_numDescriptorsPerHeap, numDescriptors);
@@ -53,7 +53,9 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
         allocation = newPage->Allocate(numDescriptors);
     }
 
-    return allocation;
+    // std::optional<T>::value returns l-value reference, so std::move should be used for satisfy
+    // move constructor/assignment of DescriptorAllocation
+    return std::move(allocation.value());
 }
 
 // This function not use mutex since it assumes that mutex already locked on caller's side

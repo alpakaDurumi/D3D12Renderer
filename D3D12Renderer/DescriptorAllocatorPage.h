@@ -6,6 +6,7 @@
 #include <mutex>
 #include <map>
 #include <queue>
+#include <optional>
 
 class DescriptorAllocation;
 
@@ -22,7 +23,7 @@ public:
 
     bool HasSpace(UINT32 numDescriptors) const;
 
-    DescriptorAllocation Allocate(UINT32 numDescriptors);
+    std::optional<DescriptorAllocation> Allocate(UINT32 numDescriptors);
 
     void Free(DescriptorAllocation&& descriptorHandle);
 

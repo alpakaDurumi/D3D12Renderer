@@ -6,6 +6,7 @@
 #include <mutex>
 #include <set>
 #include <vector>
+#include <optional>
 
 class DescriptorAllocatorPage;
 class DescriptorAllocation;

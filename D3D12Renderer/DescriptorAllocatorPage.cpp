@@ -33,20 +33,20 @@ bool DescriptorAllocatorPage::HasSpace(UINT32 numDescriptors) const
     return m_freeListBySize.lower_bound(numDescriptors) != m_freeListBySize.end();
 }
 
-DescriptorAllocation DescriptorAllocatorPage::Allocate(UINT32 numDescriptors)
+std::optional<DescriptorAllocation> DescriptorAllocatorPage::Allocate(UINT32 numDescriptors)
 {
     std::lock_guard<std::mutex> lock(m_allocationMutex);
 
-    // Return null descriptor if allocation failed
+    // Return std::nullopt if allocation failed
     if (numDescriptors > m_numFreeHandles)
     {
-        return DescriptorAllocation();
+        return std::nullopt;
     }
 
     auto smallestBlockIt = m_freeListBySize.lower_bound(numDescriptors);
     if (smallestBlockIt == m_freeListBySize.end())
     {
-        return DescriptorAllocation();
+        return std::nullopt;
     }
 
     auto [blockSize, offsetIt] = *smallestBlockIt;
