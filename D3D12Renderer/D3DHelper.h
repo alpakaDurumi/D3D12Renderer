@@ -131,13 +131,13 @@ namespace D3DHelper
         }
     }
 
-    inline void DowngradeRootDescriptor(D3D12_ROOT_DESCRIPTOR1* src, D3D12_ROOT_DESCRIPTOR* dst)
+    inline void DowngradeRootDescriptor(const D3D12_ROOT_DESCRIPTOR1* src, D3D12_ROOT_DESCRIPTOR* dst)
     {
         dst->ShaderRegister = src->ShaderRegister;
         dst->RegisterSpace = src->RegisterSpace;
     }
 
-    inline void DowngradeRootParameters(D3D12_ROOT_PARAMETER1* src, UINT numParameters, D3D12_ROOT_PARAMETER* dst,
+    inline void DowngradeRootParameters(const D3D12_ROOT_PARAMETER1* src, UINT numParameters, D3D12_ROOT_PARAMETER* dst,
         std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges, UINT& offset)
     {
         for (UINT i = 0; i < numParameters; i++)

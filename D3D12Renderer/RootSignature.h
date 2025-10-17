@@ -12,6 +12,8 @@ using namespace D3DHelper;
 
 class RootParameter
 {
+    friend class RootSignature;
+
 public:
     ~RootParameter()
     {
@@ -109,6 +111,25 @@ public:
 
     void Finalize(ComPtr<ID3D12Device>& device)
     {
+        // Fill bitmasks
+        for (UINT i = 0; i < m_numParameters; ++i)
+        {
+            D3D12_ROOT_PARAMETER1& param = m_parameters[i].m_parameter;
+
+            if (param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+            {
+                // 한 table 내에 속한 모든 range의 type이 같다고 가정
+                if (param.DescriptorTable.pDescriptorRanges->RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER)
+                {
+                    m_samplerTableBitMask |= (1 << i);
+                }
+                else
+                {
+                    m_descriptorTableBitMask |= (1 << i);
+                }
+            }
+        }
+
         // Use D3D_ROOT_SIGNATURE_VERSION_1_1 if current environment supports it
         D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
         featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -128,11 +149,13 @@ public:
         D3D12_ROOT_PARAMETER* pDowngradedRootParameters = new D3D12_ROOT_PARAMETER[m_numParameters];
         std::vector<D3D12_DESCRIPTOR_RANGE> convertedRanges;
 
+        const D3D12_ROOT_PARAMETER1* pParameters = (m_numParameters == 0) ? nullptr : &m_parameters.get()[0].m_parameter;
+
         if (featureData.HighestVersion == D3D_ROOT_SIGNATURE_VERSION_1_1)
         {
             rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
             rootSignatureDesc.Desc_1_1.NumParameters = m_numParameters;
-            rootSignatureDesc.Desc_1_1.pParameters = (const D3D12_ROOT_PARAMETER1*)m_parameters.get();
+            rootSignatureDesc.Desc_1_1.pParameters = pParameters;
             rootSignatureDesc.Desc_1_1.NumStaticSamplers = m_numStaticSamplers;
             rootSignatureDesc.Desc_1_1.pStaticSamplers = m_staticSamplers.get();
             rootSignatureDesc.Desc_1_1.Flags = flag;
@@ -140,7 +163,7 @@ public:
         else
         {
             UINT offset = 0;
-            DowngradeRootParameters((D3D12_ROOT_PARAMETER1*)m_parameters.get(), m_numParameters, pDowngradedRootParameters, convertedRanges, offset);
+            DowngradeRootParameters(pParameters, m_numParameters, pDowngradedRootParameters, convertedRanges, offset);
 
             rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_0;
             rootSignatureDesc.Desc_1_0.NumParameters = m_numParameters;
@@ -154,6 +177,8 @@ public:
         ComPtr<ID3DBlob> error;
         ThrowIfFailed(D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error));
         ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+
+        delete[] pDowngradedRootParameters;
     }
 
 private:
