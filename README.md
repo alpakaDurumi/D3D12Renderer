@@ -5,6 +5,7 @@ Custom 3D rendering engine using Direct3D 12 and C++
 # References
 
 - [Direct3D 12 graphics - Microsoft Learn](https://learn.microsoft.com/en-us/windows/win32/direct3d12/direct3d-12-graphics)
+- [DirectX-Specs](https://microsoft.github.io/DirectX-Specs/)
 - [Microsoft's DirectX-Graphics-Samples](https://github.com/microsoft/DirectX-Graphics-Samples)
 - [Learning DirectX 12 series by 3Dgep (Jeremiah van Oosten)](https://www.3dgep.com/category/graphics-programming/directx/)
 - [DXC guide](https://github.com/microsoft/DirectXShaderCompiler/wiki/Using-dxc.exe-and-dxcompiler.dll)
