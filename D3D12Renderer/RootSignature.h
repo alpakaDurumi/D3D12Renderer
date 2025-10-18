@@ -69,6 +69,8 @@ public:
     RootSignature(UINT numParameters, UINT numStaticSamplers)
         : m_numParameters(numParameters), m_numStaticSamplers(numStaticSamplers)
     {
+        assert(numParameters <= 32);    // Maximum number of parameters is limited to 32
+
         if (m_numParameters > 0)
             m_parameters.reset(new RootParameter[m_numParameters]);
         else
@@ -81,8 +83,17 @@ public:
     }
 
     ComPtr<ID3D12RootSignature> GetRootSignature() const { return m_rootSignature; }
-    UINT32 GetDescriptorTableBitMask() const { return m_descriptorTableBitMask; }
-    UINT32 GetSamplerTableBitMask() const { return m_samplerTableBitMask; }
+    UINT GetNumParameters() const { return m_numParameters; }
+    UINT GetNumStaticSamplers() const { return m_numStaticSamplers; }
+    UINT32 GetDescriptorTableBitMask(D3D12_DESCRIPTOR_HEAP_TYPE heapType) const
+    {
+        return heapType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV ? m_descriptorTableBitMask : m_samplerTableBitMask;
+    }
+    UINT32 GetTableSize(UINT parameterIndex) const
+    {
+        assert(parameterIndex < m_numParameters);
+        return m_descriptorTableSize[parameterIndex];
+    }
 
     RootParameter& operator[](SIZE_T parameterIndex)
     {
@@ -115,6 +126,7 @@ public:
         for (UINT i = 0; i < m_numParameters; ++i)
         {
             D3D12_ROOT_PARAMETER1& param = m_parameters[i].m_parameter;
+            m_descriptorTableSize[i] = 0;
 
             if (param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
             {
@@ -128,6 +140,9 @@ public:
                     m_descriptorTableBitMask |= (1 << i);
                 }
             }
+
+            for (UINT rangeIndex = 0; rangeIndex < param.DescriptorTable.NumDescriptorRanges; ++rangeIndex)
+                m_descriptorTableSize[i] += param.DescriptorTable.pDescriptorRanges[rangeIndex].NumDescriptors;
         }
 
         // Use D3D_ROOT_SIGNATURE_VERSION_1_1 if current environment supports it
@@ -189,7 +204,7 @@ private:
 
     UINT32 m_descriptorTableBitMask;
     UINT32 m_samplerTableBitMask;
-    UINT32 m_numDescriptorTableSize[32];
+    UINT32 m_descriptorTableSize[16];   // Maximum number of tables is limited to 16
 
     std::unique_ptr<RootParameter[]> m_parameters;
     std::unique_ptr<D3D12_STATIC_SAMPLER_DESC[]> m_staticSamplers;
