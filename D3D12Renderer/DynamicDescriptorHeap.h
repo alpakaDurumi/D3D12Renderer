@@ -12,10 +12,12 @@ class RootSignature;
 using Microsoft::WRL::ComPtr;
 
 // Staging CPU visible descriptors and committing those descriptors to a GPU visible descriptor heap
+// Root constants와 root descriptors는 디스크립터 힙을 사용하지 않으므로 이 클래스의 책임이 아니다.
+// 멀티스레딩 환경에서 사용하도록 확장하려면 뮤텍스를 사용하도록 수정해야한다.
 class DynamicDescriptorHeap
 {
 public:
-    DynamicDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT32 numDescriptorsPerHeap = 1024);
+    DynamicDescriptorHeap(ComPtr<ID3D12Device>& device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT32 numDescriptorsPerHeap = 1024);
 
     void StageDescriptors(UINT32 rootParameterIndex, UINT32 offset, UINT32 numDescriptors, const D3D12_CPU_DESCRIPTOR_HANDLE srcDescriptors);
 
@@ -32,7 +34,7 @@ public:
     void Reset();
 
 private:
-    ComPtr<ID3D12DescriptorHeap> RequestDescritorHeap();
+    ComPtr<ID3D12DescriptorHeap> RequestDescriptorHeap();
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap();
 
     UINT32 ComputeStaleDescriptorCount() const;
@@ -69,7 +71,7 @@ private:
     UINT32 m_descriptorTableBitMask;
     // Represents a descriptor table in the root signature that has changed since the last time the 
     // descriptors were copied.
-    UINT32 m_StaleDescriptorTableBitMask;
+    UINT32 m_staleDescriptorTableBitMask;
 
     using DescriptorHeapPool = std::queue<ComPtr<ID3D12DescriptorHeap>>;
 
@@ -79,6 +81,7 @@ private:
     ComPtr<ID3D12DescriptorHeap> m_currentDescriptorHeap;
     D3D12_GPU_DESCRIPTOR_HANDLE m_currentGPUDescriptorHandle;
     D3D12_CPU_DESCRIPTOR_HANDLE m_currentCPUDescriptorHandle;
+    UINT32 m_numFreeHandles;    // Number of free handles in current descriptor heap
 
-    UINT32 m_NumFreeHandles;
+    ComPtr<ID3D12Device> m_device;
 };
