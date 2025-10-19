@@ -5,7 +5,6 @@
 #include "D3DHelper.h"
 
 #include "RootSignature.h"
-//#include "CommandList.h"
 
 using namespace D3DHelper;
 
@@ -135,92 +134,94 @@ ComPtr<ID3D12DescriptorHeap> DynamicDescriptorHeap::CreateDescriptorHeap()
     return descriptorHeap;
 }
 
-//void DynamicDescriptorHeap::CommitStagedDescriptors(CommandList& commandList, std::function<void(ID3D12GraphicsCommandList*, UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc)
-//{
-//    // Compute the number of descriptors that need to be copied 
-//    UINT32 numDescriptorsToCommit = ComputeStaleDescriptorCount();
-//
-//    if (numDescriptorsToCommit > 0)
-//    {
-//        auto d3d12GraphicsCommandList = commandList.GetGraphicsCommandList().Get();
-//        assert(d3d12GraphicsCommandList != nullptr);
-//
-//        if (!m_currentDescriptorHeap || m_numFreeHandles < numDescriptorsToCommit)
-//        {
-//            m_currentDescriptorHeap = RequestDescriptorHeap();
-//            m_currentCPUDescriptorHandle = m_currentDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-//            m_currentGPUDescriptorHandle = m_currentDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-//            m_numFreeHandles = m_numDescriptorsPerHeap;
-//
-//            commandList.SetDescriptorHeap(m_heapType, m_currentDescriptorHeap.Get());
-//
-//            // When updating the descriptor heap on the command list, all descriptor
-//            // tables must be (re)recopied to the new descriptor heap (not just
-//            // the stale descriptor tables)
-//            // GPU에 제출할 디스크립터 힙이 바뀌면, 디스크립터가 변경되지 않았더라도 다시 해당 힙으로 복사해줘야 한다.
-//            m_staleDescriptorTableBitMask = m_descriptorTableBitMask;
-//        }
-//
-//        DWORD rootIndex;
-//        while (_BitScanForward(&rootIndex, m_staleDescriptorTableBitMask))
-//        {
-//            UINT numSrcDescriptors = m_descriptorTableCache[rootIndex].NumDescriptors;
-//            D3D12_CPU_DESCRIPTOR_HANDLE* pSrcDescriptorHandles = m_descriptorTableCache[rootIndex].BaseDescriptor;
-//
-//            D3D12_CPU_DESCRIPTOR_HANDLE pDestDescriptorRangeStarts[] = { m_currentCPUDescriptorHandle };
-//            UINT pDestDescriptorRangeSizes[] = { numSrcDescriptors };
-//
-//            // Copy the staged CPU visible descriptors to the GPU visible descriptor heap.
-//            // 상당히 이상하다. 수정이 필요할 것 같다. src에 대한 인자 3개를 (1, pSrcDescriptorHandles, pDestDescriptorRangeSizes)로 바꿔도 될 듯
-//            m_device->CopyDescriptors(1, pDestDescriptorRangeStarts, pDestDescriptorRangeSizes,
-//                numSrcDescriptors, pSrcDescriptorHandles, nullptr, m_heapType);
-//            // Set the descriptors on the command list using the passed-in setter function.
-//            setFunc(d3d12GraphicsCommandList, rootIndex, m_currentGPUDescriptorHandle);
-//
-//            // Offset current CPU and GPU descriptor handles.
-//            MoveCPUAndGPUDescriptorHandle(&m_currentCPUDescriptorHandle, &m_currentGPUDescriptorHandle, numSrcDescriptors, m_descriptorHandleIncrementSize);
-//            m_numFreeHandles -= numSrcDescriptors;
-//
-//            // Flip the stale bit so the descriptor table is not recopied again unless it is updated with a new descriptor
-//            m_staleDescriptorTableBitMask ^= (1 << rootIndex);
-//        }
-//    }
-//}
+void DynamicDescriptorHeap::CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommandList>& commandList, std::function<void(ID3D12GraphicsCommandList*, UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc)
+{
+    // Compute the number of descriptors that need to be copied 
+    UINT32 numDescriptorsToCommit = ComputeStaleDescriptorCount();
 
-//void DynamicDescriptorHeap::CommitStagedDescriptorsForDraw(CommandList& commandList)
-//{
-//    CommitStagedDescriptors(commandList, &ID3D12GraphicsCommandList::SetGraphicsRootDescriptorTable);
-//}
-//
-//void DynamicDescriptorHeap::CommitStagedDescriptorsForDispatch(CommandList& commandList)
-//{
-//    CommitStagedDescriptors(commandList, &ID3D12GraphicsCommandList::SetComputeRootDescriptorTable);
-//}
+    if (numDescriptorsToCommit > 0)
+    {
+        if (!m_currentDescriptorHeap || m_numFreeHandles < numDescriptorsToCommit)
+        {
+            m_currentDescriptorHeap = RequestDescriptorHeap();
+            m_currentCPUDescriptorHandle = m_currentDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+            m_currentGPUDescriptorHandle = m_currentDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+            m_numFreeHandles = m_numDescriptorsPerHeap;
 
-//// Copy a single CPU visible descriptor to a GPU visible descriptor heap
-//D3D12_GPU_DESCRIPTOR_HANDLE DynamicDescriptorHeap::CopyDescriptor(CommandList& comandList, D3D12_CPU_DESCRIPTOR_HANDLE cpuDescriptor)
-//{
-//    if (!m_currentDescriptorHeap || m_numFreeHandles < 1)
-//    {
-//        m_currentDescriptorHeap = RequestDescriptorHeap();
-//        m_currentCPUDescriptorHandle = m_currentDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-//        m_currentGPUDescriptorHandle = m_currentDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-//        m_numFreeHandles = m_numDescriptorsPerHeap;
-//
-//        comandList.SetDescriptorHeap(m_heapType, m_currentDescriptorHeap.Get());
-//
-//        m_staleDescriptorTableBitMask = m_descriptorTableBitMask;
-//    }
-//
-//    D3D12_GPU_DESCRIPTOR_HANDLE hGPU = m_currentGPUDescriptorHandle;
-//    m_device->CopyDescriptorsSimple(1, m_currentCPUDescriptorHandle, cpuDescriptor, m_heapType);
-//
-//    MoveCPUAndGPUDescriptorHandle(&m_currentCPUDescriptorHandle, &m_currentGPUDescriptorHandle, 1, m_descriptorHandleIncrementSize);
-//    m_numFreeHandles -= 1;
-//
-//    return hGPU;
-//}
+            ID3D12DescriptorHeap* ppHeaps[] = { m_currentDescriptorHeap.Get() };
+            commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
+            // When updating the descriptor heap on the command list, all descriptor
+            // tables must be (re)recopied to the new descriptor heap (not just
+            // the stale descriptor tables)
+            // GPU에 제출할 디스크립터 힙이 바뀌면, 디스크립터가 변경되지 않았더라도 다시 해당 힙으로 복사해줘야 한다.
+            m_staleDescriptorTableBitMask = m_descriptorTableBitMask;
+        }
+
+        DWORD rootIndex;
+        while (_BitScanForward(&rootIndex, m_staleDescriptorTableBitMask))
+        {
+            UINT numSrcDescriptors = m_descriptorTableCache[rootIndex].NumDescriptors;
+            D3D12_CPU_DESCRIPTOR_HANDLE* pSrcDescriptorHandles = m_descriptorTableCache[rootIndex].BaseDescriptor;
+
+            D3D12_CPU_DESCRIPTOR_HANDLE pDestDescriptorRangeStarts[] = { m_currentCPUDescriptorHandle };
+            UINT pDestDescriptorRangeSizes[] = { numSrcDescriptors };
+
+            // Copy the staged CPU visible descriptors to the GPU visible descriptor heap.
+            // 상당히 이상하다. 수정이 필요할 것 같다. src에 대한 인자 3개를 (1, pSrcDescriptorHandles, pDestDescriptorRangeSizes)로 바꿔도 될 듯
+            m_device->CopyDescriptors(1, pDestDescriptorRangeStarts, pDestDescriptorRangeSizes,
+                numSrcDescriptors, pSrcDescriptorHandles, nullptr, m_heapType);
+            // Set the descriptors on the command list using the passed-in setter function.
+            setFunc(commandList.Get(), rootIndex, m_currentGPUDescriptorHandle);
+
+            // Offset current CPU and GPU descriptor handles.
+            MoveCPUAndGPUDescriptorHandle(&m_currentCPUDescriptorHandle, &m_currentGPUDescriptorHandle, numSrcDescriptors, m_descriptorHandleIncrementSize);
+            m_numFreeHandles -= numSrcDescriptors;
+
+            // Flip the stale bit so the descriptor table is not recopied again unless it is updated with a new descriptor
+            m_staleDescriptorTableBitMask ^= (1 << rootIndex);
+        }
+    }
+}
+
+void DynamicDescriptorHeap::CommitStagedDescriptorsForDraw(ComPtr<ID3D12GraphicsCommandList>& commandList)
+{
+    CommitStagedDescriptors(commandList, &ID3D12GraphicsCommandList::SetGraphicsRootDescriptorTable);
+}
+
+void DynamicDescriptorHeap::CommitStagedDescriptorsForDispatch(ComPtr<ID3D12GraphicsCommandList>& commandList)
+{
+    CommitStagedDescriptors(commandList, &ID3D12GraphicsCommandList::SetComputeRootDescriptorTable);
+}
+
+// Copy a single CPU visible descriptor to a GPU visible descriptor heap
+D3D12_GPU_DESCRIPTOR_HANDLE DynamicDescriptorHeap::CopyDescriptor(ComPtr<ID3D12GraphicsCommandList>& commandList, D3D12_CPU_DESCRIPTOR_HANDLE cpuDescriptor)
+{
+    if (!m_currentDescriptorHeap || m_numFreeHandles < 1)
+    {
+        m_currentDescriptorHeap = RequestDescriptorHeap();
+        m_currentCPUDescriptorHandle = m_currentDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+        m_currentGPUDescriptorHandle = m_currentDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+        m_numFreeHandles = m_numDescriptorsPerHeap;
+
+        ID3D12DescriptorHeap* ppHeaps[] = { m_currentDescriptorHeap.Get() };
+        commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+        m_staleDescriptorTableBitMask = m_descriptorTableBitMask;
+    }
+
+    D3D12_GPU_DESCRIPTOR_HANDLE hGPU = m_currentGPUDescriptorHandle;
+    m_device->CopyDescriptorsSimple(1, m_currentCPUDescriptorHandle, cpuDescriptor, m_heapType);
+
+    MoveCPUAndGPUDescriptorHandle(&m_currentCPUDescriptorHandle, &m_currentGPUDescriptorHandle, 1, m_descriptorHandleIncrementSize);
+    m_numFreeHandles -= 1;
+
+    return hGPU;
+}
+
+// 현재 DynamicDescriptorHeap은 각 인스턴스가 단일 커맨드 리스트에 의해 사용된다고 가정하고 있음
+// 멀티스레드 버전으로 수정하게 된다면 이 함수는 아마 쓰지 않게 될 것임
+// Fence 기반의 모델로 수정해야 함
 void DynamicDescriptorHeap::Reset()
 {
     m_availableDescriptorHeaps = m_descriptorHeapPool;
