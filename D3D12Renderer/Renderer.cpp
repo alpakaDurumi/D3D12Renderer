@@ -2,6 +2,7 @@
 #include "Win32Application.h"
 #include "D3DHelper.h"
 #include <D3Dcompiler.h>
+#include <stdexcept>
 
 // 이거 일단 빼야겠다. nuget에서도 제외시키자
 //#include <dxcapi.h>
@@ -313,9 +314,9 @@ void Renderer::LoadPipeline()
         ComPtr<ID3D12Debug1> debugController1;
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController0))))
         {
+            debugController0->EnableDebugLayer();
             if (SUCCEEDED(debugController0.As(&debugController1)))
             {
-                debugController1->EnableDebugLayer();
                 debugController1->SetEnableGPUBasedValidation(TRUE);
             }
         }
@@ -371,6 +372,14 @@ void Renderer::LoadPipeline()
         ThrowIfFailed(d3d12InfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, TRUE));
     }
 #endif
+
+    // Check Enhanced barriers support
+    D3D12_FEATURE_DATA_D3D12_OPTIONS12 options12 = {};
+    ThrowIfFailed(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS12, &options12, sizeof(options12)));
+    if (!options12.EnhancedBarriersSupported)
+    {
+        throw std::runtime_error("Enhanced Barriers are not supported on this hardware.");
+    }
 
     // Describe and create the command queue
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
@@ -817,7 +826,7 @@ void Renderer::LoadAssets()
     WaitForGPU();
 }
 
-void Renderer::PopulateCommandList(ComPtr<ID3D12GraphicsCommandList>& commandList)
+void Renderer::PopulateCommandList(ComPtr<ID3D12GraphicsCommandList7>& commandList)
 {
     FrameResource* pFrameResource = m_frameResources[m_frameIndex];
 

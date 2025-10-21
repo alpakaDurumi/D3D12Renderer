@@ -266,7 +266,7 @@ namespace D3DHelper
 
     inline void UpdateSubresources(
         ComPtr<ID3D12Device>& device,
-        ComPtr<ID3D12GraphicsCommandList>& commandList,
+        ComPtr<ID3D12GraphicsCommandList7>& commandList,
         ComPtr<ID3D12Resource>& dest,
         ComPtr<ID3D12Resource>& intermediate,
         UINT64 intermediateOffset,
@@ -366,7 +366,7 @@ namespace D3DHelper
     template<typename T>
     inline void CreateVertexBuffer(
         ComPtr<ID3D12Device>& device,
-        ComPtr<ID3D12GraphicsCommandList>& commandList,
+        ComPtr<ID3D12GraphicsCommandList7>& commandList,
         ComPtr<ID3D12Resource>& vertexBuffer,
         ComPtr<ID3D12Resource>& uploadHeap,
         D3D12_VERTEX_BUFFER_VIEW* pvertexBufferView,
@@ -401,7 +401,7 @@ namespace D3DHelper
 
     inline void CreateIndexBuffer(
         ComPtr<ID3D12Device>& device,
-        ComPtr<ID3D12GraphicsCommandList>& commandList,
+        ComPtr<ID3D12GraphicsCommandList7>& commandList,
         ComPtr<ID3D12Resource>& indexBuffer,
         ComPtr<ID3D12Resource>& uploadHeap,
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
@@ -436,7 +436,7 @@ namespace D3DHelper
 
     inline void CreateTexture(
         ComPtr<ID3D12Device>& device,
-        ComPtr<ID3D12GraphicsCommandList>& commandList,
+        ComPtr<ID3D12GraphicsCommandList7>& commandList,
         ComPtr<ID3D12Resource>& texture,
         ComPtr<ID3D12Resource>& uploadHeap,
         std::vector<UINT8>& textureSrc,

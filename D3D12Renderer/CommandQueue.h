@@ -48,17 +48,19 @@ public:
         return commandAllocator;
     }
 
-    ComPtr<ID3D12GraphicsCommandList> CreateCommandList(ComPtr<ID3D12CommandAllocator>& commandAllocator)
+    ComPtr<ID3D12GraphicsCommandList7> CreateCommandList(ComPtr<ID3D12CommandAllocator>& commandAllocator)
     {
         ComPtr<ID3D12GraphicsCommandList> commandList;
+        ComPtr<ID3D12GraphicsCommandList7> commandList7;
         ThrowIfFailed(m_device->CreateCommandList(0, m_type, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList)));
-        return commandList;
+        ThrowIfFailed(commandList.As(&commandList7));
+        return commandList7;
     }
 
-    std::pair<ComPtr<ID3D12CommandAllocator>, ComPtr<ID3D12GraphicsCommandList>> GetCommandList()
+    std::pair<ComPtr<ID3D12CommandAllocator>, ComPtr<ID3D12GraphicsCommandList7>> GetCommandList()
     {
         ComPtr<ID3D12CommandAllocator> commandAllocator;
-        ComPtr<ID3D12GraphicsCommandList> commandList;
+        ComPtr<ID3D12GraphicsCommandList7> commandList;
 
         // Command allocator queue에 GPU 작업이 끝난 allocator가 존재한다면 그것을 사용하고 없다면 새로 생성
         if (!m_commandAllocatorQueue.empty() && IsFenceComplete(m_commandAllocatorQueue.front().fenceValue))
@@ -88,7 +90,7 @@ public:
         return { commandAllocator, commandList };
     }
 
-    UINT64 ExecuteCommandLists(ComPtr<ID3D12CommandAllocator>& commandAllocator, ComPtr<ID3D12GraphicsCommandList>& commandList)
+    UINT64 ExecuteCommandLists(ComPtr<ID3D12CommandAllocator>& commandAllocator, ComPtr<ID3D12GraphicsCommandList7>& commandList)
     {
         commandList->Close();
 
@@ -123,7 +125,7 @@ public:
             WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
         }
     }
-     
+
     // Wait for pending GPU work to complete
     void Flush()
     {
@@ -143,7 +145,7 @@ private:
 
     // 현재 GPU에서 사용중인 command allocator와 command list의 목록을 담고 있는 std::queue들
     std::queue<CommandAllocatorEntry> m_commandAllocatorQueue;
-    std::queue<ComPtr<ID3D12GraphicsCommandList>> m_commandListQueue;
+    std::queue<ComPtr<ID3D12GraphicsCommandList7>> m_commandListQueue;
 
     ComPtr<ID3D12CommandQueue> m_commandQueue;
 

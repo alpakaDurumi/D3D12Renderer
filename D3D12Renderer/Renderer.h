@@ -105,7 +105,7 @@ private:
 
     void LoadPipeline();
     void LoadAssets();
-    void PopulateCommandList(ComPtr<ID3D12GraphicsCommandList>& commandList);
+    void PopulateCommandList(ComPtr<ID3D12GraphicsCommandList7>& commandList);
     void WaitForGPU();
     void MoveToNextFrame();
 };

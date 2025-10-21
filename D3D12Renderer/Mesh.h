@@ -32,7 +32,7 @@ struct InstanceData
 class Mesh
 {
 public:
-    virtual void Render(ComPtr<ID3D12GraphicsCommandList>& commandList) const
+    virtual void Render(ComPtr<ID3D12GraphicsCommandList7>& commandList) const
     {
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
@@ -42,7 +42,7 @@ public:
 
     inline static Mesh MakeCube(
         ComPtr<ID3D12Device>& device,
-        ComPtr<ID3D12GraphicsCommandList>& commandList,
+        ComPtr<ID3D12GraphicsCommandList7>& commandList,
         ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
         ComPtr<ID3D12Resource>& indexBufferUploadHeap)
     {
@@ -111,7 +111,7 @@ public:
 
     inline static Mesh MakeSphere(
         ComPtr<ID3D12Device>& device,
-        ComPtr<ID3D12GraphicsCommandList>& commandList,
+        ComPtr<ID3D12GraphicsCommandList7>& commandList,
         ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
         ComPtr<ID3D12Resource>& indexBufferUploadHeap)
     {
@@ -201,7 +201,7 @@ public:
     {
     }
 
-    void Render(ComPtr<ID3D12GraphicsCommandList>& commandList) const override
+    void Render(ComPtr<ID3D12GraphicsCommandList7>& commandList) const override
     {
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { m_vertexBufferView, m_instanceBufferView };
@@ -212,7 +212,7 @@ public:
 
     inline static InstancedMesh MakeCubeInstanced(
         ComPtr<ID3D12Device>& device,
-        ComPtr<ID3D12GraphicsCommandList>& commandList,
+        ComPtr<ID3D12GraphicsCommandList7>& commandList,
         ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
         ComPtr<ID3D12Resource>& indexBufferUploadHeap,
         ComPtr<ID3D12Resource>& instanceUploadHeap)
