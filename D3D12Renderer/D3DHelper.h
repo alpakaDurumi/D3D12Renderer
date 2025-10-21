@@ -259,7 +259,7 @@ namespace D3DHelper
             &heapProperties,
             D3D12_HEAP_FLAG_NONE,
             &resourceDesc,
-            D3D12_RESOURCE_STATE_COPY_DEST,
+            D3D12_RESOURCE_STATE_COMMON,
             nullptr,
             IID_PPV_ARGS(&defaultHeap)));
     }
@@ -290,7 +290,7 @@ namespace D3DHelper
         UINT64* pRowSizeInBytes = reinterpret_cast<UINT64*>(pNumRows + numSubresources);
         UINT64 requiredSize = 0;
         device->GetCopyableFootprints(&desc, firstSubresource, numSubresources, intermediateOffset, pLayouts, pNumRows, pRowSizeInBytes, &requiredSize);
-        
+
         // Map intermediate resource (upload heap)
         D3D12_RANGE readRange = { 0, 0 };   // do not read from CPU. only write
         UINT8* pData;
@@ -363,6 +363,33 @@ namespace D3DHelper
         return barrier;
     }
 
+    inline D3D12_BARRIER_GROUP BufferBarrierGroup(UINT32 numBarriers, D3D12_BUFFER_BARRIER* pBarriers)
+    {
+        D3D12_BARRIER_GROUP group = {};
+        group.Type = D3D12_BARRIER_TYPE_BUFFER;
+        group.NumBarriers = numBarriers;
+        group.pBufferBarriers = pBarriers;
+        return group;
+    }
+
+    inline D3D12_BARRIER_GROUP TextureBarrierGroup(UINT32 numBarriers, D3D12_TEXTURE_BARRIER* pBarriers)
+    {
+        D3D12_BARRIER_GROUP group = {};
+        group.Type = D3D12_BARRIER_TYPE_TEXTURE;
+        group.NumBarriers = numBarriers;
+        group.pTextureBarriers = pBarriers;
+        return group;
+    }
+
+    inline D3D12_BARRIER_GROUP GlobalBarrierGroup(UINT32 numBarriers, D3D12_GLOBAL_BARRIER* pBarriers)
+    {
+        D3D12_BARRIER_GROUP group = {};
+        group.Type = D3D12_BARRIER_TYPE_GLOBAL;
+        group.NumBarriers = numBarriers;
+        group.pGlobalBarriers = pBarriers;
+        return group;
+    }
+
     template<typename T>
     inline void CreateVertexBuffer(
         ComPtr<ID3D12Device>& device,
@@ -377,8 +404,21 @@ namespace D3DHelper
         CreateDefaultHeapForBuffer(device, vertexBufferSize, vertexBuffer);
 
         // Change resource state
-        D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(vertexBuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
-        commandList->ResourceBarrier(1, &barrier);
+        D3D12_BUFFER_BARRIER barrier =
+        {
+            D3D12_BARRIER_SYNC_NONE,
+            D3D12_BARRIER_SYNC_COPY,
+            D3D12_BARRIER_ACCESS_NO_ACCESS,
+            D3D12_BARRIER_ACCESS_COPY_DEST,
+            vertexBuffer.Get(),
+            0,
+            vertexBufferSize
+        };
+        D3D12_BARRIER_GROUP barrierGroups[] =
+        {
+            BufferBarrierGroup(1, &barrier)
+        };
+        commandList->Barrier(1, barrierGroups);
 
         CreateUploadHeap(device, vertexBufferSize, uploadHeap);
 
@@ -390,8 +430,18 @@ namespace D3DHelper
         UpdateSubresources(device, commandList, vertexBuffer, uploadHeap, 0, 0, 1, &vertexData);
 
         // Change resource state
-        barrier = GetTransitionBarrier(vertexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-        commandList->ResourceBarrier(1, &barrier);
+        barrier =
+        {
+            D3D12_BARRIER_SYNC_COPY,
+            D3D12_BARRIER_SYNC_VERTEX_SHADING,
+            D3D12_BARRIER_ACCESS_COPY_DEST,
+            D3D12_BARRIER_ACCESS_VERTEX_BUFFER,
+            vertexBuffer.Get(),
+            0,
+            vertexBufferSize
+        };
+        barrierGroups[0] = BufferBarrierGroup(1, &barrier);
+        commandList->Barrier(1, barrierGroups);
 
         // Initialize the vertex buffer view
         pvertexBufferView->BufferLocation = vertexBuffer->GetGPUVirtualAddress();
@@ -412,8 +462,21 @@ namespace D3DHelper
         CreateDefaultHeapForBuffer(device, indexBufferSize, indexBuffer);
 
         // Change resource state
-        D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(indexBuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
-        commandList->ResourceBarrier(1, &barrier);
+        D3D12_BUFFER_BARRIER barrier =
+        {
+            D3D12_BARRIER_SYNC_NONE,
+            D3D12_BARRIER_SYNC_COPY,
+            D3D12_BARRIER_ACCESS_NO_ACCESS,
+            D3D12_BARRIER_ACCESS_COPY_DEST,
+            indexBuffer.Get(),
+            0,
+            indexBufferSize
+        };
+        D3D12_BARRIER_GROUP barrierGroups[] =
+        {
+            BufferBarrierGroup(1, &barrier)
+        };
+        commandList->Barrier(1, barrierGroups);
 
         CreateUploadHeap(device, indexBufferSize, uploadHeap);
 
@@ -425,8 +488,18 @@ namespace D3DHelper
         UpdateSubresources(device, commandList, indexBuffer, uploadHeap, 0, 0, 1, &indexData);
 
         // Change resource state
-        barrier = GetTransitionBarrier(indexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_INDEX_BUFFER);
-        commandList->ResourceBarrier(1, &barrier);
+        barrier =
+        {
+            D3D12_BARRIER_SYNC_COPY,
+            D3D12_BARRIER_SYNC_INDEX_INPUT,
+            D3D12_BARRIER_ACCESS_COPY_DEST,
+            D3D12_BARRIER_ACCESS_INDEX_BUFFER,
+            indexBuffer.Get(),
+            0,
+            indexBufferSize
+        };
+        barrierGroups[0] = BufferBarrierGroup(1, &barrier);
+        commandList->Barrier(1, barrierGroups);
 
         // Initialize the index buffer view
         pindexBufferView->BufferLocation = indexBuffer->GetGPUVirtualAddress();
@@ -445,6 +518,25 @@ namespace D3DHelper
         D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
     {
         CreateDefaultHeapForTexture(device, texture, width, height);
+
+        // Change resource state
+        D3D12_TEXTURE_BARRIER barrier =
+        {
+            D3D12_BARRIER_SYNC_NONE,    
+            D3D12_BARRIER_SYNC_COPY,
+            D3D12_BARRIER_ACCESS_NO_ACCESS,
+            D3D12_BARRIER_ACCESS_COPY_DEST,
+            D3D12_BARRIER_LAYOUT_UNDEFINED,
+            D3D12_BARRIER_LAYOUT_COPY_DEST,
+            texture.Get(),
+            {0xffffffff, 0, 0, 0, 0, 0},    // Select all subresources
+            D3D12_TEXTURE_BARRIER_FLAG_NONE
+        };
+        D3D12_BARRIER_GROUP barrierGroups[] =
+        {
+            TextureBarrierGroup(1, &barrier)
+        };
+        commandList->Barrier(1, barrierGroups);
 
         // Calculate required size for data upload
         D3D12_RESOURCE_DESC desc = texture->GetDesc();
@@ -465,8 +557,20 @@ namespace D3DHelper
         UpdateSubresources(device, commandList, texture, uploadHeap, 0, 0, 1, &textureData);
 
         // Change resource state
-        D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(texture, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        commandList->ResourceBarrier(1, &barrier);
+        barrier =
+        {
+            D3D12_BARRIER_SYNC_COPY,
+            D3D12_BARRIER_SYNC_PIXEL_SHADING,
+            D3D12_BARRIER_ACCESS_COPY_DEST,
+            D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+            D3D12_BARRIER_LAYOUT_COPY_DEST,
+            D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+            texture.Get(),
+            {0xffffffff, 0, 0, 0, 0, 0},    // Select all subresources
+            D3D12_TEXTURE_BARRIER_FLAG_NONE
+        };
+        barrierGroups[0] = TextureBarrierGroup(1, &barrier);
+        commandList->Barrier(1, barrierGroups);
 
         // Describe and create a SRV for the texture.
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
