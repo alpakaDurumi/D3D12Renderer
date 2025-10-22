@@ -8,7 +8,7 @@
 
 using namespace D3DHelper;
 
-DynamicDescriptorHeap::DynamicDescriptorHeap(ComPtr<ID3D12Device>& device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT32 numDescriptorsPerHeap)
+DynamicDescriptorHeap::DynamicDescriptorHeap(ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT32 numDescriptorsPerHeap)
     : m_device(device)
     , m_heapType(heapType)
     , m_numDescriptorsPerHeap(numDescriptorsPerHeap)

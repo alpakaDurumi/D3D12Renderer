@@ -11,7 +11,7 @@ template<typename T>
 class ConstantBuffer
 {
 public:
-    ConstantBuffer(ComPtr<ID3D12Device>& device, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
+    ConstantBuffer(ComPtr<ID3D12Device10>& device, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
     {
         CreateUploadHeap(device, sizeof(T), m_buffer);
 

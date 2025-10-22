@@ -340,6 +340,7 @@ void Renderer::LoadPipeline()
     ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
 
     // Create device using appropriate adapter
+    ComPtr<ID3D12Device> device;
     if (m_useWarpDevice)
     {
         ComPtr<IDXGIAdapter> warpAdapter;
@@ -348,7 +349,7 @@ void Renderer::LoadPipeline()
         ThrowIfFailed(D3D12CreateDevice(
             warpAdapter.Get(),
             D3D_FEATURE_LEVEL_11_0,
-            IID_PPV_ARGS(&m_device)));
+            IID_PPV_ARGS(&device)));
     }
     else
     {
@@ -358,9 +359,10 @@ void Renderer::LoadPipeline()
         ThrowIfFailed(D3D12CreateDevice(
             hardwareAdapter.Get(),
             D3D_FEATURE_LEVEL_11_0,
-            IID_PPV_ARGS(&m_device)
+            IID_PPV_ARGS(&device)
         ));
     }
+    ThrowIfFailed(device.As(&m_device));
 
 #if defined(_DEBUG)
     // Use ID3D12InfoQueue

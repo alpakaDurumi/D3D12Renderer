@@ -41,7 +41,7 @@ public:
     }
 
     inline static Mesh MakeCube(
-        ComPtr<ID3D12Device>& device,
+        ComPtr<ID3D12Device10>& device,
         ComPtr<ID3D12GraphicsCommandList7>& commandList,
         ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
         ComPtr<ID3D12Resource>& indexBufferUploadHeap)
@@ -110,7 +110,7 @@ public:
     }
 
     inline static Mesh MakeSphere(
-        ComPtr<ID3D12Device>& device,
+        ComPtr<ID3D12Device10>& device,
         ComPtr<ID3D12GraphicsCommandList7>& commandList,
         ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
         ComPtr<ID3D12Resource>& indexBufferUploadHeap)
@@ -211,7 +211,7 @@ public:
     }
 
     inline static InstancedMesh MakeCubeInstanced(
-        ComPtr<ID3D12Device>& device,
+        ComPtr<ID3D12Device10>& device,
         ComPtr<ID3D12GraphicsCommandList7>& commandList,
         ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
         ComPtr<ID3D12Resource>& indexBufferUploadHeap,

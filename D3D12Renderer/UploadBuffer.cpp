@@ -11,7 +11,7 @@ SIZE_T Align(SIZE_T size, SIZE_T alignment)
 
 // UploadBuffer
 
-UploadBuffer::UploadBuffer(ComPtr<ID3D12Device>& device, SIZE_T pageSize)
+UploadBuffer::UploadBuffer(ComPtr<ID3D12Device10>& device, SIZE_T pageSize)
     : m_device(device), m_pageSize(pageSize)
 {
 }
@@ -67,7 +67,7 @@ void UploadBuffer::Reset()
 // Page
 
 // Page가 살아있는 동안 한 Page 전체 영역에 대해 Mapping이 유지된다. 소멸자가 호출되면 Unmap을 통해 Mapping이 해제된다.
-UploadBuffer::Page::Page(ComPtr<ID3D12Device>& device, SIZE_T sizeInBytes)
+UploadBuffer::Page::Page(ComPtr<ID3D12Device10>& device, SIZE_T sizeInBytes)
     : m_pageSize(sizeInBytes),
     m_offset(0),
     m_CPUBasePtr(nullptr),

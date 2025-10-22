@@ -120,7 +120,7 @@ public:
         samplerDesc.ShaderVisibility = visibility;
     }
 
-    void Finalize(ComPtr<ID3D12Device>& device)
+    void Finalize(ComPtr<ID3D12Device10>& device)
     {
         // Fill bitmasks
         for (UINT i = 0; i < m_numParameters; ++i)

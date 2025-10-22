@@ -12,7 +12,7 @@ using namespace D3DHelper;
 class DescriptorHeapManager
 {
 public:
-    void Init(ComPtr<ID3D12Device>& device, UINT frameCount, UINT maxCbvPerFrame, UINT maxSrv)
+    void Init(ComPtr<ID3D12Device10>& device, UINT frameCount, UINT maxCbvPerFrame, UINT maxSrv)
     {
         D3D12_DESCRIPTOR_HEAP_DESC cbvSrvUavDesc = {};
         cbvSrvUavDesc.NumDescriptors = (frameCount * maxCbvPerFrame) + maxSrv;

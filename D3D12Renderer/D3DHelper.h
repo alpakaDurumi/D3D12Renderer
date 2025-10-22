@@ -173,7 +173,7 @@ namespace D3DHelper
         }
     }
 
-    inline void CreateUploadHeap(ComPtr<ID3D12Device>& device, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadHeap)
+    inline void CreateUploadHeap(ComPtr<ID3D12Device10>& device, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadHeap)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -182,7 +182,7 @@ namespace D3DHelper
         heapProperties.CreationNodeMask = 1;
         heapProperties.VisibleNodeMask = 1;
 
-        D3D12_RESOURCE_DESC resourceDesc = {};
+        D3D12_RESOURCE_DESC1 resourceDesc = {};
         resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
         resourceDesc.Alignment = 0;
         resourceDesc.Width = requiredSize;
@@ -193,18 +193,22 @@ namespace D3DHelper
         resourceDesc.SampleDesc = { 1, 0 };
         resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
         resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
 
-        ThrowIfFailed(device->CreateCommittedResource(
+        ThrowIfFailed(device->CreateCommittedResource3(
             &heapProperties,
             D3D12_HEAP_FLAG_NONE,
             &resourceDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
+            D3D12_BARRIER_LAYOUT_UNDEFINED,
+            nullptr,
+            nullptr,
+            0,
             nullptr,
             IID_PPV_ARGS(&uploadHeap)));
     }
 
     // For vertex buffer and index buffer
-    inline void CreateDefaultHeapForBuffer(ComPtr<ID3D12Device>& device, UINT64 size, ComPtr<ID3D12Resource>& defaultHeap)
+    inline void CreateDefaultHeapForBuffer(ComPtr<ID3D12Device10>& device, UINT64 size, ComPtr<ID3D12Resource>& defaultHeap)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -213,7 +217,7 @@ namespace D3DHelper
         heapProperties.CreationNodeMask = 1;
         heapProperties.VisibleNodeMask = 1;
 
-        D3D12_RESOURCE_DESC resourceDesc = {};
+        D3D12_RESOURCE_DESC1 resourceDesc = {};
         resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
         resourceDesc.Alignment = 0;
         resourceDesc.Width = size;
@@ -224,17 +228,21 @@ namespace D3DHelper
         resourceDesc.SampleDesc = { 1, 0 };
         resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
         resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
 
-        ThrowIfFailed(device->CreateCommittedResource(
+        ThrowIfFailed(device->CreateCommittedResource3(
             &heapProperties,
             D3D12_HEAP_FLAG_NONE,
             &resourceDesc,
-            D3D12_RESOURCE_STATE_COMMON,
+            D3D12_BARRIER_LAYOUT_UNDEFINED,
+            nullptr,
+            nullptr,
+            0,
             nullptr,
             IID_PPV_ARGS(&defaultHeap)));
     }
 
-    inline void CreateDefaultHeapForTexture(ComPtr<ID3D12Device>& device, ComPtr<ID3D12Resource>& defaultHeap, UINT width, UINT height)
+    inline void CreateDefaultHeapForTexture(ComPtr<ID3D12Device10>& device, ComPtr<ID3D12Resource>& defaultHeap, UINT width, UINT height)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -243,7 +251,7 @@ namespace D3DHelper
         heapProperties.CreationNodeMask = 1;
         heapProperties.VisibleNodeMask = 1;
 
-        D3D12_RESOURCE_DESC resourceDesc = {};
+        D3D12_RESOURCE_DESC1 resourceDesc = {};
         resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         resourceDesc.Alignment = 0;
         resourceDesc.Width = width;
@@ -254,18 +262,22 @@ namespace D3DHelper
         resourceDesc.SampleDesc = { 1, 0 };
         resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
         resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
 
-        ThrowIfFailed(device->CreateCommittedResource(
+        ThrowIfFailed(device->CreateCommittedResource3(
             &heapProperties,
             D3D12_HEAP_FLAG_NONE,
             &resourceDesc,
-            D3D12_RESOURCE_STATE_COMMON,
+            D3D12_BARRIER_LAYOUT_COMMON,
+            nullptr,
+            nullptr,
+            0,
             nullptr,
             IID_PPV_ARGS(&defaultHeap)));
     }
 
     inline void UpdateSubresources(
-        ComPtr<ID3D12Device>& device,
+        ComPtr<ID3D12Device10>& device,
         ComPtr<ID3D12GraphicsCommandList7>& commandList,
         ComPtr<ID3D12Resource>& dest,
         ComPtr<ID3D12Resource>& intermediate,
@@ -317,7 +329,6 @@ namespace D3DHelper
                         pRowSizeInBytes[i]);
                 }
             }
-
         }
 
         // Unmap
@@ -351,6 +362,7 @@ namespace D3DHelper
         HeapFree(GetProcessHeap(), 0, pMem);
     }
 
+    // Legacy barrier. Not use
     inline D3D12_RESOURCE_BARRIER GetTransitionBarrier(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after)
     {
         D3D12_RESOURCE_BARRIER barrier = {};
@@ -392,7 +404,7 @@ namespace D3DHelper
 
     template<typename T>
     inline void CreateVertexBuffer(
-        ComPtr<ID3D12Device>& device,
+        ComPtr<ID3D12Device10>& device,
         ComPtr<ID3D12GraphicsCommandList7>& commandList,
         ComPtr<ID3D12Resource>& vertexBuffer,
         ComPtr<ID3D12Resource>& uploadHeap,
@@ -403,23 +415,6 @@ namespace D3DHelper
 
         CreateDefaultHeapForBuffer(device, vertexBufferSize, vertexBuffer);
 
-        // Change resource state
-        D3D12_BUFFER_BARRIER barrier =
-        {
-            D3D12_BARRIER_SYNC_NONE,
-            D3D12_BARRIER_SYNC_COPY,
-            D3D12_BARRIER_ACCESS_NO_ACCESS,
-            D3D12_BARRIER_ACCESS_COPY_DEST,
-            vertexBuffer.Get(),
-            0,
-            vertexBufferSize
-        };
-        D3D12_BARRIER_GROUP barrierGroups[] =
-        {
-            BufferBarrierGroup(1, &barrier)
-        };
-        commandList->Barrier(1, barrierGroups);
-
         CreateUploadHeap(device, vertexBufferSize, uploadHeap);
 
         D3D12_SUBRESOURCE_DATA vertexData = {};
@@ -429,8 +424,7 @@ namespace D3DHelper
 
         UpdateSubresources(device, commandList, vertexBuffer, uploadHeap, 0, 0, 1, &vertexData);
 
-        // Change resource state
-        barrier =
+        D3D12_BUFFER_BARRIER barrier =
         {
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_SYNC_VERTEX_SHADING,
@@ -440,7 +434,7 @@ namespace D3DHelper
             0,
             vertexBufferSize
         };
-        barrierGroups[0] = BufferBarrierGroup(1, &barrier);
+        D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(1, &barrier) };
         commandList->Barrier(1, barrierGroups);
 
         // Initialize the vertex buffer view
@@ -450,7 +444,7 @@ namespace D3DHelper
     }
 
     inline void CreateIndexBuffer(
-        ComPtr<ID3D12Device>& device,
+        ComPtr<ID3D12Device10>& device,
         ComPtr<ID3D12GraphicsCommandList7>& commandList,
         ComPtr<ID3D12Resource>& indexBuffer,
         ComPtr<ID3D12Resource>& uploadHeap,
@@ -461,23 +455,6 @@ namespace D3DHelper
 
         CreateDefaultHeapForBuffer(device, indexBufferSize, indexBuffer);
 
-        // Change resource state
-        D3D12_BUFFER_BARRIER barrier =
-        {
-            D3D12_BARRIER_SYNC_NONE,
-            D3D12_BARRIER_SYNC_COPY,
-            D3D12_BARRIER_ACCESS_NO_ACCESS,
-            D3D12_BARRIER_ACCESS_COPY_DEST,
-            indexBuffer.Get(),
-            0,
-            indexBufferSize
-        };
-        D3D12_BARRIER_GROUP barrierGroups[] =
-        {
-            BufferBarrierGroup(1, &barrier)
-        };
-        commandList->Barrier(1, barrierGroups);
-
         CreateUploadHeap(device, indexBufferSize, uploadHeap);
 
         D3D12_SUBRESOURCE_DATA indexData = {};
@@ -487,8 +464,7 @@ namespace D3DHelper
 
         UpdateSubresources(device, commandList, indexBuffer, uploadHeap, 0, 0, 1, &indexData);
 
-        // Change resource state
-        barrier =
+        D3D12_BUFFER_BARRIER barrier =
         {
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_SYNC_INDEX_INPUT,
@@ -498,7 +474,7 @@ namespace D3DHelper
             0,
             indexBufferSize
         };
-        barrierGroups[0] = BufferBarrierGroup(1, &barrier);
+        D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(1, &barrier) };
         commandList->Barrier(1, barrierGroups);
 
         // Initialize the index buffer view
@@ -508,7 +484,7 @@ namespace D3DHelper
     }
 
     inline void CreateTexture(
-        ComPtr<ID3D12Device>& device,
+        ComPtr<ID3D12Device10>& device,
         ComPtr<ID3D12GraphicsCommandList7>& commandList,
         ComPtr<ID3D12Resource>& texture,
         ComPtr<ID3D12Resource>& uploadHeap,
@@ -519,23 +495,19 @@ namespace D3DHelper
     {
         CreateDefaultHeapForTexture(device, texture, width, height);
 
-        // Change resource state
         D3D12_TEXTURE_BARRIER barrier =
         {
-            D3D12_BARRIER_SYNC_NONE,    
+            D3D12_BARRIER_SYNC_NONE,
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_ACCESS_NO_ACCESS,
             D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_LAYOUT_UNDEFINED,
+            D3D12_BARRIER_LAYOUT_COMMON,
             D3D12_BARRIER_LAYOUT_COPY_DEST,
             texture.Get(),
             {0xffffffff, 0, 0, 0, 0, 0},    // Select all subresources
             D3D12_TEXTURE_BARRIER_FLAG_NONE
         };
-        D3D12_BARRIER_GROUP barrierGroups[] =
-        {
-            TextureBarrierGroup(1, &barrier)
-        };
+        D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(1, &barrier) };
         commandList->Barrier(1, barrierGroups);
 
         // Calculate required size for data upload
@@ -556,7 +528,6 @@ namespace D3DHelper
 
         UpdateSubresources(device, commandList, texture, uploadHeap, 0, 0, 1, &textureData);
 
-        // Change resource state
         barrier =
         {
             D3D12_BARRIER_SYNC_COPY,
@@ -583,7 +554,7 @@ namespace D3DHelper
     }
 
     inline void CreateDepthStencilBuffer(
-        ComPtr<ID3D12Device>& device,
+        ComPtr<ID3D12Device10>& device,
         UINT width,
         UINT height,
         ComPtr<ID3D12Resource>& depthStencilBuffer,
@@ -596,7 +567,7 @@ namespace D3DHelper
         heapProperties.CreationNodeMask = 1;
         heapProperties.VisibleNodeMask = 1;
 
-        D3D12_RESOURCE_DESC resourceDesc = {};
+        D3D12_RESOURCE_DESC1 resourceDesc = {};
         resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         resourceDesc.Alignment = 0;
         resourceDesc.Width = width;
@@ -607,20 +578,23 @@ namespace D3DHelper
         resourceDesc.SampleDesc = { 1, 0 };
         resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
         resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
 
         D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
         depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
         depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
         depthOptimizedClearValue.DepthStencil.Stencil = 0;
 
-        ThrowIfFailed(device->CreateCommittedResource(
+        ThrowIfFailed(device->CreateCommittedResource3(
             &heapProperties,
             D3D12_HEAP_FLAG_NONE,
             &resourceDesc,
-            D3D12_RESOURCE_STATE_DEPTH_WRITE,
+            D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
             &depthOptimizedClearValue,
-            IID_PPV_ARGS(&depthStencilBuffer)
-        ));
+            nullptr,
+            0,
+            nullptr,
+            IID_PPV_ARGS(&depthStencilBuffer)));
 
         D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc = {};
         depthStencilViewDesc.Format = DXGI_FORMAT_D32_FLOAT;

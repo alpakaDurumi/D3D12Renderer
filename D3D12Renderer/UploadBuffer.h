@@ -16,7 +16,7 @@ public:
         D3D12_GPU_VIRTUAL_ADDRESS m_GPUPtr;
     };
 
-    UploadBuffer(ComPtr<ID3D12Device>& device, SIZE_T pageSize);
+    UploadBuffer(ComPtr<ID3D12Device10>& device, SIZE_T pageSize);
 
     SIZE_T GetPageSize() const { return m_pageSize; }
     Allocation Allocate(SIZE_T sizeInBytes, SIZE_T alignment);
@@ -27,7 +27,7 @@ private:
     struct Page
     {
     public:
-        Page(ComPtr<ID3D12Device>& device, SIZE_T sizeInBytes);
+        Page(ComPtr<ID3D12Device10>& device, SIZE_T sizeInBytes);
         ~Page();
         bool HasSpace(SIZE_T sizeInBytes, SIZE_T alignment) const;
         Allocation Allocate(SIZE_T sizeInBytes, SIZE_T alignment);
@@ -50,5 +50,5 @@ private:
     std::shared_ptr<Page> m_currentPage;
     SIZE_T m_pageSize;
 
-    ComPtr<ID3D12Device> m_device;
+    ComPtr<ID3D12Device10> m_device;
 };

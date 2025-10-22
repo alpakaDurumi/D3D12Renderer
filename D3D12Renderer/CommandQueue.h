@@ -11,7 +11,7 @@ using namespace D3DHelper;
 class CommandQueue
 {
 public:
-    CommandQueue(ComPtr<ID3D12Device>& device, D3D12_COMMAND_LIST_TYPE type)
+    CommandQueue(ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type)
         : m_type(type), m_fenceValue(0), m_device(device)
     {
         D3D12_COMMAND_QUEUE_DESC queueDesc = {};
@@ -149,7 +149,7 @@ private:
 
     ComPtr<ID3D12CommandQueue> m_commandQueue;
 
-    ComPtr<ID3D12Device> m_device;
+    ComPtr<ID3D12Device10> m_device;
 
     ComPtr<ID3D12Fence> m_fence;
     HANDLE m_fenceEvent;

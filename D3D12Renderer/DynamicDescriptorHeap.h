@@ -16,7 +16,7 @@ using Microsoft::WRL::ComPtr;
 class DynamicDescriptorHeap
 {
 public:
-    DynamicDescriptorHeap(ComPtr<ID3D12Device>& device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT32 numDescriptorsPerHeap = 1024);
+    DynamicDescriptorHeap(ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT32 numDescriptorsPerHeap = 1024);
 
     void StageDescriptors(UINT32 rootParameterIndex, UINT32 offset, UINT32 numDescriptors, const D3D12_CPU_DESCRIPTOR_HANDLE srcDescriptors);
 
@@ -82,5 +82,5 @@ private:
     D3D12_CPU_DESCRIPTOR_HANDLE m_currentCPUDescriptorHandle;
     UINT32 m_numFreeHandles;    // Number of free handles in current descriptor heap
 
-    ComPtr<ID3D12Device> m_device;
+    ComPtr<ID3D12Device10> m_device;
 };

@@ -16,7 +16,7 @@ using Microsoft::WRL::ComPtr;
 class DescriptorAllocatorPage : public std::enable_shared_from_this<DescriptorAllocatorPage>
 {
 public:
-    DescriptorAllocatorPage(ComPtr<ID3D12Device>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptors);
+    DescriptorAllocatorPage(ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptors);
 
     D3D12_DESCRIPTOR_HEAP_TYPE GetHeapType() const { return m_heapType; }
     UINT32 GetNumFreeHandles() const { return m_numFreeHandles; }
