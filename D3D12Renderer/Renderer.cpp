@@ -841,9 +841,23 @@ void Renderer::PopulateCommandList(ComPtr<ID3D12GraphicsCommandList7>& commandLi
     commandList->RSSetViewports(1, &m_viewport);
     commandList->RSSetScissorRects(1, &m_scissorRect);
 
-    // Indicate that the back buffer will be used as a render target.
-    D3D12_RESOURCE_BARRIER barrier = GetTransitionBarrier(pFrameResource->m_renderTarget, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-    commandList->ResourceBarrier(1, &barrier);
+    // Swap Chain textures initially created in D3D12_BARRIER_LAYOUT_COMMON
+    // and presentation requires the back buffer is using D3D12_BARRIER_LAYOUT_COMMON
+    // LAYOUT_PRESENT is alias for LAYOUT_COMMON
+    D3D12_TEXTURE_BARRIER barrier =
+    {
+        D3D12_BARRIER_SYNC_NONE,
+        D3D12_BARRIER_SYNC_RENDER_TARGET,
+        D3D12_BARRIER_ACCESS_NO_ACCESS,
+        D3D12_BARRIER_ACCESS_RENDER_TARGET,
+        D3D12_BARRIER_LAYOUT_PRESENT,
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+        pFrameResource->m_renderTarget.Get(),
+        {0xffffffff, 0, 0, 0, 0, 0},    // Select all subresources
+        D3D12_TEXTURE_BARRIER_FLAG_NONE
+    };
+    D3D12_BARRIER_GROUP groups[] = { TextureBarrierGroup(1, &barrier) };
+    commandList->Barrier(1, groups);
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
     MoveCPUDescriptorHandle(&rtvHandle, m_frameIndex, m_rtvDescriptorSize);
@@ -896,9 +910,21 @@ void Renderer::PopulateCommandList(ComPtr<ID3D12GraphicsCommandList7>& commandLi
         pMesh->Render(commandList);
     }
 
-    // Indicate that the back buffer will now be used to present.
-    barrier = GetTransitionBarrier(pFrameResource->m_renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-    commandList->ResourceBarrier(1, &barrier);
+    // Barrier for present
+    barrier =
+    {
+        D3D12_BARRIER_SYNC_RENDER_TARGET,
+        D3D12_BARRIER_SYNC_NONE,
+        D3D12_BARRIER_ACCESS_RENDER_TARGET,
+        D3D12_BARRIER_ACCESS_NO_ACCESS,
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+        D3D12_BARRIER_LAYOUT_PRESENT,
+        pFrameResource->m_renderTarget.Get(),
+        {0xffffffff, 0, 0, 0, 0, 0},    // Select all subresources
+        D3D12_TEXTURE_BARRIER_FLAG_NONE
+    };
+    groups[0] = TextureBarrierGroup(1, &barrier);
+    commandList->Barrier(1, groups);
 }
 
 // Wait for pending GPU work to complete
