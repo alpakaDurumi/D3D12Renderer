@@ -1,6 +1,9 @@
 #include "D3DHelper.h"
 
 #include <exception>
+#include <cassert>
+
+#include "ResourceLayoutTracker.h"
 
 namespace D3DHelper
 {
@@ -367,6 +370,110 @@ namespace D3DHelper
         return barrier;
     }
 
+    void Barrier(
+        ID3D12GraphicsCommandList7* pCommandList,
+        ID3D12Resource* pResource,
+        D3D12_BARRIER_SYNC syncBefore,
+        D3D12_BARRIER_SYNC syncAfter,
+        D3D12_BARRIER_ACCESS accessBefore,
+        D3D12_BARRIER_ACCESS accessAfter)
+    {
+        D3D12_RESOURCE_DESC desc = pResource->GetDesc();
+        assert(desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER);
+
+        D3D12_BUFFER_BARRIER barrier =
+        {
+            syncBefore,
+            syncAfter,
+            accessBefore,
+            accessAfter,
+            pResource,
+            0,
+            UINT64_MAX
+        };
+        D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(1, &barrier) };
+        pCommandList->Barrier(1, barrierGroups);
+    }
+
+    void Barrier(
+        ID3D12GraphicsCommandList7* pCommandList,
+        ID3D12Resource* pResource,
+        ResourceLayoutTracker& layoutTracker,
+        D3D12_BARRIER_SYNC syncBefore,
+        D3D12_BARRIER_SYNC syncAfter,
+        D3D12_BARRIER_ACCESS accessBefore,
+        D3D12_BARRIER_ACCESS accessAfter,
+        D3D12_BARRIER_LAYOUT layoutAfter,
+        D3D12_BARRIER_SUBRESOURCE_RANGE subresourceRange)
+    {
+        D3D12_RESOURCE_DESC desc = pResource->GetDesc();
+        assert(desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE1D ||
+            desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D ||
+            desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D);
+
+        // subresourceRange를 순회하며 레이아웃을 확인하여 배열에 추가한 후, 배리어 그룹을 구성
+
+        const auto& [IndexOrFirstMipLevel, NumMipLevels, FirstArraySlice, NumArraySlices, FirstPlane, NumPlanes] = subresourceRange;
+
+        UINT count = NumMipLevels * NumArraySlices * NumPlanes;
+
+        std::vector<D3D12_TEXTURE_BARRIER> barriers(count);
+
+        // Target all subresources
+        if (IndexOrFirstMipLevel == 0xffffffff)
+        {
+            for (UINT i = 0; i < count; i++)
+            {
+                D3D12_BARRIER_LAYOUT layoutBefore = layoutTracker.SetLayout(pResource, i, layoutAfter);
+
+                barriers[i] =
+                {
+                    syncBefore,
+                    syncAfter,
+                    accessBefore,
+                    accessAfter,
+                    layoutBefore,
+                    layoutAfter,
+                    pResource,
+                    {i, 0, 0, 0, 0, 0},
+                    D3D12_TEXTURE_BARRIER_FLAG_NONE
+                };
+            }
+        }
+        else
+        {
+            UINT idx = 0;
+            for (UINT plane = FirstPlane; plane < FirstPlane + NumPlanes; ++plane)
+            {
+                for (UINT array = FirstArraySlice; array < FirstArraySlice + NumArraySlices; ++array)
+                {
+                    for (UINT mip = IndexOrFirstMipLevel; mip < IndexOrFirstMipLevel + NumMipLevels; ++mip)
+                    {
+                        auto [layoutBefore, subresourceIndex] = layoutTracker.SetLayout(pResource, mip, array, plane, layoutAfter);
+
+                        barriers[idx] =
+                        {
+                            syncBefore,
+                            syncAfter,
+                            accessBefore,
+                            accessAfter,
+                            layoutBefore,
+                            layoutAfter,
+                            pResource,
+                            {subresourceIndex, 0, 0, 0, 0, 0},
+                            D3D12_TEXTURE_BARRIER_FLAG_NONE
+                        };
+
+                        idx++;
+                    }
+                }
+            }
+        }
+
+        D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(count, barriers.data()) };
+        pCommandList->Barrier(1, barrierGroups);
+    }
+
     D3D12_BARRIER_GROUP BufferBarrierGroup(UINT32 numBarriers, D3D12_BUFFER_BARRIER* pBarriers)
     {
         D3D12_BARRIER_GROUP group = {};
@@ -553,5 +660,25 @@ namespace D3DHelper
         depthStencilViewDesc.Flags = D3D12_DSV_FLAG_NONE;
 
         device->CreateDepthStencilView(depthStencilBuffer.Get(), &depthStencilViewDesc, cpuHandle);
+    }
+
+    UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format)
+    {
+        D3D12_FEATURE_DATA_FORMAT_INFO formatInfo = { format };
+        if (FAILED(pDevice->CheckFeatureSupport(D3D12_FEATURE_FORMAT_INFO, &formatInfo, sizeof(formatInfo))))
+        {
+            return 0;
+        }
+        return formatInfo.PlaneCount;
+    }
+
+    UINT CalcSubresourceIndex(
+        UINT mipIndex,
+        UINT arrayIndex,
+        UINT planeIndex,
+        UINT mipLevels,
+        UINT arraySize)
+    {
+        return mipIndex + arrayIndex * mipLevels + planeIndex * mipLevels * arraySize;
     }
 }

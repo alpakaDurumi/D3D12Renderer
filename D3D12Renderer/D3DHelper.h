@@ -8,6 +8,8 @@
 
 using Microsoft::WRL::ComPtr;
 
+class ResourceLayoutTracker;
+
 namespace D3DHelper
 {
     void ThrowIfFailed(HRESULT hr);
@@ -38,8 +40,27 @@ namespace D3DHelper
         UINT firstSubresource,
         UINT numSubresources,
         D3D12_SUBRESOURCE_DATA* pSrcData);
-    
+
     D3D12_RESOURCE_BARRIER GetTransitionBarrier(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after);
+
+    void Barrier(
+        ID3D12GraphicsCommandList7* pCommandList,
+        ID3D12Resource* pResource,
+        D3D12_BARRIER_SYNC syncBefore,
+        D3D12_BARRIER_SYNC syncAfter,
+        D3D12_BARRIER_ACCESS accessBefore,
+        D3D12_BARRIER_ACCESS accessAfter);
+
+    void Barrier(
+        ID3D12GraphicsCommandList7* pCommandList,
+        ID3D12Resource* pResource,
+        ResourceLayoutTracker& layoutTracker,
+        D3D12_BARRIER_SYNC syncBefore,
+        D3D12_BARRIER_SYNC syncAfter,
+        D3D12_BARRIER_ACCESS accessBefore,
+        D3D12_BARRIER_ACCESS accessAfter,
+        D3D12_BARRIER_LAYOUT layoutAfter,
+        D3D12_BARRIER_SUBRESOURCE_RANGE subresourceRange);
 
     D3D12_BARRIER_GROUP BufferBarrierGroup(UINT32 numBarriers, D3D12_BUFFER_BARRIER* pBarriers);
     D3D12_BARRIER_GROUP TextureBarrierGroup(UINT32 numBarriers, D3D12_TEXTURE_BARRIER* pBarriers);
@@ -110,4 +131,13 @@ namespace D3DHelper
         UINT height,
         ComPtr<ID3D12Resource>& depthStencilBuffer,
         D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
+
+    UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format);
+
+    UINT CalcSubresourceIndex(
+        UINT mipIndex,
+        UINT arrayIndex,
+        UINT planeIndex,
+        UINT mipLevels,
+        UINT arraySize);
 }
