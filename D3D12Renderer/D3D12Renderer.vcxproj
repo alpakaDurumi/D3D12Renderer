@@ -144,6 +144,7 @@
     <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="ResourceLayoutTracker.cpp" />
     <ClCompile Include="UploadBuffer.cpp" />
     <ClCompile Include="Win32Application.cpp" />
   </ItemGroup>
