@@ -11,6 +11,12 @@ using namespace D3DHelper;
 class CommandQueue
 {
 public:
+    // Disable copy and move. Only use as l-value reference
+    CommandQueue(const CommandQueue&) = delete;
+    CommandQueue& operator=(const CommandQueue&) = delete;
+    CommandQueue(CommandQueue&&) = delete;
+    CommandQueue& operator=(CommandQueue&&) = delete;
+
     CommandQueue(ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type)
         : m_type(type), m_fenceValue(0), m_device(device)
     {

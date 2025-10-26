@@ -390,8 +390,12 @@ void Renderer::LoadPipeline()
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
     queueDesc.NodeMask = 0;
 
-    // Create CommandQueue
-    m_commandQueue = std::make_unique<CommandQueue>(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+    // Do not transfer prvalue object to emplace.
+    // Both CommandQueue and ResourceLayoutTracker are non-copyable and non-movable types.
+    // Passing a temporary object like `emplace(CommandQueue(...))` will fail to compile
+    // Instead, pass the constructor arguments directly to emplace.
+    m_commandQueue.emplace(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+    m_layoutTracker.emplace(m_device);
 
     // Check for Variable Refresh Rate(VRR)
     m_tearingSupported = CheckTearingSupport();

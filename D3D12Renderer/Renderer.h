@@ -15,6 +15,7 @@
 #include <chrono>
 #include <algorithm>
 #include <memory>
+#include <optional>
 
 #include "Camera.h"
 #include "InputManager.h"
@@ -24,6 +25,7 @@
 #include "ConstantBuffer.h"
 #include "DescriptorHeapManager.h"
 #include "CommandQueue.h"
+#include "ResourceLayoutTracker.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -76,7 +78,7 @@ private:
     ComPtr<ID3D12Device10> m_device;
     ComPtr<ID3D12Resource> m_depthStencilBuffer;
     //ComPtr<ID3D12CommandAllocator> m_bundleAllocator;
-    std::unique_ptr<CommandQueue> m_commandQueue;
+    std::optional<CommandQueue> m_commandQueue;
     ComPtr<ID3D12RootSignature> m_rootSignature;
     ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     DescriptorHeapManager m_cbvSrvUavHeap;
@@ -85,6 +87,8 @@ private:
     ComPtr<ID3D12PipelineState> m_instancedPipelineState;
     //ComPtr<ID3D12GraphicsCommandList> m_bundle;
     UINT m_rtvDescriptorSize;
+
+    std::optional<ResourceLayoutTracker> m_layoutTracker;
 
     const UINT MaxDynamicCbvCountPerFrame = 128;
     const UINT MaxStaticSrvCount = 64;

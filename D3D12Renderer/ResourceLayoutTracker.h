@@ -14,6 +14,12 @@ using Microsoft::WRL::ComPtr;
 class ResourceLayoutTracker
 {
 public:
+    // Disable copy and move. Only use as l-value reference
+    ResourceLayoutTracker(const ResourceLayoutTracker&) = delete;
+    ResourceLayoutTracker& operator=(const ResourceLayoutTracker&) = delete;
+    ResourceLayoutTracker(ResourceLayoutTracker&&) = delete;
+    ResourceLayoutTracker& operator=(ResourceLayoutTracker&&) = delete;
+
     ResourceLayoutTracker(ComPtr<ID3D12Device10>& device)
         : m_device(device)
     {
