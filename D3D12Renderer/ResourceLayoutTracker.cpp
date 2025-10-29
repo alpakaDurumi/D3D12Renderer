@@ -53,13 +53,13 @@ D3D12_BARRIER_LAYOUT ResourceLayoutTracker::SetLayout(ID3D12Resource* pResource,
     return layoutBefore;
 }
 
-D3D12_BARRIER_LAYOUT ResourceLayoutTracker::ResourceLayoutInfo::GetLayout(UINT subresourceIndex)
+D3D12_BARRIER_LAYOUT ResourceLayoutInfo::GetLayout(UINT subresourceIndex)
 {
     assert(subresourceIndex < Layouts.size());
     return Layouts[subresourceIndex];
 }
 
-void ResourceLayoutTracker::ResourceLayoutInfo::SetLayout(UINT subresourceIndex, D3D12_BARRIER_LAYOUT layout)
+void ResourceLayoutInfo::SetLayout(UINT subresourceIndex, D3D12_BARRIER_LAYOUT layout)
 {
     assert(subresourceIndex < Layouts.size());
     Layouts[subresourceIndex] = layout;

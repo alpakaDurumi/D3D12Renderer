@@ -9,6 +9,23 @@
 
 using Microsoft::WRL::ComPtr;
 
+struct ResourceLayoutInfo
+{
+    ResourceLayoutInfo(UINT mipLevels, UINT depthOrArraySize, UINT8 planeCount, D3D12_BARRIER_LAYOUT initialLayout)
+        : MipLevels(mipLevels), DepthOrArraySize(depthOrArraySize), PlaneCount(planeCount), Layouts(mipLevels* depthOrArraySize* planeCount, initialLayout)
+    {
+    }
+
+    D3D12_BARRIER_LAYOUT GetLayout(UINT subresourceIndex);
+
+    void SetLayout(UINT subresourceIndex, D3D12_BARRIER_LAYOUT layout);
+
+    UINT MipLevels;
+    UINT DepthOrArraySize;
+    UINT8 PlaneCount;
+    std::vector<D3D12_BARRIER_LAYOUT> Layouts;
+};
+
 // Track layout of resource which type is texture
 // 각 서브리소스의 레이아웃을 기억해야 한다
 class ResourceLayoutTracker
@@ -32,23 +49,6 @@ public:
     D3D12_BARRIER_LAYOUT SetLayout(ID3D12Resource* pResource, UINT subresourceIndex, D3D12_BARRIER_LAYOUT layout);
 
 private:
-    struct ResourceLayoutInfo
-    {
-        ResourceLayoutInfo(UINT mipLevels, UINT depthOrArraySize, UINT8 planeCount, D3D12_BARRIER_LAYOUT initialLayout)
-            : MipLevels(mipLevels), DepthOrArraySize(depthOrArraySize), PlaneCount(planeCount), Layouts(mipLevels* depthOrArraySize* planeCount, initialLayout)
-        {
-        }
-
-        D3D12_BARRIER_LAYOUT GetLayout(UINT subresourceIndex);
-
-        void SetLayout(UINT subresourceIndex, D3D12_BARRIER_LAYOUT layout);
-
-        UINT MipLevels;
-        UINT DepthOrArraySize;
-        UINT8 PlaneCount;
-        std::vector<D3D12_BARRIER_LAYOUT> Layouts;
-    };
-
     std::unordered_map<ID3D12Resource*, ResourceLayoutInfo> m_resourceLayoutMap;
     std::mutex m_mutex;
     ComPtr<ID3D12Device10> m_device;
