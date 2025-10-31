@@ -130,6 +130,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="CommandList.cpp" />
     <ClCompile Include="D3DHelper.cpp" />
     <ClCompile Include="DescriptorAllocation.cpp" />
     <ClCompile Include="DescriptorAllocator.cpp" />

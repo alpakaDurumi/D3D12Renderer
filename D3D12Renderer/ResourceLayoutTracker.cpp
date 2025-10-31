@@ -24,6 +24,16 @@ void ResourceLayoutTracker::UnregisterResource(ID3D12Resource* pResource)
     }
 }
 
+D3D12_BARRIER_LAYOUT ResourceLayoutTracker::GetLayout(ID3D12Resource* pResource, UINT subresourceIndex)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+
+    auto it = m_resourceLayoutMap.find(pResource);
+    assert(it != m_resourceLayoutMap.end());
+
+    return it->second.GetLayout(subresourceIndex);
+}
+
 std::pair<D3D12_BARRIER_LAYOUT, UINT> ResourceLayoutTracker::SetLayout(ID3D12Resource* pResource, UINT mipIndex, UINT arrayIndex, UINT planeIndex, D3D12_BARRIER_LAYOUT layout)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -53,7 +63,7 @@ D3D12_BARRIER_LAYOUT ResourceLayoutTracker::SetLayout(ID3D12Resource* pResource,
     return layoutBefore;
 }
 
-D3D12_BARRIER_LAYOUT ResourceLayoutInfo::GetLayout(UINT subresourceIndex)
+D3D12_BARRIER_LAYOUT ResourceLayoutInfo::GetLayout(UINT subresourceIndex) const
 {
     assert(subresourceIndex < Layouts.size());
     return Layouts[subresourceIndex];

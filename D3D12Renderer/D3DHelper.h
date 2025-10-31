@@ -6,6 +6,8 @@
 #include <dxgi1_6.h>    // DXGI 1.6
 #include <vector>
 
+#include "CommandList.h"
+
 using Microsoft::WRL::ComPtr;
 
 class ResourceLayoutTracker;
@@ -33,7 +35,7 @@ namespace D3DHelper
 
     void UpdateSubresources(
         ComPtr<ID3D12Device10>& device,
-        ComPtr<ID3D12GraphicsCommandList7>& commandList,
+        CommandList& commandList,
         ComPtr<ID3D12Resource>& dest,
         ComPtr<ID3D12Resource>& intermediate,
         UINT64 intermediateOffset,
@@ -43,25 +45,6 @@ namespace D3DHelper
 
     D3D12_RESOURCE_BARRIER GetTransitionBarrier(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after);
 
-    void Barrier(
-        ID3D12GraphicsCommandList7* pCommandList,
-        ID3D12Resource* pResource,
-        D3D12_BARRIER_SYNC syncBefore,
-        D3D12_BARRIER_SYNC syncAfter,
-        D3D12_BARRIER_ACCESS accessBefore,
-        D3D12_BARRIER_ACCESS accessAfter);
-
-    void Barrier(
-        ID3D12GraphicsCommandList7* pCommandList,
-        ID3D12Resource* pResource,
-        ResourceLayoutTracker& layoutTracker,
-        D3D12_BARRIER_SYNC syncBefore,
-        D3D12_BARRIER_SYNC syncAfter,
-        D3D12_BARRIER_ACCESS accessBefore,
-        D3D12_BARRIER_ACCESS accessAfter,
-        D3D12_BARRIER_LAYOUT layoutAfter,
-        D3D12_BARRIER_SUBRESOURCE_RANGE subresourceRange);
-
     D3D12_BARRIER_GROUP BufferBarrierGroup(UINT32 numBarriers, D3D12_BUFFER_BARRIER* pBarriers);
     D3D12_BARRIER_GROUP TextureBarrierGroup(UINT32 numBarriers, D3D12_TEXTURE_BARRIER* pBarriers);
     D3D12_BARRIER_GROUP GlobalBarrierGroup(UINT32 numBarriers, D3D12_GLOBAL_BARRIER* pBarriers);
@@ -69,7 +52,7 @@ namespace D3DHelper
     template<typename T>
     void CreateVertexBuffer(
         ComPtr<ID3D12Device10>& device,
-        ComPtr<ID3D12GraphicsCommandList7>& commandList,
+        CommandList& commandList,
         ComPtr<ID3D12Resource>& vertexBuffer,
         ComPtr<ID3D12Resource>& uploadHeap,
         D3D12_VERTEX_BUFFER_VIEW* pvertexBufferView,
@@ -88,18 +71,11 @@ namespace D3DHelper
 
         UpdateSubresources(device, commandList, vertexBuffer, uploadHeap, 0, 0, 1, &vertexData);
 
-        D3D12_BUFFER_BARRIER barrier =
-        {
+        commandList.Barrier(vertexBuffer.Get(),
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_SYNC_VERTEX_SHADING,
             D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_ACCESS_VERTEX_BUFFER,
-            vertexBuffer.Get(),
-            0,
-            vertexBufferSize
-        };
-        D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(1, &barrier) };
-        commandList->Barrier(1, barrierGroups);
+            D3D12_BARRIER_ACCESS_VERTEX_BUFFER);
 
         // Initialize the vertex buffer view
         pvertexBufferView->BufferLocation = vertexBuffer->GetGPUVirtualAddress();
@@ -109,7 +85,7 @@ namespace D3DHelper
 
     void CreateIndexBuffer(
         ComPtr<ID3D12Device10>& device,
-        ComPtr<ID3D12GraphicsCommandList7>& commandList,
+        CommandList& commandList,
         ComPtr<ID3D12Resource>& indexBuffer,
         ComPtr<ID3D12Resource>& uploadHeap,
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
@@ -117,13 +93,14 @@ namespace D3DHelper
 
     void CreateTexture(
         ComPtr<ID3D12Device10>& device,
-        ComPtr<ID3D12GraphicsCommandList7>& commandList,
+        CommandList& commandList,
         ComPtr<ID3D12Resource>& texture,
         ComPtr<ID3D12Resource>& uploadHeap,
         std::vector<UINT8>& textureSrc,
         UINT width,
         UINT height,
-        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
+        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle,
+        ResourceLayoutTracker& layoutTracker);
 
     void CreateDepthStencilBuffer(
         ComPtr<ID3D12Device10>& device,

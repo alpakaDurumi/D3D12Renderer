@@ -273,7 +273,7 @@ namespace D3DHelper
 
     void UpdateSubresources(
         ComPtr<ID3D12Device10>& device,
-        ComPtr<ID3D12GraphicsCommandList7>& commandList,
+        CommandList& commandList,
         ComPtr<ID3D12Resource>& dest,
         ComPtr<ID3D12Resource>& intermediate,
         UINT64 intermediateOffset,
@@ -333,7 +333,7 @@ namespace D3DHelper
         // Buffer has only one subresource
         if (desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
         {
-            commandList->CopyBufferRegion(dest.Get(), 0, intermediate.Get(), pLayouts[0].Offset, pLayouts[0].Footprint.Width);
+            commandList.GetCommandList()->CopyBufferRegion(dest.Get(), 0, intermediate.Get(), pLayouts[0].Offset, pLayouts[0].Footprint.Width);
         }
         // Texture has one or more subresources
         else
@@ -350,7 +350,7 @@ namespace D3DHelper
                 src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
                 src.PlacedFootprint = pLayouts[i];
 
-                commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                commandList.GetCommandList()->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
             }
         }
 
@@ -368,110 +368,6 @@ namespace D3DHelper
         barrier.Transition.StateBefore = before;
         barrier.Transition.StateAfter = after;
         return barrier;
-    }
-
-    void Barrier(
-        ID3D12GraphicsCommandList7* pCommandList,
-        ID3D12Resource* pResource,
-        D3D12_BARRIER_SYNC syncBefore,
-        D3D12_BARRIER_SYNC syncAfter,
-        D3D12_BARRIER_ACCESS accessBefore,
-        D3D12_BARRIER_ACCESS accessAfter)
-    {
-        D3D12_RESOURCE_DESC desc = pResource->GetDesc();
-        assert(desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER);
-
-        D3D12_BUFFER_BARRIER barrier =
-        {
-            syncBefore,
-            syncAfter,
-            accessBefore,
-            accessAfter,
-            pResource,
-            0,
-            UINT64_MAX
-        };
-        D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(1, &barrier) };
-        pCommandList->Barrier(1, barrierGroups);
-    }
-
-    void Barrier(
-        ID3D12GraphicsCommandList7* pCommandList,
-        ID3D12Resource* pResource,
-        ResourceLayoutTracker& layoutTracker,
-        D3D12_BARRIER_SYNC syncBefore,
-        D3D12_BARRIER_SYNC syncAfter,
-        D3D12_BARRIER_ACCESS accessBefore,
-        D3D12_BARRIER_ACCESS accessAfter,
-        D3D12_BARRIER_LAYOUT layoutAfter,
-        D3D12_BARRIER_SUBRESOURCE_RANGE subresourceRange)
-    {
-        D3D12_RESOURCE_DESC desc = pResource->GetDesc();
-        assert(desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE1D ||
-            desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D ||
-            desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D);
-
-        // subresourceRange를 순회하며 레이아웃을 확인하여 배열에 추가한 후, 배리어 그룹을 구성
-
-        const auto& [IndexOrFirstMipLevel, NumMipLevels, FirstArraySlice, NumArraySlices, FirstPlane, NumPlanes] = subresourceRange;
-
-        UINT count = NumMipLevels * NumArraySlices * NumPlanes;
-
-        std::vector<D3D12_TEXTURE_BARRIER> barriers(count);
-
-        // Target all subresources
-        if (IndexOrFirstMipLevel == 0xffffffff)
-        {
-            for (UINT i = 0; i < count; i++)
-            {
-                D3D12_BARRIER_LAYOUT layoutBefore = layoutTracker.SetLayout(pResource, i, layoutAfter);
-
-                barriers[i] =
-                {
-                    syncBefore,
-                    syncAfter,
-                    accessBefore,
-                    accessAfter,
-                    layoutBefore,
-                    layoutAfter,
-                    pResource,
-                    {i, 0, 0, 0, 0, 0},
-                    D3D12_TEXTURE_BARRIER_FLAG_NONE
-                };
-            }
-        }
-        else
-        {
-            UINT idx = 0;
-            for (UINT plane = FirstPlane; plane < FirstPlane + NumPlanes; ++plane)
-            {
-                for (UINT array = FirstArraySlice; array < FirstArraySlice + NumArraySlices; ++array)
-                {
-                    for (UINT mip = IndexOrFirstMipLevel; mip < IndexOrFirstMipLevel + NumMipLevels; ++mip)
-                    {
-                        auto [layoutBefore, subresourceIndex] = layoutTracker.SetLayout(pResource, mip, array, plane, layoutAfter);
-
-                        barriers[idx] =
-                        {
-                            syncBefore,
-                            syncAfter,
-                            accessBefore,
-                            accessAfter,
-                            layoutBefore,
-                            layoutAfter,
-                            pResource,
-                            {subresourceIndex, 0, 0, 0, 0, 0},
-                            D3D12_TEXTURE_BARRIER_FLAG_NONE
-                        };
-
-                        idx++;
-                    }
-                }
-            }
-        }
-
-        D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(count, barriers.data()) };
-        pCommandList->Barrier(1, barrierGroups);
     }
 
     D3D12_BARRIER_GROUP BufferBarrierGroup(UINT32 numBarriers, D3D12_BUFFER_BARRIER* pBarriers)
@@ -503,7 +399,7 @@ namespace D3DHelper
 
     void CreateIndexBuffer(
         ComPtr<ID3D12Device10>& device,
-        ComPtr<ID3D12GraphicsCommandList7>& commandList,
+        CommandList& commandList,
         ComPtr<ID3D12Resource>& indexBuffer,
         ComPtr<ID3D12Resource>& uploadHeap,
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
@@ -522,18 +418,11 @@ namespace D3DHelper
 
         UpdateSubresources(device, commandList, indexBuffer, uploadHeap, 0, 0, 1, &indexData);
 
-        D3D12_BUFFER_BARRIER barrier =
-        {
+        commandList.Barrier(indexBuffer.Get(),
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_SYNC_INDEX_INPUT,
             D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_ACCESS_INDEX_BUFFER,
-            indexBuffer.Get(),
-            0,
-            indexBufferSize
-        };
-        D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(1, &barrier) };
-        commandList->Barrier(1, barrierGroups);
+            D3D12_BARRIER_ACCESS_INDEX_BUFFER);
 
         // Initialize the index buffer view
         pindexBufferView->BufferLocation = indexBuffer->GetGPUVirtualAddress();
@@ -543,30 +432,28 @@ namespace D3DHelper
 
     void CreateTexture(
         ComPtr<ID3D12Device10>& device,
-        ComPtr<ID3D12GraphicsCommandList7>& commandList,
+        CommandList& commandList,
         ComPtr<ID3D12Resource>& texture,
         ComPtr<ID3D12Resource>& uploadHeap,
         std::vector<UINT8>& textureSrc,
         UINT width,
         UINT height,
-        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
+        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle,
+        ResourceLayoutTracker& layoutTracker)
     {
         CreateDefaultHeapForTexture(device, texture, width, height);
 
-        D3D12_TEXTURE_BARRIER barrier =
-        {
+        layoutTracker.RegisterResource(texture.Get(), D3D12_BARRIER_LAYOUT_COMMON, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
+
+        commandList.Barrier(
+            texture.Get(),
+            layoutTracker,
             D3D12_BARRIER_SYNC_NONE,
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_ACCESS_NO_ACCESS,
             D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_LAYOUT_COMMON,
             D3D12_BARRIER_LAYOUT_COPY_DEST,
-            texture.Get(),
-            {0xffffffff, 0, 0, 0, 0, 0},    // Select all subresources
-            D3D12_TEXTURE_BARRIER_FLAG_NONE
-        };
-        D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(1, &barrier) };
-        commandList->Barrier(1, barrierGroups);
+            { 0xffffffff, 0, 0, 0, 0, 0 });
 
         // Calculate required size for data upload
         D3D12_RESOURCE_DESC desc = texture->GetDesc();
@@ -586,20 +473,15 @@ namespace D3DHelper
 
         UpdateSubresources(device, commandList, texture, uploadHeap, 0, 0, 1, &textureData);
 
-        barrier =
-        {
+        commandList.Barrier(
+            texture.Get(),
+            layoutTracker,
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_SYNC_PIXEL_SHADING,
             D3D12_BARRIER_ACCESS_COPY_DEST,
             D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-            D3D12_BARRIER_LAYOUT_COPY_DEST,
             D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
-            texture.Get(),
-            {0xffffffff, 0, 0, 0, 0, 0},    // Select all subresources
-            D3D12_TEXTURE_BARRIER_FLAG_NONE
-        };
-        barrierGroups[0] = TextureBarrierGroup(1, &barrier);
-        commandList->Barrier(1, barrierGroups);
+            { 0xffffffff, 0, 0, 0, 0, 0 });
 
         // Describe and create a SRV for the texture.
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};

@@ -16,7 +16,7 @@ struct ResourceLayoutInfo
     {
     }
 
-    D3D12_BARRIER_LAYOUT GetLayout(UINT subresourceIndex);
+    D3D12_BARRIER_LAYOUT GetLayout(UINT subresourceIndex) const;
 
     void SetLayout(UINT subresourceIndex, D3D12_BARRIER_LAYOUT layout);
 
@@ -44,6 +44,8 @@ public:
 
     void RegisterResource(ID3D12Resource* pResource, D3D12_BARRIER_LAYOUT initialLayout, UINT depthOrArraySize, UINT mipLevels, DXGI_FORMAT format);
     void UnregisterResource(ID3D12Resource* pResource);
+
+    D3D12_BARRIER_LAYOUT GetLayout(ID3D12Resource* pResource, UINT subresourceIndex);
 
     std::pair<D3D12_BARRIER_LAYOUT, UINT> SetLayout(ID3D12Resource* pResource, UINT mipIndex, UINT arrayIndex, UINT planeIndex, D3D12_BARRIER_LAYOUT layout);
     D3D12_BARRIER_LAYOUT SetLayout(ID3D12Resource* pResource, UINT subresourceIndex, D3D12_BARRIER_LAYOUT layout);

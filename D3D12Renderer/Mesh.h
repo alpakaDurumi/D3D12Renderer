@@ -11,6 +11,7 @@
 
 #include "D3DHelper.h"
 #include "ConstantData.h"
+#include "CommandList.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -42,7 +43,7 @@ public:
 
     inline static Mesh MakeCube(
         ComPtr<ID3D12Device10>& device,
-        ComPtr<ID3D12GraphicsCommandList7>& commandList,
+        CommandList& commandList,
         ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
         ComPtr<ID3D12Resource>& indexBufferUploadHeap)
     {
@@ -111,7 +112,7 @@ public:
 
     inline static Mesh MakeSphere(
         ComPtr<ID3D12Device10>& device,
-        ComPtr<ID3D12GraphicsCommandList7>& commandList,
+        CommandList& commandList,
         ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
         ComPtr<ID3D12Resource>& indexBufferUploadHeap)
     {
@@ -212,7 +213,7 @@ public:
 
     inline static InstancedMesh MakeCubeInstanced(
         ComPtr<ID3D12Device10>& device,
-        ComPtr<ID3D12GraphicsCommandList7>& commandList,
+        CommandList& commandList,
         ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
         ComPtr<ID3D12Resource>& indexBufferUploadHeap,
         ComPtr<ID3D12Resource>& instanceUploadHeap)

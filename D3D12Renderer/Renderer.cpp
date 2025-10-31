@@ -227,7 +227,7 @@ void Renderer::OnRender()
     PopulateCommandList(commandList);
 
     // Execute the command lists and store the fence value
-    m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList);
+    m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, m_layoutTracker.value());
 
     // Present the frame.
     UINT syncInterval = m_vSync ? 1 : 0;
@@ -463,6 +463,13 @@ void Renderer::LoadPipeline()
             FrameResource* pFrameResource = new FrameResource(m_device, m_swapChain, i, rtvHandle);
             MoveCPUDescriptorHandle(&rtvHandle, 1, m_rtvDescriptorSize);
             m_frameResources.push_back(pFrameResource);
+
+            // Register backbuffer to tracker
+            // Initial layout of backbuffer is D3D12_BARRIER_LAYOUT_COMMON : https://microsoft.github.io/DirectX-Specs/d3d/D3D12EnhancedBarriers.html#initial-resource-state
+            // depthOrArraySize and mipLevels for backbuffers are 1
+            ID3D12Resource* pBackBuffer = pFrameResource->m_renderTarget.Get();
+            auto desc = pBackBuffer->GetDesc();
+            m_layoutTracker->RegisterResource(pBackBuffer, D3D12_BARRIER_LAYOUT_COMMON, desc.DepthOrArraySize, desc.MipLevels, DXGI_FORMAT_R8G8B8A8_UNORM);
         }
     }
 }
@@ -821,58 +828,51 @@ void Renderer::LoadAssets()
 
     // 텍스처 생성, Mesh에 할당
     UINT idx = m_cbvSrvUavHeap.GetNumSrvAllocated();
-    CreateTexture(m_device, commandList, m_texture, textureUploadHeap, simpleTextureData, 256, 256, m_cbvSrvUavHeap.GetFreeHandleForSrv());
+    CreateTexture(m_device, commandList, m_texture, textureUploadHeap, simpleTextureData, 256, 256, m_cbvSrvUavHeap.GetFreeHandleForSrv(), m_layoutTracker.value());
     pCube->m_srvDescriptorOffset = idx;
     pSphere->m_srvDescriptorOffset = idx;
 
     // Execute commands for loading assets and store fence value
-    m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList);
+    m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, m_layoutTracker.value());
 
     // Wait until assets have been uploaded to the GPU
     WaitForGPU();
 }
 
-void Renderer::PopulateCommandList(ComPtr<ID3D12GraphicsCommandList7>& commandList)
+void Renderer::PopulateCommandList(CommandList& commandList)
 {
     FrameResource* pFrameResource = m_frameResources[m_frameIndex];
 
+    auto cmdList = commandList.GetCommandList();
+
     // Set necessary state.
-    commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+    cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
 
     ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvUavHeap.m_heap.Get() };
-    commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    cmdList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-    commandList->RSSetViewports(1, &m_viewport);
-    commandList->RSSetScissorRects(1, &m_scissorRect);
+    cmdList->RSSetViewports(1, &m_viewport);
+    cmdList->RSSetScissorRects(1, &m_scissorRect);
 
-    // Swap Chain textures initially created in D3D12_BARRIER_LAYOUT_COMMON
-    // and presentation requires the back buffer is using D3D12_BARRIER_LAYOUT_COMMON
-    // LAYOUT_PRESENT is alias for LAYOUT_COMMON
-    D3D12_TEXTURE_BARRIER barrier =
-    {
+    commandList.Barrier(pFrameResource->m_renderTarget.Get(),
+        m_layoutTracker.value(),
         D3D12_BARRIER_SYNC_NONE,
         D3D12_BARRIER_SYNC_RENDER_TARGET,
         D3D12_BARRIER_ACCESS_NO_ACCESS,
         D3D12_BARRIER_ACCESS_RENDER_TARGET,
-        D3D12_BARRIER_LAYOUT_PRESENT,
         D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-        pFrameResource->m_renderTarget.Get(),
-        {0xffffffff, 0, 0, 0, 0, 0},    // Select all subresources
-        D3D12_TEXTURE_BARRIER_FLAG_NONE
-    };
-    D3D12_BARRIER_GROUP groups[] = { TextureBarrierGroup(1, &barrier) };
-    commandList->Barrier(1, groups);
+        { 0xffffffff, 0, 0, 0, 0, 0 });     // Select all subresources
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
     MoveCPUDescriptorHandle(&rtvHandle, m_frameIndex, m_rtvDescriptorSize);
     D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
-    commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+    cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
     const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-    commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-    commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+    cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+    cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-    commandList->SetPipelineState(m_defaultPipelineState.Get());
+    cmdList->SetPipelineState(m_defaultPipelineState.Get());
     for (const auto* pMesh : m_meshes)
     {
         D3D12_GPU_DESCRIPTOR_HANDLE handle;
@@ -880,20 +880,20 @@ void Renderer::PopulateCommandList(ComPtr<ID3D12GraphicsCommandList7>& commandLi
         // per-mesh CBVs
         // 각 프레임이 사용하는 디스크립터를 인덱싱
         handle = m_cbvSrvUavHeap.GetCbvHandle(m_frameIndex, pMesh->m_perMeshCbvDescriptorOffset);
-        commandList->SetGraphicsRootDescriptorTable(0, handle);
+        cmdList->SetGraphicsRootDescriptorTable(0, handle);
 
         // default CBV
         handle = m_cbvSrvUavHeap.GetCbvHandle(0, pMesh->m_defaultCbvDescriptorOffset);
-        commandList->SetGraphicsRootDescriptorTable(1, handle);
+        cmdList->SetGraphicsRootDescriptorTable(1, handle);
 
         // SRV
         handle = m_cbvSrvUavHeap.GetSrvHandle(pMesh->m_srvDescriptorOffset);
-        commandList->SetGraphicsRootDescriptorTable(2, handle);
+        cmdList->SetGraphicsRootDescriptorTable(2, handle);
 
-        pMesh->Render(commandList);
+        pMesh->Render(cmdList);
     }
 
-    commandList->SetPipelineState(m_instancedPipelineState.Get());
+    cmdList->SetPipelineState(m_instancedPipelineState.Get());
     for (const auto* pMesh : m_instancedMeshes)
     {
         D3D12_GPU_DESCRIPTOR_HANDLE handle;
@@ -901,34 +901,30 @@ void Renderer::PopulateCommandList(ComPtr<ID3D12GraphicsCommandList7>& commandLi
         // per-mesh CBVs
         // 각 프레임이 사용하는 디스크립터를 인덱싱
         handle = m_cbvSrvUavHeap.GetCbvHandle(m_frameIndex, pMesh->m_perMeshCbvDescriptorOffset);
-        commandList->SetGraphicsRootDescriptorTable(0, handle);
+        cmdList->SetGraphicsRootDescriptorTable(0, handle);
 
         // default CBV
         handle = m_cbvSrvUavHeap.GetCbvHandle(0, pMesh->m_defaultCbvDescriptorOffset);
-        commandList->SetGraphicsRootDescriptorTable(1, handle);
+        cmdList->SetGraphicsRootDescriptorTable(1, handle);
 
         // SRV
         handle = m_cbvSrvUavHeap.GetSrvHandle(pMesh->m_srvDescriptorOffset);
-        commandList->SetGraphicsRootDescriptorTable(2, handle);
+        cmdList->SetGraphicsRootDescriptorTable(2, handle);
 
-        pMesh->Render(commandList);
+        pMesh->Render(cmdList);
     }
 
-    // Barrier for present
-    barrier =
-    {
+    // Swap Chain textures initially created in D3D12_BARRIER_LAYOUT_COMMON
+    // and presentation requires the back buffer is using D3D12_BARRIER_LAYOUT_COMMON
+    // LAYOUT_PRESENT is alias for LAYOUT_COMMON
+    commandList.Barrier(pFrameResource->m_renderTarget.Get(),
+        m_layoutTracker.value(),
         D3D12_BARRIER_SYNC_RENDER_TARGET,
         D3D12_BARRIER_SYNC_NONE,
         D3D12_BARRIER_ACCESS_RENDER_TARGET,
         D3D12_BARRIER_ACCESS_NO_ACCESS,
-        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
         D3D12_BARRIER_LAYOUT_PRESENT,
-        pFrameResource->m_renderTarget.Get(),
-        {0xffffffff, 0, 0, 0, 0, 0},    // Select all subresources
-        D3D12_TEXTURE_BARRIER_FLAG_NONE
-    };
-    groups[0] = TextureBarrierGroup(1, &barrier);
-    commandList->Barrier(1, groups);
+        { 0xffffffff, 0, 0, 0, 0, 0 });     // Select all subresources
 }
 
 // Wait for pending GPU work to complete

@@ -26,6 +26,7 @@
 #include "DescriptorHeapManager.h"
 #include "CommandQueue.h"
 #include "ResourceLayoutTracker.h"
+#include "CommandList.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -109,7 +110,7 @@ private:
 
     void LoadPipeline();
     void LoadAssets();
-    void PopulateCommandList(ComPtr<ID3D12GraphicsCommandList7>& commandList);
+    void PopulateCommandList(CommandList& commandList);
     void WaitForGPU();
     void MoveToNextFrame();
 };

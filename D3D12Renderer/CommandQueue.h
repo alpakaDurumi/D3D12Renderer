@@ -4,6 +4,10 @@
 #include <d3d12.h>
 #include <queue>
 #include "D3DHelper.h"
+#include "CommandList.h"
+#include "ResourceLayoutTracker.h"
+
+#include <utility>  // for std::pair
 
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
@@ -63,7 +67,7 @@ public:
         return commandList7;
     }
 
-    std::pair<ComPtr<ID3D12CommandAllocator>, ComPtr<ID3D12GraphicsCommandList7>> GetCommandList()
+    std::pair<ComPtr<ID3D12CommandAllocator>, CommandList> GetCommandList()
     {
         ComPtr<ID3D12CommandAllocator> commandAllocator;
         ComPtr<ID3D12GraphicsCommandList7> commandList;
@@ -93,20 +97,92 @@ public:
             commandList = CreateCommandList(commandAllocator);
         }
 
-        return { commandAllocator, commandList };
+        // 커맨드 리스트는 반환 시 래퍼로 감싼다.
+        // CommandList 클래스에서 제공하는 기능들은 순수하게 커맨드 리스트가 작성될 때에만 필요하므로
+        // 풀 내에 있을 때에는 래퍼 클래스의 기능이 필요없다.
+        // piecewise_construct를 사용하여 in-place construction을 수행.
+        return std::pair<ComPtr<ID3D12CommandAllocator>, CommandList>(
+            std::piecewise_construct,
+            std::forward_as_tuple(commandAllocator),
+            std::forward_as_tuple(commandList, m_device));
     }
 
-    UINT64 ExecuteCommandLists(ComPtr<ID3D12CommandAllocator>& commandAllocator, ComPtr<ID3D12GraphicsCommandList7>& commandList)
-    {
-        commandList->Close();
+    //UINT64 ExecuteCommandLists(ComPtr<ID3D12CommandAllocator>& commandAllocator, ComPtr<ID3D12GraphicsCommandList7>& commandList)
+    //{
+    //    commandList->Close();
 
-        ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
-        m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+    //    ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
+    //    m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+    //    // Signal로 얻은 fenceValue를 사용? -> 각 command allocator가 작업이 끝났는지 알기 위한 수단
+    //    uint64_t fenceValue = Signal();
+    //    m_commandAllocatorQueue.push({ fenceValue, commandAllocator });
+    //    m_commandListQueue.push(commandList);
+
+    //    return fenceValue;
+    //}
+
+    UINT64 ExecuteCommandLists(ComPtr<ID3D12CommandAllocator>& commandAllocator, CommandList& commandList, ResourceLayoutTracker& layoutTracker)
+    {
+        // Get pending barriers and prepare the sub command list for sync
+        auto [subCommandAllocator, subCommandList] = GetCommandList();
+        ComPtr<ID3D12GraphicsCommandList7> sub = subCommandList.GetCommandList();
+
+        auto pendingBarriers = commandList.GetPendingBarriers();
+
+        if (!pendingBarriers.empty())
+        {
+            for (auto& barrier : pendingBarriers)
+            {
+                UINT subresourceIndex = barrier.Subresources.IndexOrFirstMipLevel;
+                barrier.LayoutBefore = layoutTracker.GetLayout(barrier.pResource, subresourceIndex);
+            }
+
+            D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(UINT32(pendingBarriers.size()), pendingBarriers.data()) };
+            sub->Barrier(1, barrierGroups);
+            sub->Close();
+        }
+        else
+        {
+            sub->Close();
+        }
+
+        // Prepare main command list
+        auto main = commandList.GetCommandList();
+        main->Close();
+
+        // Execute command lists
+        if (!pendingBarriers.empty())
+        {
+            ID3D12CommandList* ppCommandLists[] = { sub.Get(), main.Get() };
+            m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+        }
+        else
+        {
+            ID3D12CommandList* ppCommandLists[] = { main.Get() };
+            m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+        }
+
+        // layoutTracker 업데이트
+        auto latestLayouts = commandList.GetLatestLayouts();
+        for (const auto& [pResource, p] : latestLayouts)
+        {
+            const auto& [layoutInfo, isNotUsed] = p;
+            UINT subresourceCount = layoutInfo.MipLevels * layoutInfo.DepthOrArraySize * layoutInfo.PlaneCount;
+            for (UINT i = 0; i < subresourceCount; i++)
+            {
+                if (isNotUsed[i]) continue;     // 커맨드 리스트 내에서 사용한 적이 없는 서브리소스는 그대로 유지
+                layoutTracker.SetLayout(pResource, i, layoutInfo.GetLayout(i));
+            }
+        }
 
         // Signal로 얻은 fenceValue를 사용? -> 각 command allocator가 작업이 끝났는지 알기 위한 수단
-        uint64_t fenceValue = Signal();
+        // 일단은 둘 다 동일한 fenceValue로 표시
+        UINT64 fenceValue = Signal();
         m_commandAllocatorQueue.push({ fenceValue, commandAllocator });
-        m_commandListQueue.push(commandList);
+        m_commandListQueue.push(main);
+        m_commandAllocatorQueue.push({ fenceValue, subCommandAllocator });
+        m_commandListQueue.push(sub);
 
         return fenceValue;
     }
