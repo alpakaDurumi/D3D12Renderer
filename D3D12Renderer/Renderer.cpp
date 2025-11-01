@@ -221,7 +221,7 @@ void Renderer::OnUpdate()
 // Render the scene.
 void Renderer::OnRender()
 {
-    auto [commandAllocator, commandList] = m_commandQueue->GetCommandList();
+    auto [commandAllocator, commandList] = m_commandQueue->GetAvailableCommandList();
 
     // Record all the commands we need to render the scene into the command list
     PopulateCommandList(commandList);
@@ -709,7 +709,7 @@ void Renderer::LoadAssets()
     ComPtr<ID3D12Resource> instanceUploadHeap;
 
     // Get command allocator and list for loading assets
-    auto [commandAllocator, commandList] = m_commandQueue->GetCommandList();
+    auto [commandAllocator, commandList] = m_commandQueue->GetAvailableCommandList();
 
     InstancedMesh* pCube = new InstancedMesh(InstancedMesh::MakeCubeInstanced(
         m_device,
