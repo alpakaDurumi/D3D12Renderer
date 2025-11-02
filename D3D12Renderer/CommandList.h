@@ -23,6 +23,17 @@ public:
     {
     }
 
+    struct LatestLayout
+    {
+        LatestLayout(UINT mipLevels, UINT depthOrArraySize, UINT8 planeCount, D3D12_BARRIER_LAYOUT initialLayout)
+            : LayoutInfo(mipLevels, depthOrArraySize, planeCount, initialLayout), IsNotUsed(mipLevels * depthOrArraySize * planeCount, true)
+        {
+        }
+
+        ResourceLayoutInfo LayoutInfo;
+        std::vector<bool> IsNotUsed;
+    };
+
     ComPtr<ID3D12GraphicsCommandList7> GetCommandList() const { return m_commandList; }
 
     void Barrier(
@@ -44,12 +55,11 @@ public:
 
     std::vector<D3D12_TEXTURE_BARRIER> GetPendingBarriers() const { return m_pendingBarriers; }
 
-    std::unordered_map<ID3D12Resource*, std::pair<ResourceLayoutInfo, std::vector<bool>>> GetLatestLayouts() const { return m_latestLayouts; }
-
+    std::unordered_map<ID3D12Resource*, LatestLayout> GetLatestLayouts() const { return m_latestLayouts; }
 private:
     ComPtr<ID3D12Device10> m_device;
 
     ComPtr<ID3D12GraphicsCommandList7> m_commandList;
-    std::unordered_map<ID3D12Resource*, std::pair<ResourceLayoutInfo, std::vector<bool>>> m_latestLayouts;  // 이번 command list 작성 중, 각 리소스에 대해 알려진 최신 layout
+    std::unordered_map<ID3D12Resource*, LatestLayout> m_latestLayouts;  // 이번 command list 작성 중, 각 리소스에 대해 알려진 최신 layout
     std::vector<D3D12_TEXTURE_BARRIER> m_pendingBarriers;
 };

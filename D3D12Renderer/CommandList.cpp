@@ -56,11 +56,7 @@ void CommandList::Barrier(
     auto it = m_latestLayouts.find(pResource);
     if (it == m_latestLayouts.end())
     {
-        it = m_latestLayouts.insert({ pResource, {
-            ResourceLayoutInfo(desc.MipLevels, desc.DepthOrArraySize, GetFormatPlaneCount(m_device.Get(), desc.Format), D3D12_BARRIER_LAYOUT_COMMON),
-            std::vector<bool>(count, true)
-            }
-            }).first;
+        it = m_latestLayouts.try_emplace(pResource, desc.MipLevels, desc.DepthOrArraySize, GetFormatPlaneCount(m_device.Get(), desc.Format), D3D12_BARRIER_LAYOUT_COMMON).first;
     }
 
     auto& [layoutInfo, isNotUsed] = it->second;
