@@ -1,6 +1,9 @@
 #define NOMINMAX
 
 #include "DescriptorAllocator.h"
+
+#include <optional>
+
 #include "DescriptorAllocatorPage.h"
 #include "DescriptorAllocation.h"
 
@@ -24,7 +27,7 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
         allocation = allocatorPage->Allocate(numDescriptors);
 
         // A valid allocation has been found
-        if (!allocation.has_value())
+        if (allocation.has_value())
         {
             // DescriptorAllocatorPage::Allocate 내에서 m_numFreeHandles를 감소시킴에도 불구하고,
             // 다시 GetNumFreeHandles를 호출하여 개수를 확인하고 있다. DescriptorAllocatorPage::Allocate에서

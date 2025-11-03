@@ -1,7 +1,8 @@
 #include "ResourceLayoutTracker.h"
 
-#include "D3DHelper.h"
 #include <cassert>
+
+#include "D3DHelper.h"
 
 using namespace D3DHelper;
 

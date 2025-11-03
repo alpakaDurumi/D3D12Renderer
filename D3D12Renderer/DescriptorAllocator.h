@@ -1,15 +1,17 @@
 #pragma once
 
 #include <wrl/client.h>
+
 #include <d3d12.h>
+
 #include <memory>
 #include <mutex>
 #include <set>
 #include <vector>
-#include <optional>
+
+#include "DescriptorAllocation.h"
 
 class DescriptorAllocatorPage;
-class DescriptorAllocation;
 
 using Microsoft::WRL::ComPtr;
 

@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 #include <shellapi.h>
+
 #include "Renderer.h"
 
 class Win32Application

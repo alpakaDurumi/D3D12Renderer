@@ -6,6 +6,7 @@
 #include "D3DHelper.h"
 
 using Microsoft::WRL::ComPtr;
+using namespace D3DHelper;
 
 template<typename T>
 class ConstantBuffer

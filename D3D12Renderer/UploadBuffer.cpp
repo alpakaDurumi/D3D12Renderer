@@ -1,6 +1,8 @@
 #include "UploadBuffer.h"
-#include "D3DHelper.h"
+
 #include <new>
+
+#include "D3DHelper.h"
 
 using namespace D3DHelper;
 

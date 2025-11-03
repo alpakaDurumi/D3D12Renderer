@@ -19,14 +19,15 @@
 
 #include "Camera.h"
 #include "InputManager.h"
-#include "Mesh.h"
-#include "FrameResource.h"
 #include "ConstantData.h"
-#include "ConstantBuffer.h"
 #include "DescriptorHeapManager.h"
 #include "CommandQueue.h"
 #include "ResourceLayoutTracker.h"
-#include "CommandList.h"
+
+class Mesh;
+class InstancedMesh;
+class FrameResource;
+class CommandList;
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;

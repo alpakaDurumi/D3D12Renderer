@@ -1,7 +1,9 @@
 #pragma once
 
 #include <wrl/client.h>
+
 #include <d3d12.h>
+
 #include <memory>
 #include <queue>
 #include <functional>
@@ -22,7 +24,7 @@ public:
 
     // Copy all of the staged descriptors to the GPU visible descriptor heap and
     // bind the descriptor heap and the descriptor tables to the command list
-    void CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommandList7>& commandList, std::function<void(ID3D12GraphicsCommandList*, UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc);
+    
     void CommitStagedDescriptorsForDraw(ComPtr<ID3D12GraphicsCommandList7>& commandList);
     void CommitStagedDescriptorsForDispatch(ComPtr<ID3D12GraphicsCommandList7>& commandList);
 
@@ -33,6 +35,8 @@ public:
     void Reset();
 
 private:
+    void CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommandList7>& commandList, std::function<void(ID3D12GraphicsCommandList*, UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc);
+
     ComPtr<ID3D12DescriptorHeap> RequestDescriptorHeap();
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap();
 

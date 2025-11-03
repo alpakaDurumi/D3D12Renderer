@@ -2,8 +2,10 @@
 
 #include <Windows.h>
 #include <wrl/client.h>
+
 #include <d3d12.h>
 #include <dxgi1_6.h>    // DXGI 1.6
+
 #include <vector>
 
 #include "CommandList.h"

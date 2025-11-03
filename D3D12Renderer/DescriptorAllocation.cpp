@@ -1,8 +1,9 @@
 #include "DescriptorAllocation.h"
-#include "DescriptorAllocatorPage.h"
+
 #include <cassert>
 
 #include "D3DHelper.h"
+#include "DescriptorAllocatorPage.h"
 
 using namespace D3DHelper;
 

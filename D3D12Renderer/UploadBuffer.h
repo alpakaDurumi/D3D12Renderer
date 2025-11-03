@@ -1,12 +1,15 @@
 #pragma once
 
 #include <wrl/client.h>
+
 #include <d3d12.h>
+
 #include <deque>
 #include <memory>
 
 using Microsoft::WRL::ComPtr;
 
+// Helper class for managing intermediate resources for CPU-to-GPU data transfer.
 class UploadBuffer
 {
 public:

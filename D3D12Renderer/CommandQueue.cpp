@@ -1,7 +1,7 @@
 #include "CommandQueue.h"
 
-#include "ResourceLayoutTracker.h"
 #include "D3DHelper.h"
+#include "ResourceLayoutTracker.h"
 
 using namespace D3DHelper;
 

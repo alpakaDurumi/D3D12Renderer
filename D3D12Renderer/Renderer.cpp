@@ -1,8 +1,13 @@
 #include "Renderer.h"
+
 #include "Win32Application.h"
 #include "D3DHelper.h"
 #include <D3Dcompiler.h>
 #include <stdexcept>
+
+#include "Mesh.h"
+#include "FrameResource.h"
+#include "CommandList.h"
 
 // 이거 일단 빼야겠다. nuget에서도 제외시키자
 //#include <dxcapi.h>
