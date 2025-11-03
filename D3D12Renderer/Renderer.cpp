@@ -232,7 +232,7 @@ void Renderer::OnRender()
     PopulateCommandList(commandList);
 
     // Execute the command lists and store the fence value
-    m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, m_layoutTracker.value());
+    m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
 
     // Present the frame.
     UINT syncInterval = m_vSync ? 1 : 0;
@@ -395,12 +395,12 @@ void Renderer::LoadPipeline()
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
     queueDesc.NodeMask = 0;
 
-    // Do not transfer prvalue object to emplace.
+    // Do not transfer prvalue object to std::make_unique.
     // Both CommandQueue and ResourceLayoutTracker are non-copyable and non-movable types.
-    // Passing a temporary object like `emplace(CommandQueue(...))` will fail to compile
-    // Instead, pass the constructor arguments directly to emplace.
-    m_commandQueue.emplace(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
-    m_layoutTracker.emplace(m_device);
+    // Passing a temporary object like `std::make_unique<T>(T(...))` will fail to compile
+    // Instead, pass the constructor arguments directly to std::make_unique<T>()
+    m_commandQueue = std::make_unique<CommandQueue>(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+    m_layoutTracker = std::make_unique<ResourceLayoutTracker>(m_device);
 
     // Check for Variable Refresh Rate(VRR)
     m_tearingSupported = CheckTearingSupport();
@@ -833,12 +833,12 @@ void Renderer::LoadAssets()
 
     // 텍스처 생성, Mesh에 할당
     UINT idx = m_cbvSrvUavHeap.GetNumSrvAllocated();
-    CreateTexture(m_device, commandList, m_texture, textureUploadHeap, simpleTextureData, 256, 256, m_cbvSrvUavHeap.GetFreeHandleForSrv(), m_layoutTracker.value());
+    CreateTexture(m_device, commandList, m_texture, textureUploadHeap, simpleTextureData, 256, 256, m_cbvSrvUavHeap.GetFreeHandleForSrv(), *m_layoutTracker);
     pCube->m_srvDescriptorOffset = idx;
     pSphere->m_srvDescriptorOffset = idx;
 
     // Execute commands for loading assets and store fence value
-    m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, m_layoutTracker.value());
+    m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
 
     // Wait until assets have been uploaded to the GPU
     WaitForGPU();
@@ -860,7 +860,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     cmdList->RSSetScissorRects(1, &m_scissorRect);
 
     commandList.Barrier(pFrameResource->m_renderTarget.Get(),
-        m_layoutTracker.value(),
+        *m_layoutTracker,
         D3D12_BARRIER_SYNC_NONE,
         D3D12_BARRIER_SYNC_RENDER_TARGET,
         D3D12_BARRIER_ACCESS_NO_ACCESS,
@@ -923,7 +923,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     // and presentation requires the back buffer is using D3D12_BARRIER_LAYOUT_COMMON
     // LAYOUT_PRESENT is alias for LAYOUT_COMMON
     commandList.Barrier(pFrameResource->m_renderTarget.Get(),
-        m_layoutTracker.value(),
+        *m_layoutTracker,
         D3D12_BARRIER_SYNC_RENDER_TARGET,
         D3D12_BARRIER_SYNC_NONE,
         D3D12_BARRIER_ACCESS_RENDER_TARGET,
