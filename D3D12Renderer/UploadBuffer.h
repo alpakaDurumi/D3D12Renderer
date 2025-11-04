@@ -9,6 +9,8 @@
 
 using Microsoft::WRL::ComPtr;
 
+static const SIZE_T MAXPAGESIZE = 64 * 1024 * 1024;    // 64MB
+
 // Helper class for managing intermediate resources for CPU-to-GPU data transfer.
 class UploadBuffer
 {

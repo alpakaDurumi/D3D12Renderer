@@ -22,7 +22,20 @@ UploadBuffer::Allocation UploadBuffer::Allocate(SIZE_T sizeInBytes, SIZE_T align
 {
     if (sizeInBytes > m_pageSize)
     {
-        throw std::bad_alloc();
+        // 요구된 크기가 현재 설정된 페이지 크기보다는 크지만 최대 페이지 크기를 넘지 않는 경우
+        // 요청에 맞도록 페이지 크기를 조절하여 생성한 후 다시 원상 복구
+        if (sizeInBytes <= MAXPAGESIZE)
+        {
+            auto originalSize = m_pageSize;
+
+            m_pageSize = sizeInBytes;
+            m_currentPage = RequestPage();
+            m_pageSize = originalSize;
+        }
+        else
+        {
+            throw std::bad_alloc();
+        }
     }
 
     // 첫 할당이거나 현재 Page의 공간이 부족한 경우
