@@ -15,8 +15,10 @@ class UploadBuffer
 public:
     struct Allocation
     {
-        void* m_CPUPtr;
-        D3D12_GPU_VIRTUAL_ADDRESS m_GPUPtr;
+        void* CPUPtr;
+        D3D12_GPU_VIRTUAL_ADDRESS GPUPtr;
+        ID3D12Resource* pResource;
+        SIZE_T Offset;
     };
 
     UploadBuffer(ComPtr<ID3D12Device10>& device, SIZE_T pageSize);
@@ -27,7 +29,7 @@ public:
 
 
 private:
-    struct Page
+    class Page
     {
     public:
         Page(ComPtr<ID3D12Device10>& device, SIZE_T sizeInBytes);

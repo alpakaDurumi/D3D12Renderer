@@ -101,8 +101,10 @@ UploadBuffer::Allocation UploadBuffer::Page::Allocate(SIZE_T sizeInBytes, SIZE_T
     m_offset = Align(m_offset, alignment);
     
     Allocation allocation;
-    allocation.m_CPUPtr = static_cast<void*>(static_cast<UINT8*>(m_CPUBasePtr) + m_offset);
-    allocation.m_GPUPtr = m_GPUBasePtr + m_offset;
+    allocation.CPUPtr = static_cast<void*>(static_cast<UINT8*>(m_CPUBasePtr) + m_offset);
+    allocation.GPUPtr = m_GPUBasePtr + m_offset;
+    allocation.pResource = m_resource.Get();
+    allocation.Offset = m_offset;
 
     m_offset += alignedSize;
 

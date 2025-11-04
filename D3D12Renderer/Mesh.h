@@ -11,7 +11,8 @@
 
 #include "D3DHelper.h"
 #include "ConstantData.h"
-#include "CommandList.h"
+
+class CommandList;
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -44,8 +45,7 @@ public:
     inline static Mesh MakeCube(
         ComPtr<ID3D12Device10>& device,
         CommandList& commandList,
-        ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
-        ComPtr<ID3D12Resource>& indexBufferUploadHeap)
+        UploadBuffer& uploadBuffer)
     {
         Mesh cube;
 
@@ -89,7 +89,7 @@ public:
                 {{-1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
                 {{-1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f} }
             };
-            CreateVertexBuffer(device, commandList, cube.m_vertexBuffer, vertexBufferUploadHeap, &cube.m_vertexBufferView, cubeVertices);
+            CreateVertexBuffer(device, commandList, uploadBuffer, cube.m_vertexBuffer, &cube.m_vertexBufferView, cubeVertices);
         }
 
         // Create the index buffer
@@ -103,7 +103,7 @@ public:
                 16, 17, 18, 16, 18, 19,
                 20, 21, 22, 20, 22, 23
             };
-            CreateIndexBuffer(device, commandList, cube.m_indexBuffer, indexBufferUploadHeap, &cube.m_indexBufferView, cubeIndices);
+            CreateIndexBuffer(device, commandList, uploadBuffer, cube.m_indexBuffer, &cube.m_indexBufferView, cubeIndices);
             cube.m_numIndices = UINT(cubeIndices.size());
         }
 
@@ -113,8 +113,7 @@ public:
     inline static Mesh MakeSphere(
         ComPtr<ID3D12Device10>& device,
         CommandList& commandList,
-        ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
-        ComPtr<ID3D12Resource>& indexBufferUploadHeap)
+        UploadBuffer& uploadBuffer)
     {
         Mesh sphere;
 
@@ -147,7 +146,7 @@ public:
                     sphereVertices.push_back(v);
                 }
             }
-            CreateVertexBuffer(device, commandList, sphere.m_vertexBuffer, vertexBufferUploadHeap, &sphere.m_vertexBufferView, sphereVertices);
+            CreateVertexBuffer(device, commandList, uploadBuffer, sphere.m_vertexBuffer, &sphere.m_vertexBufferView, sphereVertices);
         }
 
         // Create the index buffer
@@ -169,7 +168,7 @@ public:
                     sphereIndices.push_back(p4);
                 }
             }
-            CreateIndexBuffer(device, commandList, sphere.m_indexBuffer, indexBufferUploadHeap, &sphere.m_indexBufferView, sphereIndices);
+            CreateIndexBuffer(device, commandList, uploadBuffer, sphere.m_indexBuffer, &sphere.m_indexBufferView, sphereIndices);
             sphere.m_numIndices = UINT(sphereIndices.size());
         }
 
@@ -214,11 +213,9 @@ public:
     inline static InstancedMesh MakeCubeInstanced(
         ComPtr<ID3D12Device10>& device,
         CommandList& commandList,
-        ComPtr<ID3D12Resource>& vertexBufferUploadHeap,
-        ComPtr<ID3D12Resource>& indexBufferUploadHeap,
-        ComPtr<ID3D12Resource>& instanceUploadHeap)
+        UploadBuffer& uploadBuffer)
     {
-        InstancedMesh cube = MakeCube(device, commandList, vertexBufferUploadHeap, indexBufferUploadHeap);
+        InstancedMesh cube = MakeCube(device, commandList, uploadBuffer);
 
         std::vector<InstanceData> instances;
 
@@ -226,24 +223,21 @@ public:
         {
             for (int j = 0; j < 100; j++)
             {
-                for (int k = 0; k < 100; k++)
-                {
-                    InstanceData data;
-                    XMMATRIX world = XMMatrixTranslation((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, (k - 50.0f) * 4.0f);
-                    XMStoreFloat4x4(&data.world, XMMatrixTranspose(world));
-                    world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-                    XMStoreFloat4x4(&data.inverseTranspose, XMMatrixInverse(nullptr, world));
-                    instances.push_back(data);
-                }
+                InstanceData data;
+                XMMATRIX world = XMMatrixTranslation((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, 10.0f);
+                XMStoreFloat4x4(&data.world, XMMatrixTranspose(world));
+                world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+                XMStoreFloat4x4(&data.inverseTranspose, XMMatrixInverse(nullptr, world));
+                instances.push_back(data);
             }
         }
 
-        CreateVertexBuffer(device, commandList, cube.m_instanceBuffer, instanceUploadHeap, &cube.m_instanceBufferView, instances);
+        CreateVertexBuffer(device, commandList, uploadBuffer, cube.m_instanceBuffer, &cube.m_instanceBufferView, instances);
 
         return cube;
     }
 
     ComPtr<ID3D12Resource> m_instanceBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_instanceBufferView;
-    UINT m_instanceCount = 1'000'000;
+    UINT m_instanceCount = 10000;
 };

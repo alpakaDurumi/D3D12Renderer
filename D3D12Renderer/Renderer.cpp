@@ -401,6 +401,7 @@ void Renderer::LoadPipeline()
     // Instead, pass the constructor arguments directly to std::make_unique<T>()
     m_commandQueue = std::make_unique<CommandQueue>(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
     m_layoutTracker = std::make_unique<ResourceLayoutTracker>(m_device);
+    m_uploadBuffer = std::make_unique<UploadBuffer>(m_device, 16 * 1024 * 1024);    // 16MB
 
     // Check for Variable Refresh Rate(VRR)
     m_tearingSupported = CheckTearingSupport();
@@ -719,9 +720,7 @@ void Renderer::LoadAssets()
     InstancedMesh* pCube = new InstancedMesh(InstancedMesh::MakeCubeInstanced(
         m_device,
         commandList,
-        vertexBufferUploadHeap0,
-        indexBufferUploadHeap0,
-        instanceUploadHeap));
+        *m_uploadBuffer));
     m_instancedMeshes.push_back(pCube);
 
     ComPtr<ID3D12Resource> vertexBufferUploadHeap1;
@@ -730,8 +729,7 @@ void Renderer::LoadAssets()
     Mesh* pSphere = new Mesh(Mesh::MakeSphere(
         m_device,
         commandList,
-        vertexBufferUploadHeap1,
-        indexBufferUploadHeap1));
+        *m_uploadBuffer));
     m_meshes.push_back(pSphere);
 
     // Create constant buffers for each frame
@@ -833,7 +831,7 @@ void Renderer::LoadAssets()
 
     // 텍스처 생성, Mesh에 할당
     UINT idx = m_cbvSrvUavHeap.GetNumSrvAllocated();
-    CreateTexture(m_device, commandList, m_texture, textureUploadHeap, simpleTextureData, 256, 256, m_cbvSrvUavHeap.GetFreeHandleForSrv(), *m_layoutTracker);
+    CreateTexture(m_device, commandList, *m_uploadBuffer, *m_layoutTracker, m_texture, simpleTextureData, 256, 256, m_cbvSrvUavHeap.GetFreeHandleForSrv());
     pCube->m_srvDescriptorOffset = idx;
     pSphere->m_srvDescriptorOffset = idx;
 

@@ -91,6 +91,7 @@ private:
     UINT m_rtvDescriptorSize;
 
     std::unique_ptr<ResourceLayoutTracker> m_layoutTracker;
+    std::unique_ptr<UploadBuffer> m_uploadBuffer;
 
     const UINT MaxDynamicCbvCountPerFrame = 128;
     const UINT MaxStaticSrvCount = 64;

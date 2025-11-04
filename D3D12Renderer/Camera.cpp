@@ -13,7 +13,7 @@ Camera::Camera(XMFLOAT3 initialPosition)
     m_fov = 90.0f * 0.5f;
     m_aspectRatio = 16.0f / 9.0f;
     m_nearPlane = 0.01f;
-    m_farPlane = 100.0f;
+    m_farPlane = 1000.0f;
 }
 
 XMFLOAT3 Camera::GetPosition()

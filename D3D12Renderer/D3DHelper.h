@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "CommandList.h"
+#include "UploadBuffer.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -45,6 +46,15 @@ namespace D3DHelper
         UINT numSubresources,
         D3D12_SUBRESOURCE_DATA* pSrcData);
 
+    void UpdateSubresources(
+        ComPtr<ID3D12Device10>& device,
+        CommandList& commandList,
+        ComPtr<ID3D12Resource>& dest,
+        UploadBuffer::Allocation& uploadAllocation,
+        UINT firstSubresource,
+        UINT numSubresources,
+        D3D12_SUBRESOURCE_DATA* pSrcData);
+
     D3D12_RESOURCE_BARRIER GetTransitionBarrier(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after);
 
     D3D12_BARRIER_GROUP BufferBarrierGroup(UINT32 numBarriers, D3D12_BUFFER_BARRIER* pBarriers);
@@ -55,23 +65,23 @@ namespace D3DHelper
     void CreateVertexBuffer(
         ComPtr<ID3D12Device10>& device,
         CommandList& commandList,
+        UploadBuffer& uploadBuffer,
         ComPtr<ID3D12Resource>& vertexBuffer,
-        ComPtr<ID3D12Resource>& uploadHeap,
-        D3D12_VERTEX_BUFFER_VIEW* pvertexBufferView,
+        D3D12_VERTEX_BUFFER_VIEW* pVertexBufferView,
         std::vector<T>& vertices)
     {
         const UINT vertexBufferSize = UINT(vertices.size()) * UINT(sizeof(T));
 
         CreateDefaultHeapForBuffer(device, vertexBufferSize, vertexBuffer);
 
-        CreateUploadHeap(device, vertexBufferSize, uploadHeap);
+        auto uploadAllocation = uploadBuffer.Allocate(vertexBufferSize, sizeof(T));
 
         D3D12_SUBRESOURCE_DATA vertexData = {};
         vertexData.pData = vertices.data();
         vertexData.RowPitch = vertexBufferSize;
         vertexData.SlicePitch = vertexData.RowPitch;
 
-        UpdateSubresources(device, commandList, vertexBuffer, uploadHeap, 0, 0, 1, &vertexData);
+        UpdateSubresources(device, commandList, vertexBuffer, uploadAllocation, 0, 1, &vertexData);
 
         commandList.Barrier(vertexBuffer.Get(),
             D3D12_BARRIER_SYNC_COPY,
@@ -80,29 +90,29 @@ namespace D3DHelper
             D3D12_BARRIER_ACCESS_VERTEX_BUFFER);
 
         // Initialize the vertex buffer view
-        pvertexBufferView->BufferLocation = vertexBuffer->GetGPUVirtualAddress();
-        pvertexBufferView->StrideInBytes = sizeof(T);
-        pvertexBufferView->SizeInBytes = vertexBufferSize;
+        pVertexBufferView->BufferLocation = vertexBuffer->GetGPUVirtualAddress();
+        pVertexBufferView->StrideInBytes = sizeof(T);
+        pVertexBufferView->SizeInBytes = vertexBufferSize;
     }
 
     void CreateIndexBuffer(
         ComPtr<ID3D12Device10>& device,
         CommandList& commandList,
+        UploadBuffer& uploadBuffer,
         ComPtr<ID3D12Resource>& indexBuffer,
-        ComPtr<ID3D12Resource>& uploadHeap,
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
         std::vector<UINT32>& indices);
 
     void CreateTexture(
         ComPtr<ID3D12Device10>& device,
         CommandList& commandList,
+        UploadBuffer& uploadBuffer,
+        ResourceLayoutTracker& layoutTracker,
         ComPtr<ID3D12Resource>& texture,
-        ComPtr<ID3D12Resource>& uploadHeap,
         std::vector<UINT8>& textureSrc,
         UINT width,
         UINT height,
-        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle,
-        ResourceLayoutTracker& layoutTracker);
+        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
 
     void CreateDepthStencilBuffer(
         ComPtr<ID3D12Device10>& device,
