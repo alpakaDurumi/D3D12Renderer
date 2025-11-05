@@ -12,16 +12,16 @@ template<typename T>
 class ConstantBuffer
 {
 public:
-    ConstantBuffer(ComPtr<ID3D12Device10>& device, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
+    ConstantBuffer(ID3D12Device10* pDevice, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
     {
-        CreateUploadHeap(device, sizeof(T), m_buffer);
+        CreateUploadHeap(pDevice, sizeof(T), m_buffer);
 
         // Create constant buffer view
         D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
         cbvDesc.BufferLocation = m_buffer->GetGPUVirtualAddress();
         cbvDesc.SizeInBytes = sizeof(T);
 
-        device->CreateConstantBufferView(&cbvDesc, cpuHandle);
+        pDevice->CreateConstantBufferView(&cbvDesc, cpuHandle);
 
         // Do not unmap this until app close
         D3D12_RANGE readRange = { 0, 0 };

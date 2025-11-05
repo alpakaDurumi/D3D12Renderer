@@ -32,24 +32,24 @@ namespace D3DHelper
     void DowngradeRootDescriptor(const D3D12_ROOT_DESCRIPTOR1* src, D3D12_ROOT_DESCRIPTOR* dst);
     void DowngradeRootParameters(const D3D12_ROOT_PARAMETER1* src, UINT numParameters, D3D12_ROOT_PARAMETER* dst, std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges, UINT& offset);
 
-    void CreateUploadHeap(ComPtr<ID3D12Device10>& device, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadHeap);
-    void CreateDefaultHeapForBuffer(ComPtr<ID3D12Device10>& device, UINT64 size, ComPtr<ID3D12Resource>& defaultHeap);
-    void CreateDefaultHeapForTexture(ComPtr<ID3D12Device10>& device, ComPtr<ID3D12Resource>& defaultHeap, UINT width, UINT height);
+    void CreateUploadHeap(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadHeap);
+    void CreateDefaultHeapForBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultHeap);
+    void CreateDefaultHeapForTexture(ID3D12Device10* pDevice, UINT width, UINT height, ComPtr<ID3D12Resource>& defaultHeap);
 
     void UpdateSubresources(
-        ComPtr<ID3D12Device10>& device,
+        ID3D12Device* pDevice,
         CommandList& commandList,
-        ComPtr<ID3D12Resource>& dest,
-        ComPtr<ID3D12Resource>& intermediate,
+        ID3D12Resource* pDest,
+        ID3D12Resource* pIntermediate,
         UINT64 intermediateOffset,
         UINT firstSubresource,
         UINT numSubresources,
         D3D12_SUBRESOURCE_DATA* pSrcData);
 
     void UpdateSubresources(
-        ComPtr<ID3D12Device10>& device,
+        ID3D12Device* pDevice,
         CommandList& commandList,
-        ComPtr<ID3D12Resource>& dest,
+        ID3D12Resource* pDest,
         UploadBuffer::Allocation& uploadAllocation,
         UINT firstSubresource,
         UINT numSubresources,
@@ -63,7 +63,7 @@ namespace D3DHelper
 
     template<typename T>
     void CreateVertexBuffer(
-        ComPtr<ID3D12Device10>& device,
+        ID3D12Device10* pDevice,
         CommandList& commandList,
         UploadBuffer& uploadBuffer,
         ComPtr<ID3D12Resource>& vertexBuffer,
@@ -72,7 +72,7 @@ namespace D3DHelper
     {
         const UINT vertexBufferSize = UINT(vertices.size()) * UINT(sizeof(T));
 
-        CreateDefaultHeapForBuffer(device, vertexBufferSize, vertexBuffer);
+        CreateDefaultHeapForBuffer(pDevice, vertexBufferSize, vertexBuffer);
 
         auto uploadAllocation = uploadBuffer.Allocate(vertexBufferSize, sizeof(T));
 
@@ -81,9 +81,10 @@ namespace D3DHelper
         vertexData.RowPitch = vertexBufferSize;
         vertexData.SlicePitch = vertexData.RowPitch;
 
-        UpdateSubresources(device, commandList, vertexBuffer, uploadAllocation, 0, 1, &vertexData);
+        UpdateSubresources(pDevice, commandList, vertexBuffer.Get(), uploadAllocation, 0, 1, &vertexData);
 
-        commandList.Barrier(vertexBuffer.Get(),
+        commandList.Barrier(
+            vertexBuffer.Get(),
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_SYNC_VERTEX_SHADING,
             D3D12_BARRIER_ACCESS_COPY_DEST,
@@ -96,7 +97,7 @@ namespace D3DHelper
     }
 
     void CreateIndexBuffer(
-        ComPtr<ID3D12Device10>& device,
+        ID3D12Device10* pDevice,
         CommandList& commandList,
         UploadBuffer& uploadBuffer,
         ComPtr<ID3D12Resource>& indexBuffer,
@@ -104,7 +105,7 @@ namespace D3DHelper
         std::vector<UINT32>& indices);
 
     void CreateTexture(
-        ComPtr<ID3D12Device10>& device,
+        ID3D12Device10* pDevice,
         CommandList& commandList,
         UploadBuffer& uploadBuffer,
         ResourceLayoutTracker& layoutTracker,

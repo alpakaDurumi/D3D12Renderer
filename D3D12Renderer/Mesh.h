@@ -43,7 +43,7 @@ public:
     }
 
     inline static Mesh MakeCube(
-        ComPtr<ID3D12Device10>& device,
+        ID3D12Device10* pDevice,
         CommandList& commandList,
         UploadBuffer& uploadBuffer)
     {
@@ -89,7 +89,7 @@ public:
                 {{-1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
                 {{-1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f} }
             };
-            CreateVertexBuffer(device, commandList, uploadBuffer, cube.m_vertexBuffer, &cube.m_vertexBufferView, cubeVertices);
+            CreateVertexBuffer(pDevice, commandList, uploadBuffer, cube.m_vertexBuffer, &cube.m_vertexBufferView, cubeVertices);
         }
 
         // Create the index buffer
@@ -103,7 +103,7 @@ public:
                 16, 17, 18, 16, 18, 19,
                 20, 21, 22, 20, 22, 23
             };
-            CreateIndexBuffer(device, commandList, uploadBuffer, cube.m_indexBuffer, &cube.m_indexBufferView, cubeIndices);
+            CreateIndexBuffer(pDevice, commandList, uploadBuffer, cube.m_indexBuffer, &cube.m_indexBufferView, cubeIndices);
             cube.m_numIndices = UINT(cubeIndices.size());
         }
 
@@ -111,7 +111,7 @@ public:
     }
 
     inline static Mesh MakeSphere(
-        ComPtr<ID3D12Device10>& device,
+        ID3D12Device10* pDevice,
         CommandList& commandList,
         UploadBuffer& uploadBuffer)
     {
@@ -146,7 +146,7 @@ public:
                     sphereVertices.push_back(v);
                 }
             }
-            CreateVertexBuffer(device, commandList, uploadBuffer, sphere.m_vertexBuffer, &sphere.m_vertexBufferView, sphereVertices);
+            CreateVertexBuffer(pDevice, commandList, uploadBuffer, sphere.m_vertexBuffer, &sphere.m_vertexBufferView, sphereVertices);
         }
 
         // Create the index buffer
@@ -168,7 +168,7 @@ public:
                     sphereIndices.push_back(p4);
                 }
             }
-            CreateIndexBuffer(device, commandList, uploadBuffer, sphere.m_indexBuffer, &sphere.m_indexBufferView, sphereIndices);
+            CreateIndexBuffer(pDevice, commandList, uploadBuffer, sphere.m_indexBuffer, &sphere.m_indexBufferView, sphereIndices);
             sphere.m_numIndices = UINT(sphereIndices.size());
         }
 
@@ -211,11 +211,11 @@ public:
     }
 
     inline static InstancedMesh MakeCubeInstanced(
-        ComPtr<ID3D12Device10>& device,
+        ID3D12Device10* pDevice,
         CommandList& commandList,
         UploadBuffer& uploadBuffer)
     {
-        InstancedMesh cube = MakeCube(device, commandList, uploadBuffer);
+        InstancedMesh cube = MakeCube(pDevice, commandList, uploadBuffer);
 
         std::vector<InstanceData> instances;
 
@@ -232,7 +232,7 @@ public:
             }
         }
 
-        CreateVertexBuffer(device, commandList, uploadBuffer, cube.m_instanceBuffer, &cube.m_instanceBufferView, instances);
+        CreateVertexBuffer(pDevice, commandList, uploadBuffer, cube.m_instanceBuffer, &cube.m_instanceBufferView, instances);
 
         return cube;
     }

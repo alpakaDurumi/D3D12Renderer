@@ -168,7 +168,7 @@ namespace D3DHelper
         }
     }
 
-    void CreateUploadHeap(ComPtr<ID3D12Device10>& device, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadHeap)
+    void CreateUploadHeap(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadHeap)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -190,7 +190,7 @@ namespace D3DHelper
         resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
         resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
 
-        ThrowIfFailed(device->CreateCommittedResource3(
+        ThrowIfFailed(pDevice->CreateCommittedResource3(
             &heapProperties,
             D3D12_HEAP_FLAG_NONE,
             &resourceDesc,
@@ -203,7 +203,7 @@ namespace D3DHelper
     }
 
     // For vertex buffer and index buffer
-    void CreateDefaultHeapForBuffer(ComPtr<ID3D12Device10>& device, UINT64 size, ComPtr<ID3D12Resource>& defaultHeap)
+    void CreateDefaultHeapForBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultHeap)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -225,7 +225,7 @@ namespace D3DHelper
         resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
         resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
 
-        ThrowIfFailed(device->CreateCommittedResource3(
+        ThrowIfFailed(pDevice->CreateCommittedResource3(
             &heapProperties,
             D3D12_HEAP_FLAG_NONE,
             &resourceDesc,
@@ -237,7 +237,7 @@ namespace D3DHelper
             IID_PPV_ARGS(&defaultHeap)));
     }
 
-    void CreateDefaultHeapForTexture(ComPtr<ID3D12Device10>& device, ComPtr<ID3D12Resource>& defaultHeap, UINT width, UINT height)
+    void CreateDefaultHeapForTexture(ID3D12Device10* pDevice, UINT width, UINT height, ComPtr<ID3D12Resource>& defaultHeap)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -259,7 +259,7 @@ namespace D3DHelper
         resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
         resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
 
-        ThrowIfFailed(device->CreateCommittedResource3(
+        ThrowIfFailed(pDevice->CreateCommittedResource3(
             &heapProperties,
             D3D12_HEAP_FLAG_NONE,
             &resourceDesc,
@@ -272,10 +272,10 @@ namespace D3DHelper
     }
 
     void UpdateSubresources(
-        ComPtr<ID3D12Device10>& device,
+        ID3D12Device* pDevice,
         CommandList& commandList,
-        ComPtr<ID3D12Resource>& dest,
-        ComPtr<ID3D12Resource>& intermediate,
+        ID3D12Resource* pDest,
+        ID3D12Resource* pIntermediate,
         UINT64 intermediateOffset,
         UINT firstSubresource,
         UINT numSubresources,
@@ -291,18 +291,18 @@ namespace D3DHelper
         }
 
         // Acquire footprint of each subresource
-        D3D12_RESOURCE_DESC desc = dest->GetDesc();
+        D3D12_RESOURCE_DESC desc = pDest->GetDesc();
         D3D12_PLACED_SUBRESOURCE_FOOTPRINT* pLayouts = static_cast<D3D12_PLACED_SUBRESOURCE_FOOTPRINT*>(pMem);
         UINT* pNumRows = reinterpret_cast<UINT*>(pLayouts + numSubresources);
         UINT64* pRowSizeInBytes = reinterpret_cast<UINT64*>(pNumRows + numSubresources);
         UINT64 requiredSize = 0;
         // 네 번째 인자인 BaseOffset은 출력되는 pLayouts[i].Offset들에 더해지는 값이다
-        device->GetCopyableFootprints(&desc, firstSubresource, numSubresources, intermediateOffset, pLayouts, pNumRows, pRowSizeInBytes, &requiredSize);
+        pDevice->GetCopyableFootprints(&desc, firstSubresource, numSubresources, intermediateOffset, pLayouts, pNumRows, pRowSizeInBytes, &requiredSize);
 
         // Map intermediate resource (upload heap)
         D3D12_RANGE readRange = { 0, 0 };   // do not read from CPU. only write
         UINT8* pData;
-        ThrowIfFailed(intermediate->Map(0, &readRange, reinterpret_cast<void**>(&pData)));
+        ThrowIfFailed(pIntermediate->Map(0, &readRange, reinterpret_cast<void**>(&pData)));
 
         // dest의 레이아웃에 맞춰서 intermediate로 데이터를 복사
         // Each subresource
@@ -328,13 +328,13 @@ namespace D3DHelper
         }
 
         // Unmap
-        intermediate->Unmap(0, nullptr);
+        pIntermediate->Unmap(0, nullptr);
 
         // Copy from upload heap to default heap
         // Buffer has only one subresource
         if (desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
         {
-            commandList.GetCommandList()->CopyBufferRegion(dest.Get(), 0, intermediate.Get(), pLayouts[0].Offset, pLayouts[0].Footprint.Width);
+            commandList.GetCommandList()->CopyBufferRegion(pDest, 0, pIntermediate, pLayouts[0].Offset, pLayouts[0].Footprint.Width);
         }
         // Texture has one or more subresources
         else
@@ -342,12 +342,12 @@ namespace D3DHelper
             for (UINT i = 0; i < numSubresources; i++)
             {
                 D3D12_TEXTURE_COPY_LOCATION dst = {};
-                dst.pResource = dest.Get();
+                dst.pResource = pDest;
                 dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
                 dst.SubresourceIndex = i + firstSubresource;
 
                 D3D12_TEXTURE_COPY_LOCATION src = {};
-                src.pResource = intermediate.Get();
+                src.pResource = pIntermediate;
                 src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
                 src.PlacedFootprint = pLayouts[i];
 
@@ -359,9 +359,9 @@ namespace D3DHelper
     }
 
     void UpdateSubresources(
-        ComPtr<ID3D12Device10>& device,
+        ID3D12Device* pDevice,
         CommandList& commandList,
-        ComPtr<ID3D12Resource>& dest,
+        ID3D12Resource* pDest,
         UploadBuffer::Allocation& uploadAllocation,
         UINT firstSubresource,
         UINT numSubresources,
@@ -377,12 +377,12 @@ namespace D3DHelper
         }
 
         // Acquire footprint of each subresource
-        D3D12_RESOURCE_DESC desc = dest->GetDesc();
+        D3D12_RESOURCE_DESC desc = pDest->GetDesc();
         D3D12_PLACED_SUBRESOURCE_FOOTPRINT* pLayouts = static_cast<D3D12_PLACED_SUBRESOURCE_FOOTPRINT*>(pMem);
         UINT* pNumRows = reinterpret_cast<UINT*>(pLayouts + numSubresources);
         UINT64* pRowSizeInBytes = reinterpret_cast<UINT64*>(pNumRows + numSubresources);
         UINT64 requiredSize = 0;
-        device->GetCopyableFootprints(&desc, firstSubresource, numSubresources, 0, pLayouts, pNumRows, pRowSizeInBytes, &requiredSize);
+        pDevice->GetCopyableFootprints(&desc, firstSubresource, numSubresources, 0, pLayouts, pNumRows, pRowSizeInBytes, &requiredSize);
 
         // dest의 레이아웃에 맞춰서 intermediate로 데이터를 복사
         // Each subresource
@@ -410,7 +410,7 @@ namespace D3DHelper
         // Buffer has only one subresource
         if (desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
         {
-            commandList.GetCommandList()->CopyBufferRegion(dest.Get(), 0, uploadAllocation.pResource, uploadAllocation.Offset + pLayouts[0].Offset, pLayouts[0].Footprint.Width);
+            commandList.GetCommandList()->CopyBufferRegion(pDest, 0, uploadAllocation.pResource, uploadAllocation.Offset + pLayouts[0].Offset, pLayouts[0].Footprint.Width);
         }
         // Texture has one or more subresources
         else
@@ -418,7 +418,7 @@ namespace D3DHelper
             for (UINT i = 0; i < numSubresources; i++)
             {
                 D3D12_TEXTURE_COPY_LOCATION dst = {};
-                dst.pResource = dest.Get();
+                dst.pResource = pDest;
                 dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
                 dst.SubresourceIndex = i + firstSubresource;
 
@@ -476,7 +476,7 @@ namespace D3DHelper
     }
 
     void CreateIndexBuffer(
-        ComPtr<ID3D12Device10>& device,
+        ID3D12Device10* pDevice,
         CommandList& commandList,
         UploadBuffer& uploadBuffer,
         ComPtr<ID3D12Resource>& indexBuffer,
@@ -485,7 +485,7 @@ namespace D3DHelper
     {
         const UINT indexBufferSize = UINT(indices.size()) * UINT(sizeof(UINT32));
 
-        CreateDefaultHeapForBuffer(device, indexBufferSize, indexBuffer);
+        CreateDefaultHeapForBuffer(pDevice, indexBufferSize, indexBuffer);
 
         auto uploadAllocation = uploadBuffer.Allocate(indexBufferSize, sizeof(UINT32));
 
@@ -494,7 +494,7 @@ namespace D3DHelper
         indexData.RowPitch = indexBufferSize;
         indexData.SlicePitch = indexData.RowPitch;
 
-        UpdateSubresources(device, commandList, indexBuffer, uploadAllocation, 0, 1, &indexData);
+        UpdateSubresources(pDevice, commandList, indexBuffer.Get(), uploadAllocation, 0, 1, &indexData);
 
         commandList.Barrier(indexBuffer.Get(),
             D3D12_BARRIER_SYNC_COPY,
@@ -509,7 +509,7 @@ namespace D3DHelper
     }
 
     void CreateTexture(
-        ComPtr<ID3D12Device10>& device,
+        ID3D12Device10* pDevice,
         CommandList& commandList,
         UploadBuffer& uploadBuffer,
         ResourceLayoutTracker& layoutTracker,
@@ -519,7 +519,7 @@ namespace D3DHelper
         UINT height,
         D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
     {
-        CreateDefaultHeapForTexture(device, texture, width, height);
+        CreateDefaultHeapForTexture(pDevice, width, height, texture);
 
         layoutTracker.RegisterResource(texture.Get(), D3D12_BARRIER_LAYOUT_COMMON, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
 
@@ -539,7 +539,7 @@ namespace D3DHelper
         UINT numRows = 0;
         UINT64 rowSizeInBytes = 0;
         UINT64 requiredSize = 0;
-        device->GetCopyableFootprints(&desc, 0, 1, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
+        pDevice->GetCopyableFootprints(&desc, 0, 1, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
 
         auto uploadAllocation = uploadBuffer.Allocate(requiredSize, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
 
@@ -549,7 +549,7 @@ namespace D3DHelper
         textureData.RowPitch = width * 4;   // 4 bytes per pixel (RGBA)
         textureData.SlicePitch = textureData.RowPitch * height;
 
-        UpdateSubresources(device, commandList, texture, uploadAllocation, 0, 1, &textureData);
+        UpdateSubresources(pDevice, commandList, texture.Get(), uploadAllocation, 0, 1, &textureData);
 
         commandList.Barrier(
             texture.Get(),
@@ -568,7 +568,7 @@ namespace D3DHelper
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         srvDesc.Texture2D.MipLevels = 1;
 
-        device->CreateShaderResourceView(texture.Get(), &srvDesc, cpuHandle);
+        pDevice->CreateShaderResourceView(texture.Get(), &srvDesc, cpuHandle);
     }
 
     void CreateDepthStencilBuffer(

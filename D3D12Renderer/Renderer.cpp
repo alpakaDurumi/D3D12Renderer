@@ -232,7 +232,10 @@ void Renderer::OnRender()
     PopulateCommandList(commandList);
 
     // Execute the command lists and store the fence value
-    m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
+    // And notify fenceValue to UploadBuffer
+    UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
+    m_frameResources[m_frameIndex]->m_fenceValue = fenceValue;
+    m_uploadBuffer->QueueRetiredPages(fenceValue);
 
     // Present the frame.
     UINT syncInterval = m_vSync ? 1 : 0;
@@ -401,7 +404,7 @@ void Renderer::LoadPipeline()
     // Instead, pass the constructor arguments directly to std::make_unique<T>()
     m_commandQueue = std::make_unique<CommandQueue>(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
     m_layoutTracker = std::make_unique<ResourceLayoutTracker>(m_device);
-    m_uploadBuffer = std::make_unique<UploadBuffer>(m_device, 16 * 1024 * 1024);    // 16MB
+    m_uploadBuffer = std::make_unique<UploadBuffer>(m_device, *m_commandQueue, 16 * 1024 * 1024);    // 16MB
 
     // Check for Variable Refresh Rate(VRR)
     m_tearingSupported = CheckTearingSupport();
@@ -466,7 +469,7 @@ void Renderer::LoadPipeline()
         // Create a RTV and command allocator for each frame
         for (UINT i = 0; i < FrameCount; i++)
         {
-            FrameResource* pFrameResource = new FrameResource(m_device, m_swapChain, i, rtvHandle);
+            FrameResource* pFrameResource = new FrameResource(m_device.Get(), m_swapChain.Get(), i, rtvHandle);
             MoveCPUDescriptorHandle(&rtvHandle, 1, m_rtvDescriptorSize);
             m_frameResources.push_back(pFrameResource);
 
@@ -710,24 +713,18 @@ void Renderer::LoadAssets()
     }
 
     // 프레임과 무관한 정적 데이터를 먼저 생성
-    ComPtr<ID3D12Resource> vertexBufferUploadHeap0;
-    ComPtr<ID3D12Resource> indexBufferUploadHeap0;
-    ComPtr<ID3D12Resource> instanceUploadHeap;
 
     // Get command allocator and list for loading assets
     auto [commandAllocator, commandList] = m_commandQueue->GetAvailableCommandList();
 
     InstancedMesh* pCube = new InstancedMesh(InstancedMesh::MakeCubeInstanced(
-        m_device,
+        m_device.Get(),
         commandList,
         *m_uploadBuffer));
     m_instancedMeshes.push_back(pCube);
 
-    ComPtr<ID3D12Resource> vertexBufferUploadHeap1;
-    ComPtr<ID3D12Resource> indexBufferUploadHeap1;
-
     Mesh* pSphere = new Mesh(Mesh::MakeSphere(
-        m_device,
+        m_device.Get(),
         commandList,
         *m_uploadBuffer));
     m_meshes.push_back(pSphere);
@@ -747,7 +744,7 @@ void Renderer::LoadAssets()
 
                 // Mesh
                 {
-                    MeshCB* meshCB = new MeshCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
+                    MeshCB* meshCB = new MeshCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
                     meshCB->Update(&pMesh->m_meshBufferData);
 
                     // 각 FrameResource에서 동일한 인덱스긴 하지만, 한 번만 수행하도록 하였음
@@ -758,7 +755,7 @@ void Renderer::LoadAssets()
 
                 // Material
                 {
-                    MaterialCB* materialCB = new MaterialCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
+                    MaterialCB* materialCB = new MaterialCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
                     materialCB->Update(&pMesh->m_materialConstantBufferData);
 
                     if (i == 0)
@@ -774,7 +771,7 @@ void Renderer::LoadAssets()
 
                 // Mesh
                 {
-                    MeshCB* meshCB = new MeshCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
+                    MeshCB* meshCB = new MeshCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
                     meshCB->Update(&pMesh->m_meshBufferData);
 
                     if (i == 0)
@@ -784,7 +781,7 @@ void Renderer::LoadAssets()
 
                 // Material
                 {
-                    MaterialCB* materialCB = new MaterialCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
+                    MaterialCB* materialCB = new MaterialCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
                     materialCB->Update(&pMesh->m_materialConstantBufferData);
 
                     if (i == 0)
@@ -807,7 +804,7 @@ void Renderer::LoadAssets()
 
         // Lights
         {
-            LightCB* lightCB = new LightCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
+            LightCB* lightCB = new LightCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
             lightCB->Update(&m_lightConstantData);
 
             pFrameResource->m_lightConstantBuffer = lightCB;
@@ -815,7 +812,7 @@ void Renderer::LoadAssets()
 
         // Camera
         {
-            CameraCB* cameraCB = new CameraCB(m_device, m_cbvSrvUavHeap.GetFreeHandleForCbv());
+            CameraCB* cameraCB = new CameraCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
             cameraCB->Update(&m_cameraConstantData);
 
             pFrameResource->m_cameraConstantBuffer = cameraCB;
@@ -831,7 +828,7 @@ void Renderer::LoadAssets()
 
     // 텍스처 생성, Mesh에 할당
     UINT idx = m_cbvSrvUavHeap.GetNumSrvAllocated();
-    CreateTexture(m_device, commandList, *m_uploadBuffer, *m_layoutTracker, m_texture, simpleTextureData, 256, 256, m_cbvSrvUavHeap.GetFreeHandleForSrv());
+    CreateTexture(m_device.Get(), commandList, *m_uploadBuffer, *m_layoutTracker, m_texture, simpleTextureData, 256, 256, m_cbvSrvUavHeap.GetFreeHandleForSrv());
     pCube->m_srvDescriptorOffset = idx;
     pSphere->m_srvDescriptorOffset = idx;
 
