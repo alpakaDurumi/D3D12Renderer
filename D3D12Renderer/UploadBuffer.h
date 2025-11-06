@@ -11,8 +11,6 @@ class CommandQueue;
 
 using Microsoft::WRL::ComPtr;
 
-static const SIZE_T MAXPAGESIZE = 64 * 1024 * 1024;    // 64MB
-
 // Helper class for managing intermediate resources for CPU-to-GPU data transfer.
 class UploadBuffer
 {
@@ -45,18 +43,11 @@ private:
     public:
         Page(ID3D12Device10* pDevice, SIZE_T sizeInBytes);
         ~Page();
-        bool HasSpace(SIZE_T sizeInBytes, SIZE_T alignment) const;
-        Allocation Allocate(SIZE_T sizeInBytes, SIZE_T alignment);
-        void Reset();
 
-    private:
         ComPtr<ID3D12Resource> m_resource;
-
         void* m_CPUBasePtr;
         D3D12_GPU_VIRTUAL_ADDRESS m_GPUBasePtr;
-
         SIZE_T m_pageSize;
-        SIZE_T m_offset;
     };
 
     Page* RequestPage();
@@ -67,6 +58,8 @@ private:
     std::queue<std::pair<Page*, UINT64>> m_pendingPages;    // 주어진 fenceValue와 비교하여 작업이 완료된 page를 꺼내 쓰게되는 목록
 
     Page* m_currentPage;
+    SIZE_T m_currentOffset;
+
     SIZE_T m_pageSize;
 
     ComPtr<ID3D12Device10> m_device;

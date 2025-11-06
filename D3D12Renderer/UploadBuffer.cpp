@@ -15,41 +15,50 @@ SIZE_T Align(SIZE_T size, SIZE_T alignment)
 // UploadBuffer
 
 UploadBuffer::UploadBuffer(ComPtr<ID3D12Device10>& device, const CommandQueue& commandQueue, SIZE_T pageSize)
-    : m_device(device), m_commandQueue(commandQueue), m_pageSize(pageSize), m_currentPage(nullptr)
+    : m_device(device), m_commandQueue(commandQueue), m_pageSize(pageSize), m_currentPage(nullptr), m_currentOffset(0)
 {
 }
 
 UploadBuffer::Allocation UploadBuffer::Allocate(SIZE_T sizeInBytes, SIZE_T alignment)
 {
-    if (sizeInBytes > m_pageSize)
+    const SIZE_T alignedSize = Align(sizeInBytes, alignment);
+
+    if (alignedSize > m_pageSize)
     {
         // 요구된 크기가 현재 설정된 페이지 크기보다는 크지만 최대 페이지 크기를 넘지 않는 경우
         // 요청에 맞도록 페이지 크기를 조절하여 생성한 후 다시 원상 복구
-        if (sizeInBytes <= MAXPAGESIZE)
-        {
-            auto originalSize = m_pageSize;
+        auto originalSize = m_pageSize;
+        m_pageSize = alignedSize;
+        m_currentPage = RequestPage();
+        m_pageSize = originalSize;
 
-            m_pageSize = sizeInBytes;
-            m_currentPage = RequestPage();
-            m_pageSize = originalSize;
-        }
-        else
-        {
-            throw std::bad_alloc();
-        }
+        m_currentOffset = 0;
+    }
+    else
+    {
+        m_currentOffset = Align(m_currentOffset, alignment);
     }
 
     // 첫 할당이거나 현재 Page의 공간이 부족한 경우
-    if (!m_currentPage || !m_currentPage->HasSpace(sizeInBytes, alignment))
+    if (!m_currentPage || (m_currentOffset + alignedSize > m_pageSize))
     {
         if (m_currentPage)
         {
             m_retiredPages.push_back(m_currentPage);
         }
         m_currentPage = RequestPage();
+        m_currentOffset = 0;
     }
 
-    return m_currentPage->Allocate(sizeInBytes, alignment);
+    Allocation allocation(
+        static_cast<void*>(static_cast<UINT8*>(m_currentPage->m_CPUBasePtr) + m_currentOffset),
+        m_currentPage->m_GPUBasePtr + m_currentOffset,
+        m_currentPage->m_resource.Get(),
+        m_currentOffset);
+
+    m_currentOffset += alignedSize;
+
+    return allocation;
 }
 
 UploadBuffer::Page* UploadBuffer::RequestPage()
@@ -81,7 +90,6 @@ void UploadBuffer::QueueRetiredPages(UINT64 fenceValue)
 {
     for (auto* page : m_retiredPages)
     {
-        page->Reset();
         m_pendingPages.push({ page, fenceValue });
     }
     m_retiredPages.clear();
@@ -92,7 +100,6 @@ void UploadBuffer::QueueRetiredPages(UINT64 fenceValue)
 // Page가 살아있는 동안 한 Page 전체 영역에 대해 Mapping이 유지된다. 소멸자가 호출되면 Unmap을 통해 Mapping이 해제된다.
 UploadBuffer::Page::Page(ID3D12Device10* pDevice, SIZE_T sizeInBytes)
     : m_pageSize(sizeInBytes),
-    m_offset(0),
     m_CPUBasePtr(nullptr),
     m_GPUBasePtr(D3D12_GPU_VIRTUAL_ADDRESS(0))
 {
@@ -106,33 +113,4 @@ UploadBuffer::Page::Page(ID3D12Device10* pDevice, SIZE_T sizeInBytes)
 UploadBuffer::Page::~Page()
 {
     m_resource->Unmap(0, nullptr);
-}
-
-bool UploadBuffer::Page::HasSpace(SIZE_T sizeInBytes, SIZE_T alignment) const
-{
-    SIZE_T alignedSize = Align(sizeInBytes, alignment);
-    SIZE_T alignedOffset = Align(m_offset, alignment);
-
-    return alignedOffset + alignedSize <= m_pageSize;
-}
-
-UploadBuffer::Allocation UploadBuffer::Page::Allocate(SIZE_T sizeInBytes, SIZE_T alignment)
-{
-    SIZE_T alignedSize = Align(sizeInBytes, alignment);
-    m_offset = Align(m_offset, alignment);
-    
-    Allocation allocation(
-        static_cast<void*>(static_cast<UINT8*>(m_CPUBasePtr) + m_offset),
-        m_GPUBasePtr + m_offset,
-        m_resource.Get(),
-        m_offset);
-
-    m_offset += alignedSize;
-
-    return allocation;
-}   
-
-void UploadBuffer::Page::Reset()
-{
-    m_offset = 0;
 }
