@@ -5,7 +5,6 @@
 #include <D3Dcompiler.h>
 #include <stdexcept>
 
-#include "Mesh.h"
 #include "FrameResource.h"
 #include "CommandList.h"
 
@@ -183,33 +182,33 @@ void Renderer::OnUpdate()
     // 이번에 드로우할 프레임에 대해 constant buffers 업데이트
     FrameResource* pFrameResource = m_frameResources[m_frameIndex];
 
-    for (auto* pMesh : m_meshes)
+    for (auto& mesh : m_meshes)
     {
         XMMATRIX world = XMMatrixTranslation(1.0f, 0.0f, -1.0f);
-        XMStoreFloat4x4(&pMesh->m_meshBufferData.world, XMMatrixTranspose(world));
+        XMStoreFloat4x4(&mesh.m_meshBufferData.world, XMMatrixTranspose(world));
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        XMStoreFloat4x4(&pMesh->m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
-        pFrameResource->m_meshConstantBuffers[pMesh->m_meshConstantBufferIndex]->Update(&pMesh->m_meshBufferData);
+        XMStoreFloat4x4(&mesh.m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
+        pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshBufferData);
 
-        pMesh->m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
-        pMesh->m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
-        pMesh->m_materialConstantBufferData.shininess = 10.0f;
-        pFrameResource->m_materialConstantBuffers[pMesh->m_materialConstantBufferIndex]->Update(&pMesh->m_materialConstantBufferData);
+        mesh.m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
+        mesh.m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
+        mesh.m_materialConstantBufferData.shininess = 10.0f;
+        pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->Update(&mesh.m_materialConstantBufferData);
     }
 
-    for (auto* pMesh : m_instancedMeshes)
+    for (auto& mesh : m_instancedMeshes)
     {
-        XMMATRIX prevWorld = XMMatrixTranspose(XMLoadFloat4x4(&pMesh->m_meshBufferData.world));
+        XMMATRIX prevWorld = XMMatrixTranspose(XMLoadFloat4x4(&mesh.m_meshBufferData.world));
         XMMATRIX world = prevWorld * XMMatrixRotationRollPitchYaw(0.0f, 0.001f, 0.0f);
-        XMStoreFloat4x4(&pMesh->m_meshBufferData.world, XMMatrixTranspose(world));
+        XMStoreFloat4x4(&mesh.m_meshBufferData.world, XMMatrixTranspose(world));
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        XMStoreFloat4x4(&pMesh->m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
-        pFrameResource->m_meshConstantBuffers[pMesh->m_meshConstantBufferIndex]->Update(&pMesh->m_meshBufferData);
+        XMStoreFloat4x4(&mesh.m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
+        pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshBufferData);
 
-        pMesh->m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
-        pMesh->m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
-        pMesh->m_materialConstantBufferData.shininess = 10.0f;
-        pFrameResource->m_materialConstantBuffers[pMesh->m_materialConstantBufferIndex]->Update(&pMesh->m_materialConstantBufferData);
+        mesh.m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
+        mesh.m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
+        mesh.m_materialConstantBufferData.shininess = 10.0f;
+        pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->Update(&mesh.m_materialConstantBufferData);
     }
 
     m_lightConstantData.lightPos = { 0.0f, 100.0f, 0.0f };
@@ -255,8 +254,6 @@ void Renderer::OnDestroy()
 
     for (auto* pFrameResource : m_frameResources)
         delete pFrameResource;
-    for (auto* pMesh : m_meshes)
-        delete pMesh;
 }
 
 void Renderer::OnKeyDown(WPARAM key)
@@ -717,17 +714,8 @@ void Renderer::LoadAssets()
     // Get command allocator and list for loading assets
     auto [commandAllocator, commandList] = m_commandQueue->GetAvailableCommandList();
 
-    InstancedMesh* pCube = new InstancedMesh(InstancedMesh::MakeCubeInstanced(
-        m_device.Get(),
-        commandList,
-        *m_uploadBuffer));
-    m_instancedMeshes.push_back(pCube);
-
-    Mesh* pSphere = new Mesh(Mesh::MakeSphere(
-        m_device.Get(),
-        commandList,
-        *m_uploadBuffer));
-    m_meshes.push_back(pSphere);
+    m_meshes.push_back(Mesh::MakeSphere(m_device.Get(), commandList, *m_uploadBuffer));
+    m_instancedMeshes.push_back(InstancedMesh::MakeCubeInstanced(m_device.Get(), commandList, *m_uploadBuffer));
 
     // Create constant buffers for each frame
     for (UINT i = 0; i < FrameCount; i++)
@@ -736,56 +724,56 @@ void Renderer::LoadAssets()
 
         // Meshes
         {
-            for (auto* pMesh : m_meshes)
+            for (auto& mesh : m_meshes)
             {
                 // 디스크립터 힙 내 per-frame 디스크립터의 상대적인 오프셋 설정은 첫 한번만 수행해야 함
                 if (i == 0)
-                    pMesh->m_perMeshCbvDescriptorOffset = m_cbvSrvUavHeap.GetNumCbvAllocated();
+                    mesh.m_perMeshCbvDescriptorOffset = m_cbvSrvUavHeap.GetNumCbvAllocated();
 
                 // Mesh
                 {
                     MeshCB* meshCB = new MeshCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
-                    meshCB->Update(&pMesh->m_meshBufferData);
+                    meshCB->Update(&mesh.m_meshBufferData);
 
                     // 각 FrameResource에서 동일한 인덱스긴 하지만, 한 번만 수행하도록 하였음
                     if (i == 0)
-                        pMesh->m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
+                        mesh.m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
                     pFrameResource->m_meshConstantBuffers.push_back(meshCB);
                 }
 
                 // Material
                 {
                     MaterialCB* materialCB = new MaterialCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
-                    materialCB->Update(&pMesh->m_materialConstantBufferData);
+                    materialCB->Update(&mesh.m_materialConstantBufferData);
 
                     if (i == 0)
-                        pMesh->m_materialConstantBufferIndex = UINT(pFrameResource->m_materialConstantBuffers.size());
+                        mesh.m_materialConstantBufferIndex = UINT(pFrameResource->m_materialConstantBuffers.size());
                     pFrameResource->m_materialConstantBuffers.push_back(materialCB);
                 }
             }
 
-            for (auto* pMesh : m_instancedMeshes)
+            for (auto& mesh : m_instancedMeshes)
             {
                 if (i == 0)
-                    pMesh->m_perMeshCbvDescriptorOffset = m_cbvSrvUavHeap.GetNumCbvAllocated();
+                    mesh.m_perMeshCbvDescriptorOffset = m_cbvSrvUavHeap.GetNumCbvAllocated();
 
                 // Mesh
                 {
                     MeshCB* meshCB = new MeshCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
-                    meshCB->Update(&pMesh->m_meshBufferData);
+                    meshCB->Update(&mesh.m_meshBufferData);
 
                     if (i == 0)
-                        pMesh->m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
+                        mesh.m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
                     pFrameResource->m_meshConstantBuffers.push_back(meshCB);
                 }
 
                 // Material
                 {
                     MaterialCB* materialCB = new MaterialCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
-                    materialCB->Update(&pMesh->m_materialConstantBufferData);
+                    materialCB->Update(&mesh.m_materialConstantBufferData);
 
                     if (i == 0)
-                        pMesh->m_materialConstantBufferIndex = UINT(pFrameResource->m_materialConstantBuffers.size());
+                        mesh.m_materialConstantBufferIndex = UINT(pFrameResource->m_materialConstantBuffers.size());
                     pFrameResource->m_materialConstantBuffers.push_back(materialCB);
                 }
             }
@@ -796,10 +784,10 @@ void Renderer::LoadAssets()
         {
             UINT idx = m_cbvSrvUavHeap.GetNumCbvAllocated();
 
-            for (auto* pMesh : m_meshes)
-                pMesh->m_defaultCbvDescriptorOffset = idx;
-            for (auto* pMesh : m_instancedMeshes)
-                pMesh->m_defaultCbvDescriptorOffset = idx;
+            for (auto& mesh : m_meshes)
+                mesh.m_defaultCbvDescriptorOffset = idx;
+            for (auto& mesh : m_instancedMeshes)
+                mesh.m_defaultCbvDescriptorOffset = idx;
         }
 
         // Lights
@@ -822,15 +810,19 @@ void Renderer::LoadAssets()
             m_cbvSrvUavHeap.m_numCbvPerFrame = m_cbvSrvUavHeap.GetNumCbvAllocated();
     }
 
-    ComPtr<ID3D12Resource> textureUploadHeap;
-
     std::vector<UINT8> simpleTextureData = GenerateTextureData(256, 256, 4);
 
     // 텍스처 생성, Mesh에 할당
     UINT idx = m_cbvSrvUavHeap.GetNumSrvAllocated();
     CreateTexture(m_device.Get(), commandList, *m_uploadBuffer, *m_layoutTracker, m_texture, simpleTextureData, 256, 256, m_cbvSrvUavHeap.GetFreeHandleForSrv());
-    pCube->m_srvDescriptorOffset = idx;
-    pSphere->m_srvDescriptorOffset = idx;
+    for (auto& mesh : m_meshes)
+    {
+        mesh.m_srvDescriptorOffset = idx;
+    }
+    for (auto& mesh : m_instancedMeshes)
+    {
+        mesh.m_srvDescriptorOffset = idx;
+    }
 
     // Execute commands for loading assets and store fence value
     m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
@@ -873,45 +865,45 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
     cmdList->SetPipelineState(m_defaultPipelineState.Get());
-    for (const auto* pMesh : m_meshes)
+    for (const auto& mesh : m_meshes)
     {
         D3D12_GPU_DESCRIPTOR_HANDLE handle;
 
         // per-mesh CBVs
         // 각 프레임이 사용하는 디스크립터를 인덱싱
-        handle = m_cbvSrvUavHeap.GetCbvHandle(m_frameIndex, pMesh->m_perMeshCbvDescriptorOffset);
+        handle = m_cbvSrvUavHeap.GetCbvHandle(m_frameIndex, mesh.m_perMeshCbvDescriptorOffset);
         cmdList->SetGraphicsRootDescriptorTable(0, handle);
 
         // default CBV
-        handle = m_cbvSrvUavHeap.GetCbvHandle(0, pMesh->m_defaultCbvDescriptorOffset);
+        handle = m_cbvSrvUavHeap.GetCbvHandle(0, mesh.m_defaultCbvDescriptorOffset);
         cmdList->SetGraphicsRootDescriptorTable(1, handle);
 
         // SRV
-        handle = m_cbvSrvUavHeap.GetSrvHandle(pMesh->m_srvDescriptorOffset);
+        handle = m_cbvSrvUavHeap.GetSrvHandle(mesh.m_srvDescriptorOffset);
         cmdList->SetGraphicsRootDescriptorTable(2, handle);
 
-        pMesh->Render(cmdList);
+        mesh.Render(cmdList);
     }
 
     cmdList->SetPipelineState(m_instancedPipelineState.Get());
-    for (const auto* pMesh : m_instancedMeshes)
+    for (const auto& mesh : m_instancedMeshes)
     {
         D3D12_GPU_DESCRIPTOR_HANDLE handle;
 
         // per-mesh CBVs
         // 각 프레임이 사용하는 디스크립터를 인덱싱
-        handle = m_cbvSrvUavHeap.GetCbvHandle(m_frameIndex, pMesh->m_perMeshCbvDescriptorOffset);
+        handle = m_cbvSrvUavHeap.GetCbvHandle(m_frameIndex, mesh.m_perMeshCbvDescriptorOffset);
         cmdList->SetGraphicsRootDescriptorTable(0, handle);
 
         // default CBV
-        handle = m_cbvSrvUavHeap.GetCbvHandle(0, pMesh->m_defaultCbvDescriptorOffset);
+        handle = m_cbvSrvUavHeap.GetCbvHandle(0, mesh.m_defaultCbvDescriptorOffset);
         cmdList->SetGraphicsRootDescriptorTable(1, handle);
 
         // SRV
-        handle = m_cbvSrvUavHeap.GetSrvHandle(pMesh->m_srvDescriptorOffset);
+        handle = m_cbvSrvUavHeap.GetSrvHandle(mesh.m_srvDescriptorOffset);
         cmdList->SetGraphicsRootDescriptorTable(2, handle);
 
-        pMesh->Render(cmdList);
+        mesh.Render(cmdList);
     }
 
     // Swap Chain textures initially created in D3D12_BARRIER_LAYOUT_COMMON

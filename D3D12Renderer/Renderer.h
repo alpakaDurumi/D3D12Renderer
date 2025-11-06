@@ -23,9 +23,8 @@
 #include "CommandQueue.h"
 #include "ResourceLayoutTracker.h"
 #include "UploadBuffer.h"
+#include "Mesh.h"
 
-class Mesh;
-class InstancedMesh;
 class FrameResource;
 class CommandList;
 
@@ -99,8 +98,8 @@ private:
     // App resources
     Camera m_camera;
     InputManager m_inputManager;
-    std::vector<Mesh*> m_meshes;
-    std::vector<InstancedMesh*> m_instancedMeshes;
+    std::vector<Mesh> m_meshes;
+    std::vector<InstancedMesh> m_instancedMeshes;
     LightConstantData m_lightConstantData;
     CameraConstantData m_cameraConstantData;
     ComPtr<ID3D12Resource> m_texture;
