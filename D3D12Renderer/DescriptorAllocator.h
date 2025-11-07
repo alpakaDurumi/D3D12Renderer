@@ -26,12 +26,12 @@ public:
 
 private:
     // Create a new heap with a specific number of descriptors
-    std::shared_ptr<DescriptorAllocatorPage> CreateAllocatorPage();
+    DescriptorAllocatorPage* CreateAllocatorPage();
 
     D3D12_DESCRIPTOR_HEAP_TYPE m_heapType;
     UINT32 m_numDescriptorsPerHeap;
 
-    std::vector<std::shared_ptr<DescriptorAllocatorPage>> m_heapPool;
+    std::vector<std::unique_ptr<DescriptorAllocatorPage>> m_heapPool;
     // Indices of available heaps in the heap pool.
     std::set<SIZE_T> m_availableHeaps;
 

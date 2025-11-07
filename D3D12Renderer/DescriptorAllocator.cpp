@@ -22,7 +22,7 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
     auto it = m_availableHeaps.begin();
     while (it != m_availableHeaps.end())
     {
-        auto allocatorPage = m_heapPool[*it];
+        auto& allocatorPage = m_heapPool[*it];
 
         allocation = allocatorPage->Allocate(numDescriptors);
 
@@ -63,13 +63,11 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
 
 // This function not use mutex since it assumes that mutex already locked on caller's side
 // If this function called outside of DescriptorAllocator::Allocate, explicit mutex should be locked
-std::shared_ptr<DescriptorAllocatorPage> DescriptorAllocator::CreateAllocatorPage()
+DescriptorAllocatorPage* DescriptorAllocator::CreateAllocatorPage()
 {
-    auto newPage = std::make_shared<DescriptorAllocatorPage>(m_device.Get(), m_heapType, m_numDescriptorsPerHeap);
-    m_heapPool.push_back(newPage);
+    m_heapPool.emplace_back(std::make_unique<DescriptorAllocatorPage>(m_device.Get(), m_heapType, m_numDescriptorsPerHeap));
     m_availableHeaps.insert(m_heapPool.size() - 1);     // Index of the page added
-
-    return newPage;
+    return m_heapPool.back().get();
 }
 
 void DescriptorAllocator::ReleaseStaleDescriptors(UINT64 completedFenceValue)
@@ -78,7 +76,7 @@ void DescriptorAllocator::ReleaseStaleDescriptors(UINT64 completedFenceValue)
 
     for (SIZE_T i = 0; i < m_heapPool.size(); ++i)
     {
-        auto page = m_heapPool[i];
+        auto& page = m_heapPool[i];
 
         page->ReleaseStaleDescriptors(completedFenceValue);
 

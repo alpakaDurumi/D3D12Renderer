@@ -3,7 +3,6 @@
 #include <wrl/client.h>
 #include <d3d12.h>
 
-#include <memory>
 #include <mutex>
 #include <map>
 #include <queue>
@@ -14,7 +13,7 @@ class DescriptorAllocation;
 using Microsoft::WRL::ComPtr;
 
 // Wrapper for ID3D12DescriptorHeap and provides free list management
-class DescriptorAllocatorPage : public std::enable_shared_from_this<DescriptorAllocatorPage>
+class DescriptorAllocatorPage
 {
 public:
     DescriptorAllocatorPage(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptors);

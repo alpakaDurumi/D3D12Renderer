@@ -3,8 +3,6 @@
 #include <wrl/client.h>
 #include <d3d12.h>
 
-#include <memory>
-
 class DescriptorAllocatorPage;
 
 // move-only self-freeing type that is used as a wrapper for a D3D12_CPU_DESCRIPTOR_HANDLE
@@ -13,7 +11,7 @@ class DescriptorAllocation
 {
 public:
     DescriptorAllocation() = delete;
-    DescriptorAllocation(D3D12_CPU_DESCRIPTOR_HANDLE baseDescriptor, UINT32 offsetInHeap, UINT32 numHandles, UINT32 descriptorSize, std::shared_ptr<DescriptorAllocatorPage> page);
+    DescriptorAllocation(D3D12_CPU_DESCRIPTOR_HANDLE baseDescriptor, UINT32 offsetInHeap, UINT32 numHandles, UINT32 descriptorSize, DescriptorAllocatorPage* pPage);
 
     ~DescriptorAllocation();
 
@@ -22,8 +20,8 @@ public:
     DescriptorAllocation& operator=(const DescriptorAllocation&) = delete;
 
     // Only move is allowed
-    DescriptorAllocation(DescriptorAllocation&& other);
-    DescriptorAllocation& operator=(DescriptorAllocation&& other);
+    DescriptorAllocation(DescriptorAllocation&& other) noexcept;
+    DescriptorAllocation& operator=(DescriptorAllocation&& other) noexcept;
 
     // Get a descriptor at a particular offset in the allocation
     D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandle(UINT32 offsetInBlock = 0) const;
@@ -31,7 +29,6 @@ public:
     UINT32 GetOffset() const { return m_offsetInHeap; }
     UINT32 GetNumHandles() const { return m_numHandles; }
     UINT64 GetFenceValue() const { return m_fenceValue; }
-    std::shared_ptr<DescriptorAllocatorPage> GetDescriptorAllocatorPage() const { return m_page; }
 
 private:
     void Free();
@@ -42,5 +39,5 @@ private:
     UINT32 m_descriptorSize;
     UINT64 m_fenceValue;
 
-    std::shared_ptr<DescriptorAllocatorPage> m_page;
+    DescriptorAllocatorPage* m_pPage;
 };
