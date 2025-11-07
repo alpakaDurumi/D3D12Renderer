@@ -38,7 +38,7 @@ public:
     ResourceLayoutTracker(ResourceLayoutTracker&&) = delete;
     ResourceLayoutTracker& operator=(ResourceLayoutTracker&&) = delete;
 
-    ResourceLayoutTracker(ComPtr<ID3D12Device10>& device)
+    ResourceLayoutTracker(const ComPtr<ID3D12Device10>& device)
         : m_device(device)
     {
     }

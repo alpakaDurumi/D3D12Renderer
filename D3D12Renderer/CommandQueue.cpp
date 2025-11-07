@@ -5,7 +5,7 @@
 
 using namespace D3DHelper;
 
-CommandQueue::CommandQueue(ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type)
+CommandQueue::CommandQueue(const ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type)
     : m_type(type), m_fenceValue(0), m_device(device)
 {
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
@@ -37,11 +37,11 @@ ComPtr<ID3D12CommandAllocator> CommandQueue::CreateCommandAllocator()
     return commandAllocator;
 }
 
-ComPtr<ID3D12GraphicsCommandList7> CommandQueue::CreateCommandList(ComPtr<ID3D12CommandAllocator>& commandAllocator)
+ComPtr<ID3D12GraphicsCommandList7> CommandQueue::CreateCommandList(ID3D12CommandAllocator* pCommandAllocator)
 {
     ComPtr<ID3D12GraphicsCommandList> commandList;
     ComPtr<ID3D12GraphicsCommandList7> commandList7;
-    ThrowIfFailed(m_device->CreateCommandList(0, m_type, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList)));
+    ThrowIfFailed(m_device->CreateCommandList(0, m_type, pCommandAllocator, nullptr, IID_PPV_ARGS(&commandList)));
     ThrowIfFailed(commandList.As(&commandList7));
     return commandList7;
 }
@@ -73,7 +73,7 @@ std::pair<ComPtr<ID3D12CommandAllocator>, CommandList> CommandQueue::GetAvailabl
     }
     else
     {
-        commandList = CreateCommandList(commandAllocator);
+        commandList = CreateCommandList(commandAllocator.Get());
     }
 
     // 커맨드 리스트는 반환 시 래퍼로 감싼다.
@@ -83,10 +83,10 @@ std::pair<ComPtr<ID3D12CommandAllocator>, CommandList> CommandQueue::GetAvailabl
     return std::pair<ComPtr<ID3D12CommandAllocator>, CommandList>(
         std::piecewise_construct,
         std::forward_as_tuple(commandAllocator),
-        std::forward_as_tuple(commandList, m_device));
+        std::forward_as_tuple(m_device, commandList));
 }
 
-UINT64 CommandQueue::ExecuteCommandLists(ComPtr<ID3D12CommandAllocator>& commandAllocator, CommandList& commandList, ResourceLayoutTracker& layoutTracker)
+UINT64 CommandQueue::ExecuteCommandLists(const ComPtr<ID3D12CommandAllocator>& commandAllocator, const CommandList& commandList, ResourceLayoutTracker& layoutTracker)
 {
     // Get pending barriers and prepare the sub command list for sync
     auto [subCommandAllocator, subCommandList] = GetAvailableCommandList();

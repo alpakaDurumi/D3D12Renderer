@@ -7,7 +7,7 @@
 #include "DescriptorAllocatorPage.h"
 #include "DescriptorAllocation.h"
 
-DescriptorAllocator::DescriptorAllocator(ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap)
+DescriptorAllocator::DescriptorAllocator(const ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap)
     : m_device(device), m_heapType(type), m_numDescriptorsPerHeap(numDescriptorsPerHeap)
 {
 }
@@ -65,7 +65,7 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
 // If this function called outside of DescriptorAllocator::Allocate, explicit mutex should be locked
 std::shared_ptr<DescriptorAllocatorPage> DescriptorAllocator::CreateAllocatorPage()
 {
-    auto newPage = std::make_shared<DescriptorAllocatorPage>(m_device, m_heapType, m_numDescriptorsPerHeap);
+    auto newPage = std::make_shared<DescriptorAllocatorPage>(m_device.Get(), m_heapType, m_numDescriptorsPerHeap);
     m_heapPool.push_back(newPage);
     m_availableHeaps.insert(m_heapPool.size() - 1);     // Index of the page added
 

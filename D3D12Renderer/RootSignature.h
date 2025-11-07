@@ -122,7 +122,7 @@ public:
         samplerDesc.ShaderVisibility = visibility;
     }
 
-    void Finalize(ComPtr<ID3D12Device10>& device)
+    void Finalize(ID3D12Device10* pDevice)
     {
         // Fill bitmasks
         for (UINT i = 0; i < m_numParameters; ++i)
@@ -150,7 +150,7 @@ public:
         // Use D3D_ROOT_SIGNATURE_VERSION_1_1 if current environment supports it
         D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
         featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-        if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+        if (FAILED(pDevice->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
         {
             featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
         }
@@ -193,7 +193,7 @@ public:
         ComPtr<ID3DBlob> signature;
         ComPtr<ID3DBlob> error;
         ThrowIfFailed(D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error));
-        ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+        ThrowIfFailed(pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 
         delete[] pDowngradedRootParameters;
     }

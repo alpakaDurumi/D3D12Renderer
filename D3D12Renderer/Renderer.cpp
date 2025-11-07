@@ -305,7 +305,7 @@ void Renderer::OnResize(UINT width, UINT height)
     }
 
     // Recreate DSV
-    CreateDepthStencilBuffer(m_device, m_width, m_height, m_depthStencilBuffer, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
 }
 
 void Renderer::LoadPipeline()
@@ -695,7 +695,7 @@ void Renderer::LoadAssets()
     }
 
     // Create the depth stencil view
-    CreateDepthStencilBuffer(m_device, m_width, m_height, m_depthStencilBuffer, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
 
     // Create and record the bundle
     {

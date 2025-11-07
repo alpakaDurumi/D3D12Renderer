@@ -14,7 +14,7 @@ SIZE_T Align(SIZE_T size, SIZE_T alignment)
 
 // UploadBuffer
 
-UploadBuffer::UploadBuffer(ComPtr<ID3D12Device10>& device, const CommandQueue& commandQueue, SIZE_T pageSize)
+UploadBuffer::UploadBuffer(const ComPtr<ID3D12Device10>& device, const CommandQueue& commandQueue, SIZE_T pageSize)
     : m_device(device), m_commandQueue(commandQueue), m_pageSize(pageSize), m_currentPage(nullptr), m_currentOffset(0)
 {
 }

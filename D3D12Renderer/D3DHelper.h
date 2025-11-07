@@ -116,7 +116,7 @@ namespace D3DHelper
         D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
 
     void CreateDepthStencilBuffer(
-        ComPtr<ID3D12Device10>& device,
+        ID3D12Device10* pDevice,
         UINT width,
         UINT height,
         ComPtr<ID3D12Resource>& depthStencilBuffer,

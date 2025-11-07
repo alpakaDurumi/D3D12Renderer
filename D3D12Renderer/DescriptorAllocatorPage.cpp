@@ -4,17 +4,17 @@
 
 using namespace D3DHelper;
 
-DescriptorAllocatorPage::DescriptorAllocatorPage(ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptors)
+DescriptorAllocatorPage::DescriptorAllocatorPage(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptors)
     : m_heapType(type), m_numDescriptorsInHeap(numDescriptors)
 {
     D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
     heapDesc.Type = m_heapType;
     heapDesc.NumDescriptors = m_numDescriptorsInHeap;
     heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;   // CPU visible descriptor heap does not need to set SHADER_VISIBLE flag
-    ThrowIfFailed(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_descriptorHeap)));
+    ThrowIfFailed(pDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_descriptorHeap)));
 
     m_baseDescriptor = m_descriptorHeap->GetCPUDescriptorHandleForHeapStart();
-    m_descriptorHandleIncrementSize = device->GetDescriptorHandleIncrementSize(m_heapType);
+    m_descriptorHandleIncrementSize = pDevice->GetDescriptorHandleIncrementSize(m_heapType);
     m_numFreeHandles = m_numDescriptorsInHeap;
 
     // Initialize the free lists

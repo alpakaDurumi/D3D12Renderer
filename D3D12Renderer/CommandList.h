@@ -21,8 +21,8 @@ public:
     CommandList(CommandList&&) = delete;
     CommandList& operator=(CommandList&&) = delete;
 
-    CommandList(ComPtr<ID3D12GraphicsCommandList7>& commandList, ComPtr<ID3D12Device10>& device)
-        : m_commandList(commandList), m_device(device)
+    CommandList(const ComPtr<ID3D12Device10>& device, const ComPtr<ID3D12GraphicsCommandList7>& commandList)
+        : m_device(device), m_commandList(commandList)
     {
     }
 

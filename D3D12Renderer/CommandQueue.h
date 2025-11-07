@@ -22,18 +22,18 @@ public:
     CommandQueue(CommandQueue&&) = delete;
     CommandQueue& operator=(CommandQueue&&) = delete;
 
-    CommandQueue(ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type);
+    CommandQueue(const ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type);
 
     ~CommandQueue();
 
     ComPtr<ID3D12CommandQueue> GetCommandQueue() const { return m_commandQueue; }
 
     ComPtr<ID3D12CommandAllocator> CreateCommandAllocator();
-    ComPtr<ID3D12GraphicsCommandList7> CreateCommandList(ComPtr<ID3D12CommandAllocator>& commandAllocator);
+    ComPtr<ID3D12GraphicsCommandList7> CreateCommandList(ID3D12CommandAllocator* pCommandAllocator);
 
     std::pair<ComPtr<ID3D12CommandAllocator>, CommandList> GetAvailableCommandList();
 
-    UINT64 ExecuteCommandLists(ComPtr<ID3D12CommandAllocator>& commandAllocator, CommandList& commandList, ResourceLayoutTracker& layoutTracker);
+    UINT64 ExecuteCommandLists(const ComPtr<ID3D12CommandAllocator>& commandAllocator, const CommandList& commandList, ResourceLayoutTracker& layoutTracker);
 
     UINT64 Signal();
     bool IsFenceComplete(UINT64 fenceValue) const;

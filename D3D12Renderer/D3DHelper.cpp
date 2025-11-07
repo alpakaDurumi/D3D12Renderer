@@ -572,7 +572,7 @@ namespace D3DHelper
     }
 
     void CreateDepthStencilBuffer(
-        ComPtr<ID3D12Device10>& device,
+        ID3D12Device10* pDevice,
         UINT width,
         UINT height,
         ComPtr<ID3D12Resource>& depthStencilBuffer,
@@ -603,7 +603,7 @@ namespace D3DHelper
         depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
         depthOptimizedClearValue.DepthStencil.Stencil = 0;
 
-        ThrowIfFailed(device->CreateCommittedResource3(
+        ThrowIfFailed(pDevice->CreateCommittedResource3(
             &heapProperties,
             D3D12_HEAP_FLAG_NONE,
             &resourceDesc,
@@ -619,7 +619,7 @@ namespace D3DHelper
         depthStencilViewDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
         depthStencilViewDesc.Flags = D3D12_DSV_FLAG_NONE;
 
-        device->CreateDepthStencilView(depthStencilBuffer.Get(), &depthStencilViewDesc, cpuHandle);
+        pDevice->CreateDepthStencilView(depthStencilBuffer.Get(), &depthStencilViewDesc, cpuHandle);
     }
 
     UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format)

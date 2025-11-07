@@ -32,7 +32,7 @@ public:
         SIZE_T Offset;
     };
 
-    UploadBuffer(ComPtr<ID3D12Device10>& device, const CommandQueue& commandQueue, SIZE_T pageSize);
+    UploadBuffer(const ComPtr<ID3D12Device10>& device, const CommandQueue& commandQueue, SIZE_T pageSize);
 
     SIZE_T GetPageSize() const { return m_pageSize; }
     Allocation Allocate(SIZE_T sizeInBytes, SIZE_T alignment);
