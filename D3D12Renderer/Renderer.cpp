@@ -286,16 +286,18 @@ void Renderer::OnResize(UINT width, UINT height)
     m_height = std::max(1u, height);
     UpdateWidthHeight();
 
-    // Release resources and set frame fence values to the current fence value
+    // Unregister and release current render target, set frame fence values to the current fence value
     for (UINT i = 0; i < FrameCount; i++)
     {
+        m_layoutTracker->UnregisterResource(m_frameResources[i]->m_renderTarget.Get());
         m_frameResources[i]->m_renderTarget.Reset();
         m_frameResources[i]->m_fenceValue = m_frameResources[m_frameIndex]->m_fenceValue;
     }
     m_depthStencilBuffer.Reset();
 
     // Preserve existing format
-    m_swapChain->ResizeBuffers(FrameCount, m_width, m_height, DXGI_FORMAT_UNKNOWN, m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
+    // Before calling ResizeBuffers, all backbuffer references should be released.
+    ThrowIfFailed(m_swapChain->ResizeBuffers(FrameCount, m_width, m_height, DXGI_FORMAT_UNKNOWN, m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
     // Recreate RTVs
@@ -303,9 +305,14 @@ void Renderer::OnResize(UINT width, UINT height)
     {
         DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate();
 
-        ThrowIfFailed(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&(m_frameResources[i]->m_renderTarget))));
+        ThrowIfFailed(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_frameResources[i]->m_renderTarget)));
         m_device->CreateRenderTargetView(m_frameResources[i]->m_renderTarget.Get(), nullptr, alloc.GetDescriptorHandle());
         m_frameResources[i]->m_rtvAllocation = std::move(alloc);
+
+        // Assume that ResizeBuffers do not preserve previous layout.
+        // For now, just use D3D12_BARRIER_LAYOUT_COMMON.
+        auto desc = m_frameResources[i]->m_renderTarget->GetDesc();
+        m_layoutTracker->RegisterResource(m_frameResources[i]->m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_COMMON, desc.DepthOrArraySize, desc.MipLevels, DXGI_FORMAT_R8G8B8A8_UNORM);
     }
 
     // Recreate DSV

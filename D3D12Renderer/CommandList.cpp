@@ -46,8 +46,7 @@ void CommandList::Barrier(
         desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D ||
         desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D);
 
-    // subresourceRange를 순회하며 레이아웃을 확인하여 배열에 추가한 후, 배리어 그룹을 구성
-
+    // Iterate through subresourceRange to check layouts and build barrier groups
     const auto& [IndexOrFirstMipLevel, NumMipLevels, FirstArraySlice, NumArraySlices, FirstPlane, NumPlanes] = subresourceRange;
 
     UINT count = desc.MipLevels * desc.DepthOrArraySize * GetFormatPlaneCount(m_device.Get(), desc.Format);
@@ -72,7 +71,7 @@ void CommandList::Barrier(
             if (isNotUsed[i])
             {
                 layoutBefore = D3D12_BARRIER_LAYOUT_COMMON;
-                isNotUsed[i] = false;   // 사용함으로 표시
+                isNotUsed[i] = false;   // Check as used
             }
             else
             {
