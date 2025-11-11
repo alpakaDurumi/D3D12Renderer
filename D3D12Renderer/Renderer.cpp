@@ -8,7 +8,7 @@
 #include "FrameResource.h"
 #include "CommandList.h"
 
-// ¿Ã∞≈ ¿œ¥‹ ª©æﬂ∞⁄¥Ÿ. nugetø°º≠µµ ¡¶ø‹Ω√≈∞¿⁄
+// Ïù¥Í±∞ ÏùºÎã® ÎπºÏïºÍ≤†Îã§. nugetÏóêÏÑúÎèÑ Ï†úÏô∏ÏãúÌÇ§Ïûê
 //#include <dxcapi.h>
 //#include <d3d12shader.h>
 
@@ -52,7 +52,7 @@ std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UI
 }
 
 Renderer::Renderer(std::wstring name)
-    : m_title(name), m_rtvDescriptorSize(0), m_frameIndex(0), m_camera({ 0.0f, 0.0f, -5.0f })
+    : m_title(name), m_frameIndex(0), m_camera({ 0.0f, 0.0f, -5.0f })
 {
 }
 
@@ -179,7 +179,7 @@ void Renderer::OnUpdate()
     XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
     m_camera.Rotate(mouseMove);
 
-    // ¿Ãπ¯ø° µÂ∑ŒøÏ«“ «¡∑π¿”ø° ¥Î«ÿ constant buffers æ˜µ•¿Ã∆Æ
+    // Ïù¥Î≤àÏóê ÎìúÎ°úÏö∞Ìï† ÌîÑÎ†àÏûÑÏóê ÎåÄÌï¥ constant buffers ÏóÖÎç∞Ïù¥Ìä∏
     FrameResource* pFrameResource = m_frameResources[m_frameIndex];
 
     for (auto& mesh : m_meshes)
@@ -254,6 +254,9 @@ void Renderer::OnDestroy()
 
     for (auto* pFrameResource : m_frameResources)
         delete pFrameResource;
+
+    m_dsvAllocation.reset();
+    m_texture.reset();
 }
 
 void Renderer::OnKeyDown(WPARAM key)
@@ -296,16 +299,18 @@ void Renderer::OnResize(UINT width, UINT height)
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
     // Recreate RTVs
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
     for (UINT i = 0; i < FrameCount; i++)
     {
+        DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate();
+
         ThrowIfFailed(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&(m_frameResources[i]->m_renderTarget))));
-        m_device->CreateRenderTargetView(m_frameResources[i]->m_renderTarget.Get(), nullptr, rtvHandle);
-        MoveCPUDescriptorHandle(&rtvHandle, 1, m_rtvDescriptorSize);
+        m_device->CreateRenderTargetView(m_frameResources[i]->m_renderTarget.Get(), nullptr, alloc.GetDescriptorHandle());
+        m_frameResources[i]->m_rtvAllocation = std::move(alloc);
     }
 
     // Recreate DSV
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
+    m_dsvAllocation = std::make_unique<DescriptorAllocation>(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
+    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation->GetDescriptorHandle());
 }
 
 void Renderer::LoadPipeline()
@@ -399,9 +404,15 @@ void Renderer::LoadPipeline()
     // Both CommandQueue and ResourceLayoutTracker are non-copyable and non-movable types.
     // Passing a temporary object like `std::make_unique<T>(T(...))` will fail to compile
     // Instead, pass the constructor arguments directly to std::make_unique<T>()
-    m_commandQueue = std::make_unique<CommandQueue>(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
     m_layoutTracker = std::make_unique<ResourceLayoutTracker>(m_device);
     m_uploadBuffer = std::make_unique<UploadBuffer>(m_device, *m_commandQueue, 16 * 1024 * 1024);    // 16MB
+    for (UINT i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
+    {
+        D3D12_DESCRIPTOR_HEAP_TYPE type = static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(i);
+        m_descriptorAllocators[i] = std::make_unique<DescriptorAllocator>(m_device, type);
+    }
+    m_dynamicDescriptorHeap = std::make_unique<DynamicDescriptorHeap>(m_device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_commandQueue = std::make_unique<CommandQueue>(m_device, *m_dynamicDescriptorHeap, D3D12_COMMAND_LIST_TYPE_DIRECT);
 
     // Check for Variable Refresh Rate(VRR)
     m_tearingSupported = CheckTearingSupport();
@@ -430,44 +441,21 @@ void Renderer::LoadPipeline()
         swapChain.GetAddressOf()
     ));
 
-    // GetCurrentBackBufferIndex¿ª ªÁøÎ«œ±‚ ¿ß«ÿ IDXGISwapChain3∑Œ ƒı∏Æ
+    // GetCurrentBackBufferIndexÏùÑ ÏÇ¨Ïö©ÌïòÍ∏∞ ÏúÑÌï¥ IDXGISwapChain3Î°ú ÏøºÎ¶¨
     ThrowIfFailed(swapChain.As(&m_swapChain));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
     // Disable switching to fullscreen execlusive mode using ALT + ENTER
     ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_NO_ALT_ENTER));
 
-    // Create descriptor heaps
-    {
-        // RTV descriptor heap
-        D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-        rtvHeapDesc.NumDescriptors = FrameCount;
-        rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-        rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-        ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
-
-        // CBV_SRV_UAV descriptor heap is managed by DescriptorHeapManager
-        m_cbvSrvUavHeap.Init(m_device, FrameCount, MaxDynamicCbvCountPerFrame, MaxStaticSrvCount);
-
-        // DSV descriptor heap
-        D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-        dsvHeapDesc.NumDescriptors = 1;
-        dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-        dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-        ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap)));
-
-        m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-    }
-
     // Create frame resources
     {
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
-
         // Create a RTV and command allocator for each frame
         for (UINT i = 0; i < FrameCount; i++)
         {
-            FrameResource* pFrameResource = new FrameResource(m_device.Get(), m_swapChain.Get(), i, rtvHandle);
-            MoveCPUDescriptorHandle(&rtvHandle, 1, m_rtvDescriptorSize);
+            DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate();
+
+            FrameResource* pFrameResource = new FrameResource(m_device.Get(), m_swapChain.Get(), i, std::move(alloc));
             m_frameResources.push_back(pFrameResource);
 
             // Register backbuffer to tracker
@@ -485,102 +473,26 @@ void Renderer::LoadAssets()
 {
     // Create root signature
     {
-        // Use D3D_ROOT_SIGNATURE_VERSION_1_1 if current environment supports it
-        D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
-        featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-        if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
-        {
-            featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-        }
+        m_rootSignature = std::make_unique<RootSignature>(4, 1);
 
-        // idx 0 for per-mesh CBV, 1 for default CBV, 2 for SRV
-        D3D12_DESCRIPTOR_RANGE1 ranges[3] = {};
-        ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        ranges[0].NumDescriptors = 2;   // Mesh + Material
-        ranges[0].BaseShaderRegister = 0;
-        ranges[0].RegisterSpace = 0;
-        ranges[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-        ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+        // Root descriptor for MeshCB and MaterialCB
+        (*m_rootSignature)[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_VERTEX, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);    // Mesh
+        (*m_rootSignature)[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);     // Material
 
-        ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-        ranges[1].NumDescriptors = 2;   // Light + Camera
-        ranges[1].BaseShaderRegister = 2;
-        ranges[1].RegisterSpace = 0;
-        ranges[1].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-        ranges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+        // Descriptor table for LightCB and CameraCB
+        (*m_rootSignature)[2].InitAsTable(2, D3D12_SHADER_VISIBILITY_ALL);
+        (*m_rootSignature)[2].InitAsRange(0, 2, 0, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);    // Light
+        (*m_rootSignature)[2].InitAsRange(1, 3, 0, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);    // Camera
 
-        ranges[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        ranges[2].NumDescriptors = 1;
-        ranges[2].BaseShaderRegister = 0;
-        ranges[2].RegisterSpace = 0;
-        ranges[2].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-        ranges[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+        // Descriptor table for texture
+        (*m_rootSignature)[3].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+        (*m_rootSignature)[3].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
-        // idx 0 for per-mesh CBV, 1 for default CBV, 2 for SRV
-        D3D12_ROOT_PARAMETER1 rootParameters[3] = {};
-        rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        rootParameters[0].DescriptorTable = { 1, &ranges[0] };
-        rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        m_rootSignature->InitStaticSampler(0, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL);
 
-        rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        rootParameters[1].DescriptorTable = { 1, &ranges[1] };
-        rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        m_rootSignature->Finalize(m_device.Get());
 
-        rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        rootParameters[2].DescriptorTable = { 1, &ranges[2] };
-        rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-        D3D12_STATIC_SAMPLER_DESC sampler = {};
-        sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-        sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-        sampler.MipLODBias = 0;
-        sampler.MaxAnisotropy = 0;
-        sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-        sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-        sampler.MinLOD = 0.0f;
-        sampler.MaxLOD = D3D12_FLOAT32_MAX;
-        sampler.ShaderRegister = 0;
-        sampler.RegisterSpace = 0;
-        sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-        D3D12_ROOT_SIGNATURE_FLAGS flag =
-            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-            D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-            D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-            D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
-
-        // Downgraded objects must not be destroyed until CreateRootSignature
-        D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-        D3D12_ROOT_PARAMETER downgradedRootParameters[_countof(rootParameters)];
-        std::vector<D3D12_DESCRIPTOR_RANGE> convertedRanges;
-        if (featureData.HighestVersion == D3D_ROOT_SIGNATURE_VERSION_1_1)
-        {
-            rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-            rootSignatureDesc.Desc_1_1.NumParameters = _countof(rootParameters);
-            rootSignatureDesc.Desc_1_1.pParameters = rootParameters;
-            rootSignatureDesc.Desc_1_1.NumStaticSamplers = 1;
-            rootSignatureDesc.Desc_1_1.pStaticSamplers = &sampler;
-            rootSignatureDesc.Desc_1_1.Flags = flag;
-        }
-        else
-        {
-            UINT offset = 0;
-            DowngradeRootParameters(rootParameters, _countof(rootParameters), downgradedRootParameters, convertedRanges, offset);
-
-            rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_0;
-            rootSignatureDesc.Desc_1_0.NumParameters = _countof(rootParameters);
-            rootSignatureDesc.Desc_1_0.pParameters = downgradedRootParameters;
-            rootSignatureDesc.Desc_1_0.NumStaticSamplers = 1;
-            rootSignatureDesc.Desc_1_0.pStaticSamplers = &sampler;
-            rootSignatureDesc.Desc_1_0.Flags = flag;
-        }
-
-        ComPtr<ID3DBlob> signature;
-        ComPtr<ID3DBlob> error;
-        ThrowIfFailed(D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error));
-        ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+        m_dynamicDescriptorHeap->ParseRootSignature(*m_rootSignature);
     }
 
     // Create the pipeline state, which includes compiling and loading shaders.
@@ -674,8 +586,8 @@ void Renderer::LoadAssets()
 
         // Describe and create the graphics pipeline state object (PSO).
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-        psoDesc.InputLayout = { inputElementDescs0, _countof(inputElementDescs0) };   // std::size()∏¶ ¥ÎΩ≈ æ≤±‚?
-        psoDesc.pRootSignature = m_rootSignature.Get();
+        psoDesc.InputLayout = { inputElementDescs0, _countof(inputElementDescs0) };   // std::size()Î•º ÎåÄÏã† Ïì∞Í∏∞?
+        psoDesc.pRootSignature = m_rootSignature->GetRootSignature().Get();
         psoDesc.VS = { vertexShader->GetBufferPointer(), vertexShader->GetBufferSize() };
         psoDesc.PS = { pixelShader->GetBufferPointer(), pixelShader->GetBufferSize() };
         psoDesc.RasterizerState = rasterizerDesc;
@@ -695,21 +607,8 @@ void Renderer::LoadAssets()
     }
 
     // Create the depth stencil view
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
-
-    // Create and record the bundle
-    {
-        //ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_BUNDLE, m_bundleAllocator.Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_bundle)));
-        // π¯µÈ¿∫ ¡§¿˚ µΩ∫≈©∏≥≈Õ »§¿∫ ¡§¿˚ µ•¿Ã≈Õ∏¶ ∞°∏Æ≈∞¥¬ µΩ∫≈©∏≥≈Õ∏¶ ∞Æ¥¬ ∆ƒ∂ÛπÃ≈Õ∞° ∆˜«‘µ» ∑Á∆Æ Ω√±◊¥œ√≥∏¶ ªÛº”πﬁ¡ˆ ∏¯«—¥Ÿ.
-        // ∑Á∆Æ Ω√±◊¥œ√≥ ≥ªø° D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC «√∑°±◊∏¶ ªÁøÎ«œ¥¬ SRV∞° ¿÷±‚ ∂ßπÆø° ∑Á∆Æ Ω√±◊¥œ√≥∏¶ π¯µÈø°º≠ ¥ŸΩ√ º≥¡§«ÿ¡‡æﬂ «—¥Ÿ. 
-        //m_bundle->SetGraphicsRootSignature(m_rootSignature.Get());
-        //m_bundle->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        //m_bundle->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-        //m_bundle->DrawInstanced(3, 1, 0, 0);
-        //ThrowIfFailed(m_bundle->Close());
-    }
-
-    // «¡∑π¿”∞˙ π´∞¸«— ¡§¿˚ µ•¿Ã≈Õ∏¶ ∏’¿˙ ª˝º∫
+    m_dsvAllocation = std::make_unique<DescriptorAllocation>(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
+    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation->GetDescriptorHandle());
 
     // Get command allocator and list for loading assets
     auto [commandAllocator, commandList] = m_commandQueue->GetAvailableCommandList();
@@ -722,44 +621,36 @@ void Renderer::LoadAssets()
     {
         FrameResource* pFrameResource = m_frameResources[i];
 
+        DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
+        MaterialCB* matCB = new MaterialCB(m_device.Get(), std::move(alloc));
+        pFrameResource->m_materialConstantBuffers.push_back(matCB);
+
         // Meshes
         {
             for (auto& mesh : m_meshes)
             {
-                // µΩ∫≈©∏≥≈Õ »¸ ≥ª per-frame µΩ∫≈©∏≥≈Õ¿« ªÛ¥Î¿˚¿Œ ø¿«¡º¬ º≥¡§¿∫ √π «—π¯∏∏ ºˆ«‡«ÿæﬂ «‘
-                if (i == 0)
-                    mesh.m_perMeshCbvDescriptorOffset = m_cbvSrvUavHeap.GetNumCbvAllocated();
-
                 // Mesh
                 {
-                    MeshCB* meshCB = new MeshCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
+                    //MeshCB* meshCB = new MeshCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
+                    MeshCB* meshCB = new MeshCB(m_device.Get());
                     meshCB->Update(&mesh.m_meshBufferData);
 
-                    // ∞¢ FrameResourceø°º≠ µø¿œ«— ¿Œµ¶Ω∫±‰ «œ¡ˆ∏∏, «— π¯∏∏ ºˆ«‡«œµµ∑œ «œø¥¿Ω
+                    // Í∞Å FrameResourceÏóêÏÑú ÎèôÏùºÌïú Ïù∏Îç±Ïä§Í∏¥ ÌïòÏßÄÎßå, Ìïú Î≤àÎßå ÏàòÌñâÌïòÎèÑÎ°ù ÌïòÏòÄÏùå
                     if (i == 0)
                         mesh.m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
                     pFrameResource->m_meshConstantBuffers.push_back(meshCB);
                 }
 
-                // Material
-                {
-                    MaterialCB* materialCB = new MaterialCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
-                    materialCB->Update(&mesh.m_materialConstantBufferData);
-
-                    if (i == 0)
-                        mesh.m_materialConstantBufferIndex = UINT(pFrameResource->m_materialConstantBuffers.size());
-                    pFrameResource->m_materialConstantBuffers.push_back(materialCB);
-                }
+                if (i == 0)
+                    mesh.m_materialConstantBufferIndex = 0;
             }
 
             for (auto& mesh : m_instancedMeshes)
             {
-                if (i == 0)
-                    mesh.m_perMeshCbvDescriptorOffset = m_cbvSrvUavHeap.GetNumCbvAllocated();
-
                 // Mesh
                 {
-                    MeshCB* meshCB = new MeshCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
+                    //MeshCB* meshCB = new MeshCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
+                    MeshCB* meshCB = new MeshCB(m_device.Get());
                     meshCB->Update(&mesh.m_meshBufferData);
 
                     if (i == 0)
@@ -767,32 +658,15 @@ void Renderer::LoadAssets()
                     pFrameResource->m_meshConstantBuffers.push_back(meshCB);
                 }
 
-                // Material
-                {
-                    MaterialCB* materialCB = new MaterialCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
-                    materialCB->Update(&mesh.m_materialConstantBufferData);
-
-                    if (i == 0)
-                        mesh.m_materialConstantBufferIndex = UINT(pFrameResource->m_materialConstantBuffers.size());
-                    pFrameResource->m_materialConstantBuffers.push_back(materialCB);
-                }
+                if (i == 0)
+                    mesh.m_materialConstantBufferIndex = 0;
             }
-        }
-
-        // ∏µÁ ∏ﬁΩ¨ø°º≠ ∞¯≈Î¿∏∑Œ ªÁøÎ«œ¥¬ CBVø° ¥Î«— ø¿«¡º¬
-        if (i == 0)
-        {
-            UINT idx = m_cbvSrvUavHeap.GetNumCbvAllocated();
-
-            for (auto& mesh : m_meshes)
-                mesh.m_defaultCbvDescriptorOffset = idx;
-            for (auto& mesh : m_instancedMeshes)
-                mesh.m_defaultCbvDescriptorOffset = idx;
         }
 
         // Lights
         {
-            LightCB* lightCB = new LightCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
+            DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
+            LightCB* lightCB = new LightCB(m_device.Get(), std::move(alloc));
             lightCB->Update(&m_lightConstantData);
 
             pFrameResource->m_lightConstantBuffer = lightCB;
@@ -800,29 +674,24 @@ void Renderer::LoadAssets()
 
         // Camera
         {
-            CameraCB* cameraCB = new CameraCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
+            DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
+            CameraCB* cameraCB = new CameraCB(m_device.Get(), std::move(alloc));
             cameraCB->Update(&m_cameraConstantData);
 
             pFrameResource->m_cameraConstantBuffer = cameraCB;
         }
-
-        if (i == 0)
-            m_cbvSrvUavHeap.m_numCbvPerFrame = m_cbvSrvUavHeap.GetNumCbvAllocated();
     }
 
     std::vector<UINT8> simpleTextureData = GenerateTextureData(256, 256, 4);
 
-    // ≈ÿΩ∫√≥ ª˝º∫, Meshø° «“¥Á
-    UINT idx = m_cbvSrvUavHeap.GetNumSrvAllocated();
-    CreateTexture(m_device.Get(), commandList, *m_uploadBuffer, *m_layoutTracker, m_texture, simpleTextureData, 256, 256, m_cbvSrvUavHeap.GetFreeHandleForSrv());
-    for (auto& mesh : m_meshes)
-    {
-        mesh.m_srvDescriptorOffset = idx;
-    }
-    for (auto& mesh : m_instancedMeshes)
-    {
-        mesh.m_srvDescriptorOffset = idx;
-    }
+    m_texture = std::make_unique<Texture>(
+        m_device.Get(),
+        commandList,
+        *m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV],
+        *m_uploadBuffer,
+        *m_layoutTracker,
+        simpleTextureData,
+        256, 256);
 
     // Execute commands for loading assets and store fence value
     m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
@@ -838,10 +707,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     auto cmdList = commandList.GetCommandList();
 
     // Set necessary state.
-    cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
-
-    ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvUavHeap.m_heap.Get() };
-    cmdList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    cmdList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature().Get());
 
     cmdList->RSSetViewports(1, &m_viewport);
     cmdList->RSSetScissorRects(1, &m_scissorRect);
@@ -855,9 +721,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         D3D12_BARRIER_LAYOUT_RENDER_TARGET,
         { 0xffffffff, 0, 0, 0, 0, 0 });     // Select all subresources
 
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-    MoveCPUDescriptorHandle(&rtvHandle, m_frameIndex, m_rtvDescriptorSize);
-    D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = pFrameResource->m_rtvAllocation.GetDescriptorHandle();
+    D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation->GetDescriptorHandle();
     cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
     const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
@@ -867,20 +732,12 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     cmdList->SetPipelineState(m_defaultPipelineState.Get());
     for (const auto& mesh : m_meshes)
     {
-        D3D12_GPU_DESCRIPTOR_HANDLE handle;
-
-        // per-mesh CBVs
-        // ∞¢ «¡∑π¿”¿Ã ªÁøÎ«œ¥¬ µΩ∫≈©∏≥≈Õ∏¶ ¿Œµ¶ΩÃ
-        handle = m_cbvSrvUavHeap.GetCbvHandle(m_frameIndex, mesh.m_perMeshCbvDescriptorOffset);
-        cmdList->SetGraphicsRootDescriptorTable(0, handle);
-
-        // default CBV
-        handle = m_cbvSrvUavHeap.GetCbvHandle(0, mesh.m_defaultCbvDescriptorOffset);
-        cmdList->SetGraphicsRootDescriptorTable(1, handle);
-
-        // SRV
-        handle = m_cbvSrvUavHeap.GetSrvHandle(mesh.m_srvDescriptorOffset);
-        cmdList->SetGraphicsRootDescriptorTable(2, handle);
+        cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
+        cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
+        m_dynamicDescriptorHeap->StageDescriptors(2, 0, 1, pFrameResource->m_lightConstantBuffer->GetDescriptorHandle());
+        m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffer->GetDescriptorHandle());
+        m_dynamicDescriptorHeap->StageDescriptors(3, 0, 1, m_texture->GetDescriptorHandle());
+        m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
         mesh.Render(cmdList);
     }
@@ -888,20 +745,12 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     cmdList->SetPipelineState(m_instancedPipelineState.Get());
     for (const auto& mesh : m_instancedMeshes)
     {
-        D3D12_GPU_DESCRIPTOR_HANDLE handle;
-
-        // per-mesh CBVs
-        // ∞¢ «¡∑π¿”¿Ã ªÁøÎ«œ¥¬ µΩ∫≈©∏≥≈Õ∏¶ ¿Œµ¶ΩÃ
-        handle = m_cbvSrvUavHeap.GetCbvHandle(m_frameIndex, mesh.m_perMeshCbvDescriptorOffset);
-        cmdList->SetGraphicsRootDescriptorTable(0, handle);
-
-        // default CBV
-        handle = m_cbvSrvUavHeap.GetCbvHandle(0, mesh.m_defaultCbvDescriptorOffset);
-        cmdList->SetGraphicsRootDescriptorTable(1, handle);
-
-        // SRV
-        handle = m_cbvSrvUavHeap.GetSrvHandle(mesh.m_srvDescriptorOffset);
-        cmdList->SetGraphicsRootDescriptorTable(2, handle);
+        cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
+        cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
+        m_dynamicDescriptorHeap->StageDescriptors(2, 0, 1, pFrameResource->m_lightConstantBuffer->GetDescriptorHandle());
+        m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffer->GetDescriptorHandle());
+        m_dynamicDescriptorHeap->StageDescriptors(3, 0, 1, m_texture->GetDescriptorHandle());
+        m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
         mesh.Render(cmdList);
     }

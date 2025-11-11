@@ -12,8 +12,6 @@ SIZE_T Align(SIZE_T size, SIZE_T alignment)
     return (size + (alignment - 1)) & ~(alignment - 1);
 }
 
-// UploadBuffer
-
 UploadBuffer::UploadBuffer(const ComPtr<ID3D12Device10>& device, const CommandQueue& commandQueue, SIZE_T pageSize)
     : m_device(device), m_commandQueue(commandQueue), m_pageSize(pageSize), m_currentPage(nullptr), m_currentOffset(0)
 {
@@ -25,8 +23,8 @@ UploadBuffer::Allocation UploadBuffer::Allocate(SIZE_T sizeInBytes, SIZE_T align
 
     if (alignedSize > m_pageSize)
     {
-        // 요구된 크기가 현재 설정된 페이지 크기보다는 크지만 최대 페이지 크기를 넘지 않는 경우
-        // 요청에 맞도록 페이지 크기를 조절하여 생성한 후 다시 원상 복구
+        // When requested size is larger than current page size
+        // Create page with requested size and restore original size
         auto originalSize = m_pageSize;
         m_pageSize = alignedSize;
         m_currentPage = RequestPage();
@@ -39,7 +37,7 @@ UploadBuffer::Allocation UploadBuffer::Allocate(SIZE_T sizeInBytes, SIZE_T align
         m_currentOffset = Align(m_currentOffset, alignment);
     }
 
-    // 첫 할당이거나 현재 Page의 공간이 부족한 경우
+    // First allocation or current page has not enough space
     if (!m_currentPage || (m_currentOffset + alignedSize > m_pageSize))
     {
         if (m_currentPage)
@@ -63,9 +61,9 @@ UploadBuffer::Allocation UploadBuffer::Allocate(SIZE_T sizeInBytes, SIZE_T align
 
 UploadBuffer::Page* UploadBuffer::RequestPage()
 {
-    while (!m_pendingPages.empty() && m_commandQueue.IsFenceComplete(m_pendingPages.front().second))
+    while (!m_pendingPages.empty() && m_commandQueue.IsFenceComplete(m_pendingPages.front().first))
     {
-        m_availablePages.push(m_pendingPages.front().first);
+        m_availablePages.push(m_pendingPages.front().second);
         m_pendingPages.pop();
     }
 
@@ -85,19 +83,17 @@ UploadBuffer::Page* UploadBuffer::RequestPage()
     return pPage;
 }
 
-// 이번 command list 작성 동안 retire한 Page들이 특정 fenceValue가 만족되면 다시 사용될 수 있다고 큐에 넣어두는 함수.
+// Move retired pages to pending queue to wait for specific fenceValue
 void UploadBuffer::QueueRetiredPages(UINT64 fenceValue)
 {
     for (auto* page : m_retiredPages)
     {
-        m_pendingPages.push({ page, fenceValue });
+        m_pendingPages.push({ fenceValue, page });
     }
     m_retiredPages.clear();
 }
 
-// Page
-
-// Page가 살아있는 동안 한 Page 전체 영역에 대해 Mapping이 유지된다. 소멸자가 호출되면 Unmap을 통해 Mapping이 해제된다.
+// Keep memory mapping for the page's lifetime
 UploadBuffer::Page::Page(ID3D12Device10* pDevice, SIZE_T sizeInBytes)
     : m_pageSize(sizeInBytes),
     m_CPUBasePtr(nullptr),

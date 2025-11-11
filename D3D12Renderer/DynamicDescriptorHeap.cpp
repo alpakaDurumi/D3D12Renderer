@@ -24,15 +24,13 @@ DynamicDescriptorHeap::DynamicDescriptorHeap(const ComPtr<ID3D12Device10>& devic
     m_descriptorHandleCache = std::make_unique<D3D12_CPU_DESCRIPTOR_HANDLE[]>(m_numDescriptorsPerHeap);
 }
 
-// 본인 heapType에 따라 루트시그니처에서 어떤 비트마스크를 보고 처리할 지 결정해야한다.
-// CBV_SRV_UAV 힙인지 또는 Sampler 힙인지에 따라 RootSignature에서 처리할 비트마스크를 선택하자.
 void DynamicDescriptorHeap::ParseRootSignature(const RootSignature& rootSignature)
 {
     // Reset stale descriptors
     m_staleDescriptorTableBitMask = 0;
 
     // Get a bit mask that represents the root parameter indices that match the 
-    // descriptor heap type for this dynamic descriptor heap
+    // descriptor heap type for this dynamic descriptor heap.
     m_descriptorTableBitMask = rootSignature.GetDescriptorTableBitMask(m_heapType);
     UINT32 descriptorTableBitMask = m_descriptorTableBitMask;
 
@@ -44,7 +42,7 @@ void DynamicDescriptorHeap::ParseRootSignature(const RootSignature& rootSignatur
 
         DescriptorTableCache& descriptorTableCache = m_descriptorTableCache[rootIndex];
         descriptorTableCache.NumDescriptors = numDescriptors;
-        // rootIndex번째 table에 대힌 디스크립터가 m_descriptorHandleCache 내에서 저장될 위치를 지정
+        // Determine the storage location within m_descriptorHandleCache for descriptors of the rootIndex-th table
         descriptorTableCache.BaseDescriptor = m_descriptorHandleCache.get() + currentOffset;
 
         currentOffset += numDescriptors;
@@ -152,9 +150,7 @@ void DynamicDescriptorHeap::CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommand
             commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
             // When updating the descriptor heap on the command list, all descriptor
-            // tables must be (re)recopied to the new descriptor heap (not just
-            // the stale descriptor tables)
-            // GPU에 제출할 디스크립터 힙이 바뀌면, 디스크립터가 변경되지 않았더라도 다시 해당 힙으로 복사해줘야 한다.
+            // tables must be (re)recopied to the new descriptor heap (not just the stale descriptor tables)
             m_staleDescriptorTableBitMask = m_descriptorTableBitMask;
         }
 
@@ -168,9 +164,12 @@ void DynamicDescriptorHeap::CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommand
             UINT pDestDescriptorRangeSizes[] = { numSrcDescriptors };
 
             // Copy the staged CPU visible descriptors to the GPU visible descriptor heap.
-            // 상당히 이상하다. 수정이 필요할 것 같다. src에 대한 인자 3개를 (1, pSrcDescriptorHandles, pDestDescriptorRangeSizes)로 바꿔도 될 듯
-            m_device->CopyDescriptors(1, pDestDescriptorRangeStarts, pDestDescriptorRangeSizes,
-                numSrcDescriptors, pSrcDescriptorHandles, nullptr, m_heapType);
+            //m_device->CopyDescriptors(1, pDestDescriptorRangeStarts, pDestDescriptorRangeSizes,
+            //    numSrcDescriptors, pSrcDescriptorHandles, nullptr, m_heapType);
+            m_device->CopyDescriptors(
+                1, pDestDescriptorRangeStarts, pDestDescriptorRangeSizes,
+                1, pSrcDescriptorHandles, pDestDescriptorRangeSizes,
+                m_heapType);
             // Set the descriptors on the command list using the passed-in setter function.
             setFunc(commandList.Get(), rootIndex, m_currentGPUDescriptorHandle);
 
@@ -219,22 +218,15 @@ D3D12_GPU_DESCRIPTOR_HANDLE DynamicDescriptorHeap::CopyDescriptor(ComPtr<ID3D12G
     return hGPU;
 }
 
-// 현재 DynamicDescriptorHeap은 각 인스턴스가 단일 커맨드 리스트에 의해 사용된다고 가정하고 있음
-// 멀티스레드 버전으로 수정하게 된다면 이 함수는 아마 쓰지 않게 될 것임
-// Fence 기반의 모델로 수정해야 함
-void DynamicDescriptorHeap::Reset()
+ComPtr<ID3D12DescriptorHeap> DynamicDescriptorHeap::GetCurrentDescriptorHeap()
 {
-    m_availableDescriptorHeaps = m_descriptorHeapPool;
-    m_currentDescriptorHeap.Reset();
-    m_currentCPUDescriptorHandle = { 0 };
-    m_currentGPUDescriptorHandle = { 0 };
-    m_numFreeHandles = 0;
-    m_descriptorTableBitMask = 0;
-    m_staleDescriptorTableBitMask = 0;
-
-    // Reset the table cache
-    for (int i = 0; i < MaxDescriptorTables; ++i)
+    if (!m_currentDescriptorHeap)
     {
-        m_descriptorTableCache[i].Reset();
+        m_currentDescriptorHeap = RequestDescriptorHeap();
+        m_currentCPUDescriptorHandle = m_currentDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+        m_currentGPUDescriptorHandle = m_currentDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+        m_numFreeHandles = m_numDescriptorsPerHeap;
     }
+
+    return m_currentDescriptorHeap;
 }

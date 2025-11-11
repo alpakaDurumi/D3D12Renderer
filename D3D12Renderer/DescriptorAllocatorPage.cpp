@@ -66,7 +66,12 @@ std::optional<DescriptorAllocation> DescriptorAllocatorPage::Allocate(UINT32 num
 
     m_numFreeHandles -= numDescriptors;
 
-    return DescriptorAllocation(m_baseDescriptor, offset, numDescriptors, m_descriptorHandleIncrementSize, this);
+    return DescriptorAllocation(
+        m_baseDescriptor,
+        offset,
+        numDescriptors,
+        m_descriptorHandleIncrementSize,
+        this);
 }
 
 // Actual free is deferred till GPU execution using that descriptor finished

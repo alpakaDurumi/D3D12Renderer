@@ -9,9 +9,8 @@
 #include <set>
 #include <vector>
 
+#include "DescriptorAllocatorPage.h"
 #include "DescriptorAllocation.h"
-
-class DescriptorAllocatorPage;
 
 using Microsoft::WRL::ComPtr;
 
@@ -32,8 +31,7 @@ private:
     UINT32 m_numDescriptorsPerHeap;
 
     std::vector<std::unique_ptr<DescriptorAllocatorPage>> m_heapPool;
-    // Indices of available heaps in the heap pool.
-    std::set<SIZE_T> m_availableHeaps;
+    std::set<SIZE_T> m_availableHeaps;      // Indices of available heaps in the heap pool.
 
     std::mutex m_allocationMutex;
 

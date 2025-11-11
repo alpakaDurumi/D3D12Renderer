@@ -104,17 +104,6 @@ namespace D3DHelper
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
         std::vector<UINT32>& indices);
 
-    void CreateTexture(
-        ID3D12Device10* pDevice,
-        CommandList& commandList,
-        UploadBuffer& uploadBuffer,
-        ResourceLayoutTracker& layoutTracker,
-        ComPtr<ID3D12Resource>& texture,
-        std::vector<UINT8>& textureSrc,
-        UINT width,
-        UINT height,
-        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
-
     void CreateDepthStencilBuffer(
         ID3D12Device10* pDevice,
         UINT width,

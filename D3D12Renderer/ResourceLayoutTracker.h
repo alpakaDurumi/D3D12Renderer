@@ -27,8 +27,7 @@ struct ResourceLayoutInfo
     std::vector<D3D12_BARRIER_LAYOUT> Layouts;
 };
 
-// Track layout of resource which type is texture
-// 각 서브리소스의 레이아웃을 기억해야 한다
+// Track layout of each subresources which type is texture
 class ResourceLayoutTracker
 {
 public:

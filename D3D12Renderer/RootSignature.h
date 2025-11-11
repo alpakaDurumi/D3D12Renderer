@@ -34,15 +34,16 @@ public:
         m_parameter.ShaderVisibility = visibility;
     }
 
-    void InitAsDescriptor(UINT reg, UINT space, D3D12_SHADER_VISIBILITY visibility, D3D12_ROOT_PARAMETER_TYPE type)
+    void InitAsDescriptor(UINT reg, UINT space, D3D12_SHADER_VISIBILITY visibility, D3D12_ROOT_PARAMETER_TYPE type, D3D12_ROOT_DESCRIPTOR_FLAGS flags)
     {
         m_parameter.ParameterType = type;
         m_parameter.Descriptor.ShaderRegister = reg;
         m_parameter.Descriptor.RegisterSpace = space;
+        m_parameter.Descriptor.Flags = flags;
         m_parameter.ShaderVisibility = visibility;
     }
 
-    void InitAsTable(UINT numRanges, UINT space, D3D12_SHADER_VISIBILITY visibility)
+    void InitAsTable(UINT numRanges, D3D12_SHADER_VISIBILITY visibility)
     {
         m_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         m_parameter.DescriptorTable.NumDescriptorRanges = numRanges;
@@ -132,7 +133,7 @@ public:
 
             if (param.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
             {
-                // ÇÑ table ³»¿¡ ¼ÓÇÑ ¸ðµç rangeÀÇ typeÀÌ °°´Ù°í °¡Á¤
+                // í•œ table ë‚´ì— ì†í•œ ëª¨ë“  rangeì˜ typeì´ ê°™ë‹¤ê³  ê°€ì •
                 if (param.DescriptorTable.pDescriptorRanges->RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER)
                 {
                     m_samplerTableBitMask |= (1 << i);
@@ -141,10 +142,10 @@ public:
                 {
                     m_descriptorTableBitMask |= (1 << i);
                 }
-            }
 
-            for (UINT rangeIndex = 0; rangeIndex < param.DescriptorTable.NumDescriptorRanges; ++rangeIndex)
-                m_descriptorTableSize[i] += param.DescriptorTable.pDescriptorRanges[rangeIndex].NumDescriptors;
+                for (UINT rangeIndex = 0; rangeIndex < param.DescriptorTable.NumDescriptorRanges; ++rangeIndex)
+                    m_descriptorTableSize[i] += param.DescriptorTable.pDescriptorRanges[rangeIndex].NumDescriptors;
+            }
         }
 
         // Use D3D_ROOT_SIGNATURE_VERSION_1_1 if current environment supports it

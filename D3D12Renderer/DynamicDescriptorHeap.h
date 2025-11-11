@@ -13,8 +13,8 @@ class RootSignature;
 using Microsoft::WRL::ComPtr;
 
 // Staging CPU visible descriptors and committing those descriptors to a GPU visible descriptor heap
-// Root constants와 root descriptors는 디스크립터 힙을 사용하지 않으므로 이 클래스의 책임이 아니다.
-// 멀티스레딩 환경에서 사용하도록 확장하려면 뮤텍스를 사용하도록 수정해야한다.
+// Root constants and root descriptors do not use descriptor heap
+// For multithreading, this class should be modified to use mutex
 class DynamicDescriptorHeap
 {
 public:
@@ -32,7 +32,7 @@ public:
 
     void ParseRootSignature(const RootSignature& rootSignature);
 
-    void Reset();
+    ComPtr<ID3D12DescriptorHeap> GetCurrentDescriptorHeap();
 
 private:
     void CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommandList7>& commandList, std::function<void(ID3D12GraphicsCommandList*, UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc);

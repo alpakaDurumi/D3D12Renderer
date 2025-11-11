@@ -1,0 +1,95 @@
+#pragma once
+
+#include <wrl/client.h>
+
+#include <d3d12.h>
+
+#include <vector>
+
+#include "D3DHelper.h"
+#include "CommandList.h"
+#include "UploadBuffer.h"
+#include "ResourceLayoutTracker.h"
+#include "DescriptorAllocator.h"
+#include "DescriptorAllocation.h"
+
+using Microsoft::WRL::ComPtr;
+using namespace D3DHelper;
+
+class Texture
+{
+public:
+    Texture(
+        ID3D12Device10* pDevice,
+        CommandList& commandList,
+        DescriptorAllocator& descriptorAllocator,
+        UploadBuffer& uploadBuffer,
+        ResourceLayoutTracker& layoutTracker,
+        const std::vector<UINT8>& textureSrc,
+        UINT width,
+        UINT height)
+        : m_width(width), m_height(height), m_allocation(descriptorAllocator.Allocate())
+    {
+        CreateDefaultHeapForTexture(pDevice, width, height, m_texture);
+
+        layoutTracker.RegisterResource(m_texture.Get(), D3D12_BARRIER_LAYOUT_COMMON, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
+
+        commandList.Barrier(
+            m_texture.Get(),
+            layoutTracker,
+            D3D12_BARRIER_SYNC_NONE,
+            D3D12_BARRIER_SYNC_COPY,
+            D3D12_BARRIER_ACCESS_NO_ACCESS,
+            D3D12_BARRIER_ACCESS_COPY_DEST,
+            D3D12_BARRIER_LAYOUT_COPY_DEST,
+            { 0xffffffff, 0, 0, 0, 0, 0 });
+
+        // Calculate required size for data upload
+        D3D12_RESOURCE_DESC desc = m_texture->GetDesc();
+        D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts = {};
+        UINT numRows = 0;
+        UINT64 rowSizeInBytes = 0;
+        UINT64 requiredSize = 0;
+        pDevice->GetCopyableFootprints(&desc, 0, 1, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
+
+        auto uploadAllocation = uploadBuffer.Allocate(requiredSize, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+
+        D3D12_SUBRESOURCE_DATA textureData = {};
+        textureData.pData = textureSrc.data();
+        textureData.RowPitch = width * 4;   // 4 bytes per pixel (RGBA)
+        textureData.SlicePitch = textureData.RowPitch * height;
+
+        UpdateSubresources(pDevice, commandList, m_texture.Get(), uploadAllocation, 0, 1, &textureData);
+
+        commandList.Barrier(
+            m_texture.Get(),
+            layoutTracker,
+            D3D12_BARRIER_SYNC_COPY,
+            D3D12_BARRIER_SYNC_PIXEL_SHADING,
+            D3D12_BARRIER_ACCESS_COPY_DEST,
+            D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+            D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+            { 0xffffffff, 0, 0, 0, 0, 0 });
+
+        // Describe and create a SRV for the texture.
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = desc.Format;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels = 1;
+
+        pDevice->CreateShaderResourceView(m_texture.Get(), &srvDesc, m_allocation.GetDescriptorHandle());
+    }
+
+    D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandle()
+    {
+        return m_allocation.GetDescriptorHandle();
+    }
+
+private:
+    ComPtr<ID3D12Resource> m_texture;
+    DescriptorAllocation m_allocation;
+
+    UINT m_width;
+    UINT m_height;
+};

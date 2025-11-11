@@ -52,10 +52,10 @@ private:
 
     Page* RequestPage();
  
-    std::vector<std::unique_ptr<Page>> m_pagePool;          // 전체 Page를 담는 Pool
-    std::queue<Page*> m_availablePages;                     // 즉시 사용 가능한 Page 목록
-    std::vector<Page*> m_retiredPages;                      // 한 번의 command list 작성 중, 더 이상 할당할 공간이 없게 된 page 목록
-    std::queue<std::pair<Page*, UINT64>> m_pendingPages;    // 주어진 fenceValue와 비교하여 작업이 완료된 page를 꺼내 쓰게되는 목록
+    std::vector<std::unique_ptr<Page>> m_pagePool;          // Pool containing all pages
+    std::queue<Page*> m_availablePages;                     // List of pages immediately available for use
+    std::vector<Page*> m_retiredPages;                      // Pages that ran out of space during a single command list recording
+    std::queue<std::pair<UINT64, Page*>> m_pendingPages;    // Queue of pages to be reused when work is completed, compared against given fenceValues
 
     Page* m_currentPage;
     SIZE_T m_currentOffset;

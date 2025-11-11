@@ -296,7 +296,7 @@ namespace D3DHelper
         UINT* pNumRows = reinterpret_cast<UINT*>(pLayouts + numSubresources);
         UINT64* pRowSizeInBytes = reinterpret_cast<UINT64*>(pNumRows + numSubresources);
         UINT64 requiredSize = 0;
-        // ³× ¹øÂ° ÀÎÀÚÀÎ BaseOffsetÀº Ãâ·ÂµÇ´Â pLayouts[i].Offsetµé¿¡ ´õÇØÁö´Â °ªÀÌ´Ù
+        // ë„¤ ë²ˆì§¸ ì¸ìì¸ BaseOffsetì€ ì¶œë ¥ë˜ëŠ” pLayouts[i].Offsetë“¤ì— ë”í•´ì§€ëŠ” ê°’ì´ë‹¤
         pDevice->GetCopyableFootprints(&desc, firstSubresource, numSubresources, intermediateOffset, pLayouts, pNumRows, pRowSizeInBytes, &requiredSize);
 
         // Map intermediate resource (upload heap)
@@ -304,7 +304,7 @@ namespace D3DHelper
         UINT8* pData;
         ThrowIfFailed(pIntermediate->Map(0, &readRange, reinterpret_cast<void**>(&pData)));
 
-        // destÀÇ ·¹ÀÌ¾Æ¿ô¿¡ ¸ÂÃç¼­ intermediate·Î µ¥ÀÌÅÍ¸¦ º¹»ç
+        // destì˜ ë ˆì´ì•„ì›ƒì— ë§ì¶°ì„œ intermediateë¡œ ë°ì´í„°ë¥¼ ë³µì‚¬
         // Each subresource
         for (UINT i = 0; i < numSubresources; i++)
         {
@@ -384,7 +384,7 @@ namespace D3DHelper
         UINT64 requiredSize = 0;
         pDevice->GetCopyableFootprints(&desc, firstSubresource, numSubresources, 0, pLayouts, pNumRows, pRowSizeInBytes, &requiredSize);
 
-        // destÀÇ ·¹ÀÌ¾Æ¿ô¿¡ ¸ÂÃç¼­ intermediate·Î µ¥ÀÌÅÍ¸¦ º¹»ç
+        // destì˜ ë ˆì´ì•„ì›ƒì— ë§ì¶°ì„œ intermediateë¡œ ë°ì´í„°ë¥¼ ë³µì‚¬
         // Each subresource
         for (UINT i = 0; i < numSubresources; i++)
         {
@@ -506,69 +506,6 @@ namespace D3DHelper
         pindexBufferView->BufferLocation = indexBuffer->GetGPUVirtualAddress();
         pindexBufferView->SizeInBytes = indexBufferSize;
         pindexBufferView->Format = DXGI_FORMAT_R32_UINT;
-    }
-
-    void CreateTexture(
-        ID3D12Device10* pDevice,
-        CommandList& commandList,
-        UploadBuffer& uploadBuffer,
-        ResourceLayoutTracker& layoutTracker,
-        ComPtr<ID3D12Resource>& texture,
-        std::vector<UINT8>& textureSrc,
-        UINT width,
-        UINT height,
-        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
-    {
-        CreateDefaultHeapForTexture(pDevice, width, height, texture);
-
-        layoutTracker.RegisterResource(texture.Get(), D3D12_BARRIER_LAYOUT_COMMON, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
-
-        commandList.Barrier(
-            texture.Get(),
-            layoutTracker,
-            D3D12_BARRIER_SYNC_NONE,
-            D3D12_BARRIER_SYNC_COPY,
-            D3D12_BARRIER_ACCESS_NO_ACCESS,
-            D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_LAYOUT_COPY_DEST,
-            { 0xffffffff, 0, 0, 0, 0, 0 });
-
-        // Calculate required size for data upload
-        D3D12_RESOURCE_DESC desc = texture->GetDesc();
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts = {};
-        UINT numRows = 0;
-        UINT64 rowSizeInBytes = 0;
-        UINT64 requiredSize = 0;
-        pDevice->GetCopyableFootprints(&desc, 0, 1, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
-
-        auto uploadAllocation = uploadBuffer.Allocate(requiredSize, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
-
-        // ÅØ½ºÃ³ µ¥ÀÌÅÍ´Â ÀÎÀÚ·Î ¹Şµµ·Ï ¼öÁ¤ÇÏ±â
-        D3D12_SUBRESOURCE_DATA textureData = {};
-        textureData.pData = textureSrc.data();
-        textureData.RowPitch = width * 4;   // 4 bytes per pixel (RGBA)
-        textureData.SlicePitch = textureData.RowPitch * height;
-
-        UpdateSubresources(pDevice, commandList, texture.Get(), uploadAllocation, 0, 1, &textureData);
-
-        commandList.Barrier(
-            texture.Get(),
-            layoutTracker,
-            D3D12_BARRIER_SYNC_COPY,
-            D3D12_BARRIER_SYNC_PIXEL_SHADING,
-            D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-            D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
-            { 0xffffffff, 0, 0, 0, 0, 0 });
-
-        // Describe and create a SRV for the texture.
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = desc.Format;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2D.MipLevels = 1;
-
-        pDevice->CreateShaderResourceView(texture.Get(), &srvDesc, cpuHandle);
     }
 
     void CreateDepthStencilBuffer(

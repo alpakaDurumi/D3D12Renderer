@@ -7,20 +7,13 @@
 
 using namespace D3DHelper;
 
-DescriptorAllocation::DescriptorAllocation(D3D12_CPU_DESCRIPTOR_HANDLE baseDescriptor, UINT32 offsetInHeap, UINT32 numHandles, UINT32 descriptorSize, DescriptorAllocatorPage* pPage)
-    : m_offsetInHeap(offsetInHeap), m_numHandles(numHandles), m_descriptorSize(descriptorSize), m_fenceValue(0), m_pPage(pPage)
-{
-    m_descriptor = baseDescriptor;
-    MoveCPUDescriptorHandle(&m_descriptor, m_offsetInHeap, descriptorSize);
-}
-
-DescriptorAllocation::~DescriptorAllocation()
-{
-    Free();
-}
-
 DescriptorAllocation::DescriptorAllocation(DescriptorAllocation&& other) noexcept
-    : m_descriptor(other.m_descriptor), m_offsetInHeap(other.m_offsetInHeap), m_numHandles(other.m_numHandles), m_descriptorSize(other.m_descriptorSize), m_fenceValue(other.m_fenceValue), m_pPage(other.m_pPage)
+    : m_descriptor(other.m_descriptor),
+    m_offsetInHeap(other.m_offsetInHeap),
+    m_numHandles(other.m_numHandles),
+    m_descriptorSize(other.m_descriptorSize),
+    m_fenceValue(other.m_fenceValue),
+    m_pPage(other.m_pPage)
 {
     other.m_descriptor.ptr = 0;
     other.m_offsetInHeap = 0;
@@ -52,6 +45,23 @@ DescriptorAllocation& DescriptorAllocation::operator=(DescriptorAllocation&& oth
     }
 
     return *this;
+}
+
+DescriptorAllocation::DescriptorAllocation(
+    D3D12_CPU_DESCRIPTOR_HANDLE baseDescriptor,
+    UINT32 offsetInHeap,
+    UINT32 numHandles,
+    UINT32 descriptorSize,
+    DescriptorAllocatorPage* pPage)
+    : m_offsetInHeap(offsetInHeap), m_numHandles(numHandles), m_descriptorSize(descriptorSize), m_fenceValue(0), m_pPage(pPage)
+{
+    m_descriptor = baseDescriptor;
+    MoveCPUDescriptorHandle(&m_descriptor, m_offsetInHeap, descriptorSize);
+}
+
+DescriptorAllocation::~DescriptorAllocation()
+{
+    Free();
 }
 
 void DescriptorAllocation::Free()

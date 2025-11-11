@@ -15,15 +15,19 @@
 #include <chrono>
 #include <algorithm>
 #include <memory>
+#include <array>
 
 #include "Camera.h"
 #include "InputManager.h"
 #include "ConstantData.h"
-#include "DescriptorHeapManager.h"
 #include "CommandQueue.h"
 #include "ResourceLayoutTracker.h"
 #include "UploadBuffer.h"
 #include "Mesh.h"
+#include "DescriptorAllocator.h"
+#include "Texture.h"
+#include "DynamicDescriptorHeap.h"
+#include "RootSignature.h"
 
 class FrameResource;
 class CommandList;
@@ -78,22 +82,16 @@ private:
     ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12Device10> m_device;
     ComPtr<ID3D12Resource> m_depthStencilBuffer;
-    //ComPtr<ID3D12CommandAllocator> m_bundleAllocator;
+    std::unique_ptr<DescriptorAllocation> m_dsvAllocation;
     std::unique_ptr<CommandQueue> m_commandQueue;
-    ComPtr<ID3D12RootSignature> m_rootSignature;
-    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-    DescriptorHeapManager m_cbvSrvUavHeap;
-    ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
+    std::unique_ptr<RootSignature> m_rootSignature;
     ComPtr<ID3D12PipelineState> m_defaultPipelineState;
     ComPtr<ID3D12PipelineState> m_instancedPipelineState;
-    //ComPtr<ID3D12GraphicsCommandList> m_bundle;
-    UINT m_rtvDescriptorSize;
-
+    std::vector<FrameResource*> m_frameResources;
     std::unique_ptr<ResourceLayoutTracker> m_layoutTracker;
     std::unique_ptr<UploadBuffer> m_uploadBuffer;
-
-    const UINT MaxDynamicCbvCountPerFrame = 128;
-    const UINT MaxStaticSrvCount = 64;
+    std::array<std::unique_ptr<DescriptorAllocator>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
+    std::unique_ptr<DynamicDescriptorHeap> m_dynamicDescriptorHeap;
 
     // App resources
     Camera m_camera;
@@ -102,9 +100,7 @@ private:
     std::vector<InstancedMesh> m_instancedMeshes;
     LightConstantData m_lightConstantData;
     CameraConstantData m_cameraConstantData;
-    ComPtr<ID3D12Resource> m_texture;
-
-    std::vector<FrameResource*> m_frameResources;
+    std::unique_ptr<Texture> m_texture;
 
     // Synchronization objects
     UINT m_frameIndex;

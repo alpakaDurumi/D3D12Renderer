@@ -10,6 +10,7 @@
 #include "CommandList.h"
 
 class ResourceLayoutTracker;
+class DynamicDescriptorHeap;
 
 using Microsoft::WRL::ComPtr;
 
@@ -22,7 +23,7 @@ public:
     CommandQueue(CommandQueue&&) = delete;
     CommandQueue& operator=(CommandQueue&&) = delete;
 
-    CommandQueue(const ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type);
+    CommandQueue(const ComPtr<ID3D12Device10>& device, DynamicDescriptorHeap& dynamicDescriptorHeap, D3D12_COMMAND_LIST_TYPE type);
 
     ~CommandQueue();
 
@@ -43,14 +44,13 @@ public:
 private:
     D3D12_COMMAND_LIST_TYPE m_type;
 
-    // 각 command allocator의 GPU 사용이 모두 끝났는지를 확인하기 위해 fence value가 짝지어져 있음
     struct CommandAllocatorEntry
     {
         UINT64 fenceValue;
         ComPtr<ID3D12CommandAllocator> commandAllocator;
     };
 
-    // 현재 GPU에서 사용중인 command allocator와 command list의 목록을 담고 있는 std::queue들
+    // Queue containing command allocators and lists currently being used by GPU
     std::queue<CommandAllocatorEntry> m_commandAllocatorQueue;
     std::queue<ComPtr<ID3D12GraphicsCommandList7>> m_commandListQueue;
 
@@ -61,4 +61,6 @@ private:
     ComPtr<ID3D12Fence> m_fence;
     HANDLE m_fenceEvent;
     UINT64 m_fenceValue;
+
+    DynamicDescriptorHeap& m_dynamicDescriptorHeap;
 };

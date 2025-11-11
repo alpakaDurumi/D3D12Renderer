@@ -163,7 +163,6 @@
     <ClInclude Include="DescriptorAllocation.h" />
     <ClInclude Include="DescriptorAllocator.h" />
     <ClInclude Include="DescriptorAllocatorPage.h" />
-    <ClInclude Include="DescriptorHeapManager.h" />
     <ClInclude Include="DynamicDescriptorHeap.h" />
     <ClInclude Include="FrameResource.h" />
     <ClInclude Include="imgui\backends\imgui_impl_dx12.h" />
@@ -179,6 +178,7 @@
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="ResourceLayoutTracker.h" />
     <ClInclude Include="RootSignature.h" />
+    <ClInclude Include="Texture.h" />
     <ClInclude Include="UploadBuffer.h" />
     <ClInclude Include="Win32Application.h" />
   </ItemGroup>

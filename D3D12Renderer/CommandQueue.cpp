@@ -2,11 +2,12 @@
 
 #include "D3DHelper.h"
 #include "ResourceLayoutTracker.h"
+#include "DynamicDescriptorHeap.h"
 
 using namespace D3DHelper;
 
-CommandQueue::CommandQueue(const ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type)
-    : m_type(type), m_fenceValue(0), m_device(device)
+CommandQueue::CommandQueue(const ComPtr<ID3D12Device10>& device, DynamicDescriptorHeap& dynamicDescriptorHeap, D3D12_COMMAND_LIST_TYPE type)
+    : m_type(type), m_fenceValue(0), m_device(device), m_dynamicDescriptorHeap(dynamicDescriptorHeap)
 {
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
     queueDesc.Type = type;
@@ -51,7 +52,7 @@ std::pair<ComPtr<ID3D12CommandAllocator>, CommandList> CommandQueue::GetAvailabl
     ComPtr<ID3D12CommandAllocator> commandAllocator;
     ComPtr<ID3D12GraphicsCommandList7> commandList;
 
-    // Command allocator queue¿¡ GPU ÀÛ¾÷ÀÌ ³¡³­ allocator°¡ Á¸ÀçÇÑ´Ù¸é ±×°ÍÀ» »ç¿ëÇÏ°í ¾ø´Ù¸é »õ·Î »ı¼º
+    // Command allocator queueì— GPU ì‘ì—…ì´ ëë‚œ allocatorê°€ ì¡´ì¬í•œë‹¤ë©´ ê·¸ê²ƒì„ ì‚¬ìš©í•˜ê³  ì—†ë‹¤ë©´ ìƒˆë¡œ ìƒì„±
     if (!m_commandAllocatorQueue.empty() && IsFenceComplete(m_commandAllocatorQueue.front().fenceValue))
     {
         commandAllocator = m_commandAllocatorQueue.front().commandAllocator;
@@ -63,8 +64,8 @@ std::pair<ComPtr<ID3D12CommandAllocator>, CommandList> CommandQueue::GetAvailabl
         commandAllocator = CreateCommandAllocator();
     }
 
-    // Command list´Â execute¸¸ µÇ¸é Áï½Ã Àç»ç¿ëÀÌ °¡´ÉÇÏ¹Ç·Î Å¥¿¡ ÀÖÀ¸¸é ¹Ù·Î »ç¿ëÇÏ°í ¾øÀ¸¸é »õ·Î »ı¼º
-    // Á÷Àü¿¡ ¾òÀº commandAllocator¿¡ ¿¬°á
+    // Command listëŠ” executeë§Œ ë˜ë©´ ì¦‰ì‹œ ì¬ì‚¬ìš©ì´ ê°€ëŠ¥í•˜ë¯€ë¡œ íì— ìˆìœ¼ë©´ ë°”ë¡œ ì‚¬ìš©í•˜ê³  ì—†ìœ¼ë©´ ìƒˆë¡œ ìƒì„±
+    // ì§ì „ì— ì–»ì€ commandAllocatorì— ì—°ê²°
     if (!m_commandListQueue.empty())
     {
         commandList = m_commandListQueue.front();
@@ -76,10 +77,14 @@ std::pair<ComPtr<ID3D12CommandAllocator>, CommandList> CommandQueue::GetAvailabl
         commandList = CreateCommandList(commandAllocator.Get());
     }
 
-    // Ä¿¸Çµå ¸®½ºÆ®´Â ¹İÈ¯ ½Ã ·¡ÆÛ·Î °¨½Ñ´Ù.
-    // CommandList Å¬·¡½º¿¡¼­ Á¦°øÇÏ´Â ±â´ÉµéÀº ¼ø¼öÇÏ°Ô Ä¿¸Çµå ¸®½ºÆ®°¡ ÀÛ¼ºµÉ ¶§¿¡¸¸ ÇÊ¿äÇÏ¹Ç·Î
-    // Ç® ³»¿¡ ÀÖÀ» ¶§¿¡´Â ·¡ÆÛ Å¬·¡½ºÀÇ ±â´ÉÀÌ ÇÊ¿ä¾ø´Ù.
-    // piecewise_construct¸¦ »ç¿ëÇÏ¿© in-place constructionÀ» ¼öÇà.
+    // Bind with DescriptorHeap
+    ID3D12DescriptorHeap* ppHeaps[] = { m_dynamicDescriptorHeap.GetCurrentDescriptorHeap().Get() };
+    commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+    // ì»¤ë§¨ë“œ ë¦¬ìŠ¤íŠ¸ëŠ” ë°˜í™˜ ì‹œ ë˜í¼ë¡œ ê°ì‹¼ë‹¤.
+    // CommandList í´ë˜ìŠ¤ì—ì„œ ì œê³µí•˜ëŠ” ê¸°ëŠ¥ë“¤ì€ ìˆœìˆ˜í•˜ê²Œ ì»¤ë§¨ë“œ ë¦¬ìŠ¤íŠ¸ê°€ ì‘ì„±ë  ë•Œì—ë§Œ í•„ìš”í•˜ë¯€ë¡œ
+    // í’€ ë‚´ì— ìˆì„ ë•Œì—ëŠ” ë˜í¼ í´ë˜ìŠ¤ì˜ ê¸°ëŠ¥ì´ í•„ìš”ì—†ë‹¤.
+    // piecewise_constructë¥¼ ì‚¬ìš©í•˜ì—¬ in-place constructionì„ ìˆ˜í–‰.
     return std::pair<ComPtr<ID3D12CommandAllocator>, CommandList>(
         std::piecewise_construct,
         std::forward_as_tuple(commandAllocator),
@@ -127,7 +132,7 @@ UINT64 CommandQueue::ExecuteCommandLists(const ComPtr<ID3D12CommandAllocator>& c
         m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
     }
 
-    // layoutTracker ¾÷µ¥ÀÌÆ®
+    // Update ResourceLayoutTracker
     auto latestLayouts = commandList.GetLatestLayouts();
     for (const auto& [pResource, p] : latestLayouts)
     {
@@ -135,13 +140,12 @@ UINT64 CommandQueue::ExecuteCommandLists(const ComPtr<ID3D12CommandAllocator>& c
         UINT subresourceCount = layoutInfo.MipLevels * layoutInfo.DepthOrArraySize * layoutInfo.PlaneCount;
         for (UINT i = 0; i < subresourceCount; i++)
         {
-            if (isNotUsed[i]) continue;     // Ä¿¸Çµå ¸®½ºÆ® ³»¿¡¼­ »ç¿ëÇÑ ÀûÀÌ ¾ø´Â ¼­ºê¸®¼Ò½º´Â ±×´ë·Î À¯Áö
+            if (isNotUsed[i]) continue;     // ì»¤ë§¨ë“œ ë¦¬ìŠ¤íŠ¸ ë‚´ì—ì„œ ì‚¬ìš©í•œ ì ì´ ì—†ëŠ” ì„œë¸Œë¦¬ì†ŒìŠ¤ëŠ” ê·¸ëŒ€ë¡œ ìœ ì§€
             layoutTracker.SetLayout(pResource, i, layoutInfo.GetLayout(i));
         }
     }
 
-    // Signal·Î ¾òÀº fenceValue¸¦ »ç¿ë? -> °¢ command allocator°¡ ÀÛ¾÷ÀÌ ³¡³µ´ÂÁö ¾Ë±â À§ÇÑ ¼ö´Ü
-    // ÀÏ´ÜÀº µÑ ´Ù µ¿ÀÏÇÑ fenceValue·Î Ç¥½Ã
+    // Set sub and main with same fenceValue for now
     UINT64 fenceValue = Signal();
     m_commandAllocatorQueue.push({ fenceValue, commandAllocator });
     m_commandListQueue.push(main);

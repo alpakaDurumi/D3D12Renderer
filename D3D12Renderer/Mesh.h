@@ -11,6 +11,7 @@
 
 #include "D3DHelper.h"
 #include "ConstantData.h"
+#include "DescriptorAllocator.h"
 
 class CommandList;
 
@@ -185,12 +186,6 @@ public:
     MaterialConstantData m_materialConstantBufferData;
     UINT m_meshConstantBufferIndex;
     UINT m_materialConstantBufferIndex;
-
-    // 디스크립터 힙 내 CBV 구역에서 각 프레임에 대한 영역이 있을 때, 해당 영역의 시작 지점 기준 오프셋
-    UINT m_perMeshCbvDescriptorOffset;
-    UINT m_defaultCbvDescriptorOffset;
-    // 디스크립터 힙 내 SRV 구역에서 디스크립터에 대한 오프셋
-    UINT m_srvDescriptorOffset;
 };
 
 class InstancedMesh : public Mesh

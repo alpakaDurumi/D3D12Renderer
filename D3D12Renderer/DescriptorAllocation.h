@@ -6,22 +6,28 @@
 class DescriptorAllocatorPage;
 
 // move-only self-freeing type that is used as a wrapper for a D3D12_CPU_DESCRIPTOR_HANDLE
-// The reason why the DescriptorAllocation must be a move-only class is to ensure there is only a single instance of a particular allocation
+// The reason why the DescriptorAllocation must be a move-only class is to ensure there is only a single instance of a particular allocation exists.
 class DescriptorAllocation
 {
 public:
     DescriptorAllocation() = delete;
-    DescriptorAllocation(D3D12_CPU_DESCRIPTOR_HANDLE baseDescriptor, UINT32 offsetInHeap, UINT32 numHandles, UINT32 descriptorSize, DescriptorAllocatorPage* pPage);
-
-    ~DescriptorAllocation();
 
     // Copies are not allowed
     DescriptorAllocation(const DescriptorAllocation&) = delete;
     DescriptorAllocation& operator=(const DescriptorAllocation&) = delete;
-
+    
     // Only move is allowed
     DescriptorAllocation(DescriptorAllocation&& other) noexcept;
     DescriptorAllocation& operator=(DescriptorAllocation&& other) noexcept;
+
+    DescriptorAllocation(
+        D3D12_CPU_DESCRIPTOR_HANDLE baseDescriptor,
+        UINT32 offsetInHeap,
+        UINT32 numHandles,
+        UINT32 descriptorSize,
+        DescriptorAllocatorPage* pPage);
+
+    ~DescriptorAllocation();
 
     // Get a descriptor at a particular offset in the allocation
     D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandle(UINT32 offsetInBlock = 0) const;
