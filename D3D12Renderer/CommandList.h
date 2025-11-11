@@ -63,6 +63,6 @@ private:
     ComPtr<ID3D12Device10> m_device;
 
     ComPtr<ID3D12GraphicsCommandList7> m_commandList;
-    std::unordered_map<ID3D12Resource*, LatestLayout> m_latestLayouts;  // 이번 command list 작성 중, 각 리소스에 대해 알려진 최신 layout
+    std::unordered_map<ID3D12Resource*, LatestLayout> m_latestLayouts;  // Latest layout for each resource during a single command list recording.
     std::vector<D3D12_TEXTURE_BARRIER> m_pendingBarriers;
 };

@@ -18,6 +18,12 @@ using Microsoft::WRL::ComPtr;
 class DynamicDescriptorHeap
 {
 public:
+    // Disable copy and move. Only use as l-value reference
+    DynamicDescriptorHeap(const DynamicDescriptorHeap&) = delete;
+    DynamicDescriptorHeap& operator=(const DynamicDescriptorHeap&) = delete;
+    DynamicDescriptorHeap(DynamicDescriptorHeap&&) = delete;
+    DynamicDescriptorHeap& operator=(DynamicDescriptorHeap&&) = delete;
+
     DynamicDescriptorHeap(const ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT32 numDescriptorsPerHeap = 1024);
 
     void StageDescriptors(UINT32 rootParameterIndex, UINT32 offset, UINT32 numDescriptors, const D3D12_CPU_DESCRIPTOR_HANDLE srcDescriptors);

@@ -15,11 +15,20 @@ using Microsoft::WRL::ComPtr;
 class UploadBuffer
 {
 public:
+    // Disable copy and move. Only use as l-value reference
+    UploadBuffer(const UploadBuffer&) = delete;
+    UploadBuffer& operator=(const UploadBuffer&) = delete;
+    UploadBuffer(UploadBuffer&&) = delete;
+    UploadBuffer& operator=(UploadBuffer&&) = delete;
+
     struct Allocation
     {
-        //// Disable copy
-        //Allocation(const Allocation&) = delete;
-        //Allocation& operator=(const Allocation&) = delete;
+        // Disable copy
+        Allocation(const Allocation&) = delete;
+        Allocation& operator=(const Allocation&) = delete;
+
+        Allocation(Allocation&& other) noexcept;
+        Allocation& operator=(Allocation&& other) noexcept;
 
         Allocation(void* cpuPtr, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr, ID3D12Resource* pResource, SIZE_T offset)
             : CPUPtr(cpuPtr), GPUPtr(gpuPtr), pResource(pResource), Offset(offset)

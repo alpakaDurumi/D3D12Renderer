@@ -12,6 +12,33 @@ SIZE_T Align(SIZE_T size, SIZE_T alignment)
     return (size + (alignment - 1)) & ~(alignment - 1);
 }
 
+UploadBuffer::Allocation::Allocation(UploadBuffer::Allocation&& other) noexcept
+    : CPUPtr(other.CPUPtr), GPUPtr(other.GPUPtr), pResource(other.pResource), Offset(other.Offset)
+{
+    other.CPUPtr = nullptr;
+    other.GPUPtr = 0;
+    other.pResource = nullptr;
+    other.Offset = 0;
+}
+
+UploadBuffer::Allocation& UploadBuffer::Allocation::operator=(UploadBuffer::Allocation&& other) noexcept
+{
+    if (this != &other)
+    {
+        CPUPtr = other.CPUPtr;
+        GPUPtr = other.GPUPtr;
+        pResource = other.pResource;
+        Offset = other.Offset;
+
+        other.CPUPtr = nullptr;
+        other.GPUPtr = 0;
+        other.pResource = nullptr;
+        other.Offset = 0;
+    }
+
+    return *this;
+}
+
 UploadBuffer::UploadBuffer(const ComPtr<ID3D12Device10>& device, const CommandQueue& commandQueue, SIZE_T pageSize)
     : m_device(device), m_commandQueue(commandQueue), m_pageSize(pageSize), m_currentPage(nullptr), m_currentOffset(0)
 {

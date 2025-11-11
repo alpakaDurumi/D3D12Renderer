@@ -61,37 +61,41 @@ public:
     void OnResize(UINT width, UINT height);
 
 private:
+    // Window
     UINT m_width = 1280;
     UINT m_height = 720;
 
     std::wstring m_title;
 
-    static const UINT FrameCount = 2;
-
     bool m_vSync = false;
     bool m_tearingSupported = false;
     bool m_fullScreen = false;
+
     RECT m_windowRect;
+    D3D12_VIEWPORT m_viewport;
+    D3D12_RECT m_scissorRect;
+
+    static const UINT FrameCount = 2;
 
     // Adapter info
     bool m_useWarpDevice = false;
 
     // Pipeline objects
-    D3D12_VIEWPORT m_viewport;
-    D3D12_RECT m_scissorRect;
-    ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12Device10> m_device;
-    ComPtr<ID3D12Resource> m_depthStencilBuffer;
-    std::unique_ptr<DescriptorAllocation> m_dsvAllocation;
+    ComPtr<IDXGISwapChain3> m_swapChain;
+
+    std::unique_ptr<DynamicDescriptorHeap> m_dynamicDescriptorHeap;
     std::unique_ptr<CommandQueue> m_commandQueue;
-    std::unique_ptr<RootSignature> m_rootSignature;
-    ComPtr<ID3D12PipelineState> m_defaultPipelineState;
-    ComPtr<ID3D12PipelineState> m_instancedPipelineState;
-    std::vector<FrameResource*> m_frameResources;
     std::unique_ptr<ResourceLayoutTracker> m_layoutTracker;
     std::unique_ptr<UploadBuffer> m_uploadBuffer;
     std::array<std::unique_ptr<DescriptorAllocator>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
-    std::unique_ptr<DynamicDescriptorHeap> m_dynamicDescriptorHeap;
+    std::vector<FrameResource*> m_frameResources;
+
+    std::unique_ptr<RootSignature> m_rootSignature;
+    ComPtr<ID3D12PipelineState> m_defaultPipelineState;
+    ComPtr<ID3D12PipelineState> m_instancedPipelineState;
+    std::unique_ptr<DescriptorAllocation> m_dsvAllocation;
+    ComPtr<ID3D12Resource> m_depthStencilBuffer;
 
     // App resources
     Camera m_camera;

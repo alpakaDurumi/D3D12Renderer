@@ -401,9 +401,11 @@ void Renderer::LoadPipeline()
     queueDesc.NodeMask = 0;
 
     // Do not transfer prvalue object to std::make_unique.
-    // Both CommandQueue and ResourceLayoutTracker are non-copyable and non-movable types.
+    // These are non-copyable and non-movable types.
     // Passing a temporary object like `std::make_unique<T>(T(...))` will fail to compile
     // Instead, pass the constructor arguments directly to std::make_unique<T>()
+    m_dynamicDescriptorHeap = std::make_unique<DynamicDescriptorHeap>(m_device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_commandQueue = std::make_unique<CommandQueue>(m_device, *m_dynamicDescriptorHeap, D3D12_COMMAND_LIST_TYPE_DIRECT);
     m_layoutTracker = std::make_unique<ResourceLayoutTracker>(m_device);
     m_uploadBuffer = std::make_unique<UploadBuffer>(m_device, *m_commandQueue, 16 * 1024 * 1024);    // 16MB
     for (UINT i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
@@ -411,8 +413,6 @@ void Renderer::LoadPipeline()
         D3D12_DESCRIPTOR_HEAP_TYPE type = static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(i);
         m_descriptorAllocators[i] = std::make_unique<DescriptorAllocator>(m_device, type);
     }
-    m_dynamicDescriptorHeap = std::make_unique<DynamicDescriptorHeap>(m_device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_commandQueue = std::make_unique<CommandQueue>(m_device, *m_dynamicDescriptorHeap, D3D12_COMMAND_LIST_TYPE_DIRECT);
 
     // Check for Variable Refresh Rate(VRR)
     m_tearingSupported = CheckTearingSupport();

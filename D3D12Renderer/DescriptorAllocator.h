@@ -18,6 +18,12 @@ using Microsoft::WRL::ComPtr;
 class DescriptorAllocator
 {
 public:
+    // Disable copy and move. Only use as l-value reference
+    DescriptorAllocator(const DescriptorAllocator&) = delete;
+    DescriptorAllocator& operator=(const DescriptorAllocator&) = delete;
+    DescriptorAllocator(DescriptorAllocator&&) = delete;
+    DescriptorAllocator& operator=(DescriptorAllocator&&) = delete;
+
     DescriptorAllocator(const ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap = 256);
 
     DescriptorAllocation Allocate(UINT32 numDescriptors = 1);
