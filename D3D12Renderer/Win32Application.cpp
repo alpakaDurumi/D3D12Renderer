@@ -1,4 +1,7 @@
+#include "pch.h"
 #include "Win32Application.h"
+
+#include "Renderer.h"
 
 int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmdLine, int nCmdShow)
 {

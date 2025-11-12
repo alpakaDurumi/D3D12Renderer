@@ -1,11 +1,14 @@
 #pragma once
 
+#include <Windows.h>
 #include <wrl/client.h>
 
 #include <d3d12.h>
 
 #include <memory>
 #include <queue>
+#include <vector>
+#include <utility>
 
 class CommandQueue;
 
@@ -60,7 +63,7 @@ private:
     };
 
     Page* RequestPage();
- 
+
     std::vector<std::unique_ptr<Page>> m_pagePool;          // Pool containing all pages
     std::queue<Page*> m_availablePages;                     // List of pages immediately available for use
     std::vector<Page*> m_retiredPages;                      // Pages that ran out of space during a single command list recording

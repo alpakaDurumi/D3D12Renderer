@@ -1,12 +1,13 @@
 #pragma once
 
+#include <Windows.h>
 #include <wrl/client.h>
 
 #include <d3d12.h>
 #include <dxgi1_6.h>    // DXGI 1.6
-#include <DirectXMath.h>
 
 #include <vector>
+#include <utility>
 
 #include "D3DHelper.h"
 #include "ConstantData.h"
@@ -14,7 +15,6 @@
 #include "DescriptorAllocation.h"
 
 using Microsoft::WRL::ComPtr;
-using namespace DirectX;
 using namespace D3DHelper;
 
 // aliasing

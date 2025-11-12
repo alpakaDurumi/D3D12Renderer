@@ -1,6 +1,5 @@
+#include "pch.h"
 #include "DescriptorAllocation.h"
-
-#include <cassert>
 
 #include "D3DHelper.h"
 #include "DescriptorAllocatorPage.h"

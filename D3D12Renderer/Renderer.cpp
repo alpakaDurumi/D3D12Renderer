@@ -1,10 +1,12 @@
+#include "pch.h"
 #include "Renderer.h"
+
+#include <D3Dcompiler.h>
+#include <dxgidebug.h>
+#include <chrono>
 
 #include "Win32Application.h"
 #include "D3DHelper.h"
-#include <D3Dcompiler.h>
-#include <stdexcept>
-
 #include "FrameResource.h"
 #include "CommandList.h"
 

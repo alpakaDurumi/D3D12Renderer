@@ -1,9 +1,5 @@
+#include "pch.h"
 #include "D3DHelper.h"
-
-#include <exception>
-#include <cassert>
-
-#include "ResourceLayoutTracker.h"
 
 namespace D3DHelper
 {
@@ -23,7 +19,7 @@ namespace D3DHelper
         bool requestHighPerformanceAdapter)
     {
         *ppAdapter = nullptr;
-
+        
         ComPtr<IDXGIAdapter1> adapter;
 
         ComPtr<IDXGIFactory6> factory6;

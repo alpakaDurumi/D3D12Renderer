@@ -1,6 +1,5 @@
+#include "pch.h"
 #include "UploadBuffer.h"
-
-#include <new>
 
 #include "D3DHelper.h"
 #include "CommandQueue.h"

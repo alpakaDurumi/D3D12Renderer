@@ -1,5 +1,7 @@
 #include <Windows.h>
+
 #include "Win32Application.h"
+#include "Renderer.h"
 
 extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 717; }
 extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\"; }

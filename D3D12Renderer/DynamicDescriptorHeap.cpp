@@ -1,7 +1,5 @@
+#include "pch.h"
 #include "DynamicDescriptorHeap.h"
-
-#include <cassert>
-#include <stdexcept>
 
 #include "D3DHelper.h"
 #include "RootSignature.h"

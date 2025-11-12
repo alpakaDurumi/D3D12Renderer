@@ -7,11 +7,9 @@
 #include <DirectXMath.h>
 
 #include <vector>
-#include <cmath>
 
 #include "D3DHelper.h"
 #include "ConstantData.h"
-#include "DescriptorAllocator.h"
 
 class CommandList;
 

@@ -1,6 +1,9 @@
 #pragma once
 
-// 여러 곳으로 동작을 전파할 때, 콜백/함수 포인터/이벤트 시스템 등 여러가지 방법 가능
+#include <Windows.h>
+
+#include <DirectXMath.h>
+
 class InputManager
 {
 public:

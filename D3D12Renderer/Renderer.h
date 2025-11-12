@@ -1,19 +1,13 @@
 #pragma once
 
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
 #include <Windows.h>
 #include <wrl/client.h>
 
 #include <d3d12.h>
 #include <dxgi1_6.h>    // DXGI 1.6
-#include <dxgidebug.h>
-#include <DirectXMath.h>
 
 #include <string>
 #include <vector>
-#include <chrono>
-#include <algorithm>
 #include <memory>
 #include <array>
 

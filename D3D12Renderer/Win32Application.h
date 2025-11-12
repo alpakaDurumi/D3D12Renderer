@@ -1,9 +1,8 @@
 #pragma once
 
 #include <Windows.h>
-#include <shellapi.h>
 
-#include "Renderer.h"
+class Renderer;
 
 class Win32Application
 {

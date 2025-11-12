@@ -1,9 +1,12 @@
 #pragma once
 
+#include <Windows.h>
 #include <wrl/client.h>
+
 #include <d3d12.h>
 
 #include <optional>
+#include <utility>
 
 #include "D3DHelper.h"
 #include "DescriptorAllocation.h"

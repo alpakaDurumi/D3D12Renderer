@@ -1,6 +1,7 @@
 #pragma once
 
-#include <wrl/client.h>
+#include <Windows.h>
+
 #include <d3d12.h>
 
 class DescriptorAllocatorPage;

@@ -1,6 +1,5 @@
+#include "pch.h"
 #include "ResourceLayoutTracker.h"
-
-#include <cassert>
 
 #include "D3DHelper.h"
 

@@ -1,11 +1,5 @@
-#define NOMINMAX
-
+#include "pch.h"
 #include "DescriptorAllocator.h"
-
-#include <optional>
-
-#include "DescriptorAllocatorPage.h"
-#include "DescriptorAllocation.h"
 
 DescriptorAllocator::DescriptorAllocator(const ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap)
     : m_device(device), m_heapType(type), m_numDescriptorsPerHeap(numDescriptorsPerHeap)
@@ -29,9 +23,8 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
         // A valid allocation has been found
         if (allocation.has_value())
         {
-            // DescriptorAllocatorPage::Allocate 내에서 m_numFreeHandles를 감소시킴에도 불구하고,
-            // 다시 GetNumFreeHandles를 호출하여 개수를 확인하고 있다. DescriptorAllocatorPage::Allocate에서
-            // 남은 개수가 0인지 아닌지도 반환하도록 하면 연산 횟수를 줄일 수 있을 것 같다.
+            // In DescriptorAllocatorPage::Allocate, m_numFreeHandles is already checked,
+            // but here it's checked again with GetNumFreeHandles. This could be redundant.
             
             // Check if page has free handles only when allocation succeeded
             if (allocatorPage->GetNumFreeHandles() == 0)
