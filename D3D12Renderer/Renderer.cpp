@@ -92,8 +92,11 @@ Renderer::Renderer(std::wstring name)
 
 void Renderer::SetPix()
 {
+    if (GetModuleHandleW(L"WinPixGpuCapturer.dll") == 0)
+    {
     std::wstring path = GetLatestWinPixGpuCapturerPath_Cpp17();
     HMODULE hPixModule = LoadLibraryW(path.c_str());
+}
 }
 
 void Renderer::UpdateWidthHeight()
