@@ -179,13 +179,9 @@ void DynamicDescriptorHeap::CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommand
             UINT pDestDescriptorRangeSizes[] = { numSrcDescriptors };
 
             // Copy the staged CPU visible descriptors to the GPU visible descriptor heap.
-            //m_device->CopyDescriptors(
-            //    1, pDestDescriptorRangeStarts, pDestDescriptorRangeSizes,
-            //    numSrcDescriptors, pSrcDescriptorHandles, nullptr,
-            //    m_heapType);
             m_device->CopyDescriptors(
                 1, pDestDescriptorRangeStarts, pDestDescriptorRangeSizes,
-                1, pSrcDescriptorHandles, pDestDescriptorRangeSizes,
+                numSrcDescriptors, pSrcDescriptorHandles, nullptr,
                 m_heapType);
             // Set the descriptors on the command list using the passed-in setter function.
             setFunc(commandList.Get(), rootIndex, m_currentGPUDescriptorHandle);
