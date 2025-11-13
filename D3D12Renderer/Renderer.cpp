@@ -4,6 +4,8 @@
 #include <D3Dcompiler.h>
 #include <dxgidebug.h>
 #include <chrono>
+#include <filesystem>
+#include <shlobj.h>
 
 #include "Win32Application.h"
 #include "D3DHelper.h"
@@ -53,9 +55,45 @@ std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UI
     return data;
 }
 
+// https://devblogs.microsoft.com/pix/taking-a-capture/
+static std::wstring GetLatestWinPixGpuCapturerPath_Cpp17()
+{
+    LPWSTR programFilesPath = nullptr;
+    SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &programFilesPath);
+
+    std::filesystem::path pixInstallationPath = programFilesPath;
+    pixInstallationPath /= "Microsoft PIX";
+
+    std::wstring newestVersionFound;
+
+    for (auto const& directory_entry : std::filesystem::directory_iterator(pixInstallationPath))
+    {
+        if (directory_entry.is_directory())
+        {
+            if (newestVersionFound.empty() || newestVersionFound < directory_entry.path().filename().c_str())
+            {
+                newestVersionFound = directory_entry.path().filename().c_str();
+            }
+        }
+    }
+
+    if (newestVersionFound.empty())
+    {
+        throw std::runtime_error("No PIX installation found.");
+    }
+
+    return pixInstallationPath / newestVersionFound / L"WinPixGpuCapturer.dll";
+}
+
 Renderer::Renderer(std::wstring name)
     : m_title(name), m_frameIndex(0), m_camera({ 0.0f, 0.0f, -5.0f })
 {
+}
+
+void Renderer::SetPix()
+{
+    std::wstring path = GetLatestWinPixGpuCapturerPath_Cpp17();
+    HMODULE hPixModule = LoadLibraryW(path.c_str());
 }
 
 void Renderer::UpdateWidthHeight()
@@ -386,6 +424,7 @@ void Renderer::LoadPipeline()
 
 #if defined(_DEBUG)
     // Use ID3D12InfoQueue
+    // This querying is only successful when the debug layer is enabled.
     ComPtr<ID3D12InfoQueue> d3d12InfoQueue;
     if (SUCCEEDED(m_device.As(&d3d12InfoQueue)))
     {

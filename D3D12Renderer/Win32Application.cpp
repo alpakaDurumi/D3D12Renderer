@@ -158,6 +158,8 @@ void Win32Application::ParseCommandLineArgs(Renderer* pRenderer, LPWSTR lpCmdLin
             pRenderer->SetHeight(wcstol(argv[++i], nullptr, 10));
         if (wcscmp(argv[i], L"-warp") == 0 || wcscmp(argv[i], L"--warp") == 0)
             pRenderer->SetWarp(true);
+        if (wcscmp(argv[i], L"-pix") == 0 || wcscmp(argv[i], L"--pix") == 0)
+            pRenderer->SetPix();
     }
 
     LocalFree(argv);
