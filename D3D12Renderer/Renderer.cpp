@@ -94,9 +94,9 @@ void Renderer::SetPix()
 {
     if (GetModuleHandleW(L"WinPixGpuCapturer.dll") == 0)
     {
-    std::wstring path = GetLatestWinPixGpuCapturerPath_Cpp17();
-    HMODULE hPixModule = LoadLibraryW(path.c_str());
-}
+        std::wstring path = GetLatestWinPixGpuCapturerPath_Cpp17();
+        HMODULE hPixModule = LoadLibraryW(path.c_str());
+    }
 }
 
 void Renderer::UpdateWidthHeight()
@@ -542,8 +542,10 @@ void Renderer::LoadAssets()
         (*m_rootSignature)[2].InitAsRange(1, 3, 0, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);    // Camera
 
         // Descriptor table for texture
+        // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
+        // In Resource history of PIX, only read occurs to this texture. So it seems like a bug of PIX.
         (*m_rootSignature)[3].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-        (*m_rootSignature)[3].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+        (*m_rootSignature)[3].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
         m_rootSignature->InitStaticSampler(0, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL);
 
