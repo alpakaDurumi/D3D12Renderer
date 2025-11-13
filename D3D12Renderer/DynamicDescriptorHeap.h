@@ -10,6 +10,7 @@
 #include <functional>
 
 class RootSignature;
+class CommandQueue;
 
 using Microsoft::WRL::ComPtr;
 
@@ -27,6 +28,8 @@ public:
 
     DynamicDescriptorHeap(const ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT32 numDescriptorsPerHeap = 1024);
 
+    void SetCommandQueue(const CommandQueue* pCommandQueue) { m_pCommandQueue = pCommandQueue; }
+
     void StageDescriptors(UINT32 rootParameterIndex, UINT32 offset, UINT32 numDescriptors, const D3D12_CPU_DESCRIPTOR_HANDLE srcDescriptors);
 
     // Copy all of the staged descriptors to the GPU visible descriptor heap and
@@ -39,12 +42,14 @@ public:
 
     void ParseRootSignature(const RootSignature& rootSignature);
 
-    ComPtr<ID3D12DescriptorHeap> GetCurrentDescriptorHeap();
+    ID3D12DescriptorHeap* GetCurrentDescriptorHeap() const;
+
+    void QueueRetiredHeaps(UINT64 fenceValue);
 
 private:
     void CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommandList7>& commandList, std::function<void(ID3D12GraphicsCommandList*, UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc);
 
-    ComPtr<ID3D12DescriptorHeap> RequestDescriptorHeap();
+    ID3D12DescriptorHeap* RequestDescriptorHeap();
     ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap();
 
     UINT32 ComputeStaleDescriptorCount() const;
@@ -83,15 +88,17 @@ private:
     // descriptors were copied.
     UINT32 m_staleDescriptorTableBitMask;
 
-    using DescriptorHeapPool = std::queue<ComPtr<ID3D12DescriptorHeap>>;
+    std::vector<ComPtr<ID3D12DescriptorHeap>> m_heapPool;
+    std::queue<ID3D12DescriptorHeap*> m_availableHeaps;
 
-    DescriptorHeapPool m_descriptorHeapPool;
-    DescriptorHeapPool m_availableDescriptorHeaps;
+    std::vector<ID3D12DescriptorHeap*> m_retiredHeaps;
+    std::queue<std::pair<UINT64, ID3D12DescriptorHeap*>> m_pendingHeaps;
 
-    ComPtr<ID3D12DescriptorHeap> m_currentDescriptorHeap;
+    ID3D12DescriptorHeap* m_currentHeap;
     D3D12_GPU_DESCRIPTOR_HANDLE m_currentGPUDescriptorHandle;
     D3D12_CPU_DESCRIPTOR_HANDLE m_currentCPUDescriptorHandle;
     UINT32 m_numFreeHandles;    // Number of free handles in current descriptor heap
 
     ComPtr<ID3D12Device10> m_device;
+    const CommandQueue* m_pCommandQueue;     // For IsFenceComplete
 };

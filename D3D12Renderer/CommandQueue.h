@@ -24,9 +24,11 @@ public:
     CommandQueue(CommandQueue&&) = delete;
     CommandQueue& operator=(CommandQueue&&) = delete;
 
-    CommandQueue(const ComPtr<ID3D12Device10>& device, DynamicDescriptorHeap& dynamicDescriptorHeap, D3D12_COMMAND_LIST_TYPE type);
+    CommandQueue(const ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type);
 
     ~CommandQueue();
+
+    void SetDynamicDescriptorHeap(const DynamicDescriptorHeap* pDynamicDescriptorHeap) { m_pDynamicDescriptorHeap = pDynamicDescriptorHeap; }
 
     ComPtr<ID3D12CommandQueue> GetCommandQueue() const { return m_commandQueue; }
 
@@ -63,5 +65,5 @@ private:
     HANDLE m_fenceEvent;
     UINT64 m_fenceValue;
 
-    DynamicDescriptorHeap& m_dynamicDescriptorHeap;
+    const DynamicDescriptorHeap* m_pDynamicDescriptorHeap;
 };

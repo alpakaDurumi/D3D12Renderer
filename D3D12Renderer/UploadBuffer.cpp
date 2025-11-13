@@ -38,8 +38,8 @@ UploadBuffer::Allocation& UploadBuffer::Allocation::operator=(UploadBuffer::Allo
     return *this;
 }
 
-UploadBuffer::UploadBuffer(const ComPtr<ID3D12Device10>& device, const CommandQueue& commandQueue, SIZE_T pageSize)
-    : m_device(device), m_commandQueue(commandQueue), m_pageSize(pageSize), m_currentPage(nullptr), m_currentOffset(0)
+UploadBuffer::UploadBuffer(const ComPtr<ID3D12Device10>& device, SIZE_T pageSize)
+    : m_device(device), m_pCommandQueue(nullptr), m_pageSize(pageSize), m_currentPage(nullptr), m_currentOffset(0)
 {
 }
 
@@ -87,7 +87,7 @@ UploadBuffer::Allocation UploadBuffer::Allocate(SIZE_T sizeInBytes, SIZE_T align
 
 UploadBuffer::Page* UploadBuffer::RequestPage()
 {
-    while (!m_pendingPages.empty() && m_commandQueue.IsFenceComplete(m_pendingPages.front().first))
+    while (!m_pendingPages.empty() && m_pCommandQueue->IsFenceComplete(m_pendingPages.front().first))
     {
         m_availablePages.push(m_pendingPages.front().second);
         m_pendingPages.pop();

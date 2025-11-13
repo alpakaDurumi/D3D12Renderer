@@ -44,7 +44,9 @@ public:
         SIZE_T Offset;
     };
 
-    UploadBuffer(const ComPtr<ID3D12Device10>& device, const CommandQueue& commandQueue, SIZE_T pageSize);
+    UploadBuffer(const ComPtr<ID3D12Device10>& device, SIZE_T pageSize);
+
+    void SetCommandQueue(const CommandQueue* pCommandQueue) { m_pCommandQueue = pCommandQueue; }
 
     SIZE_T GetPageSize() const { return m_pageSize; }
     Allocation Allocate(SIZE_T sizeInBytes, SIZE_T alignment);
@@ -75,5 +77,5 @@ private:
     SIZE_T m_pageSize;
 
     ComPtr<ID3D12Device10> m_device;
-    const CommandQueue& m_commandQueue;     // For IsFenceComplete
+    const CommandQueue* m_pCommandQueue;     // For IsFenceComplete
 };
