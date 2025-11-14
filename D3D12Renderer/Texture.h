@@ -37,7 +37,6 @@ public:
 
         commandList.Barrier(
             m_texture.Get(),
-            layoutTracker,
             D3D12_BARRIER_SYNC_NONE,
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_ACCESS_NO_ACCESS,
@@ -64,7 +63,6 @@ public:
 
         commandList.Barrier(
             m_texture.Get(),
-            layoutTracker,
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_SYNC_PIXEL_SHADING,
             D3D12_BARRIER_ACCESS_COPY_DEST,

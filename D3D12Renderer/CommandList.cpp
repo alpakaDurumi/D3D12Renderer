@@ -32,7 +32,6 @@ void CommandList::Barrier(
 
 void CommandList::Barrier(
     ID3D12Resource* pResource,
-    ResourceLayoutTracker& layoutTracker,
     D3D12_BARRIER_SYNC syncBefore,
     D3D12_BARRIER_SYNC syncAfter,
     D3D12_BARRIER_ACCESS accessBefore,

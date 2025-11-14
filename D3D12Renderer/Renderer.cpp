@@ -771,8 +771,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     cmdList->RSSetViewports(1, &m_viewport);
     cmdList->RSSetScissorRects(1, &m_scissorRect);
 
-    commandList.Barrier(pFrameResource->m_renderTarget.Get(),
-        *m_layoutTracker,
+    commandList.Barrier(
+        pFrameResource->m_renderTarget.Get(),
         D3D12_BARRIER_SYNC_NONE,
         D3D12_BARRIER_SYNC_RENDER_TARGET,
         D3D12_BARRIER_ACCESS_NO_ACCESS,
@@ -817,8 +817,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     // Swap Chain textures initially created in D3D12_BARRIER_LAYOUT_COMMON
     // and presentation requires the back buffer is using D3D12_BARRIER_LAYOUT_COMMON
     // LAYOUT_PRESENT is alias for LAYOUT_COMMON
-    commandList.Barrier(pFrameResource->m_renderTarget.Get(),
-        *m_layoutTracker,
+    commandList.Barrier(
+        pFrameResource->m_renderTarget.Get(),
         D3D12_BARRIER_SYNC_RENDER_TARGET,
         D3D12_BARRIER_SYNC_NONE,
         D3D12_BARRIER_ACCESS_RENDER_TARGET,
