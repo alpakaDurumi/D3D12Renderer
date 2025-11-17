@@ -690,9 +690,7 @@ void Renderer::LoadAssets()
             {
                 // Mesh
                 {
-                    //MeshCB* meshCB = new MeshCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
                     MeshCB* meshCB = new MeshCB(m_device.Get());
-                    meshCB->Update(&mesh.m_meshBufferData);
 
                     // 각 FrameResource에서 동일한 인덱스긴 하지만, 한 번만 수행하도록 하였음
                     if (i == 0)
@@ -708,9 +706,7 @@ void Renderer::LoadAssets()
             {
                 // Mesh
                 {
-                    //MeshCB* meshCB = new MeshCB(m_device.Get(), m_cbvSrvUavHeap.GetFreeHandleForCbv());
                     MeshCB* meshCB = new MeshCB(m_device.Get());
-                    meshCB->Update(&mesh.m_meshBufferData);
 
                     if (i == 0)
                         mesh.m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
@@ -726,8 +722,6 @@ void Renderer::LoadAssets()
         {
             DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
             LightCB* lightCB = new LightCB(m_device.Get(), std::move(alloc));
-            lightCB->Update(&m_lightConstantData);
-
             pFrameResource->m_lightConstantBuffer = lightCB;
         }
 
@@ -735,8 +729,6 @@ void Renderer::LoadAssets()
         {
             DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
             CameraCB* cameraCB = new CameraCB(m_device.Get(), std::move(alloc));
-            cameraCB->Update(&m_cameraConstantData);
-
             pFrameResource->m_cameraConstantBuffer = cameraCB;
         }
     }
