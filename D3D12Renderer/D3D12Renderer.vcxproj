@@ -169,6 +169,7 @@
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="ResourceLayoutTracker.cpp" />
     <ClCompile Include="UploadBuffer.cpp" />
+    <ClCompile Include="Utility.cpp" />
     <ClCompile Include="Win32Application.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -202,6 +203,7 @@
     <ClInclude Include="RootSignature.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="UploadBuffer.h" />
+    <ClInclude Include="Utility.h" />
     <ClInclude Include="Win32Application.h" />
   </ItemGroup>
   <ItemGroup>

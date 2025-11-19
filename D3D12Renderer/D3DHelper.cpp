@@ -1,6 +1,11 @@
 #include "pch.h"
 #include "D3DHelper.h"
 
+#include "Utility.h"
+#include "DirectXTex.h"
+
+using namespace DirectX;
+
 namespace D3DHelper
 {
     void ThrowIfFailed(HRESULT hr)
@@ -19,7 +24,7 @@ namespace D3DHelper
         bool requestHighPerformanceAdapter)
     {
         *ppAdapter = nullptr;
-        
+
         ComPtr<IDXGIAdapter1> adapter;
 
         ComPtr<IDXGIFactory6> factory6;
@@ -573,5 +578,182 @@ namespace D3DHelper
         UINT arraySize)
     {
         return mipIndex + arrayIndex * mipLevels + planeIndex * mipLevels * arraySize;
+    }
+
+    void ConvertToDDS(const std::wstring& filePath, bool useBlockCompress, bool flipImage) 
+    {
+        bool isHDR = false;
+        bool isSRGB = false;
+
+        std::wstring ext = Utility::GetFileExtension(filePath);
+
+        // Load texture based on file extension
+        // No exr extension considered yet
+        TexMetadata info;
+        ScratchImage image;
+
+        if (ext == L"dds")
+        {
+            HRESULT hr = LoadFromDDSFile(filePath.c_str(), DDS_FLAGS_NONE, &info, image);
+            if (FAILED(hr))
+            {
+                throw std::runtime_error("Could not load DDS texture.");
+            }
+        }
+        else if (ext == L"tga")
+        {
+            HRESULT hr = LoadFromTGAFile(filePath.c_str(), &info, image);
+            if (FAILED(hr))
+            {
+                throw std::runtime_error("Could not load TGA texture.");
+            }
+        }
+        else if (ext == L"hdr")
+        {
+            isHDR = true;
+            HRESULT hr = LoadFromHDRFile(filePath.c_str(), &info, image);
+            if (FAILED(hr))
+            {
+                throw std::runtime_error("Could not load HDR texture.");
+            }
+        }
+        else
+        {
+            HRESULT hr = LoadFromWICFile(filePath.c_str(), WIC_FLAGS_NONE, &info, image);
+            if (FAILED(hr))
+            {
+                throw std::runtime_error("Could not load WIC texture.");
+            }
+        }
+
+        // Check resource limits
+        if (info.dimension == TEX_DIMENSION_TEXTURE1D)
+        {
+            if (info.width > D3D12_REQ_TEXTURE1D_U_DIMENSION)
+            {
+                throw std::runtime_error("Texture1D size is too large.");
+            }
+        }
+        else if (info.dimension == TEX_DIMENSION_TEXTURE2D)
+        {
+            if (info.width > D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION ||
+                info.height > D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION)
+            {
+                throw std::runtime_error("Texture2D size is too large.");
+            }
+        }
+        else
+        {
+            if (info.width > D3D12_REQ_TEXTURE3D_U_V_OR_W_DIMENSION ||
+                info.height > D3D12_REQ_TEXTURE3D_U_V_OR_W_DIMENSION ||
+                info.depth > D3D12_REQ_TEXTURE3D_U_V_OR_W_DIMENSION)
+            {
+                throw std::runtime_error("Texture3D size is too large.");
+            }
+        }
+
+        DXGI_FORMAT targetBCFormat;
+
+        isSRGB = IsSRGB(info.format);
+
+        // Check size and set target BC format
+        if (useBlockCompress)
+        {
+            if (info.width % 4 || info.height % 4)
+            {
+                throw std::runtime_error("BC compressed image width and height should be multiple of 4.");
+            }
+
+            if (isHDR)
+            {
+                targetBCFormat = DXGI_FORMAT_BC6H_UF16;
+            }
+            else
+            {
+                targetBCFormat = isSRGB ? DXGI_FORMAT_BC7_UNORM_SRGB : DXGI_FORMAT_BC7_UNORM;
+            }
+        }
+
+        // If image already compressed, decompress it on demand.
+        // FlipRotate and GenerateMipMaps do not operate directly on block compressed images.
+        if (IsCompressed(info.format))
+        {
+            if (!useBlockCompress || info.format != targetBCFormat || flipImage || info.mipLevels == 1)
+            {
+                DXGI_FORMAT targetDecompressedFormat = DXGI_FORMAT_UNKNOWN;     // Pick default format based on the input BC format
+
+                ScratchImage decompressed;
+
+                HRESULT hr = Decompress(image.GetImages(), image.GetImageCount(), image.GetMetadata(), targetDecompressedFormat, decompressed);
+
+                if (FAILED(hr))
+                {
+                    throw std::runtime_error("Failed to decompressing image.");
+                }
+                else
+                {
+                    image = std::move(decompressed);
+                }
+            }
+        }
+
+        // Flip image
+        // Only flips first subresource only
+        if (flipImage)
+        {
+            ScratchImage flipped;
+
+            HRESULT hr = FlipRotate(image.GetImages()[0], TEX_FR_FLIP_VERTICAL, flipped);
+
+            if (FAILED(hr))
+            {
+                throw std::runtime_error("Failed to flipping image.");
+            }
+            else
+            {
+                image = std::move(flipped);
+            }
+        }
+
+        // Generate mipmaps
+        // If image flipped, mipmaps should be regenerated.
+        if (info.mipLevels == 1 || flipImage)
+        {
+            ScratchImage mipChain;
+
+            HRESULT hr = GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(), TEX_FILTER_DEFAULT, 0, mipChain);
+            if (FAILED(hr))
+            {
+                throw std::runtime_error("Failed to generating mipmaps.");
+            }
+            else
+            {
+                image = std::move(mipChain);
+            }
+        }
+
+        // Compress image
+        if (useBlockCompress && info.format != targetBCFormat)
+        {
+            ScratchImage compressed;
+
+            HRESULT hr = Compress(image.GetImages(), image.GetImageCount(), image.GetMetadata(), targetBCFormat, TEX_COMPRESS_DEFAULT, 0.5f, compressed);
+            if (FAILED(hr))
+            {
+                throw std::runtime_error("Failed to compressing images.");
+            }
+            else
+            {
+                image = std::move(compressed);
+            }
+        }
+
+        // Save DDS file
+        const std::wstring resultName = Utility::RemoveFileExtension(filePath) + L".dds";
+        HRESULT hr = SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DDS_FLAGS_NONE, resultName.c_str());
+        if (FAILED(hr))
+        {
+            throw std::runtime_error("Failed to save dds file.");
+        }
     }
 }

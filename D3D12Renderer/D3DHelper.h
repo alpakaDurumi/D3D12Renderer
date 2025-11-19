@@ -119,4 +119,6 @@ namespace D3DHelper
         UINT planeIndex,
         UINT mipLevels,
         UINT arraySize);
+
+    void ConvertToDDS(const std::wstring& filePath, bool useBlockCompress, bool flipImage);
 }
