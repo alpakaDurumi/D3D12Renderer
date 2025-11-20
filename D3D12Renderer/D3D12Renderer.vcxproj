@@ -135,6 +135,9 @@
     <ClCompile Include="CommandList.cpp" />
     <ClCompile Include="CommandQueue.cpp" />
     <ClCompile Include="D3DHelper.cpp" />
+    <ClCompile Include="DDSTextureLoader12.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="DescriptorAllocation.cpp" />
     <ClCompile Include="DescriptorAllocator.cpp" />
     <ClCompile Include="DescriptorAllocatorPage.cpp" />
@@ -182,6 +185,7 @@
     <ClInclude Include="ConstantBuffer.h" />
     <ClInclude Include="ConstantData.h" />
     <ClInclude Include="D3DHelper.h" />
+    <ClInclude Include="DDSTextureLoader12.h" />
     <ClInclude Include="DescriptorAllocation.h" />
     <ClInclude Include="DescriptorAllocator.h" />
     <ClInclude Include="DescriptorAllocatorPage.h" />
