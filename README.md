@@ -1,6 +1,23 @@
 # D3D12Renderer
 
-Custom 3D rendering engine using Direct3D 12 and C++
+Custom 3D rendering engine using Direct3D 12, C++17 and Win32 API
+
+# Used
+
+## Served as Nuget
+
+|Package|Version|
+|--|--|
+|DirectXMath|2024.10.15.1|
+|DirectXTex|2025.10.28.1|
+|DirectX 12 Agility SDK|1.717.1-preview|
+
+## Included files or codes
+
+- [ImGui](https://github.com/ocornut/imgui)
+- [DDSTextureLoader12](https://github.com/microsoft/DirectXTex/tree/main/DDSTextureLoader) from DirectXTex
+- [ThrowIfFailed](https://github.com/Microsoft/DirectXTK/wiki/ThrowIfFailed)
+- [GetLatestWinPixGpuCapturerPath_Cpp17](https://devblogs.microsoft.com/pix/taking-a-capture/)
 
 # References
 
@@ -13,4 +30,3 @@ Custom 3D rendering engine using Direct3D 12 and C++
 - Detail about
     - The wiki page of DirectXTK repo has good explanations.
     - [ComPtr](https://github.com/Microsoft/DirectXTK/wiki/ComPtr)
-    - [ThrowIfFailed](https://github.com/Microsoft/DirectXTK/wiki/ThrowIfFailed)
