@@ -426,3 +426,6 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Ignore Asset directory. Assets will be provided from outside, not github
+/D3D12Renderer/[Aa]ssets/
