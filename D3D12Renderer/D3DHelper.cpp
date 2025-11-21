@@ -737,7 +737,8 @@ namespace D3DHelper
         {
             ScratchImage compressed;
 
-            HRESULT hr = Compress(image.GetImages(), image.GetImageCount(), image.GetMetadata(), targetBCFormat, TEX_COMPRESS_DEFAULT, 0.5f, compressed);
+            // CPU codec Compressing. GPU compression is not yet supported for d3d12 devices.
+            HRESULT hr = Compress(image.GetImages(), image.GetImageCount(), image.GetMetadata(), targetBCFormat, TEX_COMPRESS_BC7_QUICK | TEX_COMPRESS_PARALLEL, TEX_THRESHOLD_DEFAULT, compressed);
             if (FAILED(hr))
             {
                 throw std::runtime_error("Failed to compressing images.");

@@ -161,6 +161,7 @@ void Renderer::SetFullScreen(bool fullScreen)
 
 void Renderer::OnInit()
 {
+    ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
     LoadPipeline();
     LoadAssets();
 }
@@ -741,8 +742,10 @@ void Renderer::LoadAssets()
         *m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV],
         *m_uploadBuffer,
         *m_layoutTracker,
-        simpleTextureData,
-        256, 256);
+        L"Assets/Textures/PavingStones150_4K-PNG_Color.png",
+        true,
+        false,
+        false);
 
     // Execute commands for loading assets and store fence value
     m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);

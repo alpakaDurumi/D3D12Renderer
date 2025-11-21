@@ -19,6 +19,14 @@ Custom 3D rendering engine using Direct3D 12, C++17 and Win32 API
 - [ThrowIfFailed](https://github.com/Microsoft/DirectXTK/wiki/ThrowIfFailed)
 - [GetLatestWinPixGpuCapturerPath_Cpp17](https://devblogs.microsoft.com/pix/taking-a-capture/)
 
+## Assets
+
+- https://ambientcg.com/a/PavingStones150
+
+# Build
+
+Download assets from [here](https://drive.google.com/drive/folders/1CGZupYVKDUj7CQFzVJCZiTwuaJ--kPri?usp=sharing), copy `Assets` folder to `D3D12Renderer` project directory.
+
 # References
 
 - [Direct3D 12 graphics - Microsoft Learn](https://learn.microsoft.com/en-us/windows/win32/direct3d12/direct3d-12-graphics)

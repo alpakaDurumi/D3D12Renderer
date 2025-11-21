@@ -48,11 +48,8 @@ public:
 
         // Calculate required size for data upload
         D3D12_RESOURCE_DESC desc = m_texture->GetDesc();
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts = {};
-        UINT numRows = 0;
-        UINT64 rowSizeInBytes = 0;
         UINT64 requiredSize = 0;
-        pDevice->GetCopyableFootprints(&desc, 0, 1, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
+        pDevice->GetCopyableFootprints(&desc, 0, 1, 0, nullptr, nullptr, nullptr, &requiredSize);
 
         auto uploadAllocation = uploadBuffer.Allocate(requiredSize, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
 
@@ -138,11 +135,8 @@ public:
             { 0xffffffff, 0, 0, 0, 0, 0 });
 
         // Calculate required size for data upload
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts = {};
-        UINT numRows = 0;
-        UINT64 rowSizeInBytes = 0;
         UINT64 requiredSize = 0;
-        pDevice->GetCopyableFootprints(&desc, 0, numSubresources, 0, &layouts, &numRows, &rowSizeInBytes, &requiredSize);
+        pDevice->GetCopyableFootprints(&desc, 0, numSubresources, 0, nullptr, nullptr, nullptr, &requiredSize);
 
         auto uploadAllocation = uploadBuffer.Allocate(requiredSize, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
 
