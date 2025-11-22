@@ -41,9 +41,9 @@ PSInput main(VSInput input)
 	output.pos = mul(float4(output.posWorld, 1.0f), viewProjection);
 	output.texCoord = input.texCoord;
 #ifdef INSTANCED
-	output.normal = mul(float4(input.normal, 0.0f), mul(input.instanceInverseTranspose, inverseTranspose)).xyz;
+	output.normal = normalize(mul(float4(input.normal, 0.0f), mul(input.instanceInverseTranspose, inverseTranspose)).xyz);
 #else
-	output.normal = mul(float4(input.normal, 0.0f), inverseTranspose).xyz;
+    output.normal = normalize(mul(float4(input.normal, 0.0f), inverseTranspose).xyz);
 #endif
 	
 	return output;

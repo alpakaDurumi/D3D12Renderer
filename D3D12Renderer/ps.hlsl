@@ -43,11 +43,11 @@ float4 main(PSInput input) : SV_TARGET
 	
 	// Diffuse
 	float nDotL = max(dot(input.normal, toLight), 0.0f);
-	float3 diffuse = texColor * nDotL * lightColor;
+	float3 diffuse = texColor * nDotL * lightColor * lightIntensity;
 	
 	// Specular
 	float nDotH = max(dot(input.normal, halfWay), 0.0f);
-	float3 specular = pow(nDotH, shininess) * materialSpecular * lightColor;
+    float3 specular = pow(nDotH, shininess) * materialSpecular * lightColor * lightIntensity;
 	
 	return float4(ambient + diffuse + specular, 1.0f);
 }
