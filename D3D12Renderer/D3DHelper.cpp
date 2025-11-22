@@ -580,10 +580,13 @@ namespace D3DHelper
         return mipIndex + arrayIndex * mipLevels + planeIndex * mipLevels * arraySize;
     }
 
-    void ConvertToDDS(const std::wstring& filePath, bool useBlockCompress, bool flipImage) 
+    void ConvertToDDS(
+        const std::wstring& filePath,
+        bool isSRGB,
+        bool useBlockCompress,
+        bool flipImage) 
     {
         bool isHDR = false;
-        bool isSRGB = false;
 
         std::wstring ext = Utility::GetFileExtension(filePath);
 
@@ -619,7 +622,7 @@ namespace D3DHelper
         }
         else
         {
-            HRESULT hr = LoadFromWICFile(filePath.c_str(), WIC_FLAGS_NONE, &info, image);
+            HRESULT hr = LoadFromWICFile(filePath.c_str(), isSRGB ? WIC_FLAGS_DEFAULT_SRGB : WIC_FLAGS_IGNORE_SRGB, &info, image);
             if (FAILED(hr))
             {
                 throw std::runtime_error("Could not load WIC texture.");
@@ -652,11 +655,8 @@ namespace D3DHelper
             }
         }
 
-        DXGI_FORMAT targetBCFormat;
-
-        isSRGB = IsSRGB(info.format);
-
         // Check size and set target BC format
+        DXGI_FORMAT targetBCFormat;
         if (useBlockCompress)
         {
             if (info.width % 4 || info.height % 4)

@@ -744,6 +744,7 @@ void Renderer::LoadAssets()
         *m_layoutTracker,
         L"Assets/Textures/PavingStones150_4K-PNG_Color.png",
         true,
+        true,
         false,
         false);
 

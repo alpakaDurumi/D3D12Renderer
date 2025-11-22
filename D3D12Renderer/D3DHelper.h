@@ -120,5 +120,9 @@ namespace D3DHelper
         UINT mipLevels,
         UINT arraySize);
 
-    void ConvertToDDS(const std::wstring& filePath, bool useBlockCompress, bool flipImage);
+    void ConvertToDDS(
+        const std::wstring& filePath,
+        bool isSRGB,
+        bool useBlockCompress,
+        bool flipImage);
 }

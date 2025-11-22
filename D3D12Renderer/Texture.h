@@ -86,6 +86,7 @@ public:
         UploadBuffer& uploadBuffer,
         ResourceLayoutTracker& layoutTracker,
         const std::wstring& filePath,
+        bool isSRGB,
         bool useBlockCompress,
         bool flipImage,
         bool isCubeMap)
@@ -107,7 +108,7 @@ public:
         // If dds file does not exist or older than src file
         if (ddsFileMissing || ddsFileStat.st_mtime < srcFileStat.st_mtime)
         {
-            ConvertToDDS(filePath, useBlockCompress, flipImage);
+            ConvertToDDS(filePath, isSRGB, useBlockCompress, flipImage);
         }
 
         std::unique_ptr<uint8_t[]> ddsData;
