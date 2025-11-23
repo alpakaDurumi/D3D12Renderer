@@ -12,6 +12,7 @@ struct PSInput
 cbuffer MaterialConstantBuffer : register(b1)
 {
 	float3 materialAmbient;
+    float textureTileScale;
 	float3 materialSpecular;
 	float shininess;
 }
@@ -36,7 +37,7 @@ float4 main(PSInput input) : SV_TARGET
 	float3 toCamera = normalize(cameraPos - input.posWorld);
 	float3 halfWay = normalize(toLight + toCamera);
 	
-	float3 texColor = g_texture.Sample(g_sampler, input.texCoord).rgb;
+    float3 texColor = g_texture.SampleLevel(g_sampler, input.texCoord * textureTileScale, 0.0f).rgb;
 	
 	// Ambient
 	float3 ambient = materialAmbient * texColor;

@@ -31,10 +31,10 @@ struct MeshConstantData : public ConstantData<MeshConstantData>
 struct MaterialConstantData : public ConstantData<MaterialConstantData>
 {
     XMFLOAT3 materialAmbient;
-    float padding0;
+    float textureTileScale = 1.0f;
     XMFLOAT3 materialSpecular;
     float shininess;
-    float padding1[56];
+    float padding[56];
 };
 
 struct LightConstantData : public ConstantData<LightConstantData>

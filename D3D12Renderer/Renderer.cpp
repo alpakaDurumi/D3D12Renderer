@@ -228,7 +228,7 @@ void Renderer::OnUpdate()
 
     for (auto& mesh : m_meshes)
     {
-        XMMATRIX world = XMMatrixScaling(100.0f, 0.5f, 100.0f) * XMMatrixTranslation(0.0f, -3.0f, 0.0f);
+        XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -3.0f, 0.0f);
         XMStoreFloat4x4(&mesh.m_meshBufferData.world, XMMatrixTranspose(world));
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
         XMStoreFloat4x4(&mesh.m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
@@ -237,6 +237,7 @@ void Renderer::OnUpdate()
         mesh.m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
         mesh.m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
         mesh.m_materialConstantBufferData.shininess = 10.0f;
+        mesh.m_materialConstantBufferData.textureTileScale = 50.0f;
         pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->Update(&mesh.m_materialConstantBufferData);
     }
 
@@ -249,10 +250,10 @@ void Renderer::OnUpdate()
         XMStoreFloat4x4(&mesh.m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
         pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshBufferData);
 
-        mesh.m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
-        mesh.m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
-        mesh.m_materialConstantBufferData.shininess = 10.0f;
-        pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->Update(&mesh.m_materialConstantBufferData);
+        //mesh.m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
+        //mesh.m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
+        //mesh.m_materialConstantBufferData.shininess = 10.0f;
+        //pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->Update(&mesh.m_materialConstantBufferData);
     }
 
     m_lightConstantData.lightPos = { 0.0f, 100.0f, 0.0f };
