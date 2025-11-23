@@ -228,7 +228,7 @@ void Renderer::OnUpdate()
 
     for (auto& mesh : m_meshes)
     {
-        XMMATRIX world = XMMatrixTranslation(1.0f, 0.0f, -1.0f);
+        XMMATRIX world = XMMatrixScaling(100.0f, 0.5f, 100.0f) * XMMatrixTranslation(0.0f, -3.0f, 0.0f);
         XMStoreFloat4x4(&mesh.m_meshBufferData.world, XMMatrixTranspose(world));
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
         XMStoreFloat4x4(&mesh.m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
@@ -673,7 +673,7 @@ void Renderer::LoadAssets()
     // Get command allocator and list for loading assets
     auto [commandAllocator, commandList] = m_commandQueue->GetAvailableCommandList();
 
-    m_meshes.push_back(Mesh::MakeSphere(m_device.Get(), commandList, *m_uploadBuffer));
+    m_meshes.push_back(Mesh::MakeCube(m_device.Get(), commandList, *m_uploadBuffer));
     m_instancedMeshes.push_back(InstancedMesh::MakeCubeInstanced(m_device.Get(), commandList, *m_uploadBuffer));
 
     // Create constant buffers for each frame
