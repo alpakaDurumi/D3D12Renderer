@@ -228,7 +228,7 @@ void Renderer::OnUpdate()
 
     for (auto& mesh : m_meshes)
     {
-        XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -3.0f, 0.0f);
+        XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -5.0f, 0.0f);
         XMStoreFloat4x4(&mesh.m_meshBufferData.world, XMMatrixTranspose(world));
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
         XMStoreFloat4x4(&mesh.m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
@@ -808,7 +808,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         m_dynamicDescriptorHeap->StageDescriptors(3, 0, 1, m_texture->GetDescriptorHandle());
         m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
-        mesh.Render(cmdList);
+        //mesh.Render(cmdList);
     }
 
     // Swap Chain textures initially created in D3D12_BARRIER_LAYOUT_COMMON
