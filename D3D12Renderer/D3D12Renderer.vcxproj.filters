@@ -185,6 +185,9 @@
     <ClInclude Include="DDSTextureLoader12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ImGuiDescriptorAllocator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="vs.hlsl">

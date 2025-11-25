@@ -7,6 +7,10 @@
 #include <filesystem>
 #include <shlobj.h>
 
+#include "imgui.h"
+#include "imgui_impl_win32.h"
+#include "imgui_impl_dx12.h"
+
 #include "Win32Application.h"
 #include "D3DHelper.h"
 #include "FrameResource.h"
@@ -17,6 +21,9 @@
 //#include <d3d12shader.h>
 
 using namespace D3DHelper;
+
+// Definition for static member
+Renderer* Renderer::sm_instance = nullptr;
 
 // Generate a simple black and white checkerboard texture.
 std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UINT texturePixelSize)
@@ -85,9 +92,22 @@ static std::wstring GetLatestWinPixGpuCapturerPath_Cpp17()
     return pixInstallationPath / newestVersionFound / L"WinPixGpuCapturer.dll";
 }
 
+// Wrappers of callback functions for ImGui SRV descriptor
+void Renderer::ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
+{
+    Renderer::GetInstance()->m_imguiDescriptorAllocator->Allocate(out_cpu_handle, out_gpu_handle);
+}
+
+void Renderer::ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
+{
+    Renderer::GetInstance()->m_imguiDescriptorAllocator->Free(cpu_handle, gpu_handle);
+}
+
 Renderer::Renderer(std::wstring name)
     : m_title(name), m_frameIndex(0), m_camera({ 0.0f, 0.0f, -5.0f })
 {
+    // Set instance pointer
+    sm_instance = this;
 }
 
 void Renderer::SetPix()
@@ -164,6 +184,7 @@ void Renderer::OnInit()
     ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
     LoadPipeline();
     LoadAssets();
+    InitImGui();
 }
 
 void Renderer::OnUpdate()
@@ -275,6 +296,26 @@ void Renderer::OnRender()
     // Record all the commands we need to render the scene into the command list
     PopulateCommandList(commandList);
 
+    // ImGui
+    ImGui::Render();
+
+    auto cmdList = commandList.GetCommandList();
+
+    // Is it OK to call SetDescriptorHeaps? (Does it affect performance?)
+    ID3D12DescriptorHeap* ppHeaps[] = { m_imguiDescriptorAllocator->GetDescriptorHeap() };
+    commandList.GetCommandList()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cmdList.Get());
+
+    commandList.Barrier(
+        m_frameResources[m_frameIndex]->m_renderTarget.Get(),
+        D3D12_BARRIER_SYNC_RENDER_TARGET,
+        D3D12_BARRIER_SYNC_NONE,
+        D3D12_BARRIER_ACCESS_RENDER_TARGET,
+        D3D12_BARRIER_ACCESS_NO_ACCESS,
+        D3D12_BARRIER_LAYOUT_PRESENT,
+        { 0xffffffff, 0, 0, 0, 0, 0 });     // Select all subresources
+
     // Execute the command lists and store the fence value
     // And notify fenceValue to UploadBuffer
     UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
@@ -303,6 +344,11 @@ void Renderer::OnDestroy()
 
     m_dsvAllocation.reset();
     m_texture.reset();
+
+    // Shutdown ImGui
+    ImGui_ImplDX12_Shutdown();
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
 }
 
 void Renderer::OnKeyDown(WPARAM key)
@@ -472,6 +518,9 @@ void Renderer::LoadPipeline()
     m_commandQueue->SetDynamicDescriptorHeap(m_dynamicDescriptorHeap.get());
     m_dynamicDescriptorHeap->SetCommandQueue(m_commandQueue.get());
     m_uploadBuffer->SetCommandQueue(m_commandQueue.get());
+
+    // For ImGui
+    m_imguiDescriptorAllocator = std::make_unique<ImGuiDescriptorAllocator>(m_device.Get());
 
     // Check for Variable Refresh Rate(VRR)
     m_tearingSupported = CheckTearingSupport();
@@ -811,17 +860,20 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         //mesh.Render(cmdList);
     }
 
+
+    // Barrier for RTV should be called after ImGui Render.
+
     // Swap Chain textures initially created in D3D12_BARRIER_LAYOUT_COMMON
     // and presentation requires the back buffer is using D3D12_BARRIER_LAYOUT_COMMON
     // LAYOUT_PRESENT is alias for LAYOUT_COMMON
-    commandList.Barrier(
-        pFrameResource->m_renderTarget.Get(),
-        D3D12_BARRIER_SYNC_RENDER_TARGET,
-        D3D12_BARRIER_SYNC_NONE,
-        D3D12_BARRIER_ACCESS_RENDER_TARGET,
-        D3D12_BARRIER_ACCESS_NO_ACCESS,
-        D3D12_BARRIER_LAYOUT_PRESENT,
-        { 0xffffffff, 0, 0, 0, 0, 0 });     // Select all subresources
+    //commandList.Barrier(
+    //    pFrameResource->m_renderTarget.Get(),
+    //    D3D12_BARRIER_SYNC_RENDER_TARGET,
+    //    D3D12_BARRIER_SYNC_NONE,
+    //    D3D12_BARRIER_ACCESS_RENDER_TARGET,
+    //    D3D12_BARRIER_ACCESS_NO_ACCESS,
+    //    D3D12_BARRIER_LAYOUT_PRESENT,
+    //    { 0xffffffff, 0, 0, 0, 0, 0 });     // Select all subresources
 }
 
 // Wait for pending GPU work to complete
@@ -835,4 +887,27 @@ void Renderer::MoveToNextFrame()
     // Update frame index and wait for fence value
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
     m_commandQueue->WaitForFenceValue(m_frameResources[m_frameIndex]->m_fenceValue);
+}
+
+// Setup Dear ImGui context
+void Renderer::InitImGui()
+{
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+
+    ImGui_ImplWin32_Init(Win32Application::GetHwnd());
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplDX12_InitInfo init_info = {};
+    init_info.Device = m_device.Get();
+    init_info.CommandQueue = m_commandQueue->GetCommandQueue().Get();
+    init_info.NumFramesInFlight = FrameCount;
+    init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+    init_info.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+    init_info.SrvDescriptorHeap = m_imguiDescriptorAllocator->GetDescriptorHeap();
+    init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle) { return ImGuiSrvDescriptorAllocate(out_cpu_handle, out_gpu_handle); };
+    init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) { return ImGuiSrvDescriptorFree(cpu_handle, gpu_handle); };
+    ImGui_ImplDX12_Init(&init_info);
 }

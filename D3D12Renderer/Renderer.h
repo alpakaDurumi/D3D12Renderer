@@ -22,6 +22,7 @@
 #include "Texture.h"
 #include "DynamicDescriptorHeap.h"
 #include "RootSignature.h"
+#include "ImGuiDescriptorAllocator.h"
 
 class FrameResource;
 class CommandList;
@@ -37,6 +38,7 @@ public:
     UINT GetWidth() const { return m_width; }
     UINT GetHeight() const { return m_height; }
     const WCHAR* GetTitle() const { return m_title.c_str(); }
+    static Renderer* GetInstance() { return sm_instance; }
 
     void SetWidth(UINT width) { m_width = width; }
     void SetHeight(UINT height) { m_height = height; }
@@ -54,6 +56,9 @@ public:
     void OnKeyUp(WPARAM key);
     void OnMouseMove(int xPos, int yPos);
     void OnResize(UINT width, UINT height);
+
+    static void ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle);
+    static void ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle);
 
 private:
     // Window
@@ -101,6 +106,10 @@ private:
     CameraConstantData m_cameraConstantData;
     std::unique_ptr<Texture> m_texture;
 
+    // For ImGui
+    std::unique_ptr<ImGuiDescriptorAllocator> m_imguiDescriptorAllocator;
+    static Renderer* sm_instance;
+
     // Synchronization objects
     UINT m_frameIndex;
 
@@ -109,4 +118,5 @@ private:
     void PopulateCommandList(CommandList& commandList);
     void WaitForGPU();
     void MoveToNextFrame();
+    void InitImGui();
 };

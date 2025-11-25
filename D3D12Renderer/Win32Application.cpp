@@ -1,6 +1,9 @@
 #include "pch.h"
 #include "Win32Application.h"
 
+#include "imgui_impl_win32.h"
+#include "imgui_impl_dx12.h"
+
 #include "Renderer.h"
 
 int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmdLine, int nCmdShow)
@@ -69,6 +72,12 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
         }
         else
         {
+            // Start the Dear ImGui frame
+            ImGui_ImplDX12_NewFrame();
+            ImGui_ImplWin32_NewFrame();
+            ImGui::NewFrame();
+            ImGui::ShowDemoWindow(); // Show demo window! :)
+
             pRenderer->OnUpdate();
             pRenderer->OnRender();
         }
@@ -80,8 +89,14 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     return static_cast<int>(msg.wParam);
 }
 
+// Forward declaration
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+        return true;
+
     Renderer* renderer = reinterpret_cast<Renderer*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
 
     switch (message)
