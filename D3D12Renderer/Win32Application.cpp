@@ -76,8 +76,8 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
             ImGui_ImplDX12_NewFrame();
             ImGui_ImplWin32_NewFrame();
             ImGui::NewFrame();
-            ImGui::ShowDemoWindow(); // Show demo window! :)
 
+            pRenderer->OnPrepareImGui();
             pRenderer->OnUpdate();
             pRenderer->OnRender();
         }

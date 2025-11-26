@@ -412,6 +412,11 @@ void Renderer::OnResize(UINT width, UINT height)
     CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation->GetDescriptorHandle());
 }
 
+void Renderer::OnPrepareImGui()
+{
+    ImGui::ShowDemoWindow(); // Show demo window! :)
+}
+
 void Renderer::LoadPipeline()
 {
     UINT dxgiFactoryFlags = 0;
