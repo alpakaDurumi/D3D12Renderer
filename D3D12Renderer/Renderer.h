@@ -23,6 +23,7 @@
 #include "DynamicDescriptorHeap.h"
 #include "RootSignature.h"
 #include "ImGuiDescriptorAllocator.h"
+#include "Utility.h"
 
 class FrameResource;
 class CommandList;
@@ -64,6 +65,39 @@ struct std::hash<PSOKey>
             (static_cast<uint64_t>(key.addressingMode) << 1) |
             static_cast<uint64_t>(key.meshType);
         return std::hash<uint64_t>()(combined);
+    }
+};
+
+// Key that identify unique ShaderBlob.
+// We Assume that defines already sorted.
+struct ShaderKey
+{
+    std::wstring fileName;
+    std::vector<std::string> defines;
+    std::string target;
+
+    bool operator==(const ShaderKey& other)
+    {
+        return fileName == other.fileName &&
+            target == other.target &&
+            defines == other.defines;
+    }
+};
+
+template<>
+struct std::hash<ShaderKey>
+{
+    std::size_t operator()(const ShaderKey& key) const
+    {
+        std::wstring combinedString = L"";
+        combinedString += key.fileName;
+        for (const std::string& define : key.defines)
+        {
+            combinedString += L"|" + Utility::MultiByteToWideChar(define);
+        }
+        combinedString += L"|" + Utility::MultiByteToWideChar(key.target);
+
+        return static_cast<size_t>(Utility::Djb2Hash(combinedString));
     }
 };
 

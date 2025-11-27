@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "Win32Application.h"
 
+#include <locale>
+
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx12.h"
 
@@ -10,6 +12,9 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
 {
     ParseCommandLineArgs(pRenderer, lpCmdLine);
     pRenderer->UpdateWidthHeight();
+
+    // Set locale for converting between multi-byte character and wide character (e.g. std::mbstowcs)
+    std::setlocale(LC_ALL, ".UTF8");
 
     // Register the window class
     WNDCLASSEXW windowClass = { 0 };
