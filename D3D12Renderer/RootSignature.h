@@ -13,6 +13,53 @@
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
 
+enum class TextureFilteringOption
+{
+    POINT,
+    BILINEAR,
+    ANISOTROPIC_X2,
+    ANISOTROPIC_X4,
+    ANISOTROPIC_X8,
+    ANISOTROPIC_X16,
+    NUM_TEXTURE_FILTERING_OPTIONS
+};
+
+enum class TextureAddressingMode
+{
+    WRAP,
+    MIRROR,
+    CLAMP,
+    BORDER,
+    MIRROR_ONCE,
+    NUM_TEXTURE_ADDRESSING_MODES
+};
+
+// Key that identify unique root signature.
+// For now, only use attributes of static sampler to distinguish root signatures.
+struct RSKey
+{
+    TextureFilteringOption filteringOption : 3;
+    TextureAddressingMode addressingMode : 3;
+
+    // Equality operator (required for std::unordered_map)
+    bool operator==(const RSKey& other)
+    {
+        return filteringOption == other.filteringOption &&
+            addressingMode == other.addressingMode;
+    }
+};
+
+// Specialization for hashing RSKey (required for std::unordered_map)
+template<>
+struct std::hash<RSKey>
+{
+    std::size_t operator()(const RSKey& key) const
+    {
+        uint64_t combined = (static_cast<uint64_t>(key.filteringOption) << 3) | static_cast<uint64_t>(key.addressingMode);
+        return std::hash<uint64_t>()(combined);
+    }
+};
+
 class RootParameter
 {
     friend class RootSignature;

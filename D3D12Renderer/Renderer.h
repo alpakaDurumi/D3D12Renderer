@@ -30,6 +30,43 @@ class CommandList;
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
+enum MeshType
+{
+    DEFUALT,
+    INSTANCED,
+    NUM_MESH_TYPES
+};
+
+// Key that identify unique PSO.
+struct PSOKey
+{
+    TextureFilteringOption filteringOption : 3;
+    TextureAddressingMode addressingMode : 3;
+
+    MeshType meshType : 1;
+
+    // Equality operator (required for std::unordered_map)
+    bool operator==(const PSOKey& other)
+    {
+        return filteringOption == other.filteringOption &&
+            addressingMode == other.addressingMode &&
+            meshType == other.meshType;
+    }
+};
+
+// Specialization for hashing PSOKey (required for std::unordered_map)
+template<>
+struct std::hash<PSOKey>
+{
+    std::size_t operator()(const PSOKey& key) const
+    {
+        uint64_t combined = (static_cast<uint64_t>(key.filteringOption) << 4) |
+            (static_cast<uint64_t>(key.addressingMode) << 1) |
+            static_cast<uint64_t>(key.meshType);
+        return std::hash<uint64_t>()(combined);
+    }
+};
+
 class Renderer
 {
 public:
