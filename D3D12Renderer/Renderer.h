@@ -38,36 +38,6 @@ enum MeshType
     NUM_MESH_TYPES
 };
 
-// Key that identify unique PSO.
-struct PSOKey
-{
-    TextureFilteringOption filteringOption : 3;
-    TextureAddressingMode addressingMode : 3;
-
-    MeshType meshType : 1;
-
-    // Equality operator (required for std::unordered_map)
-    bool operator==(const PSOKey& other)
-    {
-        return filteringOption == other.filteringOption &&
-            addressingMode == other.addressingMode &&
-            meshType == other.meshType;
-    }
-};
-
-// Specialization for hashing PSOKey (required for std::unordered_map)
-template<>
-struct std::hash<PSOKey>
-{
-    std::size_t operator()(const PSOKey& key) const
-    {
-        uint64_t combined = (static_cast<uint64_t>(key.filteringOption) << 4) |
-            (static_cast<uint64_t>(key.addressingMode) << 1) |
-            static_cast<uint64_t>(key.meshType);
-        return std::hash<uint64_t>()(combined);
-    }
-};
-
 // Key that identify unique ShaderBlob.
 // We Assume that defines already sorted.
 struct ShaderKey
@@ -76,7 +46,7 @@ struct ShaderKey
     std::vector<std::string> defines;
     std::string target;
 
-    bool operator==(const ShaderKey& other)
+    bool operator==(const ShaderKey& other) const
     {
         return fileName == other.fileName &&
             target == other.target &&
@@ -98,6 +68,48 @@ struct std::hash<ShaderKey>
         combinedString += L"|" + Utility::MultiByteToWideChar(key.target);
 
         return static_cast<size_t>(Utility::Djb2Hash(combinedString));
+    }
+};
+
+// Key that identify unique PSO.
+struct PSOKey
+{
+    TextureFiltering filtering;
+    TextureAddressingMode addressingMode;
+
+    MeshType meshType;
+
+    ShaderKey vsKey;
+    ShaderKey psKey;
+
+    // Equality operator (required for std::unordered_map)
+    bool operator==(const PSOKey& other) const
+    {
+        return filtering == other.filtering &&
+            addressingMode == other.addressingMode &&
+            meshType == other.meshType &&
+            vsKey == other.vsKey &&
+            psKey == other.psKey;
+    }
+};
+
+// Specialization for hashing PSOKey (required for std::unordered_map)
+template<>
+struct std::hash<PSOKey>
+{
+    std::size_t operator()(const PSOKey& key) const
+    {
+        size_t seed = 0;
+
+        size_t combinedBits = (static_cast<size_t>(key.filtering) << 4) |
+            (static_cast<size_t>(key.addressingMode) << 1) |
+            static_cast<size_t>(key.meshType);
+
+        Utility::HashCombine(seed, combinedBits);
+        Utility::HashCombine(seed, key.vsKey);
+        Utility::HashCombine(seed, key.psKey);
+
+        return seed;
     }
 };
 
@@ -163,9 +175,15 @@ private:
     std::array<std::unique_ptr<DescriptorAllocator>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
     std::vector<FrameResource*> m_frameResources;
 
-    std::unique_ptr<RootSignature> m_rootSignature;
-    ComPtr<ID3D12PipelineState> m_defaultPipelineState;
-    ComPtr<ID3D12PipelineState> m_instancedPipelineState;
+    std::unordered_map<RSKey, std::unique_ptr<RootSignature>> m_rootSignatures;
+    std::unordered_map<PSOKey, ComPtr<ID3D12PipelineState>> m_pipelineStates;
+
+    RSKey m_currentRSKey = { TextureFiltering::ANISOTROPIC_X16, TextureAddressingMode::WRAP };
+    PSOKey m_currentPSOKey = { TextureFiltering::ANISOTROPIC_X16, TextureAddressingMode::WRAP, MeshType::DEFUALT };
+
+    std::unordered_map<MeshType, std::vector<D3D12_INPUT_ELEMENT_DESC>> m_inputLayouts;
+    std::unordered_map<ShaderKey, ComPtr<ID3DBlob>> m_shaderBlobs;
+
     std::unique_ptr<DescriptorAllocation> m_dsvAllocation;
     ComPtr<ID3D12Resource> m_depthStencilBuffer;
 
@@ -191,4 +209,12 @@ private:
     void WaitForGPU();
     void MoveToNextFrame();
     void InitImGui();
+
+    void SetTextureFiltering(TextureFiltering filtering);
+    void SetTextureAddressingMode(TextureAddressingMode addressingMode);
+    void SetMeshType(MeshType meshType);
+
+    RootSignature* GetRootSignature(const RSKey& rsKey);
+    ID3D12PipelineState* GetPipelineState(const PSOKey& psoKey);
+    ID3DBlob* GetShaderBlob(const ShaderKey& shaderKey);
 };

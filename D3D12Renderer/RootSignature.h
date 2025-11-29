@@ -13,7 +13,7 @@
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
 
-enum class TextureFilteringOption
+enum class TextureFiltering
 {
     POINT,
     BILINEAR,
@@ -21,7 +21,7 @@ enum class TextureFilteringOption
     ANISOTROPIC_X4,
     ANISOTROPIC_X8,
     ANISOTROPIC_X16,
-    NUM_TEXTURE_FILTERING_OPTIONS
+    NUM_TEXTURE_FILTERINGS
 };
 
 enum class TextureAddressingMode
@@ -38,13 +38,13 @@ enum class TextureAddressingMode
 // For now, only use attributes of static sampler to distinguish root signatures.
 struct RSKey
 {
-    TextureFilteringOption filteringOption : 3;
-    TextureAddressingMode addressingMode : 3;
+    TextureFiltering filtering;
+    TextureAddressingMode addressingMode;
 
     // Equality operator (required for std::unordered_map)
-    bool operator==(const RSKey& other)
+    bool operator==(const RSKey& other) const
     {
-        return filteringOption == other.filteringOption &&
+        return filtering == other.filtering &&
             addressingMode == other.addressingMode;
     }
 };
@@ -55,8 +55,8 @@ struct std::hash<RSKey>
 {
     std::size_t operator()(const RSKey& key) const
     {
-        uint64_t combined = (static_cast<uint64_t>(key.filteringOption) << 3) | static_cast<uint64_t>(key.addressingMode);
-        return std::hash<uint64_t>()(combined);
+        size_t combined = (static_cast<size_t>(key.filtering) << 3) | static_cast<size_t>(key.addressingMode);
+        return std::hash<size_t>()(combined);
     }
 };
 
@@ -152,16 +152,68 @@ public:
         return m_parameters.get()[parameterIndex];
     }
 
-    void InitStaticSampler(UINT reg, UINT space, UINT samplerIndex, D3D12_SHADER_VISIBILITY visibility)
+    void InitStaticSampler(UINT reg, UINT space, UINT samplerIndex, D3D12_SHADER_VISIBILITY visibility, TextureFiltering filtering, TextureAddressingMode addressingMode)
     {
         D3D12_STATIC_SAMPLER_DESC& samplerDesc = m_staticSamplers[samplerIndex];
 
+        switch (filtering)
+        {
+        case TextureFiltering::POINT:
+            samplerDesc.Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
+            samplerDesc.MaxAnisotropy = 0;
+            break;
+        case TextureFiltering::BILINEAR:
+            samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+            samplerDesc.MaxAnisotropy = 0;
+            break;
+        case TextureFiltering::ANISOTROPIC_X2:
         samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
+            samplerDesc.MaxAnisotropy = 2;
+            break;
+        case TextureFiltering::ANISOTROPIC_X4:
+            samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
+            samplerDesc.MaxAnisotropy = 4;
+            break;
+        case TextureFiltering::ANISOTROPIC_X8:
+            samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
+            samplerDesc.MaxAnisotropy = 8;
+            break;
+        case TextureFiltering::ANISOTROPIC_X16:
+            samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
+            samplerDesc.MaxAnisotropy = 16;
+            break;
+        }
+
+        switch (addressingMode)
+        {
+        case TextureAddressingMode::WRAP:
         samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+            break;
+        case TextureAddressingMode::MIRROR:
+            samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+            samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+            samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+            break;
+        case TextureAddressingMode::CLAMP:
+            samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+            samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+            samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+            break;
+        case TextureAddressingMode::BORDER:
+            samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+            samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+            samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+            break;
+        case TextureAddressingMode::MIRROR_ONCE:
+            samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
+            samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
+            samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
+            break;
+        }
+
         samplerDesc.MipLODBias = 0;
-        samplerDesc.MaxAnisotropy = 16;
         samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
         samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
         samplerDesc.MinLOD = 0.0f;

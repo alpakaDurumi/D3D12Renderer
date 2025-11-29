@@ -296,17 +296,17 @@ void Renderer::OnRender()
     // Record all the commands we need to render the scene into the command list
     PopulateCommandList(commandList);
 
-    // ImGui
-    ImGui::Render();
-
-    auto cmdList = commandList.GetCommandList();
-
+    // ImGui Render
     // Is it OK to call SetDescriptorHeaps? (Does it affect performance?)
+    ImGui::Render();
     ID3D12DescriptorHeap* ppHeaps[] = { m_imguiDescriptorAllocator->GetDescriptorHeap() };
     commandList.GetCommandList()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.GetCommandList().Get());
 
-    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cmdList.Get());
-
+    // Barrier for RTV should be called after ImGui Render.
+    // Swap Chain textures initially created in D3D12_BARRIER_LAYOUT_COMMON.
+    // and presentation requires the back buffer is using D3D12_BARRIER_LAYOUT_COMMON.
+    // LAYOUT_PRESENT is alias for LAYOUT_COMMON.
     commandList.Barrier(
         m_frameResources[m_frameIndex]->m_renderTarget.Get(),
         D3D12_BARRIER_SYNC_RENDER_TARGET,
@@ -414,7 +414,33 @@ void Renderer::OnResize(UINT width, UINT height)
 
 void Renderer::OnPrepareImGui()
 {
-    ImGui::ShowDemoWindow(); // Show demo window! :)
+    //ImGui::ShowDemoWindow(); // Show demo window! :)
+
+    ImGui::Begin("Test");
+
+    const char* items[] = { "Point", "Bilinear", "AnisotropicX2", "AnisotropicX4", "AnisotropicX8", "AnisotropicX16" };
+    static int item_selected_idx = 5;
+
+    const char* combo_preview_value = items[item_selected_idx];
+    if (ImGui::BeginCombo("Texture Filtering", combo_preview_value))
+    {
+        for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+        {
+            const bool is_selected = (item_selected_idx == n);
+            if (ImGui::Selectable(items[n], is_selected))
+            {
+                item_selected_idx = n;
+                SetTextureFiltering(static_cast<TextureFiltering>(n));
+}
+
+            // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+            if (is_selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    ImGui::End();
 }
 
 void Renderer::LoadPipeline()
@@ -498,13 +524,6 @@ void Renderer::LoadPipeline()
         throw std::runtime_error("Enhanced Barriers are not supported on this hardware.");
     }
 
-    // Describe and create the command queue
-    D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-    queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-    queueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
-    queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-    queueDesc.NodeMask = 0;
-
     // Do not transfer prvalue object to std::make_unique.
     // These are non-copyable and non-movable types.
     // Passing a temporary object like `std::make_unique<T>(T(...))` will fail to compile
@@ -561,9 +580,7 @@ void Renderer::LoadPipeline()
     // Disable switching to fullscreen execlusive mode using ALT + ENTER
     ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_NO_ALT_ENTER));
 
-    // Create frame resources
-    {
-        // Create a RTV and command allocator for each frame
+    // Create frame resources : RTV and command allocator for each frame
         for (UINT i = 0; i < FrameCount; i++)
         {
             DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate();
@@ -579,43 +596,12 @@ void Renderer::LoadPipeline()
             m_layoutTracker->RegisterResource(pBackBuffer, D3D12_BARRIER_LAYOUT_COMMON, desc.DepthOrArraySize, desc.MipLevels, DXGI_FORMAT_R8G8B8A8_UNORM);
         }
     }
-}
 
 // Load the sample assets.
 void Renderer::LoadAssets()
 {
-    // Create root signature
+    // Compile shaders
     {
-        m_rootSignature = std::make_unique<RootSignature>(4, 1);
-
-        // Root descriptor for MeshCB and MaterialCB
-        (*m_rootSignature)[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_VERTEX, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);    // Mesh
-        (*m_rootSignature)[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);     // Material
-
-        // Descriptor table for LightCB and CameraCB
-        (*m_rootSignature)[2].InitAsTable(2, D3D12_SHADER_VISIBILITY_ALL);
-        (*m_rootSignature)[2].InitAsRange(0, 2, 0, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);    // Light
-        (*m_rootSignature)[2].InitAsRange(1, 3, 0, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);    // Camera
-
-        // Descriptor table for texture
-        // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
-        // In Resource history of PIX, only read occurs to this texture. So it seems like a bug of PIX.
-        (*m_rootSignature)[3].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-        (*m_rootSignature)[3].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
-
-        m_rootSignature->InitStaticSampler(0, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL);
-
-        m_rootSignature->Finalize(m_device.Get());
-
-        m_dynamicDescriptorHeap->ParseRootSignature(*m_rootSignature);
-    }
-
-    // Create the pipeline state, which includes compiling and loading shaders.
-    {
-        ComPtr<ID3DBlob> vertexShader;
-        ComPtr<ID3DBlob> instancedVertexShader;
-        ComPtr<ID3DBlob> pixelShader;
-
         UINT compileFlags = 0;
 #if defined(_DEBUG)
         // Enable better shader debugging with the graphics debugging tools.
@@ -626,20 +612,36 @@ void Renderer::LoadAssets()
         std::wstring psName = L"ps.hlsl";
 
         // conditional compilation for instancing
-        D3D_SHADER_MACRO shaderMacros[] = { { "INSTANCED", "1" }, { NULL, NULL } };
-        ThrowIfFailed(D3DCompileFromFile(vsName.c_str(), nullptr, nullptr, "main", "vs_5_0", compileFlags, 0, &vertexShader, nullptr));
-        ThrowIfFailed(D3DCompileFromFile(vsName.c_str(), shaderMacros, nullptr, "main", "vs_5_0", compileFlags, 0, &instancedVertexShader, nullptr));
-        ThrowIfFailed(D3DCompileFromFile(psName.c_str(), nullptr, nullptr, "main", "ps_5_0", compileFlags, 0, &pixelShader, nullptr));
+        std::vector<std::string> definesInstanced = { "INSTANCED" };
 
-        // Define the vertex input layout
-        D3D12_INPUT_ELEMENT_DESC inputElementDescs0[] =
+        std::vector<ShaderKey> shaderKeys;
+        shaderKeys.push_back({ vsName, std::vector<std::string>(), "vs_5_0" });
+        shaderKeys.push_back({ vsName, definesInstanced, "vs_5_0" });
+        shaderKeys.push_back({ psName, std::vector<std::string>(), "ps_5_0" });
+
+        for (const ShaderKey& key : shaderKeys)
+        {
+            auto it = m_shaderBlobs.emplace(key, nullptr).first;
+            std::vector<D3D_SHADER_MACRO> shaderMacros;
+            for (const std::string& define : key.defines)
+            {
+                shaderMacros.push_back({ define.c_str(), NULL });
+            }
+            shaderMacros.push_back({ NULL, NULL });
+            ThrowIfFailed(D3DCompileFromFile(key.fileName.c_str(), shaderMacros.data(), nullptr, "main", key.target.c_str(), compileFlags, 0, &it->second, nullptr));
+        }
+    }
+
+    // Define input layouts
+    {
+        std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescs0 = 
         {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
         };
 
-        D3D12_INPUT_ELEMENT_DESC inputElementDescs1[] =
+        std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescs1 =
         {
             // Slot 0 for per-vertex data
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -658,67 +660,8 @@ void Renderer::LoadAssets()
             { "INSTANCE_INVTRANSPOSE", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
         };
 
-        // Rasterizer State
-        D3D12_RASTERIZER_DESC rasterizerDesc = {};
-        rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
-        rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
-        rasterizerDesc.FrontCounterClockwise = FALSE;
-        rasterizerDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
-        rasterizerDesc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
-        rasterizerDesc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
-        rasterizerDesc.DepthClipEnable = TRUE;
-        rasterizerDesc.MultisampleEnable = FALSE;
-        rasterizerDesc.AntialiasedLineEnable = FALSE;
-        rasterizerDesc.ForcedSampleCount = 0;
-        rasterizerDesc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
-
-        // Blend State
-        D3D12_BLEND_DESC blendDesc = {};
-        blendDesc.AlphaToCoverageEnable = FALSE;
-        blendDesc.IndependentBlendEnable = FALSE;
-        const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc =
-        {
-            FALSE,FALSE,
-            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-            D3D12_LOGIC_OP_NOOP,
-            D3D12_COLOR_WRITE_ENABLE_ALL,
-        };
-        for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
-            blendDesc.RenderTarget[i] = defaultRenderTargetBlendDesc;
-
-        D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
-        depthStencilDesc.DepthEnable = TRUE;
-        depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-        depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-        depthStencilDesc.StencilEnable = FALSE;
-        depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
-        depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-        const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =
-        { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
-        depthStencilDesc.FrontFace = defaultStencilOp;
-        depthStencilDesc.BackFace = defaultStencilOp;
-
-        // Describe and create the graphics pipeline state object (PSO).
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-        psoDesc.InputLayout = { inputElementDescs0, _countof(inputElementDescs0) };   // std::size()를 대신 쓰기?
-        psoDesc.pRootSignature = m_rootSignature->GetRootSignature().Get();
-        psoDesc.VS = { vertexShader->GetBufferPointer(), vertexShader->GetBufferSize() };
-        psoDesc.PS = { pixelShader->GetBufferPointer(), pixelShader->GetBufferSize() };
-        psoDesc.RasterizerState = rasterizerDesc;
-        psoDesc.BlendState = blendDesc;
-        psoDesc.DepthStencilState = depthStencilDesc;
-        psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-        psoDesc.SampleMask = UINT_MAX;
-        psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        psoDesc.NumRenderTargets = 1;
-        psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-        psoDesc.SampleDesc.Count = 1;
-        ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_defaultPipelineState)));
-
-        psoDesc.VS = { instancedVertexShader->GetBufferPointer(), instancedVertexShader->GetBufferSize() };
-        psoDesc.InputLayout = { inputElementDescs1, _countof(inputElementDescs1) };
-        ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_instancedPipelineState)));
+        m_inputLayouts.emplace(MeshType::DEFUALT, inputElementDescs0);
+        m_inputLayouts.emplace(MeshType::INSTANCED, inputElementDescs1);
     }
 
     // Create the depth stencil view
@@ -789,8 +732,6 @@ void Renderer::LoadAssets()
         }
     }
 
-    std::vector<UINT8> simpleTextureData = GenerateTextureData(256, 256, 4);
-
     m_texture = std::make_unique<Texture>(
         m_device.Get(),
         commandList,
@@ -816,8 +757,10 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
     auto cmdList = commandList.GetCommandList();
 
-    // Set necessary state.
-    cmdList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature().Get());
+    // Set and parse root signature
+    auto pRootSignature = GetRootSignature(m_currentRSKey);
+    cmdList->SetGraphicsRootSignature(pRootSignature->GetRootSignature().Get());
+    m_dynamicDescriptorHeap->ParseRootSignature(*pRootSignature);       // TODO : parse root signature only when root signature changed?
 
     cmdList->RSSetViewports(1, &m_viewport);
     cmdList->RSSetScissorRects(1, &m_scissorRect);
@@ -839,7 +782,9 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-    cmdList->SetPipelineState(m_defaultPipelineState.Get());
+    m_currentPSOKey.vsKey = { L"vs.hlsl", {}, "vs_5_0" };
+    m_currentPSOKey.psKey = { L"ps.hlsl", {}, "ps_5_0" };
+    cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
     for (const auto& mesh : m_meshes)
     {
         cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
@@ -852,7 +797,9 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         mesh.Render(cmdList);
     }
 
-    cmdList->SetPipelineState(m_instancedPipelineState.Get());
+    m_currentPSOKey.vsKey.defines = { "INSTANCED" };
+    SetMeshType(MeshType::INSTANCED);
+    cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
     for (const auto& mesh : m_instancedMeshes)
     {
         cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
@@ -862,23 +809,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         m_dynamicDescriptorHeap->StageDescriptors(3, 0, 1, m_texture->GetDescriptorHandle());
         m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
-        //mesh.Render(cmdList);
+        mesh.Render(cmdList);
     }
-
-
-    // Barrier for RTV should be called after ImGui Render.
-
-    // Swap Chain textures initially created in D3D12_BARRIER_LAYOUT_COMMON
-    // and presentation requires the back buffer is using D3D12_BARRIER_LAYOUT_COMMON
-    // LAYOUT_PRESENT is alias for LAYOUT_COMMON
-    //commandList.Barrier(
-    //    pFrameResource->m_renderTarget.Get(),
-    //    D3D12_BARRIER_SYNC_RENDER_TARGET,
-    //    D3D12_BARRIER_SYNC_NONE,
-    //    D3D12_BARRIER_ACCESS_RENDER_TARGET,
-    //    D3D12_BARRIER_ACCESS_NO_ACCESS,
-    //    D3D12_BARRIER_LAYOUT_PRESENT,
-    //    { 0xffffffff, 0, 0, 0, 0, 0 });     // Select all subresources
 }
 
 // Wait for pending GPU work to complete
@@ -915,4 +847,138 @@ void Renderer::InitImGui()
     init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle) { return ImGuiSrvDescriptorAllocate(out_cpu_handle, out_gpu_handle); };
     init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) { return ImGuiSrvDescriptorFree(cpu_handle, gpu_handle); };
     ImGui_ImplDX12_Init(&init_info);
+}
+
+void Renderer::SetTextureFiltering(TextureFiltering filtering)
+{
+    m_currentRSKey.filtering = filtering;
+    m_currentPSOKey.filtering = filtering;
+}
+
+void Renderer::SetTextureAddressingMode(TextureAddressingMode addressingMode)
+{
+    m_currentRSKey.addressingMode = addressingMode;
+    m_currentPSOKey.addressingMode = addressingMode;
+}
+
+void Renderer::SetMeshType(MeshType meshType)
+{
+    m_currentPSOKey.meshType = meshType;
+}
+
+RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
+{
+    auto [it, inserted] = m_rootSignatures.try_emplace(rsKey, std::make_unique<RootSignature>(4, 1));
+    RootSignature& rootSignature = *it->second;
+
+    // Create root signature if cache not exists.
+    if (inserted)
+    {
+        // Root descriptor for MeshCB and MaterialCB
+        rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_VERTEX, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);    // Mesh
+        rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);     // Material
+
+        // Descriptor table for LightCB and CameraCB
+        rootSignature[2].InitAsTable(2, D3D12_SHADER_VISIBILITY_ALL);
+        rootSignature[2].InitAsRange(0, 2, 0, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);    // Light
+        rootSignature[2].InitAsRange(1, 3, 0, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);    // Camera
+
+        // Descriptor table for texture
+        // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
+        // In Resource history of PIX, only read occurs to this texture. So it seems like a bug of PIX.
+        rootSignature[3].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+        rootSignature[3].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+
+        rootSignature.InitStaticSampler(0, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL, rsKey.filtering, rsKey.addressingMode);
+
+        rootSignature.Finalize(m_device.Get());
+    }
+
+    return &rootSignature;
+}
+
+ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
+{
+    auto [it, inserted] = m_pipelineStates.try_emplace(psoKey, nullptr);
+
+    if (inserted)
+    {
+        // Rasterizer State
+        D3D12_RASTERIZER_DESC rasterizerDesc = {};
+        rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
+        rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+        rasterizerDesc.FrontCounterClockwise = FALSE;
+        rasterizerDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+        rasterizerDesc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+        rasterizerDesc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+        rasterizerDesc.DepthClipEnable = TRUE;
+        rasterizerDesc.MultisampleEnable = FALSE;
+        rasterizerDesc.AntialiasedLineEnable = FALSE;
+        rasterizerDesc.ForcedSampleCount = 0;
+        rasterizerDesc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+        // Blend State
+        D3D12_BLEND_DESC blendDesc = {};
+        blendDesc.AlphaToCoverageEnable = FALSE;
+        blendDesc.IndependentBlendEnable = FALSE;
+        const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc =
+        {
+            FALSE,FALSE,
+            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+            D3D12_LOGIC_OP_NOOP,
+            D3D12_COLOR_WRITE_ENABLE_ALL,
+        };
+        for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+            blendDesc.RenderTarget[i] = defaultRenderTargetBlendDesc;
+
+        // Depth-stencil
+        D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
+        depthStencilDesc.DepthEnable = TRUE;
+        depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+        depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+        depthStencilDesc.StencilEnable = FALSE;
+        depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+        depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+        const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =
+        { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+        depthStencilDesc.FrontFace = defaultStencilOp;
+        depthStencilDesc.BackFace = defaultStencilOp;
+
+        // idx 0 : VS
+        // idx 1 : PS
+        ID3DBlob* vsBlob = GetShaderBlob(psoKey.vsKey);
+        ID3DBlob* psBlob = GetShaderBlob(psoKey.psKey);
+
+        // Describe and create the graphics pipeline state object (PSO).
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+        psoDesc.InputLayout = { m_inputLayouts[psoKey.meshType].data(), static_cast<UINT>(m_inputLayouts[psoKey.meshType].size()) };
+        psoDesc.pRootSignature = GetRootSignature(m_currentRSKey)->GetRootSignature().Get();
+        psoDesc.VS = { vsBlob->GetBufferPointer(), vsBlob->GetBufferSize() };
+        psoDesc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
+        psoDesc.RasterizerState = rasterizerDesc;
+        psoDesc.BlendState = blendDesc;
+        psoDesc.DepthStencilState = depthStencilDesc;
+        psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+        psoDesc.SampleMask = UINT_MAX;
+        psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        psoDesc.NumRenderTargets = 1;
+        psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        psoDesc.SampleDesc.Count = 1;
+        ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&it->second)));
+    }
+
+    return it->second.Get();
+}
+
+ID3DBlob* Renderer::GetShaderBlob(const ShaderKey& shaderKey)
+{
+    auto it = m_shaderBlobs.find(shaderKey);
+
+    if (it == m_shaderBlobs.end())
+    {
+        throw std::runtime_error("Shaders should be baked in initialization or first run.");
+    }
+
+    return it->second.Get();
 }
