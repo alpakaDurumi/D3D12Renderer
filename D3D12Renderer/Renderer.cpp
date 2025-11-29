@@ -253,12 +253,12 @@ void Renderer::OnUpdate()
         XMStoreFloat4x4(&mesh.m_meshBufferData.world, XMMatrixTranspose(world));
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
         XMStoreFloat4x4(&mesh.m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
+        mesh.m_meshBufferData.textureTileScale = 50.0f;
         pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshBufferData);
 
         mesh.m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
         mesh.m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
         mesh.m_materialConstantBufferData.shininess = 10.0f;
-        mesh.m_materialConstantBufferData.textureTileScale = 50.0f;
         pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->Update(&mesh.m_materialConstantBufferData);
     }
 
@@ -269,6 +269,7 @@ void Renderer::OnUpdate()
         XMStoreFloat4x4(&mesh.m_meshBufferData.world, XMMatrixTranspose(world));
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
         XMStoreFloat4x4(&mesh.m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
+        mesh.m_meshBufferData.textureTileScale = 1.0f;
         pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshBufferData);
 
         //mesh.m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
@@ -431,7 +432,7 @@ void Renderer::OnPrepareImGui()
             {
                 item_selected_idx = n;
                 SetTextureFiltering(static_cast<TextureFiltering>(n));
-}
+            }
 
             // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
             if (is_selected)
@@ -581,21 +582,21 @@ void Renderer::LoadPipeline()
     ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_NO_ALT_ENTER));
 
     // Create frame resources : RTV and command allocator for each frame
-        for (UINT i = 0; i < FrameCount; i++)
-        {
-            DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate();
+    for (UINT i = 0; i < FrameCount; i++)
+    {
+        DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate();
 
-            FrameResource* pFrameResource = new FrameResource(m_device.Get(), m_swapChain.Get(), i, std::move(alloc));
-            m_frameResources.push_back(pFrameResource);
+        FrameResource* pFrameResource = new FrameResource(m_device.Get(), m_swapChain.Get(), i, std::move(alloc));
+        m_frameResources.push_back(pFrameResource);
 
-            // Register backbuffer to tracker
-            // Initial layout of backbuffer is D3D12_BARRIER_LAYOUT_COMMON : https://microsoft.github.io/DirectX-Specs/d3d/D3D12EnhancedBarriers.html#initial-resource-state
-            // depthOrArraySize and mipLevels for backbuffers are 1
-            ID3D12Resource* pBackBuffer = pFrameResource->m_renderTarget.Get();
-            auto desc = pBackBuffer->GetDesc();
-            m_layoutTracker->RegisterResource(pBackBuffer, D3D12_BARRIER_LAYOUT_COMMON, desc.DepthOrArraySize, desc.MipLevels, DXGI_FORMAT_R8G8B8A8_UNORM);
-        }
+        // Register backbuffer to tracker
+        // Initial layout of backbuffer is D3D12_BARRIER_LAYOUT_COMMON : https://microsoft.github.io/DirectX-Specs/d3d/D3D12EnhancedBarriers.html#initial-resource-state
+        // depthOrArraySize and mipLevels for backbuffers are 1
+        ID3D12Resource* pBackBuffer = pFrameResource->m_renderTarget.Get();
+        auto desc = pBackBuffer->GetDesc();
+        m_layoutTracker->RegisterResource(pBackBuffer, D3D12_BARRIER_LAYOUT_COMMON, desc.DepthOrArraySize, desc.MipLevels, DXGI_FORMAT_R8G8B8A8_UNORM);
     }
+}
 
 // Load the sample assets.
 void Renderer::LoadAssets()
@@ -634,7 +635,7 @@ void Renderer::LoadAssets()
 
     // Define input layouts
     {
-        std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescs0 = 
+        std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescs0 =
         {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -875,7 +876,7 @@ RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
     if (inserted)
     {
         // Root descriptor for MeshCB and MaterialCB
-        rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_VERTEX, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);    // Mesh
+        rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);    // Mesh
         rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);     // Material
 
         // Descriptor table for LightCB and CameraCB

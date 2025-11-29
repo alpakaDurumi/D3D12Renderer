@@ -25,16 +25,17 @@ struct MeshConstantData : public ConstantData<MeshConstantData>
         0.0f, 0.0f, 0.0f, 1.0f
     };
     XMFLOAT4X4 inverseTranspose;
-    XMFLOAT4X4 padding[2];
+    float textureTileScale = 1.0f;
+    float padding[31];
 };
 
 struct MaterialConstantData : public ConstantData<MaterialConstantData>
 {
     XMFLOAT3 materialAmbient;
-    float textureTileScale = 1.0f;
+    float padding0;
     XMFLOAT3 materialSpecular;
     float shininess;
-    float padding[56];
+    float padding1[56];
 };
 
 struct LightConstantData : public ConstantData<LightConstantData>

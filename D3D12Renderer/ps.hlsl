@@ -9,10 +9,16 @@ struct PSInput
 	float3 normal : NORMAL;
 };
 
+cbuffer MeshConstantBuffer : register(b0)
+{
+    float4x4 world;
+    float4x4 inverseTranspose;
+    float textureTileScale;
+};
+
 cbuffer MaterialConstantBuffer : register(b1)
 {
 	float3 materialAmbient;
-    float textureTileScale;
 	float3 materialSpecular;
 	float shininess;
 }

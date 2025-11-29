@@ -21,6 +21,7 @@ cbuffer MeshConstantBuffer : register(b0)
 {
 	float4x4 world;
 	float4x4 inverseTranspose;
+    float textureTileScale;
 };
 
 cbuffer CameraConstantBuffer : register(b3)
