@@ -635,14 +635,14 @@ void Renderer::LoadAssets()
 
     // Define input layouts
     {
-        std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescs0 =
+        std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescsDefault =
         {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
         };
 
-        std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescs1 =
+        std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescsInstanced =
         {
             // Slot 0 for per-vertex data
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -661,8 +661,8 @@ void Renderer::LoadAssets()
             { "INSTANCE_INVTRANSPOSE", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
         };
 
-        m_inputLayouts.emplace(MeshType::DEFUALT, inputElementDescs0);
-        m_inputLayouts.emplace(MeshType::INSTANCED, inputElementDescs1);
+        m_inputLayouts.emplace(MeshType::DEFUALT, std::move(inputElementDescsDefault));
+        m_inputLayouts.emplace(MeshType::INSTANCED, std::move(inputElementDescsInstanced));
     }
 
     // Create the depth stencil view
