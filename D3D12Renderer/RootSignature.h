@@ -9,56 +9,10 @@
 #include <cassert>
 
 #include "D3DHelper.h"
+#include "CacheKeys.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
-
-enum class TextureFiltering
-{
-    POINT,
-    BILINEAR,
-    ANISOTROPIC_X2,
-    ANISOTROPIC_X4,
-    ANISOTROPIC_X8,
-    ANISOTROPIC_X16,
-    NUM_TEXTURE_FILTERINGS
-};
-
-enum class TextureAddressingMode
-{
-    WRAP,
-    MIRROR,
-    CLAMP,
-    BORDER,
-    MIRROR_ONCE,
-    NUM_TEXTURE_ADDRESSING_MODES
-};
-
-// Key that identify unique root signature.
-// For now, only use attributes of static sampler to distinguish root signatures.
-struct RSKey
-{
-    TextureFiltering filtering;
-    TextureAddressingMode addressingMode;
-
-    // Equality operator (required for std::unordered_map)
-    bool operator==(const RSKey& other) const
-    {
-        return filtering == other.filtering &&
-            addressingMode == other.addressingMode;
-    }
-};
-
-// Specialization for hashing RSKey (required for std::unordered_map)
-template<>
-struct std::hash<RSKey>
-{
-    std::size_t operator()(const RSKey& key) const
-    {
-        size_t combined = (static_cast<size_t>(key.filtering) << 3) | static_cast<size_t>(key.addressingMode);
-        return std::hash<size_t>()(combined);
-    }
-};
 
 class RootParameter
 {

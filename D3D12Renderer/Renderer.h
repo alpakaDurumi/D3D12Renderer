@@ -23,95 +23,13 @@
 #include "DynamicDescriptorHeap.h"
 #include "RootSignature.h"
 #include "ImGuiDescriptorAllocator.h"
-#include "Utility.h"
+#include "CacheKeys.h"
 
 class FrameResource;
 class CommandList;
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
-
-enum MeshType
-{
-    DEFUALT,
-    INSTANCED,
-    NUM_MESH_TYPES
-};
-
-// Key that identify unique ShaderBlob.
-// We Assume that defines already sorted.
-struct ShaderKey
-{
-    std::wstring fileName;
-    std::vector<std::string> defines;
-    std::string target;
-
-    bool operator==(const ShaderKey& other) const
-    {
-        return fileName == other.fileName &&
-            target == other.target &&
-            defines == other.defines;
-    }
-};
-
-template<>
-struct std::hash<ShaderKey>
-{
-    std::size_t operator()(const ShaderKey& key) const
-    {
-        std::wstring combinedString = L"";
-        combinedString += key.fileName;
-        for (const std::string& define : key.defines)
-        {
-            combinedString += L"|" + Utility::MultiByteToWideChar(define);
-        }
-        combinedString += L"|" + Utility::MultiByteToWideChar(key.target);
-
-        return static_cast<size_t>(Utility::Djb2Hash(combinedString));
-    }
-};
-
-// Key that identify unique PSO.
-struct PSOKey
-{
-    TextureFiltering filtering;
-    TextureAddressingMode addressingMode;
-
-    MeshType meshType;
-
-    ShaderKey vsKey;
-    ShaderKey psKey;
-
-    // Equality operator (required for std::unordered_map)
-    bool operator==(const PSOKey& other) const
-    {
-        return filtering == other.filtering &&
-            addressingMode == other.addressingMode &&
-            meshType == other.meshType &&
-            vsKey == other.vsKey &&
-            psKey == other.psKey;
-    }
-};
-
-// Specialization for hashing PSOKey (required for std::unordered_map)
-template<>
-struct std::hash<PSOKey>
-{
-    std::size_t operator()(const PSOKey& key) const
-    {
-        size_t seed = 0;
-
-        size_t combinedBits = (static_cast<size_t>(key.filtering) << 4) |
-            (static_cast<size_t>(key.addressingMode) << 1) |
-            static_cast<size_t>(key.meshType);
-
-        Utility::HashCombine(seed, combinedBits);
-        Utility::HashCombine(seed, key.vsKey);
-        Utility::HashCombine(seed, key.psKey);
-
-        return seed;
-    }
-};
 
 class Renderer
 {
