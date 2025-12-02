@@ -181,7 +181,6 @@ public:
     UINT m_numIndices = 0;
 
     MeshConstantData m_meshBufferData;
-    MaterialConstantData m_materialConstantBufferData;
     UINT m_meshConstantBufferIndex;
     UINT m_materialConstantBufferIndex;
 };

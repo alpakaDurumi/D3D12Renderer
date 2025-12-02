@@ -247,6 +247,12 @@ void Renderer::OnUpdate()
     // 이번에 드로우할 프레임에 대해 constant buffers 업데이트
     FrameResource* pFrameResource = m_frameResources[m_frameIndex];
 
+    m_materialConstantData.materialAmbient = { 0.1f, 0.1f, 0.1f };
+    m_materialConstantData.materialSpecular = { 1.0f, 1.0f, 1.0f };
+    m_materialConstantData.shininess = 10.0f;
+    // For now, just use index 0
+    pFrameResource->m_materialConstantBuffers[0]->Update(&m_materialConstantData);
+
     for (auto& mesh : m_meshes)
     {
         XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -5.0f, 0.0f);
@@ -255,11 +261,6 @@ void Renderer::OnUpdate()
         XMStoreFloat4x4(&mesh.m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
         mesh.m_meshBufferData.textureTileScale = 50.0f;
         pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshBufferData);
-
-        mesh.m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
-        mesh.m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
-        mesh.m_materialConstantBufferData.shininess = 10.0f;
-        pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->Update(&mesh.m_materialConstantBufferData);
     }
 
     for (auto& mesh : m_instancedMeshes)
@@ -271,11 +272,6 @@ void Renderer::OnUpdate()
         XMStoreFloat4x4(&mesh.m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
         mesh.m_meshBufferData.textureTileScale = 1.0f;
         pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshBufferData);
-
-        //mesh.m_materialConstantBufferData.materialAmbient = { 0.1f, 0.1f, 0.1f };
-        //mesh.m_materialConstantBufferData.materialSpecular = { 1.0f, 1.0f, 1.0f };
-        //mesh.m_materialConstantBufferData.shininess = 10.0f;
-        //pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->Update(&mesh.m_materialConstantBufferData);
     }
 
     m_lightConstantData.lightPos = { 0.0f, 100.0f, 0.0f };

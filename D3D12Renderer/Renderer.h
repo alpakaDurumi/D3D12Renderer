@@ -110,6 +110,7 @@ private:
     InputManager m_inputManager;
     std::vector<Mesh> m_meshes;
     std::vector<InstancedMesh> m_instancedMeshes;
+    MaterialConstantData m_materialConstantData;
     LightConstantData m_lightConstantData;
     CameraConstantData m_cameraConstantData;
     std::unique_ptr<Texture> m_texture;
