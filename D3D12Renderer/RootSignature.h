@@ -19,6 +19,40 @@ class RootParameter
     friend class RootSignature;
 
 public:
+    // Explicitly initialize with 0
+    // Since m_paramter is POD, it could be garbage value and desctructor may occurs undefined behaviour
+    RootParameter()
+        : m_parameter{}
+    {
+    }
+
+    // Disable copy
+    RootParameter(const RootParameter&) = delete;
+    RootParameter& operator=(const RootParameter&) = delete;
+
+    // Move-only
+    RootParameter(RootParameter&& other) noexcept
+    {
+        m_parameter = other.m_parameter;
+        other.m_parameter = {};
+    }
+
+    RootParameter& operator=(RootParameter&& other) noexcept
+    {
+        if (this != &other)
+        {
+            if (m_parameter.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+            {
+                delete[] m_parameter.DescriptorTable.pDescriptorRanges;
+            }
+            m_parameter = other.m_parameter;
+
+            other.m_parameter = {};
+        }
+
+        return *this;
+    }
+
     ~RootParameter()
     {
         if (m_parameter.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
@@ -121,7 +155,7 @@ public:
             samplerDesc.MaxAnisotropy = 0;
             break;
         case TextureFiltering::ANISOTROPIC_X2:
-        samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
+            samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
             samplerDesc.MaxAnisotropy = 2;
             break;
         case TextureFiltering::ANISOTROPIC_X4:
@@ -141,9 +175,9 @@ public:
         switch (addressingMode)
         {
         case TextureAddressingMode::WRAP:
-        samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+            samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+            samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+            samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
             break;
         case TextureAddressingMode::MIRROR:
             samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
