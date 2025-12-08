@@ -622,9 +622,8 @@ namespace D3DHelper
         }
         else
         {
-            // Ignore SRGB, load data just as it. Because srgb linearization will be applied when load dds file.
-            // If we set SRGB here, srgb linearization occurs TWICE, so image color would be darker than expected.
-            HRESULT hr = LoadFromWICFile(filePath.c_str(), WIC_FLAGS_IGNORE_SRGB, &info, image);
+            // Setting SRGB flag does not change image data. It only affects format of metadata.
+            HRESULT hr = LoadFromWICFile(filePath.c_str(), isSRGB ? WIC_FLAGS_DEFAULT_SRGB : WIC_FLAGS_NONE, &info, image);
             if (FAILED(hr))
             {
                 throw std::runtime_error("Could not load WIC texture.");
@@ -719,6 +718,7 @@ namespace D3DHelper
 
         // Generate mipmaps
         // If image flipped, mipmaps should be regenerated.
+        // Automatically handles SRGB <-> linear conversion based on metadata of image.
         if (info.mipLevels == 1 || flipImage)
         {
             ScratchImage mipChain;

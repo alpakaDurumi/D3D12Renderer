@@ -247,8 +247,9 @@ void Renderer::OnUpdate()
     // 이번에 드로우할 프레임에 대해 constant buffers 업데이트
     FrameResource* pFrameResource = m_frameResources[m_frameIndex];
 
-    m_materialConstantData.materialAmbient = { 0.1f, 0.1f, 0.1f };
-    m_materialConstantData.materialSpecular = { 1.0f, 1.0f, 1.0f };
+    // Use linear color for gamma-correct rendering
+    XMStoreFloat3(&m_materialConstantData.materialAmbient, XMColorSRGBToRGB(XMVectorSet(0.1f, 0.1f, 0.1f, 1.0f)));
+    XMStoreFloat3(&m_materialConstantData.materialSpecular, XMColorSRGBToRGB(XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f)));
     m_materialConstantData.shininess = 10.0f;
     // For now, just use index 0
     pFrameResource->m_materialConstantBuffers[0]->Update(&m_materialConstantData);
