@@ -181,7 +181,7 @@ void Renderer::SetFullScreen(bool fullScreen)
 
 void Renderer::OnInit()
 {
-    ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
+    ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED));   // For initializing DirectXTex
     LoadPipeline();
     LoadAssets();
     InitImGui();
@@ -341,7 +341,8 @@ void Renderer::OnDestroy()
         delete pFrameResource;
 
     m_dsvAllocation.reset();
-    m_texture.reset();
+    m_albedo.reset();
+    m_normalMap.reset();
 
     // Shutdown ImGui
     ImGui_ImplDX12_Shutdown();
@@ -640,7 +641,8 @@ void Renderer::LoadAssets()
         {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+            { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
         };
 
         std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescsInstanced =
@@ -649,6 +651,7 @@ void Renderer::LoadAssets()
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 
             // Slot 1 for instanced data
             { "INSTANCE_WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
@@ -734,7 +737,7 @@ void Renderer::LoadAssets()
         }
     }
 
-    m_texture = std::make_unique<Texture>(
+    m_albedo = std::make_unique<Texture>(
         m_device.Get(),
         commandList,
         *m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV],
@@ -742,6 +745,18 @@ void Renderer::LoadAssets()
         *m_layoutTracker,
         L"Assets/Textures/PavingStones150_4K-PNG_Color.png",
         true,
+        true,
+        false,
+        false);
+
+    m_normalMap = std::make_unique<Texture>(
+        m_device.Get(),
+        commandList,
+        *m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV],
+        *m_uploadBuffer,
+        *m_layoutTracker,
+        L"Assets/Textures/PavingStones150_4K-PNG_NormalDX.png",
+        false,
         true,
         false,
         false);
@@ -795,7 +810,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
         m_dynamicDescriptorHeap->StageDescriptors(2, 0, 1, pFrameResource->m_lightConstantBuffer->GetDescriptorHandle());
         m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffer->GetDescriptorHandle());
-        m_dynamicDescriptorHeap->StageDescriptors(3, 0, 1, m_texture->GetDescriptorHandle());
+        m_dynamicDescriptorHeap->StageDescriptors(3, 0, 1, m_albedo->GetDescriptorHandle());
+        m_dynamicDescriptorHeap->StageDescriptors(3, 1, 1, m_normalMap->GetDescriptorHandle());
         m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
         mesh.Render(cmdList);
@@ -810,7 +826,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
         m_dynamicDescriptorHeap->StageDescriptors(2, 0, 1, pFrameResource->m_lightConstantBuffer->GetDescriptorHandle());
         m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffer->GetDescriptorHandle());
-        m_dynamicDescriptorHeap->StageDescriptors(3, 0, 1, m_texture->GetDescriptorHandle());
+        m_dynamicDescriptorHeap->StageDescriptors(3, 0, 1, m_albedo->GetDescriptorHandle());
+        m_dynamicDescriptorHeap->StageDescriptors(3, 1, 1, m_normalMap->GetDescriptorHandle());
         m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
         mesh.Render(cmdList);
@@ -883,15 +900,14 @@ RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
         rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);     // Material
 
         // Descriptor table for LightCB and CameraCB
-        rootSignature[2].InitAsTable(2, D3D12_SHADER_VISIBILITY_ALL);
-        rootSignature[2].InitAsRange(0, 2, 0, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);    // Light
-        rootSignature[2].InitAsRange(1, 3, 0, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);    // Camera
+        rootSignature[2].InitAsTable(1, D3D12_SHADER_VISIBILITY_ALL);
+        rootSignature[2].InitAsRange(0, 2, 0, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 2, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);    // Light + Camera
 
         // Descriptor table for texture
         // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
         // In Resource history of PIX, only read occurs to this texture. So it seems like a bug of PIX.
         rootSignature[3].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootSignature[3].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+        rootSignature[3].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
         rootSignature.InitStaticSampler(0, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL, rsKey.filtering, rsKey.addressingMode);
 

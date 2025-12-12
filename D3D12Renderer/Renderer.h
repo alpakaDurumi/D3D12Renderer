@@ -113,7 +113,8 @@ private:
     MaterialConstantData m_materialConstantData;
     LightConstantData m_lightConstantData;
     CameraConstantData m_cameraConstantData;
-    std::unique_ptr<Texture> m_texture;
+    std::unique_ptr<Texture> m_albedo;
+    std::unique_ptr<Texture> m_normalMap;
 
     // For ImGui
     std::unique_ptr<ImGuiDescriptorAllocator> m_imguiDescriptorAllocator;
