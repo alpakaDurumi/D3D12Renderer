@@ -761,6 +761,18 @@ void Renderer::LoadAssets()
         false,
         false);
 
+    m_heightMap = std::make_unique<Texture>(
+        m_device.Get(),
+        commandList,
+        *m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV],
+        *m_uploadBuffer,
+        *m_layoutTracker,
+        L"Assets/Textures/PavingStones150_4K-PNG_Displacement.png",
+        false,
+        true,
+        false,
+        false);
+
     // Execute commands for loading assets and store fence value
     m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
 
@@ -812,6 +824,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffer->GetDescriptorHandle());
         m_dynamicDescriptorHeap->StageDescriptors(3, 0, 1, m_albedo->GetDescriptorHandle());
         m_dynamicDescriptorHeap->StageDescriptors(3, 1, 1, m_normalMap->GetDescriptorHandle());
+        m_dynamicDescriptorHeap->StageDescriptors(3, 2, 1, m_heightMap->GetDescriptorHandle());
         m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
         mesh.Render(cmdList);
@@ -828,6 +841,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffer->GetDescriptorHandle());
         m_dynamicDescriptorHeap->StageDescriptors(3, 0, 1, m_albedo->GetDescriptorHandle());
         m_dynamicDescriptorHeap->StageDescriptors(3, 1, 1, m_normalMap->GetDescriptorHandle());
+        m_dynamicDescriptorHeap->StageDescriptors(3, 2, 1, m_heightMap->GetDescriptorHandle());
         m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
         mesh.Render(cmdList);
@@ -907,7 +921,7 @@ RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
         // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
         // In Resource history of PIX, only read occurs to this texture. So it seems like a bug of PIX.
         rootSignature[3].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootSignature[3].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+        rootSignature[3].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
         rootSignature.InitStaticSampler(0, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL, rsKey.filtering, rsKey.addressingMode);
 

@@ -1,5 +1,7 @@
 Texture2D g_texture : register(t0);
 Texture2D g_normalMap : register(t1);
+Texture2D g_heightMap : register(t2);
+
 SamplerState g_sampler : register(s0);
 
 struct PSInput
@@ -33,6 +35,17 @@ cbuffer LightConstantBuffer : register(b2)
 	float lightIntensity;
 }
 
+// Simple Parallax mapping
+float2 ParallaxMapping(float2 texCoord, float3 toCamera)
+{
+    float heightScale = 0.02f;
+	
+    float height = 1.0f - g_heightMap.Sample(g_sampler, texCoord * textureTileScale).r;
+    float2 offset = toCamera.xy / toCamera.z * height * heightScale;
+	
+    return texCoord * textureTileScale - offset;
+}
+
 float4 main(PSInput input) : SV_TARGET
 {
 	// Shading in tangent space
@@ -41,18 +54,20 @@ float4 main(PSInput input) : SV_TARGET
     float3 toCamera = normalize(input.cameraPosTangent - input.posTangent);
 	float3 halfWay = normalize(toLight + toCamera);
 	
-    float3 texColor = g_texture.Sample(g_sampler, input.texCoord * textureTileScale).rgb;
-    float3 normalTangent = g_normalMap.Sample(g_sampler, input.texCoord * textureTileScale).rgb * 2.0f - 1.0f;
+    float2 texCoord = ParallaxMapping(input.texCoord, toCamera);
+	
+    float3 texColor = g_texture.Sample(g_sampler, texCoord).rgb;
+    float3 normal = g_normalMap.Sample(g_sampler, texCoord).rgb * 2.0f - 1.0f;
 	
 	// Ambient
 	float3 ambient = materialAmbient * texColor;
 	
 	// Diffuse
-    float nDotL = max(dot(normalTangent, toLight), 0.0f);
+    float nDotL = max(dot(normal, toLight), 0.0f);
 	float3 diffuse = texColor * nDotL * lightColor * lightIntensity;
 	
 	// Specular
-    float nDotH = max(dot(normalTangent, halfWay), 0.0f);
+    float nDotH = max(dot(normal, halfWay), 0.0f);
     float3 specular = pow(nDotH, shininess) * materialSpecular * lightColor * lightIntensity;
 	
 	return float4(ambient + diffuse + specular, 1.0f);

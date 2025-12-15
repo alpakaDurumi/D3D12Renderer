@@ -66,7 +66,7 @@ PSInput main(VSInput input)
 #endif
     
     T = normalize(T - dot(T, N) * N);   // Gram-Schmidt process
-    B = normalize(cross(N, T));         // Multiply w element of input.tangent if it exists. (for handedess)
+    B = cross(N, T);         // Multiply w element of input.tangent if it exists. (for handedess)
     
     // Transform vectors from world space to tangent space.
     // Since the TBN matrix is orthogonal, its inverse is equal to its transpose.
