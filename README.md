@@ -4,6 +4,9 @@ Custom 3D rendering engine using Direct3D 12, C++17 and Win32 API
 
 # Used
 
+- **Visual Studio 2026** with platform toolset **v145**
+- **Windows 10.0 SDK**
+
 ## Served as Nuget
 
 |Package|Version|
@@ -25,7 +28,9 @@ Custom 3D rendering engine using Direct3D 12, C++17 and Win32 API
 
 # Build
 
-Download assets from [here](https://drive.google.com/drive/folders/1CGZupYVKDUj7CQFzVJCZiTwuaJ--kPri?usp=sharing), copy `Assets` folder to `D3D12Renderer` project directory.
+1. Download assets from [here](https://drive.google.com/drive/folders/1CGZupYVKDUj7CQFzVJCZiTwuaJ--kPri?usp=sharing)
+2. copy `Assets` folder to `D3D12Renderer` project directory
+3. Open `D3D12Renderer.sln` solution and build the project (Debug/Release)
 
 # References
 
