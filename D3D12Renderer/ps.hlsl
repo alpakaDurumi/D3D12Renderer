@@ -35,15 +35,36 @@ cbuffer LightConstantBuffer : register(b2)
 	float lightIntensity;
 }
 
-// Simple Parallax mapping
+// Steep Parallax mapping
 float2 ParallaxMapping(float2 texCoord, float3 toCamera)
 {
-    float heightScale = 0.02f;
+    const float heightScale = 0.1f;
 	
-    float height = 1.0f - g_heightMap.Sample(g_sampler, texCoord * textureTileScale).r;
-    float2 offset = toCamera.xy / toCamera.z * height * heightScale;
+    // Set numLayers based on view direction
+    const float minLayers = 8.0f;
+    const float maxLayers = 32.0f;
+    const float numLayers = lerp(maxLayers, minLayers, max(dot(float3(0.0f, 0.0f, 1.0f), toCamera), 0.0f));
+    
+    float layerStep = 1.0f / numLayers;
 	
-    return texCoord * textureTileScale - offset;
+    float currentLayerHeight = 0.0f;
+	
+    // Texture coord offset per layer
+    // xy / z = offset / (1.0 * heightScale)
+    float2 deltaTexCoord = toCamera.xy / toCamera.z * heightScale / numLayers; 
+	
+    float2 currentTexCoord = texCoord * textureTileScale;
+    float currentHeightMapValue = g_heightMap.Sample(g_sampler, currentTexCoord).r;
+    
+	[loop]
+    while (currentLayerHeight < currentHeightMapValue)
+    {
+        currentTexCoord -= deltaTexCoord;
+        currentHeightMapValue = g_heightMap.Sample(g_sampler, currentTexCoord).r;
+        currentLayerHeight += layerStep;
+    }
+    
+    return currentTexCoord;
 }
 
 float4 main(PSInput input) : SV_TARGET
@@ -55,6 +76,12 @@ float4 main(PSInput input) : SV_TARGET
 	float3 halfWay = normalize(toLight + toCamera);
 	
     float2 texCoord = ParallaxMapping(input.texCoord, toCamera);
+
+    // Clip if texCoord exceeds boundary
+    if (texCoord.x < 0.0 || texCoord.x > 1.0 * textureTileScale || texCoord.y < 0.0 || texCoord.y > 1.0 * textureTileScale)
+    {
+        clip(-1);
+    }
 	
     float3 texColor = g_texture.Sample(g_sampler, texCoord).rgb;
     float3 normal = g_normalMap.Sample(g_sampler, texCoord).rgb * 2.0f - 1.0f;
