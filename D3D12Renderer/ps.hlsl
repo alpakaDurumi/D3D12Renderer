@@ -54,13 +54,13 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera)
     float2 deltaTexCoord = toCamera.xy / toCamera.z * heightScale / numLayers; 
 	
     float2 currentTexCoord = texCoord * textureTileScale;
-    float currentHeightMapValue = g_heightMap.Sample(g_sampler, currentTexCoord).r;
+    float currentHeightMapValue = 1.0f - g_heightMap.Sample(g_sampler, currentTexCoord).r;
     
 	[loop]
     while (currentLayerHeight < currentHeightMapValue)
     {
         currentTexCoord -= deltaTexCoord;
-        currentHeightMapValue = g_heightMap.Sample(g_sampler, currentTexCoord).r;
+        currentHeightMapValue = 1.0f - g_heightMap.Sample(g_sampler, currentTexCoord).r;
         currentLayerHeight += layerStep;
     }
     
