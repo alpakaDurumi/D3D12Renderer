@@ -47,30 +47,36 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera)
     
     float layerStep = 1.0f / numLayers;
 	
-    float currentLayerHeight = 0.0f;
-	
     // Texture coord offset per layer
     // xy / z = offset / (1.0 * heightScale)
     float2 deltaTexCoord = toCamera.xy / toCamera.z * heightScale / numLayers; 
 	
     float2 currentTexCoord = texCoord * textureTileScale;
     float currentHeightMapValue = 1.0f - g_heightMap.Sample(g_sampler, currentTexCoord).r;
+    float currentLayerHeight = 0.0f;
+    
+    float2 prevTexCoord = currentTexCoord;
+    float prevHeightMapValue = currentHeightMapValue;
+    float prevLayerHeight = currentLayerHeight;
     
 	[loop]
     while (currentLayerHeight < currentHeightMapValue)
     {
+        prevTexCoord = currentTexCoord;
+        prevHeightMapValue = currentHeightMapValue;
+        prevLayerHeight = currentLayerHeight;
+        
         currentTexCoord -= deltaTexCoord;
         currentHeightMapValue = 1.0f - g_heightMap.Sample(g_sampler, currentTexCoord).r;
         currentLayerHeight += layerStep;
     }
     
     // Interpolate
-    float2 prevTexCoord = currentTexCoord + deltaTexCoord;  
-    
     float diffAfter = currentLayerHeight - currentHeightMapValue;
-    float diffBefore = 1.0f - g_heightMap.Sample(g_sampler, prevTexCoord).r - (currentLayerHeight - layerStep);
+    float diffBefore = prevHeightMapValue - prevLayerHeight;
     
-    float weight = diffBefore / (diffAfter + diffBefore);
+    // Eliminate divide by zero
+    float weight = saturate(diffBefore / max(diffAfter + diffBefore, 0.00001f));
     float2 interpolatedTexCoord = lerp(prevTexCoord, currentTexCoord, weight);
     
     return interpolatedTexCoord;
