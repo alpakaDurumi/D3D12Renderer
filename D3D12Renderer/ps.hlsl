@@ -35,10 +35,10 @@ cbuffer LightConstantBuffer : register(b2)
 	float lightIntensity;
 }
 
-// Steep Parallax mapping
+// Parallax Occlusion Mapping
 float2 ParallaxMapping(float2 texCoord, float3 toCamera)
 {
-    const float heightScale = 0.1f;
+    const float heightScale = 0.02f;
 	
     // Set numLayers based on view direction
     const float minLayers = 8.0f;
@@ -64,7 +64,16 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera)
         currentLayerHeight += layerStep;
     }
     
-    return currentTexCoord;
+    // Interpolate
+    float2 prevTexCoord = currentTexCoord + deltaTexCoord;  
+    
+    float diffAfter = currentLayerHeight - currentHeightMapValue;
+    float diffBefore = 1.0f - g_heightMap.Sample(g_sampler, prevTexCoord).r - (currentLayerHeight - layerStep);
+    
+    float weight = diffBefore / (diffAfter + diffBefore);
+    float2 interpolatedTexCoord = lerp(prevTexCoord, currentTexCoord, weight);
+    
+    return interpolatedTexCoord;
 }
 
 float4 main(PSInput input) : SV_TARGET
