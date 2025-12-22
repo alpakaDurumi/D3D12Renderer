@@ -7,10 +7,11 @@ SamplerState g_sampler : register(s0);
 struct PSInput
 {
     float4 pos : SV_POSITION;
-    float2 texCoord : TEXCOORD;
-    float3 posTangent : POSITION0;
-    float3 lightPosTangent : POSITION1;
-    float3 cameraPosTangent : POSITION2;
+    float3 posWorld : POSITION;
+    float2 texCoord : TEXCOORD0;
+    float3 tangentWorld : TANGENT;
+    float3 normalWorld : NORMAL;
+    nointerpolation float tangentW : TEXCOORD1; // Do not interpolate w component of tangent vector.
 };
 
 cbuffer MeshConstantBuffer : register(b0)
@@ -35,6 +36,12 @@ cbuffer LightConstantBuffer : register(b2)
 	float lightIntensity;
 }
 
+cbuffer CameraConstantBuffer : register(b3)
+{
+    float3 cameraPos;
+    float4x4 viewProjection;
+}
+
 // Parallax Occlusion Mapping
 float2 ParallaxMapping(float2 texCoord, float3 toCamera)
 {
@@ -43,13 +50,13 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera)
     // Set numLayers based on view direction
     const float minLayers = 8.0f;
     const float maxLayers = 32.0f;
-    const float numLayers = lerp(maxLayers, minLayers, max(dot(float3(0.0f, 0.0f, 1.0f), toCamera), 0.0f));
+    const float numLayers = lerp(maxLayers, minLayers, abs(dot(float3(0.0f, 0.0f, 1.0f), toCamera)));
     
     float layerStep = 1.0f / numLayers;
 	
     // Texture coord offset per layer
     // xy / z = offset / (1.0 * heightScale)
-    float2 deltaTexCoord = toCamera.xy / toCamera.z * heightScale / numLayers; 
+    float2 deltaTexCoord = toCamera.xy / max(toCamera.z, 0.001f) * heightScale / numLayers;
 	
     float2 currentTexCoord = texCoord * textureTileScale;
     float currentHeightMapValue = 1.0f - g_heightMap.Sample(g_sampler, currentTexCoord).r;
@@ -60,7 +67,7 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera)
     float prevLayerHeight = currentLayerHeight;
     
 	[loop]
-    while (currentLayerHeight < currentHeightMapValue)
+    while (currentLayerHeight < 1.0f && currentLayerHeight < currentHeightMapValue)
     {
         prevTexCoord = currentTexCoord;
         prevHeightMapValue = currentHeightMapValue;
@@ -84,13 +91,17 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera)
 
 float4 main(PSInput input) : SV_TARGET
 {
-	// Shading in tangent space
+    // For POM, use inaccurate inverse-TBN
+    float3 iT = normalize(input.tangentWorld);
+    float3 iN = normalize(input.normalWorld);
+    iT = normalize(iT - dot(iT, iN) * iN);              // Gram-Schmidt process
+    float3 iB = input.tangentW * cross(iN, iT);         // W represents handedness
+    float3x3 iiTBN = transpose(float3x3(iT, iB, iN));   // Inverse of orthogonal matrix is same as transpose.
 	
-    float3 toLight = normalize(input.lightPosTangent - input.posTangent);
-    float3 toCamera = normalize(input.cameraPosTangent - input.posTangent);
-	float3 halfWay = normalize(toLight + toCamera);
+    float3 toCameraWorld = normalize(cameraPos - input.posWorld);
+    float3 toCameraTangent = normalize(mul(toCameraWorld, iiTBN));
 	
-    float2 texCoord = ParallaxMapping(input.texCoord, toCamera);
+    float2 texCoord = ParallaxMapping(input.texCoord, toCameraTangent);
 
     // Clip if texCoord exceeds boundary
     if (texCoord.x < 0.0 || texCoord.x > 1.0 * textureTileScale || texCoord.y < 0.0 || texCoord.y > 1.0 * textureTileScale)
@@ -98,18 +109,27 @@ float4 main(PSInput input) : SV_TARGET
         clip(-1);
     }
 	
+    // Set up TBN matrix
+    float3 B = input.tangentW * cross(input.normalWorld, input.tangentWorld);
+    float3x3 TBN = float3x3(input.tangentWorld, B, input.normalWorld);
+    
+    // Shading in world space
+    float3 toLightWorld = normalize(lightPos - input.posWorld);
+    float3 halfWay = normalize(toLightWorld + toCameraWorld);
+    
     float3 texColor = g_texture.Sample(g_sampler, texCoord).rgb;
     float3 normal = g_normalMap.Sample(g_sampler, texCoord).rgb * 2.0f - 1.0f;
+    float3 normalWorld = mul(normal, TBN);
 	
 	// Ambient
 	float3 ambient = materialAmbient * texColor;
 	
 	// Diffuse
-    float nDotL = max(dot(normal, toLight), 0.0f);
+    float nDotL = max(dot(normalWorld, toLightWorld), 0.0f);
 	float3 diffuse = texColor * nDotL * lightColor * lightIntensity;
 	
 	// Specular
-    float nDotH = max(dot(normal, halfWay), 0.0f);
+    float nDotH = max(dot(normalWorld, halfWay), 0.0f);
     float3 specular = pow(nDotH, shininess) * materialSpecular * lightColor * lightIntensity;
 	
 	return float4(ambient + diffuse + specular, 1.0f);
