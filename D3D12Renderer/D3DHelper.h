@@ -111,6 +111,14 @@ namespace D3DHelper
         ComPtr<ID3D12Resource>& depthStencilBuffer,
         D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
 
+    void CreateShadowMap(
+        ID3D12Device10* pDevice,
+        UINT width,
+        UINT height,
+        ComPtr<ID3D12Resource>& shadowMap,
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvCpuHandle,
+        D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle);
+
     UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format);
 
     UINT CalcSubresourceIndex(
