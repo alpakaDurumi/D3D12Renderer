@@ -24,6 +24,7 @@
 #include "RootSignature.h"
 #include "ImGuiDescriptorAllocator.h"
 #include "CacheKeys.h"
+#include "Light.h"
 
 class FrameResource;
 class CommandList;
@@ -64,8 +65,8 @@ public:
 
 private:
     // Window
-    UINT m_width = 1280;
-    UINT m_height = 720;
+    UINT m_width = 1920;
+    UINT m_height = 1080;
 
     std::wstring m_title;
 
@@ -111,11 +112,18 @@ private:
     std::vector<Mesh> m_meshes;
     std::vector<InstancedMesh> m_instancedMeshes;
     MaterialConstantData m_materialConstantData;
-    LightConstantData m_lightConstantData;
     CameraConstantData m_cameraConstantData;
     std::unique_ptr<Texture> m_albedo;
     std::unique_ptr<Texture> m_normalMap;
     std::unique_ptr<Texture> m_heightMap;
+
+    std::unique_ptr<DescriptorAllocation> m_shadowMapDsvAllocation;
+    std::unique_ptr<DescriptorAllocation> m_shadowMapSrvAllocation;
+    ComPtr<ID3D12Resource> m_shadowMap;
+    D3D12_VIEWPORT m_shadowMapViewport;
+    D3D12_RECT m_shadowMapScissorRect;
+
+    std::vector<Light> m_lights;
 
     // For ImGui
     std::unique_ptr<ImGuiDescriptorAllocator> m_imguiDescriptorAllocator;

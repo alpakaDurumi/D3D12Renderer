@@ -183,7 +183,7 @@ public:
     D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
     UINT m_numIndices = 0;
 
-    MeshConstantData m_meshBufferData;
+    MeshConstantData m_meshConstantData;
     UINT m_meshConstantBufferIndex;
     UINT m_materialConstantBufferIndex;
 };

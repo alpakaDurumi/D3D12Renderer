@@ -8,7 +8,7 @@ using namespace DirectX;
 template<typename T>
 struct ConstantData
 {
-    // static_assert must be in in a member function (like the constructor)
+    // static_assert must be in a member function (like the constructor)
     // because the derived class T is an incomplete type at the point of inheritance
     ConstantData()
     {

@@ -44,8 +44,10 @@ public:
             delete pMeshCB;
         for (auto* pMatCB : m_materialConstantBuffers)
             delete pMatCB;
-        delete m_lightConstantBuffer;
-        delete m_cameraConstantBuffer;
+        for (auto* pLightCB : m_lightConstantBuffers)
+            delete pLightCB;
+        for (auto* pCameraCB : m_cameraConstantBuffers)
+            delete pCameraCB;
     }
 
 //private:
@@ -54,8 +56,8 @@ public:
 
     std::vector<MeshCB*> m_meshConstantBuffers;
     std::vector<MaterialCB*> m_materialConstantBuffers;
-    LightCB* m_lightConstantBuffer = nullptr;
-    CameraCB* m_cameraConstantBuffer = nullptr;
+    std::vector<LightCB*> m_lightConstantBuffers;
+    std::vector<CameraCB*> m_cameraConstantBuffers;
 
     UINT64 m_fenceValue = 0;
 };

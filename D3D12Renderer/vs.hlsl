@@ -47,15 +47,16 @@ PSInput main(VSInput input)
     output.pos = mul(float4(output.posWorld, 1.0f), viewProjection);
     output.texCoord = input.texCoord;
     
+#ifndef DEPTH_ONLY
 #ifdef INSTANCED
     output.tangentWorld = normalize(mul(float4(input.tangent.xyz, 0.0f), mul(input.instanceInverseTranspose, inverseTranspose)).xyz);
     output.normalWorld = normalize(mul(float4(input.normal, 0.0f), mul(input.instanceInverseTranspose, inverseTranspose)).xyz);
-#else
+#else   // INSTANCED
     output.tangentWorld = normalize(mul(float4(input.tangent.xyz, 0.0f), inverseTranspose).xyz);
     output.normalWorld = normalize(mul(float4(input.normal, 0.0f), inverseTranspose).xyz);
-#endif
-    
+#endif  // INSTANCED
     output.tangentW = input.tangent.w;
+#endif  // SHADOW
     
     return output;
 }

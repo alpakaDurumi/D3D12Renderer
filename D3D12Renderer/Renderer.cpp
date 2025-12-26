@@ -247,43 +247,51 @@ void Renderer::OnUpdate()
     // 이번에 드로우할 프레임에 대해 constant buffers 업데이트
     FrameResource* pFrameResource = m_frameResources[m_frameIndex];
 
+    // Main Camera
+    m_cameraConstantData.cameraPos = m_camera.GetPosition();
+    XMStoreFloat4x4(&m_cameraConstantData.viewProjection, XMMatrixTranspose(m_camera.GetViewMatrix() * m_camera.GetProjectionMatrix(true)));
+    pFrameResource->m_cameraConstantBuffers[0]->Update(&m_cameraConstantData);
+
     // Use linear color for gamma-correct rendering
+    // For now, just use index 0
     XMStoreFloat3(&m_materialConstantData.materialAmbient, XMColorSRGBToRGB(XMVectorSet(0.1f, 0.1f, 0.1f, 1.0f)));
     XMStoreFloat3(&m_materialConstantData.materialSpecular, XMColorSRGBToRGB(XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f)));
     m_materialConstantData.shininess = 10.0f;
-    // For now, just use index 0
     pFrameResource->m_materialConstantBuffers[0]->Update(&m_materialConstantData);
 
     for (auto& mesh : m_meshes)
     {
         XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -5.0f, 0.0f);
-        XMStoreFloat4x4(&mesh.m_meshBufferData.world, XMMatrixTranspose(world));
+        XMStoreFloat4x4(&mesh.m_meshConstantData.world, XMMatrixTranspose(world));
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        XMStoreFloat4x4(&mesh.m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
-        mesh.m_meshBufferData.textureTileScale = 50.0f;
-        pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshBufferData);
+        XMStoreFloat4x4(&mesh.m_meshConstantData.inverseTranspose, XMMatrixInverse(nullptr, world));
+        mesh.m_meshConstantData.textureTileScale = 50.0f;
+        pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshConstantData);
     }
 
     for (auto& mesh : m_instancedMeshes)
     {
-        XMMATRIX prevWorld = XMMatrixTranspose(XMLoadFloat4x4(&mesh.m_meshBufferData.world));
+        XMMATRIX prevWorld = XMMatrixTranspose(XMLoadFloat4x4(&mesh.m_meshConstantData.world));
         XMMATRIX world = prevWorld * XMMatrixRotationRollPitchYaw(0.0f, 0.001f, 0.0f);
-        XMStoreFloat4x4(&mesh.m_meshBufferData.world, XMMatrixTranspose(world));
+        XMStoreFloat4x4(&mesh.m_meshConstantData.world, XMMatrixTranspose(world));
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        XMStoreFloat4x4(&mesh.m_meshBufferData.inverseTranspose, XMMatrixInverse(nullptr, world));
-        mesh.m_meshBufferData.textureTileScale = 1.0f;
-        pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshBufferData);
+        XMStoreFloat4x4(&mesh.m_meshConstantData.inverseTranspose, XMMatrixInverse(nullptr, world));
+        mesh.m_meshConstantData.textureTileScale = 1.0f;
+        pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshConstantData);
     }
 
-    m_lightConstantData.lightPos = { 0.0f, 100.0f, 0.0f };
-    m_lightConstantData.lightDir = { -1.0f, -1.0f, 1.0f };
-    m_lightConstantData.lightColor = { 1.0f, 1.0f, 1.0f };
-    m_lightConstantData.lightIntensity = 1.0f;
-    pFrameResource->m_lightConstantBuffer->Update(&m_lightConstantData);
+    for (auto& light : m_lights)
+    {
+        pFrameResource->m_lightConstantBuffers[light.m_lightConstantBufferIndex]->Update(&light.m_lightConstantData);
 
-    m_cameraConstantData.cameraPos = m_camera.GetPosition();
-    XMStoreFloat4x4(&m_cameraConstantData.viewProjection, XMMatrixTranspose(m_camera.GetViewMatrix() * m_camera.GetProjectionMatrix(true)));
-    pFrameResource->m_cameraConstantBuffer->Update(&m_cameraConstantData);
+        static float nearPlane = 0.01f;
+        static float farPlane = 1000.0f;
+        static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+        XMMATRIX view = XMMatrixLookToLH(XMLoadFloat3(&light.m_lightConstantData.lightPos), XMLoadFloat3(&light.m_lightConstantData.lightDir), up);
+        XMMATRIX projection = XMMatrixOrthographicLH(100.0f, 100.0f, nearPlane, farPlane);
+        XMStoreFloat4x4(&light.m_cameraConstantData.viewProjection, XMMatrixTranspose(view * projection));
+        pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex]->Update(&light.m_cameraConstantData);
+    }
 }
 
 // Render the scene.
@@ -616,11 +624,15 @@ void Renderer::LoadAssets()
 
         // conditional compilation for instancing
         std::vector<std::string> definesInstanced = { "INSTANCED" };
+        std::vector<std::string> definesDepthOnly = { "DEPTH_ONLY" };
+        std::vector<std::string> definesInstancedDepthOnly = { "INSTANCED", "DEPTH_ONLY" };
 
         std::vector<ShaderKey> shaderKeys;
-        shaderKeys.push_back({ vsName, std::vector<std::string>(), "vs_5_0" });
+        shaderKeys.push_back({ vsName, {}, "vs_5_0" });
         shaderKeys.push_back({ vsName, definesInstanced, "vs_5_0" });
-        shaderKeys.push_back({ psName, std::vector<std::string>(), "ps_5_0" });
+        shaderKeys.push_back({ vsName, definesDepthOnly, "vs_5_0" });
+        shaderKeys.push_back({ vsName, definesInstancedDepthOnly, "vs_5_0" });
+        shaderKeys.push_back({ psName, {}, "ps_5_0" });
 
         for (const ShaderKey& key : shaderKeys)
         {
@@ -673,6 +685,21 @@ void Renderer::LoadAssets()
     m_dsvAllocation = std::make_unique<DescriptorAllocation>(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
     CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation->GetDescriptorHandle());
 
+    // Create depth buffer for shadow mapping
+    m_shadowMapDsvAllocation = std::make_unique<DescriptorAllocation>(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
+    m_shadowMapSrvAllocation = std::make_unique<DescriptorAllocation>(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
+    CreateShadowMap(m_device.Get(), 2048, 2048, m_shadowMap, m_shadowMapDsvAllocation->GetDescriptorHandle(), m_shadowMapSrvAllocation->GetDescriptorHandle());
+    m_layoutTracker->RegisterResource(m_shadowMap.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, 1, 1, DXGI_FORMAT_R32_TYPELESS);
+    m_shadowMapViewport = { 0.0f, 0.0f, static_cast<float>(2048), static_cast<float>(2048), 0.0f, 1.0f };
+    m_shadowMapScissorRect = { 0, 0, static_cast<LONG>(2048), static_cast<LONG>(2048) };
+
+    // Set up lights
+    m_lights.push_back(Light());
+    m_lights[0].m_lightConstantData.lightPos = { 0.0f, 100.0f, -50.0f };
+    m_lights[0].m_lightConstantData.lightDir = { -1.0f, -1.0f, 1.0f };
+    m_lights[0].m_lightConstantData.lightColor = { 1.0f, 1.0f, 1.0f };
+    m_lights[0].m_lightConstantData.lightIntensity = 1.0f;
+
     // Get command allocator and list for loading assets
     auto [commandAllocator, commandList] = m_commandQueue->GetAvailableCommandList();
 
@@ -684,56 +711,55 @@ void Renderer::LoadAssets()
     {
         FrameResource* pFrameResource = m_frameResources[i];
 
+        // Main Camera
+        {
         DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
+            CameraCB* cameraCB = new CameraCB(m_device.Get(), std::move(alloc));
+            pFrameResource->m_cameraConstantBuffers.push_back(cameraCB);
+        }
+
+        // Material
+        {
+            DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
         MaterialCB* matCB = new MaterialCB(m_device.Get(), std::move(alloc));
         pFrameResource->m_materialConstantBuffers.push_back(matCB);
+        }
 
         // Meshes
-        {
             for (auto& mesh : m_meshes)
             {
-                // Mesh
-                {
                     MeshCB* meshCB = new MeshCB(m_device.Get());
 
-                    // 각 FrameResource에서 동일한 인덱스긴 하지만, 한 번만 수행하도록 하였음
-                    if (i == 0)
-                        mesh.m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
+            // Set index only at first iteration because indices are same in each FrameResource
+            if (i == 0) mesh.m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
                     pFrameResource->m_meshConstantBuffers.push_back(meshCB);
-                }
 
-                if (i == 0)
-                    mesh.m_materialConstantBufferIndex = 0;
+            if (i == 0) mesh.m_materialConstantBufferIndex = 0;
             }
 
+        // Instanced Meshes
             for (auto& mesh : m_instancedMeshes)
             {
-                // Mesh
-                {
                     MeshCB* meshCB = new MeshCB(m_device.Get());
 
-                    if (i == 0)
-                        mesh.m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
+            if (i == 0) mesh.m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
                     pFrameResource->m_meshConstantBuffers.push_back(meshCB);
-                }
 
-                if (i == 0)
-                    mesh.m_materialConstantBufferIndex = 0;
+            if (i == 0) mesh.m_materialConstantBufferIndex = 0;
             }
-        }
 
         // Lights
+        for (auto& light : m_lights)
         {
-            DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-            LightCB* lightCB = new LightCB(m_device.Get(), std::move(alloc));
-            pFrameResource->m_lightConstantBuffer = lightCB;
-        }
+            DescriptorAllocation lightCBAlloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
+            LightCB* lightCB = new LightCB(m_device.Get(), std::move(lightCBAlloc));
+            if (i == 0) light.m_lightConstantBufferIndex = UINT(pFrameResource->m_lightConstantBuffers.size());
+            pFrameResource->m_lightConstantBuffers.push_back(lightCB);
 
-        // Camera
-        {
-            DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-            CameraCB* cameraCB = new CameraCB(m_device.Get(), std::move(alloc));
-            pFrameResource->m_cameraConstantBuffer = cameraCB;
+            DescriptorAllocation CameraCBAlloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
+            CameraCB* cameraCB = new CameraCB(m_device.Get(), std::move(CameraCBAlloc));
+            if (i == 0) light.m_cameraConstantBufferIndex = UINT(pFrameResource->m_cameraConstantBuffers.size());
+            pFrameResource->m_cameraConstantBuffers.push_back(cameraCB);
         }
     }
 
@@ -791,6 +817,60 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     cmdList->SetGraphicsRootSignature(pRootSignature->GetRootSignature().Get());
     m_dynamicDescriptorHeap->ParseRootSignature(*pRootSignature);       // TODO : parse root signature only when root signature changed?
 
+    // Depth-only pass for shadow mapping
+    {
+        cmdList->RSSetViewports(1, &m_shadowMapViewport);
+        cmdList->RSSetScissorRects(1, &m_shadowMapScissorRect);
+
+        for (auto& light : m_lights)
+        {
+            //commandList.Barrier(
+            //    m_shadowMap.Get(),
+            //    D3D12_BARRIER_SYNC_NONE,
+            //    D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+            //    D3D12_BARRIER_ACCESS_NO_ACCESS,
+            //    D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+            //    D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
+            //    { 0xffffffff, 0, 0, 0, 0, 0 });     // Select all subresources
+
+            D3D12_CPU_DESCRIPTOR_HANDLE shadowMapDsvHandle = m_shadowMapDsvAllocation->GetDescriptorHandle();
+            cmdList->OMSetRenderTargets(0, nullptr, FALSE, &shadowMapDsvHandle);
+
+            cmdList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+            m_currentPSOKey.passType = DEPTH_ONLY;
+            m_currentPSOKey.vsKey = { L"vs.hlsl", {"DEPTH_ONLY"}, "vs_5_0" };
+            m_currentPSOKey.psKey = { L"", {}, "" };
+            cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
+            for (const auto& mesh : m_meshes)
+            {
+                cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
+                m_dynamicDescriptorHeap->StageDescriptors(2, 0, 1, pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
+                m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex]->GetDescriptorHandle());
+                m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
+
+                mesh.Render(cmdList);
+            }
+
+            m_currentPSOKey.vsKey.defines = { "INSTANCED", "DEPTH_ONLY" };
+            SetMeshType(MeshType::INSTANCED);
+            cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
+            for (const auto& mesh : m_instancedMeshes)
+            {
+                cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
+                m_dynamicDescriptorHeap->StageDescriptors(2, 0, 1, pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
+                m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex]->GetDescriptorHandle());
+                m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
+
+                mesh.Render(cmdList);
+            }
+
+            // Barrier
+        }
+    }
+
+    // Color pass
+    {
     cmdList->RSSetViewports(1, &m_viewport);
     cmdList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -813,6 +893,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
     cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
+        m_currentPSOKey.passType = DEFAULT;
     m_currentPSOKey.vsKey = { L"vs.hlsl", {}, "vs_5_0" };
     m_currentPSOKey.psKey = { L"ps.hlsl", {}, "ps_5_0" };
     cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
@@ -820,8 +901,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     {
         cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
         cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
-        m_dynamicDescriptorHeap->StageDescriptors(2, 0, 1, pFrameResource->m_lightConstantBuffer->GetDescriptorHandle());
-        m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffer->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(2, 0, 1, pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffers[0]->GetDescriptorHandle());
         m_dynamicDescriptorHeap->StageDescriptors(3, 0, 1, m_albedo->GetDescriptorHandle());
         m_dynamicDescriptorHeap->StageDescriptors(3, 1, 1, m_normalMap->GetDescriptorHandle());
         m_dynamicDescriptorHeap->StageDescriptors(3, 2, 1, m_heightMap->GetDescriptorHandle());
@@ -837,8 +918,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     {
         cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
         cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
-        m_dynamicDescriptorHeap->StageDescriptors(2, 0, 1, pFrameResource->m_lightConstantBuffer->GetDescriptorHandle());
-        m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffer->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(2, 0, 1, pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffers[0]->GetDescriptorHandle());
         m_dynamicDescriptorHeap->StageDescriptors(3, 0, 1, m_albedo->GetDescriptorHandle());
         m_dynamicDescriptorHeap->StageDescriptors(3, 1, 1, m_normalMap->GetDescriptorHandle());
         m_dynamicDescriptorHeap->StageDescriptors(3, 2, 1, m_heightMap->GetDescriptorHandle());
@@ -846,6 +927,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
         mesh.Render(cmdList);
     }
+}
 }
 
 // Wait for pending GPU work to complete
@@ -942,9 +1024,20 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
         rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
         rasterizerDesc.FrontCounterClockwise = FALSE;
+
+        if (psoKey.passType == DEPTH_ONLY)
+        {
+            rasterizerDesc.DepthBias = 100;
+            rasterizerDesc.DepthBiasClamp = 0.1f;
+            rasterizerDesc.SlopeScaledDepthBias = 1.5f;
+        }
+        else
+        {
         rasterizerDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
         rasterizerDesc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
         rasterizerDesc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+        }
+
         rasterizerDesc.DepthClipEnable = TRUE;
         rasterizerDesc.MultisampleEnable = FALSE;
         rasterizerDesc.AntialiasedLineEnable = FALSE;
@@ -979,8 +1072,6 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         depthStencilDesc.FrontFace = defaultStencilOp;
         depthStencilDesc.BackFace = defaultStencilOp;
 
-        // idx 0 : VS
-        // idx 1 : PS
         ID3DBlob* vsBlob = GetShaderBlob(psoKey.vsKey);
         ID3DBlob* psBlob = GetShaderBlob(psoKey.psKey);
 
@@ -988,16 +1079,32 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
         psoDesc.InputLayout = { m_inputLayouts[psoKey.meshType].data(), static_cast<UINT>(m_inputLayouts[psoKey.meshType].size()) };
         psoDesc.pRootSignature = GetRootSignature(m_currentRSKey)->GetRootSignature().Get();
+
+        // Shader stages are selected by demand.
+        // VS is essential for rasterization.
+        // PS is optional. (e.g. Depth-only pass)
         psoDesc.VS = { vsBlob->GetBufferPointer(), vsBlob->GetBufferSize() };
+        if (psBlob)
+        {
         psoDesc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
+        }
+
         psoDesc.RasterizerState = rasterizerDesc;
         psoDesc.BlendState = blendDesc;
         psoDesc.DepthStencilState = depthStencilDesc;
         psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
         psoDesc.SampleMask = UINT_MAX;
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+
+        if (psoKey.passType == DEPTH_ONLY)
+        {
+            psoDesc.NumRenderTargets = 0;
+        }
+        else
+        {
         psoDesc.NumRenderTargets = 1;
         psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+        }
         psoDesc.SampleDesc.Count = 1;
         ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&it->second)));
     }
@@ -1007,6 +1114,11 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
 
 ID3DBlob* Renderer::GetShaderBlob(const ShaderKey& shaderKey)
 {
+    if (shaderKey.IsEmpty())
+    {
+        return nullptr;
+    }
+
     auto it = m_shaderBlobs.find(shaderKey);
 
     if (it == m_shaderBlobs.end())
