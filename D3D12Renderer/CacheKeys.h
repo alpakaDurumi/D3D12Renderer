@@ -34,6 +34,13 @@ enum MeshType
     NUM_MESH_TYPES
 };
 
+enum PassType
+{
+    DEFAULT,
+    DEPTH_ONLY,
+    NUM_PASS_TYPES
+};
+
 // Key that identify unique root signature.
 // For now, only use attributes of static sampler to distinguish root signatures.
 struct RSKey
@@ -64,6 +71,8 @@ struct ShaderKey
     std::string target;
 
     bool operator==(const ShaderKey& other) const;
+
+    bool IsEmpty() const;
 };
 
 template<>
@@ -77,7 +86,11 @@ struct std::hash<ShaderKey>
         {
             combinedString += L"|" + Utility::MultiByteToWideChar(define);
         }
-        combinedString += L"|" + Utility::MultiByteToWideChar(key.target);
+
+        if (!key.target.empty())
+        {
+            combinedString += L"|" + Utility::MultiByteToWideChar(key.target);
+        }
 
         return static_cast<size_t>(Utility::Djb2Hash(combinedString));
     }
@@ -86,10 +99,10 @@ struct std::hash<ShaderKey>
 // Key that identify unique PSO.
 struct PSOKey
 {
-    TextureFiltering filtering;
-    TextureAddressingMode addressingMode;
-
-    MeshType meshType;
+    TextureFiltering filtering;             // 3
+    TextureAddressingMode addressingMode;   // 3
+    MeshType meshType;                      // 1
+    PassType passType;                      // 1
 
     ShaderKey vsKey;
     ShaderKey psKey;
@@ -105,9 +118,11 @@ struct std::hash<PSOKey>
     {
         size_t seed = 0;
 
-        size_t combinedBits = (static_cast<size_t>(key.filtering) << 4) |
-            (static_cast<size_t>(key.addressingMode) << 1) |
-            static_cast<size_t>(key.meshType);
+        size_t combinedBits =
+            (static_cast<size_t>(key.filtering) << 5) |
+            (static_cast<size_t>(key.addressingMode) << 2) |
+            (static_cast<size_t>(key.meshType) << 1) |
+            static_cast<size_t>(key.passType);
 
         Utility::HashCombine(seed, combinedBits);
         Utility::HashCombine(seed, key.vsKey);

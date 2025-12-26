@@ -11,8 +11,13 @@ bool RSKey::operator==(const RSKey& other) const
 bool ShaderKey::operator==(const ShaderKey& other) const
 {
     return fileName == other.fileName &&
-        target == other.target &&
-        defines == other.defines;
+        defines == other.defines &&
+        target == other.target;
+}
+
+bool ShaderKey::IsEmpty() const
+{
+    return fileName.empty() && defines.empty() && target.empty();
 }
 
 bool PSOKey::operator==(const PSOKey& other) const
@@ -20,6 +25,7 @@ bool PSOKey::operator==(const PSOKey& other) const
     return filtering == other.filtering &&
         addressingMode == other.addressingMode &&
         meshType == other.meshType &&
+        passType == other.passType &&
         vsKey == other.vsKey &&
         psKey == other.psKey;
 }
