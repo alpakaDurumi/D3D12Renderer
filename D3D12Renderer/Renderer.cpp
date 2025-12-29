@@ -613,10 +613,10 @@ void Renderer::LoadAssets()
 {
     // Compile shaders
     {
-        UINT compileFlags = 0;
+        UINT compileFlags = D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES;
 #if defined(_DEBUG)
         // Enable better shader debugging with the graphics debugging tools.
-        compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+        compileFlags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #endif
 
         std::wstring vsName = L"vs.hlsl";
@@ -632,7 +632,7 @@ void Renderer::LoadAssets()
         shaderKeys.push_back({ vsName, definesInstanced, "vs_5_0" });
         shaderKeys.push_back({ vsName, definesDepthOnly, "vs_5_0" });
         shaderKeys.push_back({ vsName, definesInstancedDepthOnly, "vs_5_0" });
-        shaderKeys.push_back({ psName, {}, "ps_5_0" });
+        shaderKeys.push_back({ psName, {}, "ps_5_1" });
 
         for (const ShaderKey& key : shaderKeys)
         {
@@ -845,8 +845,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             for (const auto& mesh : m_meshes)
             {
                 cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-                m_dynamicDescriptorHeap->StageDescriptors(2, 0, 1, pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
-                m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex]->GetDescriptorHandle());
+                cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex]->GetGPUVirtualAddress());
                 m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
                 mesh.Render(cmdList);
@@ -858,8 +857,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             for (const auto& mesh : m_instancedMeshes)
             {
                 cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-                m_dynamicDescriptorHeap->StageDescriptors(2, 0, 1, pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
-                m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex]->GetDescriptorHandle());
+                cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex]->GetGPUVirtualAddress());
                 m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
                 mesh.Render(cmdList);
@@ -895,17 +893,22 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
         m_currentPSOKey.passType = DEFAULT;
     m_currentPSOKey.vsKey = { L"vs.hlsl", {}, "vs_5_0" };
-    m_currentPSOKey.psKey = { L"ps.hlsl", {}, "ps_5_0" };
+        m_currentPSOKey.psKey = { L"ps.hlsl", {}, "ps_5_1" };
     cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
     for (const auto& mesh : m_meshes)
     {
         cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
         cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
-            m_dynamicDescriptorHeap->StageDescriptors(2, 0, 1, pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
-            m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffers[0]->GetDescriptorHandle());
-        m_dynamicDescriptorHeap->StageDescriptors(3, 0, 1, m_albedo->GetDescriptorHandle());
-        m_dynamicDescriptorHeap->StageDescriptors(3, 1, 1, m_normalMap->GetDescriptorHandle());
-        m_dynamicDescriptorHeap->StageDescriptors(3, 2, 1, m_heightMap->GetDescriptorHandle());
+            cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[0]->GetGPUVirtualAddress());
+
+            m_dynamicDescriptorHeap->StageDescriptors(3, 0, pFrameResource->m_lightConstantBuffers.size(), pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
+
+            m_dynamicDescriptorHeap->StageDescriptors(4, 0, 1, m_albedo->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(4, 1, 1, m_normalMap->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(4, 2, 1, m_heightMap->GetDescriptorHandle());
+
+            m_dynamicDescriptorHeap->StageDescriptors(5, 0, pFrameResource->m_lightConstantBuffers.size(), m_shadowMapSrvAllocation->GetDescriptorHandle());
+
         m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
         mesh.Render(cmdList);
@@ -918,11 +921,16 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     {
         cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
         cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
-            m_dynamicDescriptorHeap->StageDescriptors(2, 0, 1, pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
-            m_dynamicDescriptorHeap->StageDescriptors(2, 1, 1, pFrameResource->m_cameraConstantBuffers[0]->GetDescriptorHandle());
-        m_dynamicDescriptorHeap->StageDescriptors(3, 0, 1, m_albedo->GetDescriptorHandle());
-        m_dynamicDescriptorHeap->StageDescriptors(3, 1, 1, m_normalMap->GetDescriptorHandle());
-        m_dynamicDescriptorHeap->StageDescriptors(3, 2, 1, m_heightMap->GetDescriptorHandle());
+            cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[0]->GetGPUVirtualAddress());
+
+            m_dynamicDescriptorHeap->StageDescriptors(3, 0, pFrameResource->m_lightConstantBuffers.size(), pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
+
+            m_dynamicDescriptorHeap->StageDescriptors(4, 0, 1, m_albedo->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(4, 1, 1, m_normalMap->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(4, 2, 1, m_heightMap->GetDescriptorHandle());
+
+            m_dynamicDescriptorHeap->StageDescriptors(5, 0, pFrameResource->m_lightConstantBuffers.size(), m_shadowMapSrvAllocation->GetDescriptorHandle());
+
         m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
         mesh.Render(cmdList);
@@ -985,25 +993,30 @@ void Renderer::SetMeshType(MeshType meshType)
 
 RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
 {
-    auto [it, inserted] = m_rootSignatures.try_emplace(rsKey, std::make_unique<RootSignature>(4, 1));
+    auto [it, inserted] = m_rootSignatures.try_emplace(rsKey, std::make_unique<RootSignature>(6, 1));
     RootSignature& rootSignature = *it->second;
 
     // Create root signature if cache not exists.
     if (inserted)
     {
-        // Root descriptor for MeshCB and MaterialCB
-        rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);    // Mesh
-        rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);     // Material
+        // Root descriptor for MeshCB, MaterialCB, and CameraCB
+        rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Mesh
+        rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Material
+        rootSignature[2].InitAsDescriptor(2, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Camera
 
-        // Descriptor table for LightCB and CameraCB
-        rootSignature[2].InitAsTable(1, D3D12_SHADER_VISIBILITY_ALL);
-        rootSignature[2].InitAsRange(0, 2, 0, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 2, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);    // Light + Camera
-
-        // Descriptor table for texture
-        // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
-        // In Resource history of PIX, only read occurs to this texture. So it seems like a bug of PIX.
+        // Descriptor table for LightConstantBuffers[]
         rootSignature[3].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootSignature[3].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+        rootSignature[3].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+
+        // Descriptor table for textures (albedo, normal map, height map)
+        // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
+        // GPU jobs (UpdateSubresources) are already finished when recording command list. I don't know why DATA_STATIC flag fails.
+        rootSignature[4].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+        rootSignature[4].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+
+        // Descriptor table for shadowMaps[]
+        rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+        rootSignature[5].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
         rootSignature.InitStaticSampler(0, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL, rsKey.filtering, rsKey.addressingMode);
 

@@ -54,8 +54,8 @@ private:
 
     UINT32 ComputeStaleDescriptorCount() const;
 
-    // A 32-bit mask is used to keep track of the root parameter indices that are descriptor tables
-    static const UINT32 MaxDescriptorTables = 32;
+    // A 16-bit mask is used to keep track of the root parameter indices that are descriptor tables
+    static const UINT32 MaxDescriptorTables = 16;
 
     // A structure that represents a descriptor table entry in the root signature.
     struct DescriptorTableCache
@@ -82,11 +82,16 @@ private:
     std::unique_ptr<D3D12_CPU_DESCRIPTOR_HANDLE[]> m_descriptorHandleCache;
     DescriptorTableCache m_descriptorTableCache[MaxDescriptorTables];
 
+    UINT32 m_currentOffset;
+
+    UINT m_numParameters;
+    UINT m_numStaticSamplers;
+
     // Represents the index in the root signature that contains a descriptor table
-    UINT32 m_descriptorTableBitMask;
+    UINT16 m_descriptorTableBitMask;
     // Represents a descriptor table in the root signature that has changed since the last time the 
     // descriptors were copied.
-    UINT32 m_staleDescriptorTableBitMask;
+    UINT16 m_staleDescriptorTableBitMask;
 
     std::vector<ComPtr<ID3D12DescriptorHeap>> m_heapPool;
     std::queue<ID3D12DescriptorHeap*> m_availableHeaps;

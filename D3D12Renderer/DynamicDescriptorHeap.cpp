@@ -17,6 +17,9 @@ DynamicDescriptorHeap::DynamicDescriptorHeap(const ComPtr<ID3D12Device10>& devic
     , m_currentGPUDescriptorHandle{ 0 }
     , m_numFreeHandles(0)
     , m_pCommandQueue(nullptr)
+    , m_currentOffset(0)
+    , m_numParameters(0)
+    , m_numStaticSamplers(0)
 {
     m_descriptorHandleIncrementSize = device->GetDescriptorHandleIncrementSize(m_heapType);
 
@@ -38,56 +41,87 @@ void DynamicDescriptorHeap::ParseRootSignature(const RootSignature& rootSignatur
     // Get a bit mask that represents the root parameter indices that match the 
     // descriptor heap type for this dynamic descriptor heap.
     m_descriptorTableBitMask = rootSignature.GetDescriptorTableBitMask(m_heapType);
-    UINT32 descriptorTableBitMask = m_descriptorTableBitMask;
 
-    UINT32 currentOffset = 0;
-    DWORD rootIndex;
-    while (_BitScanForward(&rootIndex, descriptorTableBitMask) && rootIndex < rootSignature.GetNumParameters())
-    {
-        UINT32 numDescriptors = rootSignature.GetTableSize(rootIndex);
+    m_currentOffset = 0;
 
-        DescriptorTableCache& descriptorTableCache = m_descriptorTableCache[rootIndex];
-        descriptorTableCache.NumDescriptors = numDescriptors;
-        // Determine the storage location within m_descriptorHandleCache for descriptors of the rootIndex-th table
-        descriptorTableCache.BaseDescriptor = m_descriptorHandleCache.get() + currentOffset;
-
-        currentOffset += numDescriptors;
-
-        // Flip the descriptor table bit so it's not scanned again for the current index.
-        descriptorTableBitMask ^= (1 << rootIndex);
-    }
-
-    // Make sure the maximum number of descriptors per descriptor heap has not been exceeded.
-    assert(currentOffset <= m_numDescriptorsPerHeap);
+    m_numParameters = rootSignature.GetNumParameters();
+    m_numStaticSamplers = rootSignature.GetNumStaticSamplers();
 }
 
 void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 offset, UINT32 numDescriptors, const D3D12_CPU_DESCRIPTOR_HANDLE srcDescriptor)
 {
-    // Cannot stage more than MaxDescriptorTables root parameters
     if (rootParameterIndex >= MaxDescriptorTables)
-    {
         throw std::out_of_range("Root parameter index exceeds MaxDescriptorTables.");
-    }
 
     DescriptorTableCache& descriptorTableCache = m_descriptorTableCache[rootParameterIndex];
 
-    // Check that the number of descriptors to copy does not exceed the number
-    // of descriptors expected in the descriptor table.
-    if ((offset + numDescriptors) > descriptorTableCache.NumDescriptors)
+    // If parameter already staged.
+    // Check if range of parameter can extended.
+    if (descriptorTableCache.BaseDescriptor)
     {
-        throw std::length_error("Number of descriptors exceeds the number of descriptors in the descriptor table.");
+        if (rootParameterIndex == m_numParameters - 1)
+        {
+            if ((descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get() + offset + numDescriptors) > m_numDescriptorsPerHeap)
+                throw std::out_of_range("input range exceeds the heap boundary.");
+
+            descriptorTableCache.NumDescriptors = std::max(descriptorTableCache.NumDescriptors, offset + numDescriptors);
+            m_currentOffset = descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get() + descriptorTableCache.NumDescriptors;
+        }
+        else
+        {
+            DWORD nextTableIndex;
+            UINT16 nextTableMask = m_descriptorTableBitMask & ~((1 << (rootParameterIndex + 1)) - 1);
+            if (_BitScanForward(&nextTableIndex, nextTableMask))
+            {
+                // If next parameter staged, check corruption
+                if (m_descriptorTableCache[nextTableIndex].BaseDescriptor)
+                {
+                    if (descriptorTableCache.BaseDescriptor + offset + numDescriptors > m_descriptorTableCache[nextTableIndex].BaseDescriptor)
+                        throw std::out_of_range("Input range corrupts the next table range.");
+                }
+                // If next parameter not yet staged, check heap boundary
+                else
+                {
+                    if ((descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get() + offset + numDescriptors) > m_numDescriptorsPerHeap)
+                        throw std::out_of_range("Number of descriptors exceeds the heap boundary even if a new heap allocated.");
+
+                    descriptorTableCache.NumDescriptors = std::max(descriptorTableCache.NumDescriptors, offset + numDescriptors);
+                    m_currentOffset = descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get() + descriptorTableCache.NumDescriptors;
+                }
+            }
+            else
+            {
+                if ((descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get() + offset + numDescriptors) > m_numDescriptorsPerHeap)
+                    throw std::out_of_range("Number of descriptors exceeds the heap boundary even if a new heap allocated.");
+
+                descriptorTableCache.NumDescriptors = std::max(descriptorTableCache.NumDescriptors, offset + numDescriptors);
+                m_currentOffset = descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get() + descriptorTableCache.NumDescriptors;
+            }
+        }
+    }
+    // If new parameter staged.
+    // Staging new parameters MUST be done in ascending order of parameter index.
+    else
+    {
+        if ((m_currentOffset + numDescriptors) > m_numDescriptorsPerHeap)
+            throw std::out_of_range("Number of descriptors exceeds the heap boundary even if a new heap allocated.");
+
+        // Set start address and accumulate number of descriptors
+        descriptorTableCache.BaseDescriptor = m_descriptorHandleCache.get() + m_currentOffset;
+        descriptorTableCache.NumDescriptors += numDescriptors;
+        m_currentOffset += numDescriptors;
     }
 
     // Copy descriptor handles
-    D3D12_CPU_DESCRIPTOR_HANDLE* dstDescriptor = descriptorTableCache.BaseDescriptor + offset;
+    D3D12_CPU_DESCRIPTOR_HANDLE* pDest = descriptorTableCache.BaseDescriptor + offset;
     for (UINT32 i = 0; i < numDescriptors; ++i)
     {
         D3D12_CPU_DESCRIPTOR_HANDLE temp = srcDescriptor;
         MoveCPUDescriptorHandle(&temp, i, m_descriptorHandleIncrementSize);
-        dstDescriptor[i] = temp;
+        pDest[i] = temp;
     }
 
-    // Set the root parameter index bit to make sure the descriptor table 
+    // Set the root parameter index bit as 1 to make sure the descriptor table 
     // at that index is bound to the command list.
     m_staleDescriptorTableBitMask |= (1 << rootParameterIndex);
 }
@@ -179,10 +213,12 @@ void DynamicDescriptorHeap::CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommand
             UINT pDestDescriptorRangeSizes[] = { numSrcDescriptors };
 
             // Copy the staged CPU visible descriptors to the GPU visible descriptor heap.
+            // Assume that descriptors in m_descriptorHandleCache are discontinuous or reside in different heap.
             m_device->CopyDescriptors(
                 1, pDestDescriptorRangeStarts, pDestDescriptorRangeSizes,
                 numSrcDescriptors, pSrcDescriptorHandles, nullptr,
                 m_heapType);
+
             // Set the descriptors on the command list using the passed-in setter function.
             setFunc(commandList.Get(), rootIndex, m_currentGPUDescriptorHandle);
 
@@ -193,6 +229,11 @@ void DynamicDescriptorHeap::CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommand
             // Flip the stale bit so the descriptor table is not recopied again unless it is updated with a new descriptor
             m_staleDescriptorTableBitMask ^= (1 << rootIndex);
         }
+
+        // Reset variables
+        m_currentOffset = 0;
+        for (auto& cache : m_descriptorTableCache)
+            cache.Reset();
     }
 }
 

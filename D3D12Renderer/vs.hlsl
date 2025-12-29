@@ -27,7 +27,7 @@ cbuffer MeshConstantBuffer : register(b0)
     float textureTileScale;
 };
 
-cbuffer CameraConstantBuffer : register(b3)
+cbuffer CameraConstantBuffer : register(b2)
 {
     float3 cameraPos;
     float4x4 viewProjection;

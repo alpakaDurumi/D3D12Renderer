@@ -108,7 +108,7 @@ public:
     RootSignature(UINT numParameters, UINT numStaticSamplers)
         : m_numParameters(numParameters), m_numStaticSamplers(numStaticSamplers)
     {
-        assert(numParameters <= 32);    // Maximum number of parameters is limited to 32
+        assert(numParameters <= 16);    // Maximum number of parameters is limited to 16
 
         if (m_numParameters > 0)
             m_parameters.reset(new RootParameter[m_numParameters]);
