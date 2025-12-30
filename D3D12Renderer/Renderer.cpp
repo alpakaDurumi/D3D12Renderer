@@ -901,13 +901,13 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[0]->GetGPUVirtualAddress());
 
-            m_dynamicDescriptorHeap->StageDescriptors(3, 0, pFrameResource->m_lightConstantBuffers.size(), pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(3, 0, static_cast<UINT32>(pFrameResource->m_lightConstantBuffers.size()), pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
 
             m_dynamicDescriptorHeap->StageDescriptors(4, 0, 1, m_albedo->GetDescriptorHandle());
             m_dynamicDescriptorHeap->StageDescriptors(4, 1, 1, m_normalMap->GetDescriptorHandle());
             m_dynamicDescriptorHeap->StageDescriptors(4, 2, 1, m_heightMap->GetDescriptorHandle());
 
-            m_dynamicDescriptorHeap->StageDescriptors(5, 0, pFrameResource->m_lightConstantBuffers.size(), m_shadowMapSrvAllocation->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(5, 0, static_cast<UINT32>(pFrameResource->m_lightConstantBuffers.size()), m_shadowMapSrvAllocation->GetDescriptorHandle());
 
         m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
@@ -923,13 +923,13 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[0]->GetGPUVirtualAddress());
 
-            m_dynamicDescriptorHeap->StageDescriptors(3, 0, pFrameResource->m_lightConstantBuffers.size(), pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(3, 0, static_cast<UINT32>(pFrameResource->m_lightConstantBuffers.size()), pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
 
             m_dynamicDescriptorHeap->StageDescriptors(4, 0, 1, m_albedo->GetDescriptorHandle());
             m_dynamicDescriptorHeap->StageDescriptors(4, 1, 1, m_normalMap->GetDescriptorHandle());
             m_dynamicDescriptorHeap->StageDescriptors(4, 2, 1, m_heightMap->GetDescriptorHandle());
 
-            m_dynamicDescriptorHeap->StageDescriptors(5, 0, pFrameResource->m_lightConstantBuffers.size(), m_shadowMapSrvAllocation->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(5, 0, static_cast<UINT32>(pFrameResource->m_lightConstantBuffers.size()), m_shadowMapSrvAllocation->GetDescriptorHandle());
 
         m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 

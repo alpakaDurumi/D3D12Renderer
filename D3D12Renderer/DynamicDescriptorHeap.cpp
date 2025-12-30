@@ -65,7 +65,7 @@ void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 o
                 throw std::out_of_range("input range exceeds the heap boundary.");
 
             descriptorTableCache.NumDescriptors = std::max(descriptorTableCache.NumDescriptors, offset + numDescriptors);
-            m_currentOffset = descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get() + descriptorTableCache.NumDescriptors;
+            m_currentOffset = static_cast<UINT32>(descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get()) + descriptorTableCache.NumDescriptors;
         }
         else
         {
@@ -86,7 +86,7 @@ void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 o
                         throw std::out_of_range("Number of descriptors exceeds the heap boundary even if a new heap allocated.");
 
                     descriptorTableCache.NumDescriptors = std::max(descriptorTableCache.NumDescriptors, offset + numDescriptors);
-                    m_currentOffset = descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get() + descriptorTableCache.NumDescriptors;
+                    m_currentOffset = static_cast<UINT32>(descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get()) + descriptorTableCache.NumDescriptors;
                 }
             }
             else
@@ -95,7 +95,7 @@ void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 o
                     throw std::out_of_range("Number of descriptors exceeds the heap boundary even if a new heap allocated.");
 
                 descriptorTableCache.NumDescriptors = std::max(descriptorTableCache.NumDescriptors, offset + numDescriptors);
-                m_currentOffset = descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get() + descriptorTableCache.NumDescriptors;
+                m_currentOffset = static_cast<UINT32>(descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get()) + descriptorTableCache.NumDescriptors;
             }
         }
     }
@@ -103,13 +103,13 @@ void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 o
     // Staging new parameters MUST be done in ascending order of parameter index.
     else
     {
-        if ((m_currentOffset + numDescriptors) > m_numDescriptorsPerHeap)
+        if ((m_currentOffset + offset + numDescriptors) > m_numDescriptorsPerHeap)
             throw std::out_of_range("Number of descriptors exceeds the heap boundary even if a new heap allocated.");
 
         // Set start address and accumulate number of descriptors
         descriptorTableCache.BaseDescriptor = m_descriptorHandleCache.get() + m_currentOffset;
-        descriptorTableCache.NumDescriptors += numDescriptors;
-        m_currentOffset += numDescriptors;
+        descriptorTableCache.NumDescriptors = offset + numDescriptors;
+        m_currentOffset += descriptorTableCache.NumDescriptors;
     }
 
     // Copy descriptor handles
