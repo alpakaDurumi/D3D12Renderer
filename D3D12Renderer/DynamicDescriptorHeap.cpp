@@ -48,6 +48,7 @@ void DynamicDescriptorHeap::ParseRootSignature(const RootSignature& rootSignatur
     m_numStaticSamplers = rootSignature.GetNumStaticSamplers();
 }
 
+// Staging new parameters MUST be done in ascending order of parameter index.
 void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 offset, UINT32 numDescriptors, const D3D12_CPU_DESCRIPTOR_HANDLE srcDescriptor)
 {
     if (rootParameterIndex >= MaxDescriptorTables)
@@ -55,70 +56,50 @@ void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 o
 
     DescriptorTableCache& descriptorTableCache = m_descriptorTableCache[rootParameterIndex];
 
-    // If parameter already staged.
-    // Check if range of parameter can extended.
-    if (descriptorTableCache.BaseDescriptor)
+    bool isNewParameter = descriptorTableCache.BaseDescriptor == nullptr;
+    bool isLastStaged = true;
+
+    D3D12_CPU_DESCRIPTOR_HANDLE* start = isNewParameter ? m_descriptorHandleCache.get() + m_currentOffset + offset : descriptorTableCache.BaseDescriptor + offset;
+    D3D12_CPU_DESCRIPTOR_HANDLE* upperLimit = m_descriptorHandleCache.get() + m_numDescriptorsPerHeap;
+
+    // If given index is not last, check that next table is staged
+    if (rootParameterIndex < m_numParameters - 1)
     {
-        if (rootParameterIndex == m_numParameters - 1)
+        DWORD nextTableIndex;
+        UINT16 nextTableMask = m_descriptorTableBitMask & ~((1 << (rootParameterIndex + 1)) - 1);
+        if (_BitScanForward(&nextTableIndex, nextTableMask) && m_descriptorTableCache[nextTableIndex].BaseDescriptor)
         {
-            if ((descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get() + offset + numDescriptors) > m_numDescriptorsPerHeap)
-                throw std::out_of_range("input range exceeds the heap boundary.");
-
-            descriptorTableCache.NumDescriptors = std::max(descriptorTableCache.NumDescriptors, offset + numDescriptors);
-            m_currentOffset = static_cast<UINT32>(descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get()) + descriptorTableCache.NumDescriptors;
-        }
-        else
-        {
-            DWORD nextTableIndex;
-            UINT16 nextTableMask = m_descriptorTableBitMask & ~((1 << (rootParameterIndex + 1)) - 1);
-            if (_BitScanForward(&nextTableIndex, nextTableMask))
-            {
-                // If next parameter staged, check corruption
-                if (m_descriptorTableCache[nextTableIndex].BaseDescriptor)
-                {
-                    if (descriptorTableCache.BaseDescriptor + offset + numDescriptors > m_descriptorTableCache[nextTableIndex].BaseDescriptor)
-                        throw std::out_of_range("Input range corrupts the next table range.");
-                }
-                // If next parameter not yet staged, check heap boundary
-                else
-                {
-                    if ((descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get() + offset + numDescriptors) > m_numDescriptorsPerHeap)
-                        throw std::out_of_range("Number of descriptors exceeds the heap boundary even if a new heap allocated.");
-
-                    descriptorTableCache.NumDescriptors = std::max(descriptorTableCache.NumDescriptors, offset + numDescriptors);
-                    m_currentOffset = static_cast<UINT32>(descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get()) + descriptorTableCache.NumDescriptors;
-                }
-            }
-            else
-            {
-                if ((descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get() + offset + numDescriptors) > m_numDescriptorsPerHeap)
-                    throw std::out_of_range("Number of descriptors exceeds the heap boundary even if a new heap allocated.");
-
-                descriptorTableCache.NumDescriptors = std::max(descriptorTableCache.NumDescriptors, offset + numDescriptors);
-                m_currentOffset = static_cast<UINT32>(descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get()) + descriptorTableCache.NumDescriptors;
-            }
+            upperLimit = m_descriptorTableCache[nextTableIndex].BaseDescriptor;
+            isLastStaged = false;
         }
     }
-    // If new parameter staged.
-    // Staging new parameters MUST be done in ascending order of parameter index.
-    else
-    {
-        if ((m_currentOffset + offset + numDescriptors) > m_numDescriptorsPerHeap)
-            throw std::out_of_range("Number of descriptors exceeds the heap boundary even if a new heap allocated.");
 
-        // Set start address and accumulate number of descriptors
+    if ((start + numDescriptors) > upperLimit)
+    {
+        if (isLastStaged)
+            throw std::out_of_range("Input range exceeds the heap boundary even if a new heap allocated.");
+        else
+            throw std::out_of_range("Input range corrupted the next table range.");
+    }
+
+    if (isNewParameter)
+    {
         descriptorTableCache.BaseDescriptor = m_descriptorHandleCache.get() + m_currentOffset;
         descriptorTableCache.NumDescriptors = offset + numDescriptors;
         m_currentOffset += descriptorTableCache.NumDescriptors;
     }
+    else if (isLastStaged)
+    {
+        descriptorTableCache.NumDescriptors = std::max(descriptorTableCache.NumDescriptors, offset + numDescriptors);
+        m_currentOffset = static_cast<UINT32>(descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get()) + descriptorTableCache.NumDescriptors;
+    }
 
     // Copy descriptor handles
-    D3D12_CPU_DESCRIPTOR_HANDLE* pDest = descriptorTableCache.BaseDescriptor + offset;
+    D3D12_CPU_DESCRIPTOR_HANDLE src = srcDescriptor;
     for (UINT32 i = 0; i < numDescriptors; ++i)
     {
-        D3D12_CPU_DESCRIPTOR_HANDLE temp = srcDescriptor;
-        MoveCPUDescriptorHandle(&temp, i, m_descriptorHandleIncrementSize);
-        pDest[i] = temp;
+        start[i] = src;
+        MoveCPUDescriptorHandle(&src, 1, m_descriptorHandleIncrementSize);
     }
 
     // Set the root parameter index bit as 1 to make sure the descriptor table 
