@@ -82,7 +82,7 @@ public:
     Texture(
         ID3D12Device10* pDevice,
         CommandList& commandList,
-        DescriptorAllocator& descriptorAllocator,
+        DescriptorAllocation&& allocation,
         UploadBuffer& uploadBuffer,
         ResourceLayoutTracker& layoutTracker,
         const std::wstring& filePath,
@@ -90,7 +90,7 @@ public:
         bool useBlockCompress,
         bool flipImage,
         bool isCubeMap)
-        : m_allocation(descriptorAllocator.Allocate())
+        : m_allocation(std::move(allocation))
     {
         // Find file and check validity
         std::wstring ddsFilePath = Utility::RemoveFileExtension(filePath) + L".dds";

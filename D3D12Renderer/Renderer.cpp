@@ -762,7 +762,7 @@ void Renderer::LoadAssets()
     m_albedo = std::make_unique<Texture>(
         m_device.Get(),
         commandList,
-        *m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV],
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
         *m_uploadBuffer,
         *m_layoutTracker,
         L"Assets/Textures/PavingStones150_4K-PNG_Color.png",
@@ -774,7 +774,7 @@ void Renderer::LoadAssets()
     m_normalMap = std::make_unique<Texture>(
         m_device.Get(),
         commandList,
-        *m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV],
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
         *m_uploadBuffer,
         *m_layoutTracker,
         L"Assets/Textures/PavingStones150_4K-PNG_NormalDX.png",
@@ -786,7 +786,7 @@ void Renderer::LoadAssets()
     m_heightMap = std::make_unique<Texture>(
         m_device.Get(),
         commandList,
-        *m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV],
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
         *m_uploadBuffer,
         *m_layoutTracker,
         L"Assets/Textures/PavingStones150_4K-PNG_Displacement.png",
