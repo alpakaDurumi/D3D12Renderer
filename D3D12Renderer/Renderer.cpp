@@ -686,15 +686,11 @@ void Renderer::LoadAssets()
     CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation->GetDescriptorHandle());
 
     // Create depth buffer for shadow mapping
-    m_shadowMapDsvAllocation = std::make_unique<DescriptorAllocation>(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
-    m_shadowMapSrvAllocation = std::make_unique<DescriptorAllocation>(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
-    CreateShadowMap(m_device.Get(), 2048, 2048, m_shadowMap, m_shadowMapDsvAllocation->GetDescriptorHandle(), m_shadowMapSrvAllocation->GetDescriptorHandle());
-    m_layoutTracker->RegisterResource(m_shadowMap.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, 1, 1, DXGI_FORMAT_R32_TYPELESS);
-    m_shadowMapViewport = { 0.0f, 0.0f, static_cast<float>(2048), static_cast<float>(2048), 0.0f, 1.0f };
-    m_shadowMapScissorRect = { 0, 0, static_cast<LONG>(2048), static_cast<LONG>(2048) };
+    m_shadowMapViewport = { 0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f };
+    m_shadowMapScissorRect = { 0, 0, static_cast<LONG>(m_shadowMapResolution), static_cast<LONG>(m_shadowMapResolution) };
 
     // Set up lights
-    m_lights.push_back(Light());
+    m_lights.emplace_back(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(), m_shadowMapResolution, *m_layoutTracker);
     m_lights[0].m_lightConstantData.lightPos = { 0.0f, 100.0f, -50.0f };
     m_lights[0].m_lightConstantData.lightDir = { -1.0f, -1.0f, 1.0f };
     m_lights[0].m_lightConstantData.lightColor = { 1.0f, 1.0f, 1.0f };
@@ -833,7 +829,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             //    D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
             //    { 0xffffffff, 0, 0, 0, 0, 0 });     // Select all subresources
 
-            D3D12_CPU_DESCRIPTOR_HANDLE shadowMapDsvHandle = m_shadowMapDsvAllocation->GetDescriptorHandle();
+            D3D12_CPU_DESCRIPTOR_HANDLE shadowMapDsvHandle = light.m_shadowMapDsvAllocation.GetDescriptorHandle();
             cmdList->OMSetRenderTargets(0, nullptr, FALSE, &shadowMapDsvHandle);
 
             cmdList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
@@ -869,6 +865,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
     // Color pass
     {
+        UINT32 numLights = static_cast<UINT32>(m_lights.size());
+
     cmdList->RSSetViewports(1, &m_viewport);
     cmdList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -901,13 +899,15 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[0]->GetGPUVirtualAddress());
 
-            m_dynamicDescriptorHeap->StageDescriptors(3, 0, static_cast<UINT32>(pFrameResource->m_lightConstantBuffers.size()), pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
+            for (UINT32 i = 0; i < numLights; ++i)
+                m_dynamicDescriptorHeap->StageDescriptors(3, i, 1, pFrameResource->m_lightConstantBuffers[i]->GetDescriptorHandle());
 
             m_dynamicDescriptorHeap->StageDescriptors(4, 0, 1, m_albedo->GetDescriptorHandle());
             m_dynamicDescriptorHeap->StageDescriptors(4, 1, 1, m_normalMap->GetDescriptorHandle());
             m_dynamicDescriptorHeap->StageDescriptors(4, 2, 1, m_heightMap->GetDescriptorHandle());
 
-            m_dynamicDescriptorHeap->StageDescriptors(5, 0, static_cast<UINT32>(pFrameResource->m_lightConstantBuffers.size()), m_shadowMapSrvAllocation->GetDescriptorHandle());
+            for (UINT32 i = 0; i < numLights; ++i)
+                m_dynamicDescriptorHeap->StageDescriptors(5, i, 1, m_lights[i].m_shadowMapSrvAllocation.GetDescriptorHandle());
 
         m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
@@ -923,13 +923,15 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[0]->GetGPUVirtualAddress());
 
-            m_dynamicDescriptorHeap->StageDescriptors(3, 0, static_cast<UINT32>(pFrameResource->m_lightConstantBuffers.size()), pFrameResource->m_lightConstantBuffers[0]->GetDescriptorHandle());
+            for (UINT32 i = 0; i < numLights; ++i)
+                m_dynamicDescriptorHeap->StageDescriptors(3, i, 1, pFrameResource->m_lightConstantBuffers[i]->GetDescriptorHandle());
 
             m_dynamicDescriptorHeap->StageDescriptors(4, 0, 1, m_albedo->GetDescriptorHandle());
             m_dynamicDescriptorHeap->StageDescriptors(4, 1, 1, m_normalMap->GetDescriptorHandle());
             m_dynamicDescriptorHeap->StageDescriptors(4, 2, 1, m_heightMap->GetDescriptorHandle());
 
-            m_dynamicDescriptorHeap->StageDescriptors(5, 0, static_cast<UINT32>(pFrameResource->m_lightConstantBuffers.size()), m_shadowMapSrvAllocation->GetDescriptorHandle());
+            for (UINT32 i = 0; i < numLights; ++i)
+                m_dynamicDescriptorHeap->StageDescriptors(5, i, 1, m_lights[i].m_shadowMapSrvAllocation.GetDescriptorHandle());
 
         m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 

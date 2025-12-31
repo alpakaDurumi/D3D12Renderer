@@ -117,11 +117,9 @@ private:
     std::unique_ptr<Texture> m_normalMap;
     std::unique_ptr<Texture> m_heightMap;
 
-    std::unique_ptr<DescriptorAllocation> m_shadowMapDsvAllocation;
-    std::unique_ptr<DescriptorAllocation> m_shadowMapSrvAllocation;
-    ComPtr<ID3D12Resource> m_shadowMap;
     D3D12_VIEWPORT m_shadowMapViewport;
     D3D12_RECT m_shadowMapScissorRect;
+    UINT m_shadowMapResolution = 2048;
 
     std::vector<Light> m_lights;
 
