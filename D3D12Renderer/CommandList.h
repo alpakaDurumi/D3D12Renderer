@@ -54,7 +54,7 @@ public:
         D3D12_BARRIER_ACCESS accessBefore,
         D3D12_BARRIER_ACCESS accessAfter,
         D3D12_BARRIER_LAYOUT layoutAfter,
-        D3D12_BARRIER_SUBRESOURCE_RANGE subresourceRange);
+        D3D12_BARRIER_SUBRESOURCE_RANGE subresourceRange = { 0xffffffff, 0, 0, 0, 0, 0 });
 
     std::vector<D3D12_TEXTURE_BARRIER> GetPendingBarriers() const { return m_pendingBarriers; }
 

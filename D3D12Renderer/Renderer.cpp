@@ -282,15 +282,16 @@ void Renderer::OnUpdate()
 
     for (auto& light : m_lights)
     {
-        pFrameResource->m_lightConstantBuffers[light.m_lightConstantBufferIndex]->Update(&light.m_lightConstantData);
-
         static float nearPlane = 0.01f;
         static float farPlane = 1000.0f;
         static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
         XMMATRIX view = XMMatrixLookToLH(XMLoadFloat3(&light.m_lightConstantData.lightPos), XMLoadFloat3(&light.m_lightConstantData.lightDir), up);
         XMMATRIX projection = XMMatrixOrthographicLH(100.0f, 100.0f, nearPlane, farPlane);
         XMStoreFloat4x4(&light.m_cameraConstantData.viewProjection, XMMatrixTranspose(view * projection));
+        XMStoreFloat4x4(&light.m_lightConstantData.viewProjection, XMMatrixTranspose(view * projection));
         pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex]->Update(&light.m_cameraConstantData);
+        pFrameResource->m_lightConstantBuffers[light.m_lightConstantBufferIndex]->Update(&light.m_lightConstantData);
     }
 }
 
@@ -319,8 +320,7 @@ void Renderer::OnRender()
         D3D12_BARRIER_SYNC_NONE,
         D3D12_BARRIER_ACCESS_RENDER_TARGET,
         D3D12_BARRIER_ACCESS_NO_ACCESS,
-        D3D12_BARRIER_LAYOUT_PRESENT,
-        { 0xffffffff, 0, 0, 0, 0, 0 });     // Select all subresources
+        D3D12_BARRIER_LAYOUT_PRESENT);
 
     // Execute the command lists and store the fence value
     // And notify fenceValue to UploadBuffer
@@ -820,14 +820,14 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
         for (auto& light : m_lights)
         {
-            //commandList.Barrier(
-            //    m_shadowMap.Get(),
-            //    D3D12_BARRIER_SYNC_NONE,
-            //    D3D12_BARRIER_SYNC_DEPTH_STENCIL,
-            //    D3D12_BARRIER_ACCESS_NO_ACCESS,
-            //    D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
-            //    D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
-            //    { 0xffffffff, 0, 0, 0, 0, 0 });     // Select all subresources
+            // Barrier to change layout of shadowMap to depth write
+            commandList.Barrier(
+                light.m_shadowMap.Get(),
+                D3D12_BARRIER_SYNC_NONE,
+                D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+                D3D12_BARRIER_ACCESS_NO_ACCESS,
+                D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+                D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
 
             D3D12_CPU_DESCRIPTOR_HANDLE shadowMapDsvHandle = light.m_shadowMapDsvAllocation.GetDescriptorHandle();
             cmdList->OMSetRenderTargets(0, nullptr, FALSE, &shadowMapDsvHandle);
@@ -859,7 +859,14 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 mesh.Render(cmdList);
             }
 
-            // Barrier
+            // Barrier to change layout of shadowMap to SRV
+            commandList.Barrier(
+                light.m_shadowMap.Get(),
+                D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+                D3D12_BARRIER_SYNC_PIXEL_SHADING,
+                D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+                D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+                D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
         }
     }
 
@@ -876,8 +883,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         D3D12_BARRIER_SYNC_RENDER_TARGET,
         D3D12_BARRIER_ACCESS_NO_ACCESS,
         D3D12_BARRIER_ACCESS_RENDER_TARGET,
-        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-        { 0xffffffff, 0, 0, 0, 0, 0 });     // Select all subresources
+            D3D12_BARRIER_LAYOUT_RENDER_TARGET);
 
     D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = pFrameResource->m_rtvAllocation.GetDescriptorHandle();
     D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation->GetDescriptorHandle();
@@ -995,7 +1001,7 @@ void Renderer::SetMeshType(MeshType meshType)
 
 RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
 {
-    auto [it, inserted] = m_rootSignatures.try_emplace(rsKey, std::make_unique<RootSignature>(6, 1));
+    auto [it, inserted] = m_rootSignatures.try_emplace(rsKey, std::make_unique<RootSignature>(6, 2));
     RootSignature& rootSignature = *it->second;
 
     // Create root signature if cache not exists.
@@ -1021,6 +1027,7 @@ RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
         rootSignature[5].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
         rootSignature.InitStaticSampler(0, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL, rsKey.filtering, rsKey.addressingMode);
+        rootSignature.InitStaticSampler(1, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL, rsKey.filtering, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_LESS_EQUAL);
 
         rootSignature.Finalize(m_device.Get());
     }

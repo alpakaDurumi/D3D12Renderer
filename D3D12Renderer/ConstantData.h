@@ -46,7 +46,8 @@ struct LightConstantData : public ConstantData<LightConstantData>
     float padding1;
     XMFLOAT3 lightColor;
     float lightIntensity;
-    float padding2[52];
+    XMFLOAT4X4 viewProjection;
+    float padding2[36];
 };
 
 struct CameraConstantData : public ConstantData<CameraConstantData>

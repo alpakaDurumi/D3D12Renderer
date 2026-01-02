@@ -497,7 +497,8 @@ namespace D3DHelper
 
         UpdateSubresources(pDevice, commandList, indexBuffer.Get(), uploadAllocation, 0, 1, &indexData);
 
-        commandList.Barrier(indexBuffer.Get(),
+        commandList.Barrier(
+            indexBuffer.Get(),
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_SYNC_INDEX_INPUT,
             D3D12_BARRIER_ACCESS_COPY_DEST,

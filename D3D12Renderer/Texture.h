@@ -43,8 +43,7 @@ public:
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_ACCESS_NO_ACCESS,
             D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_LAYOUT_COPY_DEST,
-            { 0xffffffff, 0, 0, 0, 0, 0 });
+            D3D12_BARRIER_LAYOUT_COPY_DEST);
 
         // Calculate required size for data upload
         D3D12_RESOURCE_DESC desc = m_texture->GetDesc();
@@ -66,8 +65,7 @@ public:
             D3D12_BARRIER_SYNC_PIXEL_SHADING,
             D3D12_BARRIER_ACCESS_COPY_DEST,
             D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-            D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
-            { 0xffffffff, 0, 0, 0, 0, 0 });
+            D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
 
         // Describe and create a SRV for the texture.
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -132,8 +130,7 @@ public:
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_ACCESS_NO_ACCESS,
             D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_LAYOUT_COPY_DEST,
-            { 0xffffffff, 0, 0, 0, 0, 0 });
+            D3D12_BARRIER_LAYOUT_COPY_DEST);
 
         // Calculate required size for data upload
         UINT64 requiredSize = 0;
@@ -149,8 +146,7 @@ public:
             D3D12_BARRIER_SYNC_PIXEL_SHADING,
             D3D12_BARRIER_ACCESS_COPY_DEST,
             D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-            D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
-            { 0xffffffff, 0, 0, 0, 0, 0 });
+            D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
 
         // Describe and create a SRV for the texture.
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};

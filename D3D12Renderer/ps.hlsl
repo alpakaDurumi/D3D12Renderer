@@ -2,9 +2,10 @@ Texture2D g_albedo : register(t0, space0);
 Texture2D g_normalMap : register(t1, space0);
 Texture2D g_heightMap : register(t2, space0);
 
-Texture2D<float4> g_shadowMaps[] : register(t0, space1);
+Texture2D<float> g_shadowMaps[] : register(t0, space1);
 
 SamplerState g_sampler : register(s0);
+SamplerComparisonState g_samplerComparison : register(s1);
 
 struct PSInput
 {
@@ -42,6 +43,7 @@ struct LightConstants
     float3 lightDir;
     float3 lightColor;
     float lightIntensity;
+    float4x4 viewProjection;
 };
 ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space1);
 
@@ -121,10 +123,17 @@ float4 main(PSInput input) : SV_TARGET
     
     float3 total = float3(0.0f, 0.0f, 0.0f);
     
+    [loop]
     for (uint i = 0; i < 1; ++i)
     {
         LightConstants light = LightConstantBuffers[i];
-
+        
+        float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection);
+        lightScreen.xyz /= lightScreen.w;
+        
+        float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
+        float shadowFactor = g_shadowMaps[i].SampleCmpLevelZero(g_samplerComparison, lightTexCoord, lightScreen.z);
+        
         // Shading in world space
         float3 toLightWorld = normalize(light.lightPos - input.posWorld);
         float3 halfWay = normalize(toLightWorld + toCameraWorld);
@@ -144,7 +153,7 @@ float4 main(PSInput input) : SV_TARGET
         float nDotH = max(dot(normalWorld, halfWay), 0.0f);
         float3 specular = pow(nDotH, shininess) * materialSpecular * light.lightColor * light.lightIntensity;
         
-        total += float3(ambient + diffuse + specular);
+        total += float3(ambient + diffuse + specular) * shadowFactor;
     }
     
     return float4(total, 1.0f);
