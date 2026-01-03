@@ -153,7 +153,7 @@ float4 main(PSInput input) : SV_TARGET
         float nDotH = max(dot(normalWorld, halfWay), 0.0f);
         float3 specular = pow(nDotH, shininess) * materialSpecular * light.lightColor * light.lightIntensity;
         
-        total += float3(ambient + diffuse + specular) * shadowFactor;
+        total += ambient + (diffuse + specular) * shadowFactor;
     }
     
     return float4(total, 1.0f);

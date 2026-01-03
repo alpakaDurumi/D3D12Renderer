@@ -254,7 +254,7 @@ void Renderer::OnUpdate()
 
     // Use linear color for gamma-correct rendering
     // For now, just use index 0
-    XMStoreFloat3(&m_materialConstantData.materialAmbient, XMColorSRGBToRGB(XMVectorSet(0.1f, 0.1f, 0.1f, 1.0f)));
+    XMStoreFloat3(&m_materialConstantData.materialAmbient, XMColorSRGBToRGB(XMVectorSet(0.2f, 0.2f, 0.2f, 1.0f)));
     XMStoreFloat3(&m_materialConstantData.materialSpecular, XMColorSRGBToRGB(XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f)));
     m_materialConstantData.shininess = 10.0f;
     pFrameResource->m_materialConstantBuffers[0]->Update(&m_materialConstantData);
