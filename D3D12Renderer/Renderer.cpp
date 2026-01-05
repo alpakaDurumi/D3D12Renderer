@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "Renderer.h"
 
+#include <DirectXCollision.h>
+
 #include <D3Dcompiler.h>
 #include <dxgidebug.h>
 #include <chrono>
@@ -281,70 +283,34 @@ void Renderer::OnUpdate()
         pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshConstantData);
     }
 
-    // View frustum corners (NDC)
-    XMVECTOR corners[8] = {
-        XMVectorSet(-1.0f, -1.0f, 0.0f, 1.0f),
-        XMVectorSet(-1.0f, 1.0f, 0.0f, 1.0f),
-        XMVectorSet(1.0f, 1.0f, 0.0f, 1.0f),
-        XMVectorSet(1.0f, -1.0f, 0.0f, 1.0f),
-        XMVectorSet(-1.0f, -1.0f, 1.0f, 1.0f),
-        XMVectorSet(-1.0f, 1.0f, 1.0f, 1.0f),
-        XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f),
-        XMVectorSet(1.0f, -1.0f, 1.0f, 1.0f)
-    };
+    // Create bounding sphere of view frustum using bounding frustum.
+    BoundingFrustum boundingFrustum;
+    BoundingFrustum::CreateFromMatrix(boundingFrustum, m_camera.GetProjectionMatrix());
 
-    // Transform view frustum to world space (NDC -> World)
-    XMMATRIX inverseViewProjection = XMMatrixInverse(nullptr, viewProjection);
-    for (UINT i = 0; i < 8; ++i)
-    {
-        XMVECTOR temp = XMVector4Transform(corners[i], inverseViewProjection);
-        // Perspective divide
-        corners[i] = XMVectorScale(temp, 1.0f / XMVectorGetW(temp));
-    }
+    BoundingSphere frustumBS;
+    BoundingSphere::CreateFromFrustum(frustumBS, boundingFrustum);
 
-    // Calculate center of view frustum
-    // Use this position for calculating view matrix of directional light
-    XMVECTOR frustumCenter = XMVectorZero();
-    for (UINT i = 0; i < 8; ++i)
-    {
-        frustumCenter = XMVectorAdd(frustumCenter, corners[i]);
-    }
-    frustumCenter = XMVectorScale(frustumCenter, 1.0f / 8.0f);
+    // And transform this view space bounding sphere to world space.
+    XMMATRIX inverseView = XMMatrixInverse(nullptr, m_camera.GetViewMatrix());
+    frustumBS.Transform(frustumBS, inverseView);
+
+    XMVECTOR center = XMLoadFloat3(&frustumBS.Center);
+    float radius = frustumBS.Radius;
 
     // Calculate view/projection matrix fit to light frustum
     for (auto& light : m_lights)
     {
-        float minX = FLT_MAX, maxX = -FLT_MAX;
-        float minY = FLT_MAX, maxY = -FLT_MAX;
-        float minZ = FLT_MAX, maxZ = -FLT_MAX;
-
         static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
         XMVECTOR lightDir = XMLoadFloat3(&light.m_lightConstantData.lightDir);
         lightDir = XMVector3Normalize(lightDir);
 
-        XMMATRIX view = XMMatrixLookToLH(frustumCenter, lightDir, up);
-
-        for (UINT i = 0; i < 8; ++i)
-        {
-            XMVECTOR cornerLightSpace = XMVector4Transform(corners[i], view);
-
-            float x = XMVectorGetX(cornerLightSpace);
-            float y = XMVectorGetY(cornerLightSpace);
-            float z = XMVectorGetZ(cornerLightSpace);
-
-            minX = std::min(minX, x);
-            maxX = std::max(maxX, x);
-            minY = std::min(minY, y);
-            maxY = std::max(maxY, y);
-            minZ = std::min(minZ, z);
-            maxZ = std::max(maxZ, z);
-        }
+        XMMATRIX view = XMMatrixLookToLH(center, lightDir, up);
 
         XMMATRIX projection = XMMatrixOrthographicOffCenterLH(
-            minX, maxX,
-            minY, maxY,
-            minZ, maxZ
+            -radius, radius,
+            -radius, radius,
+            -radius, radius
         );
 
         XMStoreFloat4x4(&light.m_cameraConstantData.viewProjection, XMMatrixTranspose(view * projection));
@@ -768,7 +734,7 @@ void Renderer::LoadAssets()
 
         // Main Camera
         {
-        DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
+            DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
             CameraCB* cameraCB = new CameraCB(m_device.Get(), std::move(alloc));
             pFrameResource->m_cameraConstantBuffers.push_back(cameraCB);
         }
@@ -776,32 +742,32 @@ void Renderer::LoadAssets()
         // Material
         {
             DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-        MaterialCB* matCB = new MaterialCB(m_device.Get(), std::move(alloc));
-        pFrameResource->m_materialConstantBuffers.push_back(matCB);
+            MaterialCB* matCB = new MaterialCB(m_device.Get(), std::move(alloc));
+            pFrameResource->m_materialConstantBuffers.push_back(matCB);
         }
 
         // Meshes
-            for (auto& mesh : m_meshes)
-            {
-                    MeshCB* meshCB = new MeshCB(m_device.Get());
+        for (auto& mesh : m_meshes)
+        {
+            MeshCB* meshCB = new MeshCB(m_device.Get());
 
             // Set index only at first iteration because indices are same in each FrameResource
             if (i == 0) mesh.m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
-                    pFrameResource->m_meshConstantBuffers.push_back(meshCB);
+            pFrameResource->m_meshConstantBuffers.push_back(meshCB);
 
             if (i == 0) mesh.m_materialConstantBufferIndex = 0;
-            }
+        }
 
         // Instanced Meshes
-            for (auto& mesh : m_instancedMeshes)
-            {
-                    MeshCB* meshCB = new MeshCB(m_device.Get());
+        for (auto& mesh : m_instancedMeshes)
+        {
+            MeshCB* meshCB = new MeshCB(m_device.Get());
 
             if (i == 0) mesh.m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
-                    pFrameResource->m_meshConstantBuffers.push_back(meshCB);
+            pFrameResource->m_meshConstantBuffers.push_back(meshCB);
 
             if (i == 0) mesh.m_materialConstantBufferIndex = 0;
-            }
+        }
 
         // Lights
         for (auto& light : m_lights)
@@ -933,35 +899,35 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     {
         UINT32 numLights = static_cast<UINT32>(m_lights.size());
 
-    cmdList->RSSetViewports(1, &m_viewport);
-    cmdList->RSSetScissorRects(1, &m_scissorRect);
+        cmdList->RSSetViewports(1, &m_viewport);
+        cmdList->RSSetScissorRects(1, &m_scissorRect);
 
-    commandList.Barrier(
-        pFrameResource->m_renderTarget.Get(),
-        D3D12_BARRIER_SYNC_NONE,
-        D3D12_BARRIER_SYNC_RENDER_TARGET,
-        D3D12_BARRIER_ACCESS_NO_ACCESS,
-        D3D12_BARRIER_ACCESS_RENDER_TARGET,
+        commandList.Barrier(
+            pFrameResource->m_renderTarget.Get(),
+            D3D12_BARRIER_SYNC_NONE,
+            D3D12_BARRIER_SYNC_RENDER_TARGET,
+            D3D12_BARRIER_ACCESS_NO_ACCESS,
+            D3D12_BARRIER_ACCESS_RENDER_TARGET,
             D3D12_BARRIER_LAYOUT_RENDER_TARGET);
 
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = pFrameResource->m_rtvAllocation.GetDescriptorHandle();
-    D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation->GetDescriptorHandle();
-    cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = pFrameResource->m_rtvAllocation.GetDescriptorHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation->GetDescriptorHandle();
+        cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
-    // Use linear color for gamma-correct rendering
-    XMVECTORF32 clearColor;
-    clearColor.v = XMColorSRGBToRGB(XMVectorSet(0.5f, 0.5f, 0.5f, 1.0f));
-    cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-    cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+        // Use linear color for gamma-correct rendering
+        XMVECTORF32 clearColor;
+        clearColor.v = XMColorSRGBToRGB(XMVectorSet(0.5f, 0.5f, 0.5f, 1.0f));
+        cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
         m_currentPSOKey.passType = DEFAULT;
-    m_currentPSOKey.vsKey = { L"vs.hlsl", {}, "vs_5_0" };
+        m_currentPSOKey.vsKey = { L"vs.hlsl", {}, "vs_5_0" };
         m_currentPSOKey.psKey = { L"ps.hlsl", {}, "ps_5_1" };
-    cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
-    for (const auto& mesh : m_meshes)
-    {
-        cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-        cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
+        cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
+        for (const auto& mesh : m_meshes)
+        {
+            cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[0]->GetGPUVirtualAddress());
 
             for (UINT32 i = 0; i < numLights; ++i)
@@ -974,18 +940,18 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             for (UINT32 i = 0; i < numLights; ++i)
                 m_dynamicDescriptorHeap->StageDescriptors(5, i, 1, m_lights[i].m_shadowMapSrvAllocation.GetDescriptorHandle());
 
-        m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
+            m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
-        mesh.Render(cmdList);
-    }
+            mesh.Render(cmdList);
+        }
 
-    m_currentPSOKey.vsKey.defines = { "INSTANCED" };
-    SetMeshType(MeshType::INSTANCED);
-    cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
-    for (const auto& mesh : m_instancedMeshes)
-    {
-        cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-        cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
+        m_currentPSOKey.vsKey.defines = { "INSTANCED" };
+        SetMeshType(MeshType::INSTANCED);
+        cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
+        for (const auto& mesh : m_instancedMeshes)
+        {
+            cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[0]->GetGPUVirtualAddress());
 
             for (UINT32 i = 0; i < numLights; ++i)
@@ -998,11 +964,11 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             for (UINT32 i = 0; i < numLights; ++i)
                 m_dynamicDescriptorHeap->StageDescriptors(5, i, 1, m_lights[i].m_shadowMapSrvAllocation.GetDescriptorHandle());
 
-        m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
+            m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
-        mesh.Render(cmdList);
+            mesh.Render(cmdList);
+        }
     }
-}
 }
 
 // Wait for pending GPU work to complete
@@ -1114,9 +1080,9 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         }
         else
         {
-        rasterizerDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
-        rasterizerDesc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
-        rasterizerDesc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+            rasterizerDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+            rasterizerDesc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+            rasterizerDesc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
         }
 
         rasterizerDesc.DepthClipEnable = TRUE;
@@ -1167,7 +1133,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         psoDesc.VS = { vsBlob->GetBufferPointer(), vsBlob->GetBufferSize() };
         if (psBlob)
         {
-        psoDesc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
+            psoDesc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
         }
 
         psoDesc.RasterizerState = rasterizerDesc;
@@ -1183,8 +1149,8 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         }
         else
         {
-        psoDesc.NumRenderTargets = 1;
-        psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+            psoDesc.NumRenderTargets = 1;
+            psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
         }
         psoDesc.SampleDesc.Count = 1;
         ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&it->second)));

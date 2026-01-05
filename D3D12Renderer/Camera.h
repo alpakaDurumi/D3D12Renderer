@@ -9,7 +9,7 @@ public:
     Camera(XMFLOAT3 initialPosition = { 0.0f, 0.0f, 0.0f });
     XMFLOAT3 GetPosition();
     XMMATRIX GetViewMatrix();
-    XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection);
+    XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection = true);
     void SetAspectRatio(float aspectRatio);
     void MoveForward(float speedScale);
     void MoveRight(float speedScale);
