@@ -249,7 +249,8 @@ void Renderer::OnUpdate()
 
     // Main Camera
     m_cameraConstantData.cameraPos = m_camera.GetPosition();
-    XMStoreFloat4x4(&m_cameraConstantData.viewProjection, XMMatrixTranspose(m_camera.GetViewMatrix() * m_camera.GetProjectionMatrix(true)));
+    XMMATRIX viewProjection = m_camera.GetViewMatrix() * m_camera.GetProjectionMatrix(true);
+    XMStoreFloat4x4(&m_cameraConstantData.viewProjection, XMMatrixTranspose(viewProjection));
     pFrameResource->m_cameraConstantBuffers[0]->Update(&m_cameraConstantData);
 
     // Use linear color for gamma-correct rendering
@@ -280,14 +281,72 @@ void Renderer::OnUpdate()
         pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshConstantData);
     }
 
+    // View frustum corners (NDC)
+    XMVECTOR corners[8] = {
+        XMVectorSet(-1.0f, -1.0f, 0.0f, 1.0f),
+        XMVectorSet(-1.0f, 1.0f, 0.0f, 1.0f),
+        XMVectorSet(1.0f, 1.0f, 0.0f, 1.0f),
+        XMVectorSet(1.0f, -1.0f, 0.0f, 1.0f),
+        XMVectorSet(-1.0f, -1.0f, 1.0f, 1.0f),
+        XMVectorSet(-1.0f, 1.0f, 1.0f, 1.0f),
+        XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f),
+        XMVectorSet(1.0f, -1.0f, 1.0f, 1.0f)
+    };
+
+    // Transform view frustum to world space (NDC -> World)
+    XMMATRIX inverseViewProjection = XMMatrixInverse(nullptr, viewProjection);
+    for (UINT i = 0; i < 8; ++i)
+    {
+        XMVECTOR temp = XMVector4Transform(corners[i], inverseViewProjection);
+        // Perspective divide
+        corners[i] = XMVectorScale(temp, 1.0f / XMVectorGetW(temp));
+    }
+
+    // Calculate center of view frustum
+    // Use this position for calculating view matrix of directional light
+    XMVECTOR frustumCenter = XMVectorZero();
+    for (UINT i = 0; i < 8; ++i)
+    {
+        frustumCenter = XMVectorAdd(frustumCenter, corners[i]);
+    }
+    frustumCenter = XMVectorScale(frustumCenter, 1.0f / 8.0f);
+
+    // Calculate view/projection matrix fit to light frustum
     for (auto& light : m_lights)
     {
-        static float nearPlane = 0.01f;
-        static float farPlane = 1000.0f;
+        float minX = FLT_MAX, maxX = -FLT_MAX;
+        float minY = FLT_MAX, maxY = -FLT_MAX;
+        float minZ = FLT_MAX, maxZ = -FLT_MAX;
+
         static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
-        XMMATRIX view = XMMatrixLookToLH(XMLoadFloat3(&light.m_lightConstantData.lightPos), XMLoadFloat3(&light.m_lightConstantData.lightDir), up);
-        XMMATRIX projection = XMMatrixOrthographicLH(100.0f, 100.0f, nearPlane, farPlane);
+        XMVECTOR lightDir = XMLoadFloat3(&light.m_lightConstantData.lightDir);
+        lightDir = XMVector3Normalize(lightDir);
+
+        XMMATRIX view = XMMatrixLookToLH(frustumCenter, lightDir, up);
+
+        for (UINT i = 0; i < 8; ++i)
+        {
+            XMVECTOR cornerLightSpace = XMVector4Transform(corners[i], view);
+
+            float x = XMVectorGetX(cornerLightSpace);
+            float y = XMVectorGetY(cornerLightSpace);
+            float z = XMVectorGetZ(cornerLightSpace);
+
+            minX = std::min(minX, x);
+            maxX = std::max(maxX, x);
+            minY = std::min(minY, y);
+            maxY = std::max(maxY, y);
+            minZ = std::min(minZ, z);
+            maxZ = std::max(maxZ, z);
+        }
+
+        XMMATRIX projection = XMMatrixOrthographicOffCenterLH(
+            minX, maxX,
+            minY, maxY,
+            minZ, maxZ
+        );
+
         XMStoreFloat4x4(&light.m_cameraConstantData.viewProjection, XMMatrixTranspose(view * projection));
         XMStoreFloat4x4(&light.m_lightConstantData.viewProjection, XMMatrixTranspose(view * projection));
         pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex]->Update(&light.m_cameraConstantData);
