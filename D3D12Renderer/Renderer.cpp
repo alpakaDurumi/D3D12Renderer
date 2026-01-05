@@ -306,15 +306,25 @@ void Renderer::OnUpdate()
         lightDir = XMVector3Normalize(lightDir);
 
         XMMATRIX view = XMMatrixLookToLH(center, lightDir, up);
+        XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, -radius, radius);
 
-        XMMATRIX projection = XMMatrixOrthographicOffCenterLH(
-            -radius, radius,
-            -radius, radius,
-            -radius, radius
-        );
+        // Apply texel-sized increments to eliminate shadow shimmering.
+        XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+        shadowOrigin = XMVector4Transform(shadowOrigin, view * projection);
+        shadowOrigin = XMVectorScale(shadowOrigin, 1.0f / XMVectorGetW(shadowOrigin));      // Perspective divide. Can be ommitted if it uses orthographic projection.
+        // [-1, 1] -> [-resolution / 2, resolution / 2]
+        shadowOrigin = XMVectorScale(shadowOrigin, m_shadowMapResolution * 0.5f);           // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
 
-        XMStoreFloat4x4(&light.m_cameraConstantData.viewProjection, XMMatrixTranspose(view * projection));
-        XMStoreFloat4x4(&light.m_lightConstantData.viewProjection, XMMatrixTranspose(view * projection));
+        // Calculate diff and apply as translation matrix.
+        XMVECTOR roundedOrigin = XMVectorRound(shadowOrigin);
+        XMVECTOR diff = roundedOrigin - shadowOrigin;
+        diff = XMVectorScale(diff, 2.0f / m_shadowMapResolution);                           // Since diff is texel scale, it should be transformed to NDC scale.
+        XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
+
+        XMMATRIX viewProjection = view * projection * fix;
+
+        XMStoreFloat4x4(&light.m_cameraConstantData.viewProjection, XMMatrixTranspose(viewProjection));
+        XMStoreFloat4x4(&light.m_lightConstantData.viewProjection, XMMatrixTranspose(viewProjection));
         pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex]->Update(&light.m_cameraConstantData);
         pFrameResource->m_lightConstantBuffers[light.m_lightConstantBufferIndex]->Update(&light.m_lightConstantData);
     }
