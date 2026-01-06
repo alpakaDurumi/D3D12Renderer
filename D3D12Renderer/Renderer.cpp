@@ -296,6 +296,14 @@ void Renderer::OnUpdate()
 
     XMVECTOR center = XMLoadFloat3(&frustumBS.Center);
     float radius = frustumBS.Radius;
+    
+    XMFLOAT3 temp = m_camera.GetPosition();
+    XMVECTOR cameraPos = XMLoadFloat3(&temp);
+
+    XMVECTOR viewOriginToCenter = center - cameraPos;
+
+    // Same as far plane of perspective projection in camera, for now.
+    static float sceneRadius = 1000.0f;
 
     // Calculate view/projection matrix fit to light frustum
     for (auto& light : m_lights)
@@ -305,8 +313,15 @@ void Renderer::OnUpdate()
         XMVECTOR lightDir = XMLoadFloat3(&light.m_lightConstantData.lightDir);
         lightDir = XMVector3Normalize(lightDir);
 
+        // Orthogonal projection of (center - view origin) onto lightDir.
+        // This represents where the view origin is located relative to the center on the light's Z-axis.
+        float d = XMVectorGetX(XMVector3Dot(viewOriginToCenter, lightDir));
+
         XMMATRIX view = XMMatrixLookToLH(center, lightDir, up);
-        XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, -radius, radius);
+        // Near Plane : Set to (view origin - sceneRadius) in Light Space.
+        //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
+        // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
+        XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, -d - sceneRadius, radius);
 
         // Apply texel-sized increments to eliminate shadow shimmering.
         XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
