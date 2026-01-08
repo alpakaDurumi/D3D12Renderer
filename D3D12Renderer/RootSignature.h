@@ -140,38 +140,55 @@ public:
         return m_parameters.get()[parameterIndex];
     }
 
-    void InitStaticSampler(UINT reg, UINT space, UINT samplerIndex, D3D12_SHADER_VISIBILITY visibility, TextureFiltering filtering, TextureAddressingMode addressingMode, D3D12_COMPARISON_FUNC comparisonFunc = D3D12_COMPARISON_FUNC_NONE)
+    // filtering argument ignored if comparisonFunc set.
+    void InitStaticSampler(
+        UINT reg,
+        UINT space,
+        UINT samplerIndex,
+        D3D12_SHADER_VISIBILITY visibility,
+        TextureFiltering filtering,
+        TextureAddressingMode addressingMode,
+        D3D12_COMPARISON_FUNC comparisonFunc = D3D12_COMPARISON_FUNC_NONE)
     {
         D3D12_STATIC_SAMPLER_DESC& samplerDesc = m_staticSamplers[samplerIndex];
 
         bool doCompare = comparisonFunc != D3D12_COMPARISON_FUNC_NONE;
 
-        switch (filtering)
+        // If comparisonFunc set, always perform hardware PCF.
+        if (doCompare)
         {
-        case TextureFiltering::POINT:
-            samplerDesc.Filter = doCompare ? D3D12_FILTER_COMPARISON_MIN_MAG_POINT_MIP_LINEAR : D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
+            samplerDesc.Filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
             samplerDesc.MaxAnisotropy = 0;
-            break;
-        case TextureFiltering::BILINEAR:
-            samplerDesc.Filter = doCompare ? D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR : D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-            samplerDesc.MaxAnisotropy = 0;
-            break;
-        case TextureFiltering::ANISOTROPIC_X2:
-            samplerDesc.Filter = doCompare ? D3D12_FILTER_COMPARISON_ANISOTROPIC : D3D12_FILTER_ANISOTROPIC;
-            samplerDesc.MaxAnisotropy = 2;
-            break;
-        case TextureFiltering::ANISOTROPIC_X4:
-            samplerDesc.Filter = doCompare ? D3D12_FILTER_COMPARISON_ANISOTROPIC : D3D12_FILTER_ANISOTROPIC;
-            samplerDesc.MaxAnisotropy = 4;
-            break;
-        case TextureFiltering::ANISOTROPIC_X8:
-            samplerDesc.Filter = doCompare ? D3D12_FILTER_COMPARISON_ANISOTROPIC : D3D12_FILTER_ANISOTROPIC;
-            samplerDesc.MaxAnisotropy = 8;
-            break;
-        case TextureFiltering::ANISOTROPIC_X16:
-            samplerDesc.Filter = doCompare ? D3D12_FILTER_COMPARISON_ANISOTROPIC : D3D12_FILTER_ANISOTROPIC;
-            samplerDesc.MaxAnisotropy = 16;
-            break;
+        }
+        else
+        {
+            switch (filtering)
+            {
+            case TextureFiltering::POINT:
+                samplerDesc.Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
+                samplerDesc.MaxAnisotropy = 0;
+                break;
+            case TextureFiltering::BILINEAR:
+                samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+                samplerDesc.MaxAnisotropy = 0;
+                break;
+            case TextureFiltering::ANISOTROPIC_X2:
+                samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
+                samplerDesc.MaxAnisotropy = 2;
+                break;
+            case TextureFiltering::ANISOTROPIC_X4:
+                samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
+                samplerDesc.MaxAnisotropy = 4;
+                break;
+            case TextureFiltering::ANISOTROPIC_X8:
+                samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
+                samplerDesc.MaxAnisotropy = 8;
+                break;
+            case TextureFiltering::ANISOTROPIC_X16:
+                samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
+                samplerDesc.MaxAnisotropy = 16;
+                break;
+            }
         }
 
         switch (addressingMode)
