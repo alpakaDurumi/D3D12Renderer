@@ -12,21 +12,31 @@ Camera::Camera(XMFLOAT3 initialPosition)
 
     m_fov = 90.0f * 0.5f;
     m_aspectRatio = 16.0f / 9.0f;
-    m_nearPlane = 0.01f;
+    m_nearPlane = 0.1f;
     m_farPlane = 1000.0f;
 }
 
-XMFLOAT3 Camera::GetPosition()
+XMFLOAT3 Camera::GetPosition() const
 {
     return m_position;
 }
 
-XMMATRIX Camera::GetViewMatrix()
+float Camera::GetNearPlane() const
+{
+    return m_nearPlane;
+}
+
+float Camera::GetFarPlane() const
+{
+    return m_farPlane;
+}
+
+XMMATRIX Camera::GetViewMatrix() const
 {
     return XMMatrixLookToLH(XMLoadFloat3(&m_position), XMLoadFloat3(&m_orientation), XMLoadFloat3(&m_up));
 }
 
-XMMATRIX Camera::GetProjectionMatrix(bool usePerspectiveProjection)
+XMMATRIX Camera::GetProjectionMatrix(bool usePerspectiveProjection) const
 {
     return usePerspectiveProjection ?
         XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fov), m_aspectRatio, m_nearPlane, m_farPlane) :

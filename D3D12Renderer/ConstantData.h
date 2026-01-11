@@ -63,6 +63,7 @@ struct CameraConstantData : public ConstantData<CameraConstantData>
 
 struct ShadowConstantData : public ConstantData<ShadowConstantData>
 {
-    float cascadeSplits[MAX_CASCADES];
-    float padding[60];
+    // Each cascade split should be stored in x component. Use XMFLOAT4 because of HLSL alignment rule.
+    XMFLOAT4 cascadeSplits[MAX_CASCADES];
+    float padding[48];
 };

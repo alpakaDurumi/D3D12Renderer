@@ -148,6 +148,28 @@ float4 main(PSInput input) : SV_TARGET
     
     uint csmIdx = CalcCSMIndex(input.distView);
     
+    // Check CSM boundaries
+    //if (csmIdx == 0)
+    //{
+    //    return float4(1.0f, 0.0f, 0.0f, 1.0f);
+    //}
+    //else if (csmIdx == 1)
+    //{
+    //    return float4(0.0f, 1.0f, 0.0f, 1.0f);
+    //}
+    //else if (csmIdx == 2)
+    //{
+    //    return float4(0.0f, 0.0f, 1.0f, 1.0f);
+    //}
+    //else if (csmIdx == 3)
+    //{
+    //    return float4(1.0f, 1.0f, 1.0f, 1.0f);
+    //}
+    //else
+    //{
+    //    return float4(0.0f, 0.0f, 0.0f, 1.0f);
+    //}
+    
     [loop]
     for (uint i = 0; i < 1; ++i)
     {

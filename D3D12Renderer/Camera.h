@@ -7,9 +7,13 @@ using namespace DirectX;
 class Camera {
 public:
     Camera(XMFLOAT3 initialPosition = { 0.0f, 0.0f, 0.0f });
-    XMFLOAT3 GetPosition();
-    XMMATRIX GetViewMatrix();
-    XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection = true);
+
+    XMFLOAT3 GetPosition() const;
+    float GetNearPlane() const;
+    float GetFarPlane() const;
+    XMMATRIX GetViewMatrix() const;
+    XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection = true) const;
+
     void SetAspectRatio(float aspectRatio);
     void MoveForward(float speedScale);
     void MoveRight(float speedScale);

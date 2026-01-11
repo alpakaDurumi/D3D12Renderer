@@ -306,33 +306,44 @@ void Renderer::OnUpdate()
     //    3----2  7----6
     XMFLOAT3 frustumCorners[8];
     boundingFrustum.GetCorners(frustumCorners);
-    
+
     XMFLOAT3 cascadeCorners[4][8];
     std::vector<BoundingSphere> frustumBSs(4);
 
-    float step = 1.0f / MAX_CASCADES;
+    // Practical Split Scheme
+    // https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus
+    const float nearPlane = m_camera.GetNearPlane();
+    const float farPlane = m_camera.GetFarPlane();
+    const float lambda = 0.9f;
+
+    float splitRatio[MAX_CASCADES];
+
+    for (UINT i = 1; i <= MAX_CASCADES; ++i)
+    {
+        float ratio = static_cast<float>(i) / MAX_CASCADES;
+        float logSplit = nearPlane * std::pow(farPlane / nearPlane, ratio);
+        float uniSplit = nearPlane + (farPlane - nearPlane) * ratio;
+
+        float dist = lambda * logSplit + (1.0f - lambda) * uniSplit;
+        m_shadowConstantData.cascadeSplits[i - 1].x = dist;
+
+        splitRatio[i - 1] = (m_shadowConstantData.cascadeSplits[i - 1].x - nearPlane) / (farPlane - nearPlane);
+    }
+
     for (UINT i = 0; i < MAX_CASCADES; ++i)
     {
         // Create corners.
-        float start = step * i;
-        float end = step * (i + 1);
         for (UINT j = 0; j < 4; ++j)
         {
             XMVECTOR n = XMLoadFloat3(&frustumCorners[j]);
             XMVECTOR f = XMLoadFloat3(&frustumCorners[j + 4]);
 
-            XMVECTOR s = XMVectorLerp(n, f, start);
-            XMVECTOR e = XMVectorLerp(n, f, end);
+            XMVECTOR s = XMVectorLerp(n, f, i == 0 ? 0.0f : splitRatio[i - 1]);
+            XMVECTOR e = XMVectorLerp(n, f, splitRatio[i]);
 
             XMStoreFloat3(&cascadeCorners[i][j], s);
             XMStoreFloat3(&cascadeCorners[i][j + 4], e);
         }
-
-        // Same as far plane of perspective projection in camera, for now.
-        static float sceneRadius = 1000.0f;
-
-        // Set constant data.
-        m_shadowConstantData.cascadeSplits[i] = end * sceneRadius;
 
         // Create bounding sphere.
         BoundingSphere::CreateFromPoints(frustumBSs[i], 8, cascadeCorners[i], sizeof(XMFLOAT3));
@@ -361,7 +372,7 @@ void Renderer::OnUpdate()
             // Near Plane : Set to (view origin - sceneRadius) in Light Space.
             //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
             // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
-            XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, -d - sceneRadius, radius);
+            XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, -d - farPlane, radius);
 
             // Apply texel-sized increments to eliminate shadow shimmering.
             XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
