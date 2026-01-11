@@ -1,8 +1,10 @@
+#include "SharedConfig.h"
+
 Texture2D g_albedo : register(t0, space0);
 Texture2D g_normalMap : register(t1, space0);
 Texture2D g_heightMap : register(t2, space0);
 
-Texture2D<float> g_shadowMaps[] : register(t0, space1);
+Texture2DArray<float> g_shadowMaps[] : register(t0, space1);
 
 SamplerState g_sampler : register(s0);
 SamplerComparisonState g_samplerComparison : register(s1);
@@ -14,7 +16,8 @@ struct PSInput
     float2 texCoord : TEXCOORD0;
     float3 tangentWorld : TANGENT;
     float3 normalWorld : NORMAL;
-    nointerpolation float tangentW : TEXCOORD1; // Do not interpolate w component of tangent vector.
+    nointerpolation float tangentW : TEXCOORD1;     // Do not interpolate w component of tangent vector.
+    float distView : TEXCOORD2;                     // Distance in view space for determining CSM index.
 };
 
 cbuffer MeshConstantBuffer : register(b0, space0)
@@ -34,7 +37,13 @@ cbuffer MaterialConstantBuffer : register(b1, space0)
 cbuffer CameraConstantBuffer : register(b2, space0)
 {
     float3 cameraPos;
-    float4x4 viewProjection;
+    float4x4 view;
+    float4x4 projection;
+}
+
+cbuffer ShadowConstantBuffer : register(b3, space0)
+{
+    float cascadeSplits[MAX_CASCADES];
 }
 
 struct LightConstants
@@ -43,7 +52,7 @@ struct LightConstants
     float3 lightDir;
     float3 lightColor;
     float lightIntensity;
-    float4x4 viewProjection;
+    float4x4 viewProjection[MAX_CASCADES];
 };
 ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space1);
 
@@ -96,6 +105,21 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera)
     return interpolatedTexCoord;
 }
 
+// Determine which index to use.
+uint CalcCSMIndex(float distView)
+{
+    uint index = 0;
+    for (; index < MAX_CASCADES; ++index)
+    {
+        if (distView < cascadeSplits[index])
+        {
+            break;
+        }
+    }
+    
+    return index;
+}
+
 float4 main(PSInput input) : SV_TARGET
 {
     // For POM, use inaccurate inverse-TBN
@@ -120,19 +144,20 @@ float4 main(PSInput input) : SV_TARGET
     float3 B = input.tangentW * cross(input.normalWorld, input.tangentWorld);
     float3x3 TBN = float3x3(input.tangentWorld, B, input.normalWorld);
     
-    
     float3 total = float3(0.0f, 0.0f, 0.0f);
+    
+    uint csmIdx = CalcCSMIndex(input.distView);
     
     [loop]
     for (uint i = 0; i < 1; ++i)
     {
         LightConstants light = LightConstantBuffers[i];
         
-        float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection);
+        float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[csmIdx]);
         lightScreen.xyz /= lightScreen.w;
         
         float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
-        float shadowFactor = g_shadowMaps[i].SampleCmpLevelZero(g_samplerComparison, lightTexCoord, lightScreen.z);
+        float shadowFactor = g_shadowMaps[i].SampleCmpLevelZero(g_samplerComparison, float3(lightTexCoord, float(csmIdx)), lightScreen.z);
         
         // Shading in world space
         float3 toLightWorld = normalize(light.lightPos - input.posWorld);

@@ -17,6 +17,7 @@
 #include "D3DHelper.h"
 #include "FrameResource.h"
 #include "CommandList.h"
+#include "SharedConfig.h"
 
 // 이거 일단 빼야겠다. nuget에서도 제외시키자
 //#include <dxcapi.h>
@@ -251,8 +252,8 @@ void Renderer::OnUpdate()
 
     // Main Camera
     m_cameraConstantData.cameraPos = m_camera.GetPosition();
-    XMMATRIX viewProjection = m_camera.GetViewMatrix() * m_camera.GetProjectionMatrix(true);
-    XMStoreFloat4x4(&m_cameraConstantData.viewProjection, XMMatrixTranspose(viewProjection));
+    XMStoreFloat4x4(&m_cameraConstantData.view, XMMatrixTranspose(m_camera.GetViewMatrix()));
+    XMStoreFloat4x4(&m_cameraConstantData.projection, XMMatrixTranspose(m_camera.GetProjectionMatrix(true)));
     pFrameResource->m_cameraConstantBuffers[0]->Update(&m_cameraConstantData);
 
     // Use linear color for gamma-correct rendering
@@ -283,66 +284,107 @@ void Renderer::OnUpdate()
         pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshConstantData);
     }
 
-    // Create bounding sphere of view frustum using bounding frustum.
+    // Rotate light
+    {
+        XMVECTOR lightDir = XMLoadFloat3(&m_lights[0].m_lightConstantData.lightDir);
+        XMMATRIX rot = XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 0.001f);
+        XMVECTOR rotated = XMVector3Transform(lightDir, rot);
+        XMStoreFloat3(&m_lights[0].m_lightConstantData.lightDir, rotated);
+    }
+
+    // Create bounding frustum of view frustum and transform to world space.
     BoundingFrustum boundingFrustum;
     BoundingFrustum::CreateFromMatrix(boundingFrustum, m_camera.GetProjectionMatrix());
-
-    BoundingSphere frustumBS;
-    BoundingSphere::CreateFromFrustum(frustumBS, boundingFrustum);
-
-    // And transform this view space bounding sphere to world space.
     XMMATRIX inverseView = XMMatrixInverse(nullptr, m_camera.GetViewMatrix());
-    frustumBS.Transform(frustumBS, inverseView);
+    boundingFrustum.Transform(boundingFrustum, inverseView);
 
-    XMVECTOR center = XMLoadFloat3(&frustumBS.Center);
-    float radius = frustumBS.Radius;
+    // Get 8 corners of view frustum.
+    //     Near    Far
+    //    0----1  4----5
+    //    |    |  |    |
+    //    |    |  |    |
+    //    3----2  7----6
+    XMFLOAT3 frustumCorners[8];
+    boundingFrustum.GetCorners(frustumCorners);
     
-    XMFLOAT3 temp = m_camera.GetPosition();
-    XMVECTOR cameraPos = XMLoadFloat3(&temp);
+    XMFLOAT3 cascadeCorners[4][8];
+    std::vector<BoundingSphere> frustumBSs(4);
 
-    XMVECTOR viewOriginToCenter = center - cameraPos;
-
-    // Same as far plane of perspective projection in camera, for now.
-    static float sceneRadius = 1000.0f;
-
-    // Calculate view/projection matrix fit to light frustum
-    for (auto& light : m_lights)
+    float step = 1.0f / MAX_CASCADES;
+    for (UINT i = 0; i < MAX_CASCADES; ++i)
     {
-        static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+        // Create corners.
+        float start = step * i;
+        float end = step * (i + 1);
+        for (UINT j = 0; j < 4; ++j)
+        {
+            XMVECTOR n = XMLoadFloat3(&frustumCorners[j]);
+            XMVECTOR f = XMLoadFloat3(&frustumCorners[j + 4]);
 
-        XMVECTOR lightDir = XMLoadFloat3(&light.m_lightConstantData.lightDir);
-        lightDir = XMVector3Normalize(lightDir);
+            XMVECTOR s = XMVectorLerp(n, f, start);
+            XMVECTOR e = XMVectorLerp(n, f, end);
 
-        // Orthogonal projection of (center - view origin) onto lightDir.
-        // This represents where the view origin is located relative to the center on the light's Z-axis.
-        float d = XMVectorGetX(XMVector3Dot(viewOriginToCenter, lightDir));
+            XMStoreFloat3(&cascadeCorners[i][j], s);
+            XMStoreFloat3(&cascadeCorners[i][j + 4], e);
+        }
 
-        XMMATRIX view = XMMatrixLookToLH(center, lightDir, up);
-        // Near Plane : Set to (view origin - sceneRadius) in Light Space.
-        //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
-        // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
-        XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, -d - sceneRadius, radius);
+        // Same as far plane of perspective projection in camera, for now.
+        static float sceneRadius = 1000.0f;
 
-        // Apply texel-sized increments to eliminate shadow shimmering.
-        XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        shadowOrigin = XMVector4Transform(shadowOrigin, view * projection);
-        shadowOrigin = XMVectorScale(shadowOrigin, 1.0f / XMVectorGetW(shadowOrigin));      // Perspective divide. Can be ommitted if it uses orthographic projection.
-        // [-1, 1] -> [-resolution / 2, resolution / 2]
-        shadowOrigin = XMVectorScale(shadowOrigin, m_shadowMapResolution * 0.5f);           // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
+        // Set constant data.
+        m_shadowConstantData.cascadeSplits[i] = end * sceneRadius;
 
-        // Calculate diff and apply as translation matrix.
-        XMVECTOR roundedOrigin = XMVectorRound(shadowOrigin);
-        XMVECTOR diff = roundedOrigin - shadowOrigin;
-        diff = XMVectorScale(diff, 2.0f / m_shadowMapResolution);                           // Since diff is texel scale, it should be transformed to NDC scale.
-        XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
+        // Create bounding sphere.
+        BoundingSphere::CreateFromPoints(frustumBSs[i], 8, cascadeCorners[i], sizeof(XMFLOAT3));
 
-        XMMATRIX viewProjection = view * projection * fix;
+        XMVECTOR center = XMLoadFloat3(&frustumBSs[i].Center);
+        float radius = frustumBSs[i].Radius;
 
-        XMStoreFloat4x4(&light.m_cameraConstantData.viewProjection, XMMatrixTranspose(viewProjection));
-        XMStoreFloat4x4(&light.m_lightConstantData.viewProjection, XMMatrixTranspose(viewProjection));
-        pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex]->Update(&light.m_cameraConstantData);
-        pFrameResource->m_lightConstantBuffers[light.m_lightConstantBufferIndex]->Update(&light.m_lightConstantData);
+        XMFLOAT3 temp = m_camera.GetPosition();
+        XMVECTOR cameraPos = XMLoadFloat3(&temp);
+
+        XMVECTOR viewOriginToCenter = center - cameraPos;
+
+        // Calculate view/projection matrix fit to light frustum
+        for (auto& light : m_lights)
+        {
+            static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+            XMVECTOR lightDir = XMLoadFloat3(&light.m_lightConstantData.lightDir);
+            lightDir = XMVector3Normalize(lightDir);
+
+            // Orthogonal projection of (center - view origin) onto lightDir.
+            // This represents where the view origin is located relative to the center on the light's Z-axis.
+            float d = XMVectorGetX(XMVector3Dot(viewOriginToCenter, lightDir));
+
+            XMMATRIX view = XMMatrixLookToLH(center, lightDir, up);
+            // Near Plane : Set to (view origin - sceneRadius) in Light Space.
+            //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
+            // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
+            XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, -d - sceneRadius, radius);
+
+            // Apply texel-sized increments to eliminate shadow shimmering.
+            XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+            shadowOrigin = XMVector4Transform(shadowOrigin, view * projection);
+            shadowOrigin = XMVectorScale(shadowOrigin, 1.0f / XMVectorGetW(shadowOrigin));      // Perspective divide. Can be ommitted if it uses orthographic projection.
+            // [-1, 1] -> [-resolution / 2, resolution / 2]
+            shadowOrigin = XMVectorScale(shadowOrigin, m_shadowMapResolution * 0.5f);           // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
+
+            // Calculate diff and apply as translation matrix.
+            XMVECTOR roundedOrigin = XMVectorRound(shadowOrigin);
+            XMVECTOR diff = roundedOrigin - shadowOrigin;
+            diff = XMVectorScale(diff, 2.0f / m_shadowMapResolution);                           // Since diff is texel scale, it should be transformed to NDC scale.
+            XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
+
+            XMStoreFloat4x4(&light.m_cameraConstantData[i].view, XMMatrixTranspose(view));
+            XMStoreFloat4x4(&light.m_cameraConstantData[i].projection, XMMatrixTranspose(projection * fix));
+            XMStoreFloat4x4(&light.m_lightConstantData.viewProjection[i], XMMatrixTranspose(view * projection * fix));
+            pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex[i]]->Update(&light.m_cameraConstantData[i]);
+            pFrameResource->m_lightConstantBuffers[light.m_lightConstantBufferIndex]->Update(&light.m_lightConstantData);
+        }
     }
+
+    pFrameResource->m_shadowConstantBuffer->Update(&m_shadowConstantData);
 }
 
 // Render the scene.
@@ -693,7 +735,7 @@ void Renderer::LoadAssets()
                 shaderMacros.push_back({ define.c_str(), NULL });
             }
             shaderMacros.push_back({ NULL, NULL });
-            ThrowIfFailed(D3DCompileFromFile(key.fileName.c_str(), shaderMacros.data(), nullptr, "main", key.target.c_str(), compileFlags, 0, &it->second, nullptr));
+            ThrowIfFailed(D3DCompileFromFile(key.fileName.c_str(), shaderMacros.data(), D3D_COMPILE_STANDARD_FILE_INCLUDE, "main", key.target.c_str(), compileFlags, 0, &it->second, nullptr));
         }
     }
 
@@ -735,12 +777,12 @@ void Renderer::LoadAssets()
     m_dsvAllocation = std::make_unique<DescriptorAllocation>(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
     CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation->GetDescriptorHandle());
 
-    // Create depth buffer for shadow mapping
+    // Set viewport and scissorRect for shadow mapping
     m_shadowMapViewport = { 0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f };
     m_shadowMapScissorRect = { 0, 0, static_cast<LONG>(m_shadowMapResolution), static_cast<LONG>(m_shadowMapResolution) };
 
     // Set up lights
-    m_lights.emplace_back(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(), m_shadowMapResolution, *m_layoutTracker);
+    m_lights.emplace_back(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(MAX_CASCADES), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(), m_shadowMapResolution, *m_layoutTracker);
     m_lights[0].m_lightConstantData.lightPos = { 0.0f, 100.0f, -50.0f };
     m_lights[0].m_lightConstantData.lightDir = { -1.0f, -1.0f, 1.0f };
     m_lights[0].m_lightConstantData.lightColor = { 1.0f, 1.0f, 1.0f };
@@ -802,11 +844,19 @@ void Renderer::LoadAssets()
             if (i == 0) light.m_lightConstantBufferIndex = UINT(pFrameResource->m_lightConstantBuffers.size());
             pFrameResource->m_lightConstantBuffers.push_back(lightCB);
 
-            DescriptorAllocation CameraCBAlloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-            CameraCB* cameraCB = new CameraCB(m_device.Get(), std::move(CameraCBAlloc));
-            if (i == 0) light.m_cameraConstantBufferIndex = UINT(pFrameResource->m_cameraConstantBuffers.size());
-            pFrameResource->m_cameraConstantBuffers.push_back(cameraCB);
+            for (UINT j = 0; j < MAX_CASCADES; ++j)
+            {
+                DescriptorAllocation CameraCBAlloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
+                CameraCB* cameraCB = new CameraCB(m_device.Get(), std::move(CameraCBAlloc));
+                if (i == 0) light.m_cameraConstantBufferIndex[j] = UINT(pFrameResource->m_cameraConstantBuffers.size());
+                pFrameResource->m_cameraConstantBuffers.push_back(cameraCB);
+            }
         }
+
+        // Shadow
+        DescriptorAllocation shadowCBAlloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
+        ShadowCB* shadowCB = new ShadowCB(m_device.Get(), std::move(shadowCBAlloc));
+        pFrameResource->m_shadowConstantBuffer = shadowCB;
     }
 
     m_albedo = std::make_unique<Texture>(
@@ -879,34 +929,38 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
                 D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
 
-            D3D12_CPU_DESCRIPTOR_HANDLE shadowMapDsvHandle = light.m_shadowMapDsvAllocation.GetDescriptorHandle();
-            cmdList->OMSetRenderTargets(0, nullptr, FALSE, &shadowMapDsvHandle);
-
-            cmdList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-            m_currentPSOKey.passType = DEPTH_ONLY;
-            m_currentPSOKey.vsKey = { L"vs.hlsl", {"DEPTH_ONLY"}, "vs_5_0" };
-            m_currentPSOKey.psKey = { L"", {}, "" };
-            cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
-            for (const auto& mesh : m_meshes)
+            // Render each cascade.
+            for (UINT i = 0; i < MAX_CASCADES; ++i)
             {
-                cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-                cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex]->GetGPUVirtualAddress());
-                m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
+                D3D12_CPU_DESCRIPTOR_HANDLE shadowMapDsvHandle = light.m_shadowMapDsvAllocation.GetDescriptorHandle(i);
+                cmdList->OMSetRenderTargets(0, nullptr, FALSE, &shadowMapDsvHandle);
 
-                mesh.Render(cmdList);
-            }
+                cmdList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-            m_currentPSOKey.vsKey.defines = { "INSTANCED", "DEPTH_ONLY" };
-            SetMeshType(MeshType::INSTANCED);
-            cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
-            for (const auto& mesh : m_instancedMeshes)
-            {
-                cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-                cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex]->GetGPUVirtualAddress());
-                m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
+                m_currentPSOKey.passType = DEPTH_ONLY;
+                m_currentPSOKey.vsKey = { L"vs.hlsl", {"DEPTH_ONLY"}, "vs_5_0" };
+                m_currentPSOKey.psKey = { L"", {}, "" };
+                cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
+                for (const auto& mesh : m_meshes)
+                {
+                    cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
+                    cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex[i]]->GetGPUVirtualAddress());
+                    m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
-                mesh.Render(cmdList);
+                    mesh.Render(cmdList);
+                }
+
+                m_currentPSOKey.vsKey.defines = { "INSTANCED", "DEPTH_ONLY" };
+                SetMeshType(MeshType::INSTANCED);
+                cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
+                for (const auto& mesh : m_instancedMeshes)
+                {
+                    cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
+                    cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex[i]]->GetGPUVirtualAddress());
+                    m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
+
+                    mesh.Render(cmdList);
+                }
             }
 
             // Barrier to change layout of shadowMap to SRV
@@ -954,16 +1008,17 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[0]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(3, pFrameResource->m_shadowConstantBuffer->GetGPUVirtualAddress());
 
             for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(3, i, 1, pFrameResource->m_lightConstantBuffers[i]->GetDescriptorHandle());
+                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, pFrameResource->m_lightConstantBuffers[i]->GetDescriptorHandle());
 
-            m_dynamicDescriptorHeap->StageDescriptors(4, 0, 1, m_albedo->GetDescriptorHandle());
-            m_dynamicDescriptorHeap->StageDescriptors(4, 1, 1, m_normalMap->GetDescriptorHandle());
-            m_dynamicDescriptorHeap->StageDescriptors(4, 2, 1, m_heightMap->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(5, 0, 1, m_albedo->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(5, 1, 1, m_normalMap->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(5, 2, 1, m_heightMap->GetDescriptorHandle());
 
             for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(5, i, 1, m_lights[i].m_shadowMapSrvAllocation.GetDescriptorHandle());
+                m_dynamicDescriptorHeap->StageDescriptors(6, i, 1, m_lights[i].m_shadowMapSrvAllocation.GetDescriptorHandle());
 
             m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
@@ -978,16 +1033,17 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[0]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(3, pFrameResource->m_shadowConstantBuffer->GetGPUVirtualAddress());
 
             for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(3, i, 1, pFrameResource->m_lightConstantBuffers[i]->GetDescriptorHandle());
+                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, pFrameResource->m_lightConstantBuffers[i]->GetDescriptorHandle());
 
-            m_dynamicDescriptorHeap->StageDescriptors(4, 0, 1, m_albedo->GetDescriptorHandle());
-            m_dynamicDescriptorHeap->StageDescriptors(4, 1, 1, m_normalMap->GetDescriptorHandle());
-            m_dynamicDescriptorHeap->StageDescriptors(4, 2, 1, m_heightMap->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(5, 0, 1, m_albedo->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(5, 1, 1, m_normalMap->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(5, 2, 1, m_heightMap->GetDescriptorHandle());
 
             for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(5, i, 1, m_lights[i].m_shadowMapSrvAllocation.GetDescriptorHandle());
+                m_dynamicDescriptorHeap->StageDescriptors(6, i, 1, m_lights[i].m_shadowMapSrvAllocation.GetDescriptorHandle());
 
             m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
@@ -1051,7 +1107,7 @@ void Renderer::SetMeshType(MeshType meshType)
 
 RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
 {
-    auto [it, inserted] = m_rootSignatures.try_emplace(rsKey, std::make_unique<RootSignature>(6, 2));
+    auto [it, inserted] = m_rootSignatures.try_emplace(rsKey, std::make_unique<RootSignature>(7, 2));
     RootSignature& rootSignature = *it->second;
 
     // Create root signature if cache not exists.
@@ -1061,20 +1117,21 @@ RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
         rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Mesh
         rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Material
         rootSignature[2].InitAsDescriptor(2, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Camera
+        rootSignature[3].InitAsDescriptor(3, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Shadow
 
         // Descriptor table for LightConstantBuffers[]
-        rootSignature[3].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootSignature[3].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+        rootSignature[4].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+        rootSignature[4].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
         // Descriptor table for textures (albedo, normal map, height map)
         // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
         // GPU jobs (UpdateSubresources) are already finished when recording command list. I don't know why DATA_STATIC flag fails.
-        rootSignature[4].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootSignature[4].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+        rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+        rootSignature[5].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
         // Descriptor table for shadowMaps[]
-        rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootSignature[5].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+        rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+        rootSignature[6].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
         rootSignature.InitStaticSampler(0, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL, rsKey.filtering, rsKey.addressingMode);
         rootSignature.InitStaticSampler(1, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_LESS_EQUAL);

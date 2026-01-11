@@ -18,6 +18,7 @@ struct PSInput
     float3 tangentWorld : TANGENT;
     float3 normalWorld : NORMAL;
     nointerpolation float tangentW : TEXCOORD1;     // Do not interpolate w component of tangent vector.
+    float distView : TEXCOORD2;                     // Distance in view space for determining CSM index.
 };
 
 cbuffer MeshConstantBuffer : register(b0)
@@ -30,7 +31,8 @@ cbuffer MeshConstantBuffer : register(b0)
 cbuffer CameraConstantBuffer : register(b2)
 {
     float3 cameraPos;
-    float4x4 viewProjection;
+    float4x4 view;
+    float4x4 projection;
 }
 
 PSInput main(VSInput input)
@@ -44,7 +46,9 @@ PSInput main(VSInput input)
     output.posWorld = mul(float4(input.pos, 1.0f), world).xyz;
 #endif
     
-    output.pos = mul(float4(output.posWorld, 1.0f), viewProjection);
+    float3 posView = mul(float4(output.posWorld, 1.0f), view).xyz;
+    output.distView = posView.z;
+    output.pos = mul(float4(posView, 1.0f), projection);
     output.texCoord = input.texCoord;
     
 #ifndef DEPTH_ONLY

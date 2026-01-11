@@ -122,6 +122,7 @@ private:
     UINT m_shadowMapResolution = 2048;
 
     std::vector<Light> m_lights;
+    ShadowConstantData m_shadowConstantData;
 
     // For ImGui
     std::unique_ptr<ImGuiDescriptorAllocator> m_imguiDescriptorAllocator;

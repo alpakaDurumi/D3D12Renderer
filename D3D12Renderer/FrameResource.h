@@ -22,6 +22,7 @@ using MeshCB = ConstantBuffer<MeshConstantData>;
 using MaterialCB = ConstantBuffer<MaterialConstantData>;
 using LightCB = ConstantBuffer<LightConstantData>;
 using CameraCB = ConstantBuffer<CameraConstantData>;
+using ShadowCB = ConstantBuffer<ShadowConstantData>;
 
 // Dynamic Data for each frame
 class FrameResource
@@ -48,6 +49,7 @@ public:
             delete pLightCB;
         for (auto* pCameraCB : m_cameraConstantBuffers)
             delete pCameraCB;
+        delete m_shadowConstantBuffer;
     }
 
 //private:
@@ -58,6 +60,7 @@ public:
     std::vector<MaterialCB*> m_materialConstantBuffers;
     std::vector<LightCB*> m_lightConstantBuffers;
     std::vector<CameraCB*> m_cameraConstantBuffers;
+    ShadowCB* m_shadowConstantBuffer;
 
     UINT64 m_fenceValue = 0;
 };

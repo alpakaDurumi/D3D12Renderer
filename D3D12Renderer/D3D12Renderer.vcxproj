@@ -222,6 +222,7 @@
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="ResourceLayoutTracker.h" />
     <ClInclude Include="RootSignature.h" />
+    <ClInclude Include="SharedConfig.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="UploadBuffer.h" />
     <ClInclude Include="Utility.h" />

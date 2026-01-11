@@ -2,6 +2,8 @@
 
 #include <DirectXMath.h>
 
+#include "SharedConfig.h"
+
 using namespace DirectX;
 
 // CRTP for 256-byte alignment
@@ -46,14 +48,21 @@ struct LightConstantData : public ConstantData<LightConstantData>
     float padding1;
     XMFLOAT3 lightColor;
     float lightIntensity;
-    XMFLOAT4X4 viewProjection;
-    float padding2[36];
+    XMFLOAT4X4 viewProjection[MAX_CASCADES];
+    float padding2[52];
 };
 
 struct CameraConstantData : public ConstantData<CameraConstantData>
 {
     XMFLOAT3 cameraPos;
     float padding0;
-    XMFLOAT4X4 viewProjection;
-    float padding1[44];
+    XMFLOAT4X4 view;
+    XMFLOAT4X4 projection;
+    float padding1[28];
+};
+
+struct ShadowConstantData : public ConstantData<ShadowConstantData>
+{
+    float cascadeSplits[MAX_CASCADES];
+    float padding[60];
 };

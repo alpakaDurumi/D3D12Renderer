@@ -3,6 +3,7 @@
 
 #include "Utility.h"
 #include "DirectXTex.h"
+#include "SharedConfig.h"
 
 using namespace DirectX;
 
@@ -566,7 +567,7 @@ namespace D3DHelper
         UINT width,
         UINT height,
         ComPtr<ID3D12Resource>& shadowMap,
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvCpuHandle,
+        DescriptorAllocation& dsvAllocation,
         D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
@@ -581,7 +582,7 @@ namespace D3DHelper
         resourceDesc.Alignment = 0;
         resourceDesc.Width = width;
         resourceDesc.Height = height;
-        resourceDesc.DepthOrArraySize = 1;
+        resourceDesc.DepthOrArraySize = MAX_CASCADES;
         resourceDesc.MipLevels = 1;
         resourceDesc.Format = DXGI_FORMAT_R32_TYPELESS;
         resourceDesc.SampleDesc = { 1, 0 };
@@ -605,18 +606,30 @@ namespace D3DHelper
             nullptr,
             IID_PPV_ARGS(&shadowMap)));
 
+        // Create DSV for each slice.
         D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
         dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
-        dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+        dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
         dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+        dsvDesc.Texture2DArray.MipSlice = 0;
+        dsvDesc.Texture2DArray.ArraySize = 1;
+        for (UINT i = 0; i < MAX_CASCADES; ++i)
+        {
+            dsvDesc.Texture2DArray.FirstArraySlice = i;
+            pDevice->CreateDepthStencilView(shadowMap.Get(), &dsvDesc, dsvAllocation.GetDescriptorHandle(i));
+        }
 
-        pDevice->CreateDepthStencilView(shadowMap.Get(), &dsvDesc, dsvCpuHandle);
-
+        // Create only one SRV.
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2D.MipLevels = 1;
+        srvDesc.Texture2DArray.MostDetailedMip = 0;
+        srvDesc.Texture2DArray.MipLevels = 1;
+        srvDesc.Texture2DArray.FirstArraySlice = 0;
+        srvDesc.Texture2DArray.ArraySize = MAX_CASCADES;
+        srvDesc.Texture2DArray.PlaneSlice = 0;
+        srvDesc.Texture2DArray.ResourceMinLODClamp = 0.0f;
 
         pDevice->CreateShaderResourceView(shadowMap.Get(), &srvDesc, srvCpuHandle);
     }
@@ -645,7 +658,7 @@ namespace D3DHelper
         const std::wstring& filePath,
         bool isSRGB,
         bool useBlockCompress,
-        bool flipImage) 
+        bool flipImage)
     {
         bool isHDR = false;
 

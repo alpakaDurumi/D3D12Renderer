@@ -9,6 +9,7 @@
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
 #include "ResourceLayoutTracker.h"
+#include "SharedConfig.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
@@ -26,13 +27,13 @@ public:
         : m_shadowMapDsvAllocation(std::move(dsvAllocation)),
         m_shadowMapSrvAllocation(std::move(srvAllocation))
     {
-        CreateShadowMap(pDevice, shadowMapResolution, shadowMapResolution, m_shadowMap, m_shadowMapDsvAllocation.GetDescriptorHandle(), m_shadowMapSrvAllocation.GetDescriptorHandle());
-        layoutTracker.RegisterResource(m_shadowMap.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, 1, 1, DXGI_FORMAT_R32_TYPELESS);
+        CreateShadowMap(pDevice, shadowMapResolution, shadowMapResolution, m_shadowMap, m_shadowMapDsvAllocation, m_shadowMapSrvAllocation.GetDescriptorHandle());
+        layoutTracker.RegisterResource(m_shadowMap.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, MAX_CASCADES, 1, DXGI_FORMAT_R32_TYPELESS);
     }
 
 public:
-    CameraConstantData m_cameraConstantData;
-    UINT m_cameraConstantBufferIndex;
+    CameraConstantData m_cameraConstantData[MAX_CASCADES];
+    UINT m_cameraConstantBufferIndex[MAX_CASCADES];
 
     LightConstantData m_lightConstantData;
     UINT m_lightConstantBufferIndex;
