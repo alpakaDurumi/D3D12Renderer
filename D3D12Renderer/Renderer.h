@@ -108,6 +108,7 @@ private:
 
     // App resources
     Camera m_camera;
+    UINT m_mainCameraIndex = 0;
     InputManager m_inputManager;
     std::vector<Mesh> m_meshes;
     std::vector<InstancedMesh> m_instancedMeshes;

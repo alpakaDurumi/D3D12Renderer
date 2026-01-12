@@ -254,7 +254,7 @@ void Renderer::OnUpdate()
     m_cameraConstantData.cameraPos = m_camera.GetPosition();
     XMStoreFloat4x4(&m_cameraConstantData.view, XMMatrixTranspose(m_camera.GetViewMatrix()));
     XMStoreFloat4x4(&m_cameraConstantData.projection, XMMatrixTranspose(m_camera.GetProjectionMatrix(true)));
-    pFrameResource->m_cameraConstantBuffers[0]->Update(&m_cameraConstantData);
+    pFrameResource->m_cameraConstantBuffers[m_mainCameraIndex]->Update(&m_cameraConstantData);
 
     // Use linear color for gamma-correct rendering
     // For now, just use index 0
@@ -1018,7 +1018,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         {
             cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[0]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(3, pFrameResource->m_shadowConstantBuffer->GetGPUVirtualAddress());
 
             for (UINT32 i = 0; i < numLights; ++i)
@@ -1043,7 +1043,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         {
             cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[0]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(3, pFrameResource->m_shadowConstantBuffer->GetGPUVirtualAddress());
 
             for (UINT32 i = 0; i < numLights; ++i)
