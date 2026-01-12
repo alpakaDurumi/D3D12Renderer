@@ -95,11 +95,9 @@ void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 o
     }
 
     // Copy descriptor handles
-    D3D12_CPU_DESCRIPTOR_HANDLE src = srcDescriptor;
     for (UINT32 i = 0; i < numDescriptors; ++i)
     {
-        start[i] = src;
-        MoveCPUDescriptorHandle(&src, 1, m_descriptorHandleIncrementSize);
+        start[i] = GetCPUDescriptorHandle(srcDescriptor, i, m_descriptorHandleIncrementSize);
     }
 
     // Set the root parameter index bit as 1 to make sure the descriptor table 
@@ -204,7 +202,8 @@ void DynamicDescriptorHeap::CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommand
             setFunc(commandList.Get(), rootIndex, m_currentGPUDescriptorHandle);
 
             // Offset current CPU and GPU descriptor handles.
-            MoveCPUAndGPUDescriptorHandle(&m_currentCPUDescriptorHandle, &m_currentGPUDescriptorHandle, numSrcDescriptors, m_descriptorHandleIncrementSize);
+            m_currentCPUDescriptorHandle = GetCPUDescriptorHandle(m_currentCPUDescriptorHandle, numSrcDescriptors, m_descriptorHandleIncrementSize);
+            m_currentGPUDescriptorHandle = GetGPUDescriptorHandle(m_currentGPUDescriptorHandle, numSrcDescriptors, m_descriptorHandleIncrementSize);
             m_numFreeHandles -= numSrcDescriptors;
 
             // Flip the stale bit so the descriptor table is not recopied again unless it is updated with a new descriptor
@@ -249,7 +248,8 @@ D3D12_GPU_DESCRIPTOR_HANDLE DynamicDescriptorHeap::CopyDescriptor(ComPtr<ID3D12G
     D3D12_GPU_DESCRIPTOR_HANDLE hGPU = m_currentGPUDescriptorHandle;
     m_device->CopyDescriptorsSimple(1, m_currentCPUDescriptorHandle, cpuDescriptor, m_heapType);
 
-    MoveCPUAndGPUDescriptorHandle(&m_currentCPUDescriptorHandle, &m_currentGPUDescriptorHandle, 1, m_descriptorHandleIncrementSize);
+    m_currentCPUDescriptorHandle = GetCPUDescriptorHandle(m_currentCPUDescriptorHandle, 1, m_descriptorHandleIncrementSize);
+    m_currentGPUDescriptorHandle = GetGPUDescriptorHandle(m_currentGPUDescriptorHandle, 1, m_descriptorHandleIncrementSize);
     m_numFreeHandles -= 1;
 
     return hGPU;

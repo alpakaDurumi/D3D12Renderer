@@ -98,21 +98,18 @@ namespace D3DHelper
         return allowTearing == TRUE;
     }
 
-    void MoveCPUDescriptorHandle(D3D12_CPU_DESCRIPTOR_HANDLE* handle, INT offsetInDescriptors, INT descriptorIncrementSize)
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, INT offsetInDescriptors, INT descriptorIncrementSize)
     {
-        handle->ptr = SIZE_T(INT64(handle->ptr) + INT64(offsetInDescriptors) * INT64(descriptorIncrementSize));
+        D3D12_CPU_DESCRIPTOR_HANDLE ret = handle;
+        ret.ptr += SIZE_T(INT64(offsetInDescriptors) * INT64(descriptorIncrementSize));
+        return ret;
     }
 
-    void MoveGPUDescriptorHandle(D3D12_GPU_DESCRIPTOR_HANDLE* handle, INT offsetInDescriptors, INT descriptorIncrementSize)
+    D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(const D3D12_GPU_DESCRIPTOR_HANDLE& handle, INT offsetInDescriptors, INT descriptorIncrementSize)
     {
-        handle->ptr = handle->ptr + UINT64(offsetInDescriptors) * UINT64(descriptorIncrementSize);
-    }
-
-    void MoveCPUAndGPUDescriptorHandle(D3D12_CPU_DESCRIPTOR_HANDLE* cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* gpuHandle,
-        INT offsetInDescriptors, INT descriptorIncrementSize)
-    {
-        MoveCPUDescriptorHandle(cpuHandle, offsetInDescriptors, descriptorIncrementSize);
-        MoveGPUDescriptorHandle(gpuHandle, offsetInDescriptors, descriptorIncrementSize);
+        D3D12_GPU_DESCRIPTOR_HANDLE ret = handle;
+        ret.ptr += UINT64(offsetInDescriptors) * UINT64(descriptorIncrementSize);
+        return ret;
     }
 
     void DowngradeDescriptorRanges(const D3D12_DESCRIPTOR_RANGE1* src, UINT NumDescriptorRanges, std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges)

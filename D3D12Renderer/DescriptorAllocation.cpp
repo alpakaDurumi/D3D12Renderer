@@ -52,10 +52,13 @@ DescriptorAllocation::DescriptorAllocation(
     UINT32 numHandles,
     UINT32 descriptorSize,
     DescriptorAllocatorPage* pPage)
-    : m_offsetInHeap(offsetInHeap), m_numHandles(numHandles), m_descriptorSize(descriptorSize), m_fenceValue(0), m_pPage(pPage)
+    : m_descriptor(GetCPUDescriptorHandle(baseDescriptor, offsetInHeap, descriptorSize)),
+    m_offsetInHeap(offsetInHeap),
+    m_numHandles(numHandles),
+    m_descriptorSize(descriptorSize),
+    m_fenceValue(0),
+    m_pPage(pPage)
 {
-    m_descriptor = baseDescriptor;
-    MoveCPUDescriptorHandle(&m_descriptor, m_offsetInHeap, descriptorSize);
 }
 
 DescriptorAllocation::~DescriptorAllocation()
