@@ -252,36 +252,32 @@ void Renderer::OnUpdate()
 
     // Main Camera
     m_cameraConstantData.cameraPos = m_camera.GetPosition();
-    XMStoreFloat4x4(&m_cameraConstantData.view, XMMatrixTranspose(m_camera.GetViewMatrix()));
-    XMStoreFloat4x4(&m_cameraConstantData.projection, XMMatrixTranspose(m_camera.GetProjectionMatrix(true)));
-    pFrameResource->m_cameraConstantBuffers[m_mainCameraIndex]->Update(&m_cameraConstantData);
+    m_cameraConstantData.SetView(m_camera.GetViewMatrix());
+    m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());
+    UpdateCameraConstantBuffer(pFrameResource);
 
-    // Use linear color for gamma-correct rendering
-    // For now, just use index 0
-    XMStoreFloat3(&m_materialConstantData.materialAmbient, XMColorSRGBToRGB(XMVectorSet(0.2f, 0.2f, 0.2f, 1.0f)));
-    XMStoreFloat3(&m_materialConstantData.materialSpecular, XMColorSRGBToRGB(XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f)));
+    m_materialConstantData.SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
+    m_materialConstantData.SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
     m_materialConstantData.shininess = 10.0f;
-    pFrameResource->m_materialConstantBuffers[0]->Update(&m_materialConstantData);
+    UpdateMaterialConstantBuffer(pFrameResource);
 
     for (auto& mesh : m_meshes)
     {
         XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -5.0f, 0.0f);
-        XMStoreFloat4x4(&mesh.m_meshConstantData.world, XMMatrixTranspose(world));
-        world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        XMStoreFloat4x4(&mesh.m_meshConstantData.inverseTranspose, XMMatrixInverse(nullptr, world));
+
+        mesh.m_meshConstantData.SetTransform(world);
         mesh.m_meshConstantData.textureTileScale = 50.0f;
-        pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshConstantData);
+        mesh.UpdateMeshConstantBuffer(pFrameResource);
     }
 
     for (auto& mesh : m_instancedMeshes)
     {
         XMMATRIX prevWorld = XMMatrixTranspose(XMLoadFloat4x4(&mesh.m_meshConstantData.world));
         XMMATRIX world = prevWorld * XMMatrixRotationRollPitchYaw(0.0f, 0.001f, 0.0f);
-        XMStoreFloat4x4(&mesh.m_meshConstantData.world, XMMatrixTranspose(world));
-        world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        XMStoreFloat4x4(&mesh.m_meshConstantData.inverseTranspose, XMMatrixInverse(nullptr, world));
+
+        mesh.m_meshConstantData.SetTransform(world);
         mesh.m_meshConstantData.textureTileScale = 1.0f;
-        pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->Update(&mesh.m_meshConstantData);
+        mesh.UpdateMeshConstantBuffer(pFrameResource);
     }
 
     // Rotate light
@@ -289,7 +285,8 @@ void Renderer::OnUpdate()
         XMVECTOR lightDir = XMLoadFloat3(&m_lights[0].m_lightConstantData.lightDir);
         XMMATRIX rot = XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 0.001f);
         XMVECTOR rotated = XMVector3Transform(lightDir, rot);
-        XMStoreFloat3(&m_lights[0].m_lightConstantData.lightDir, rotated);
+
+        m_lights[0].m_lightConstantData.SetLightDir(rotated);
     }
 
     // Create bounding frustum of view frustum and transform to world space.
@@ -387,12 +384,18 @@ void Renderer::OnUpdate()
             diff = XMVectorScale(diff, 2.0f / m_shadowMapResolution);                           // Since diff is texel scale, it should be transformed to NDC scale.
             XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
 
-            XMStoreFloat4x4(&light.m_cameraConstantData[i].view, XMMatrixTranspose(view));
-            XMStoreFloat4x4(&light.m_cameraConstantData[i].projection, XMMatrixTranspose(projection * fix));
-            XMStoreFloat4x4(&light.m_lightConstantData.viewProjection[i], XMMatrixTranspose(view * projection * fix));
-            pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex[i]]->Update(&light.m_cameraConstantData[i]);
-            pFrameResource->m_lightConstantBuffers[light.m_lightConstantBufferIndex]->Update(&light.m_lightConstantData);
+            light.m_cameraConstantData[i].SetView(view);
+            light.m_cameraConstantData[i].SetProjection(projection * fix);
+            light.m_lightConstantData.SetViewProjection(view * projection * fix, i);
+
+            light.UpdateCameraConstantBuffer(pFrameResource, i);
         }
+    }
+
+    // Update LightCB after viewProjection settings are finished for all cascades.
+    for (auto& light : m_lights)
+    {
+        light.UpdateLightConstantBuffer(pFrameResource);
     }
 
     pFrameResource->m_shadowConstantBuffer->Update(&m_shadowConstantData);
@@ -1267,4 +1270,15 @@ ID3DBlob* Renderer::GetShaderBlob(const ShaderKey& shaderKey)
     }
 
     return it->second.Get();
+}
+
+void Renderer::UpdateCameraConstantBuffer(FrameResource* pFrameResource)
+{
+    pFrameResource->m_cameraConstantBuffers[m_mainCameraIndex]->Update(&m_cameraConstantData);
+}
+
+// Use index 0 for now.
+void Renderer::UpdateMaterialConstantBuffer(FrameResource* pFrameResource)
+{
+    pFrameResource->m_materialConstantBuffers[0]->Update(&m_materialConstantData);
 }

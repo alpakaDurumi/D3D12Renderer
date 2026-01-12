@@ -29,6 +29,14 @@ struct MeshConstantData : public ConstantData<MeshConstantData>
     XMFLOAT4X4 inverseTranspose;
     float textureTileScale = 1.0f;
     float padding[31];
+
+    void SetTransform(XMMATRIX world)
+    {
+        XMStoreFloat4x4(&this->world, XMMatrixTranspose(world));
+
+        world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+        XMStoreFloat4x4(&this->inverseTranspose, XMMatrixInverse(nullptr, world));
+    }
 };
 
 struct CameraConstantData : public ConstantData<CameraConstantData>
@@ -38,6 +46,16 @@ struct CameraConstantData : public ConstantData<CameraConstantData>
     XMFLOAT4X4 view;
     XMFLOAT4X4 projection;
     float padding1[28];
+
+    void SetView(XMMATRIX view)
+    {
+        XMStoreFloat4x4(&this->view, XMMatrixTranspose(view));
+    }
+
+    void SetProjection(XMMATRIX projection)
+    {
+        XMStoreFloat4x4(&this->projection, XMMatrixTranspose(projection));
+    }
 };
 
 struct LightConstantData : public ConstantData<LightConstantData>
@@ -50,6 +68,16 @@ struct LightConstantData : public ConstantData<LightConstantData>
     float lightIntensity;
     XMFLOAT4X4 viewProjection[MAX_CASCADES];
     float padding2[52];
+
+    void SetLightDir(XMVECTOR lightDir)
+    {
+        XMStoreFloat3(&this->lightDir, lightDir);
+    }
+
+    void SetViewProjection(XMMATRIX viewProjection, UINT idx)
+    {
+        XMStoreFloat4x4(&this->viewProjection[idx], XMMatrixTranspose(viewProjection));
+    }
 };
 
 struct MaterialConstantData : public ConstantData<MaterialConstantData>
@@ -59,6 +87,17 @@ struct MaterialConstantData : public ConstantData<MaterialConstantData>
     XMFLOAT3 materialSpecular;
     float shininess;
     float padding1[56];
+
+    // Use linear color for gamma-correct rendering
+    void SetAmbient(XMFLOAT4 ambient)
+    {
+        XMStoreFloat3(&this->materialAmbient, XMColorSRGBToRGB(XMLoadFloat4(&ambient)));
+    }
+
+    void SetSpecular(XMFLOAT4 specular)
+    {
+        XMStoreFloat3(&this->materialSpecular, XMColorSRGBToRGB(XMLoadFloat4(&specular)));
+    }
 };
 
 struct ShadowConstantData : public ConstantData<ShadowConstantData>

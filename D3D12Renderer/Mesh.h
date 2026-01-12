@@ -10,6 +10,7 @@
 
 #include "D3DHelper.h"
 #include "ConstantData.h"
+#include "FrameResource.h"
 
 class CommandList;
 
@@ -40,6 +41,11 @@ public:
         commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
         commandList->IASetIndexBuffer(&m_indexBufferView);
         commandList->DrawIndexedInstanced(m_numIndices, 1, 0, 0, 0);
+    }
+
+    void UpdateMeshConstantBuffer(const FrameResource* pFrameResource)
+    {
+        pFrameResource->m_meshConstantBuffers[m_meshConstantBufferIndex]->Update(&m_meshConstantData);
     }
 
     inline static Mesh MakeCube(
