@@ -955,7 +955,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 for (const auto& mesh : m_meshes)
                 {
                     cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-                    cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex[i]]->GetGPUVirtualAddress());
+                    cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex[i]]->GetGPUVirtualAddress());
                     m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
                     mesh.Render(cmdList);
@@ -967,7 +967,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 for (const auto& mesh : m_instancedMeshes)
                 {
                     cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-                    cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex[i]]->GetGPUVirtualAddress());
+                    cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex[i]]->GetGPUVirtualAddress());
                     m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
                     mesh.Render(cmdList);
@@ -1017,8 +1017,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         for (const auto& mesh : m_meshes)
         {
             cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(3, pFrameResource->m_shadowConstantBuffer->GetGPUVirtualAddress());
 
             for (UINT32 i = 0; i < numLights; ++i)
@@ -1042,8 +1042,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         for (const auto& mesh : m_instancedMeshes)
         {
             cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(3, pFrameResource->m_shadowConstantBuffer->GetGPUVirtualAddress());
 
             for (UINT32 i = 0; i < numLights; ++i)
@@ -1124,10 +1124,10 @@ RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
     // Create root signature if cache not exists.
     if (inserted)
     {
-        // Root descriptor for MeshCB, MaterialCB, and CameraCB
+        // Root descriptor for MeshCB, CameraCB, MaterialCB, and ShadowCB
         rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Mesh
-        rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Material
-        rootSignature[2].InitAsDescriptor(2, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Camera
+        rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Camera
+        rootSignature[2].InitAsDescriptor(2, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Material
         rootSignature[3].InitAsDescriptor(3, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Shadow
 
         // Descriptor table for LightConstantBuffers[]

@@ -103,26 +103,32 @@ private:
     std::unordered_map<MeshType, std::vector<D3D12_INPUT_ELEMENT_DESC>> m_inputLayouts;
     std::unordered_map<ShaderKey, ComPtr<ID3DBlob>> m_shaderBlobs;
 
-    std::unique_ptr<DescriptorAllocation> m_dsvAllocation;
     ComPtr<ID3D12Resource> m_depthStencilBuffer;
+    std::unique_ptr<DescriptorAllocation> m_dsvAllocation;
 
     // App resources
+    // 
+    // Main Camera
     Camera m_camera;
     UINT m_mainCameraIndex = 0;
+    CameraConstantData m_cameraConstantData;
+
     InputManager m_inputManager;
+
     std::vector<Mesh> m_meshes;
     std::vector<InstancedMesh> m_instancedMeshes;
+
     MaterialConstantData m_materialConstantData;
-    CameraConstantData m_cameraConstantData;
+    
     std::unique_ptr<Texture> m_albedo;
     std::unique_ptr<Texture> m_normalMap;
     std::unique_ptr<Texture> m_heightMap;
 
+    // Lights, Shadows
+    std::vector<Light> m_lights;
     D3D12_VIEWPORT m_shadowMapViewport;
     D3D12_RECT m_shadowMapScissorRect;
     UINT m_shadowMapResolution = 2048;
-
-    std::vector<Light> m_lights;
     ShadowConstantData m_shadowConstantData;
 
     // For ImGui

@@ -14,7 +14,7 @@ struct ConstantData
     // because the derived class T is an incomplete type at the point of inheritance
     ConstantData()
     {
-        static_assert((sizeof(T) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
+        static_assert((sizeof(T) % D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT) == 0, "Constant Buffer size must be 256-byte aligned");
     }
 };
 
@@ -31,13 +31,13 @@ struct MeshConstantData : public ConstantData<MeshConstantData>
     float padding[31];
 };
 
-struct MaterialConstantData : public ConstantData<MaterialConstantData>
+struct CameraConstantData : public ConstantData<CameraConstantData>
 {
-    XMFLOAT3 materialAmbient;
+    XMFLOAT3 cameraPos;
     float padding0;
-    XMFLOAT3 materialSpecular;
-    float shininess;
-    float padding1[56];
+    XMFLOAT4X4 view;
+    XMFLOAT4X4 projection;
+    float padding1[28];
 };
 
 struct LightConstantData : public ConstantData<LightConstantData>
@@ -52,13 +52,13 @@ struct LightConstantData : public ConstantData<LightConstantData>
     float padding2[52];
 };
 
-struct CameraConstantData : public ConstantData<CameraConstantData>
+struct MaterialConstantData : public ConstantData<MaterialConstantData>
 {
-    XMFLOAT3 cameraPos;
+    XMFLOAT3 materialAmbient;
     float padding0;
-    XMFLOAT4X4 view;
-    XMFLOAT4X4 projection;
-    float padding1[28];
+    XMFLOAT3 materialSpecular;
+    float shininess;
+    float padding1[56];
 };
 
 struct ShadowConstantData : public ConstantData<ShadowConstantData>

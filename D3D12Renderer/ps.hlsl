@@ -27,18 +27,18 @@ cbuffer MeshConstantBuffer : register(b0, space0)
     float textureTileScale;
 };
 
-cbuffer MaterialConstantBuffer : register(b1, space0)
-{
-    float3 materialAmbient;
-    float3 materialSpecular;
-    float shininess;
-}
-
-cbuffer CameraConstantBuffer : register(b2, space0)
+cbuffer CameraConstantBuffer : register(b1, space0)
 {
     float3 cameraPos;
     float4x4 view;
     float4x4 projection;
+}
+
+cbuffer MaterialConstantBuffer : register(b2, space0)
+{
+    float3 materialAmbient;
+    float3 materialSpecular;
+    float shininess;
 }
 
 cbuffer ShadowConstantBuffer : register(b3, space0)
