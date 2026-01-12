@@ -153,6 +153,14 @@ private:
     ID3D12PipelineState* GetPipelineState(const PSOKey& psoKey);
     ID3DBlob* GetShaderBlob(const ShaderKey& shaderKey);
 
+    void PrintFPS();
+    void HandleInput();
+
+    void PrepareConstantData();
+    void PrepareCSM();
+    void UpdateConstantBuffers(FrameResource* pFrameResource);
+
     void UpdateCameraConstantBuffer(FrameResource* pFrameResource);
     void UpdateMaterialConstantBuffer(FrameResource* pFrameResource);
+    void UpdateShadowConstantBuffer(FrameResource* pFrameResource);
 };

@@ -192,213 +192,14 @@ void Renderer::OnInit()
 
 void Renderer::OnUpdate()
 {
-    // Calculate FPS
-    {
-        static UINT64 frameCounter = 0;
-        static double elapsedSeconds = 0.0;
-        static std::chrono::high_resolution_clock clock;
-        static auto t0 = clock.now();
-
-        frameCounter++;
-        auto t1 = clock.now();
-        auto deltaTime = t1 - t0;
-        t0 = t1;
-
-        elapsedSeconds += deltaTime.count() * 1e-9;
-        if (elapsedSeconds > 1.0)
-        {
-            WCHAR buffer[500];
-            auto fps = frameCounter / elapsedSeconds;
-            auto frameTime = 1000.0 / fps;
-            swprintf_s(buffer, L"FPS: %f, Frame Time: %fms\n", fps, frameTime);
-            OutputDebugStringW(buffer);
-
-            frameCounter = 0;
-            elapsedSeconds = 0.0;
-        }
-    }
-
-    if (m_inputManager.IsKeyPressed(VK_ESCAPE))
-    {
-        PostQuitMessage(0);
-        return;
-    }
-
-    if (m_inputManager.IsKeyPressed(VK_F11))
-    {
-        ToggleFullScreen();
-    }
-
-    if (m_inputManager.IsKeyPressed('V'))
-    {
-        m_vSync = !m_vSync;
-        WCHAR buffer[500];
-        swprintf_s(buffer, L"m_vSync : %d\n", m_vSync);
-        OutputDebugStringW(buffer);
-    }
-
-    if (m_inputManager.IsKeyDown('W')) m_camera.MoveForward(0.01f);
-    if (m_inputManager.IsKeyDown('A')) m_camera.MoveRight(-0.01f);
-    if (m_inputManager.IsKeyDown('S')) m_camera.MoveForward(-0.01f);
-    if (m_inputManager.IsKeyDown('D')) m_camera.MoveRight(0.01f);
-    if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-0.01f);
-    if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(0.01f);
-
-    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
-    m_camera.Rotate(mouseMove);
+    PrintFPS();
+    HandleInput();
 
     // 이번에 드로우할 프레임에 대해 constant buffers 업데이트
     FrameResource* pFrameResource = m_frameResources[m_frameIndex];
 
-    // Main Camera
-    m_cameraConstantData.cameraPos = m_camera.GetPosition();
-    m_cameraConstantData.SetView(m_camera.GetViewMatrix());
-    m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());
-    UpdateCameraConstantBuffer(pFrameResource);
-
-    m_materialConstantData.SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
-    m_materialConstantData.SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
-    m_materialConstantData.shininess = 10.0f;
-    UpdateMaterialConstantBuffer(pFrameResource);
-
-    for (auto& mesh : m_meshes)
-    {
-        XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -5.0f, 0.0f);
-
-        mesh.m_meshConstantData.SetTransform(world);
-        mesh.m_meshConstantData.textureTileScale = 50.0f;
-        mesh.UpdateMeshConstantBuffer(pFrameResource);
-    }
-
-    for (auto& mesh : m_instancedMeshes)
-    {
-        XMMATRIX prevWorld = XMMatrixTranspose(XMLoadFloat4x4(&mesh.m_meshConstantData.world));
-        XMMATRIX world = prevWorld * XMMatrixRotationRollPitchYaw(0.0f, 0.001f, 0.0f);
-
-        mesh.m_meshConstantData.SetTransform(world);
-        mesh.m_meshConstantData.textureTileScale = 1.0f;
-        mesh.UpdateMeshConstantBuffer(pFrameResource);
-    }
-
-    // Rotate light
-    {
-        XMVECTOR lightDir = XMLoadFloat3(&m_lights[0].m_lightConstantData.lightDir);
-        XMMATRIX rot = XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 0.001f);
-        XMVECTOR rotated = XMVector3Transform(lightDir, rot);
-
-        m_lights[0].m_lightConstantData.SetLightDir(rotated);
-    }
-
-    // Create bounding frustum of view frustum and transform to world space.
-    BoundingFrustum boundingFrustum;
-    BoundingFrustum::CreateFromMatrix(boundingFrustum, m_camera.GetProjectionMatrix());
-    XMMATRIX inverseView = XMMatrixInverse(nullptr, m_camera.GetViewMatrix());
-    boundingFrustum.Transform(boundingFrustum, inverseView);
-
-    // Get 8 corners of view frustum.
-    //     Near    Far
-    //    0----1  4----5
-    //    |    |  |    |
-    //    |    |  |    |
-    //    3----2  7----6
-    XMFLOAT3 frustumCorners[8];
-    boundingFrustum.GetCorners(frustumCorners);
-
-    XMFLOAT3 cascadeCorners[4][8];
-    std::vector<BoundingSphere> frustumBSs(4);
-
-    // Practical Split Scheme
-    // https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus
-    const float nearPlane = m_camera.GetNearPlane();
-    const float farPlane = m_camera.GetFarPlane();
-    const float lambda = 0.9f;
-
-    float splitRatio[MAX_CASCADES];
-
-    for (UINT i = 1; i <= MAX_CASCADES; ++i)
-    {
-        float ratio = static_cast<float>(i) / MAX_CASCADES;
-        float logSplit = nearPlane * std::pow(farPlane / nearPlane, ratio);
-        float uniSplit = nearPlane + (farPlane - nearPlane) * ratio;
-
-        float dist = lambda * logSplit + (1.0f - lambda) * uniSplit;
-        m_shadowConstantData.cascadeSplits[i - 1].x = dist;
-
-        splitRatio[i - 1] = (m_shadowConstantData.cascadeSplits[i - 1].x - nearPlane) / (farPlane - nearPlane);
-    }
-
-    for (UINT i = 0; i < MAX_CASCADES; ++i)
-    {
-        // Create corners.
-        for (UINT j = 0; j < 4; ++j)
-        {
-            XMVECTOR n = XMLoadFloat3(&frustumCorners[j]);
-            XMVECTOR f = XMLoadFloat3(&frustumCorners[j + 4]);
-
-            XMVECTOR s = XMVectorLerp(n, f, i == 0 ? 0.0f : splitRatio[i - 1]);
-            XMVECTOR e = XMVectorLerp(n, f, splitRatio[i]);
-
-            XMStoreFloat3(&cascadeCorners[i][j], s);
-            XMStoreFloat3(&cascadeCorners[i][j + 4], e);
-        }
-
-        // Create bounding sphere.
-        BoundingSphere::CreateFromPoints(frustumBSs[i], 8, cascadeCorners[i], sizeof(XMFLOAT3));
-
-        XMVECTOR center = XMLoadFloat3(&frustumBSs[i].Center);
-        float radius = frustumBSs[i].Radius;
-
-        XMFLOAT3 temp = m_camera.GetPosition();
-        XMVECTOR cameraPos = XMLoadFloat3(&temp);
-
-        XMVECTOR viewOriginToCenter = center - cameraPos;
-
-        // Calculate view/projection matrix fit to light frustum
-        for (auto& light : m_lights)
-        {
-            static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-
-            XMVECTOR lightDir = XMLoadFloat3(&light.m_lightConstantData.lightDir);
-            lightDir = XMVector3Normalize(lightDir);
-
-            // Orthogonal projection of (center - view origin) onto lightDir.
-            // This represents where the view origin is located relative to the center on the light's Z-axis.
-            float d = XMVectorGetX(XMVector3Dot(viewOriginToCenter, lightDir));
-
-            XMMATRIX view = XMMatrixLookToLH(center, lightDir, up);
-            // Near Plane : Set to (view origin - sceneRadius) in Light Space.
-            //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
-            // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
-            XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, -d - farPlane, radius);
-
-            // Apply texel-sized increments to eliminate shadow shimmering.
-            XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-            shadowOrigin = XMVector4Transform(shadowOrigin, view * projection);
-            shadowOrigin = XMVectorScale(shadowOrigin, 1.0f / XMVectorGetW(shadowOrigin));      // Perspective divide. Can be ommitted if it uses orthographic projection.
-            // [-1, 1] -> [-resolution / 2, resolution / 2]
-            shadowOrigin = XMVectorScale(shadowOrigin, m_shadowMapResolution * 0.5f);           // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
-
-            // Calculate diff and apply as translation matrix.
-            XMVECTOR roundedOrigin = XMVectorRound(shadowOrigin);
-            XMVECTOR diff = roundedOrigin - shadowOrigin;
-            diff = XMVectorScale(diff, 2.0f / m_shadowMapResolution);                           // Since diff is texel scale, it should be transformed to NDC scale.
-            XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
-
-            light.m_cameraConstantData[i].SetView(view);
-            light.m_cameraConstantData[i].SetProjection(projection * fix);
-            light.m_lightConstantData.SetViewProjection(view * projection * fix, i);
-
-            light.UpdateCameraConstantBuffer(pFrameResource, i);
-        }
-    }
-
-    // Update LightCB after viewProjection settings are finished for all cascades.
-    for (auto& light : m_lights)
-    {
-        light.UpdateLightConstantBuffer(pFrameResource);
-    }
-
-    pFrameResource->m_shadowConstantBuffer->Update(&m_shadowConstantData);
+    PrepareConstantData();
+    UpdateConstantBuffers(pFrameResource);
 }
 
 // Render the scene.
@@ -1272,6 +1073,227 @@ ID3DBlob* Renderer::GetShaderBlob(const ShaderKey& shaderKey)
     return it->second.Get();
 }
 
+void Renderer::PrintFPS()
+{
+    static UINT64 frameCounter = 0;
+    static double elapsedSeconds = 0.0;
+    static std::chrono::high_resolution_clock clock;
+    static auto t0 = clock.now();
+
+    frameCounter++;
+    auto t1 = clock.now();
+    auto deltaTime = t1 - t0;
+    t0 = t1;
+
+    elapsedSeconds += deltaTime.count() * 1e-9;
+    if (elapsedSeconds > 1.0)
+    {
+        WCHAR buffer[500];
+        auto fps = frameCounter / elapsedSeconds;
+        auto frameTime = 1000.0 / fps;
+        swprintf_s(buffer, L"FPS: %f, Frame Time: %fms\n", fps, frameTime);
+        OutputDebugStringW(buffer);
+
+        frameCounter = 0;
+        elapsedSeconds = 0.0;
+    }
+}
+
+void Renderer::HandleInput()
+{
+    if (m_inputManager.IsKeyPressed(VK_ESCAPE))
+    {
+        PostQuitMessage(0);
+        return;
+    }
+
+    if (m_inputManager.IsKeyPressed(VK_F11))
+    {
+        ToggleFullScreen();
+    }
+
+    if (m_inputManager.IsKeyPressed('V'))
+    {
+        m_vSync = !m_vSync;
+        WCHAR buffer[500];
+        swprintf_s(buffer, L"m_vSync : %d\n", m_vSync);
+        OutputDebugStringW(buffer);
+    }
+
+    if (m_inputManager.IsKeyDown('W')) m_camera.MoveForward(0.01f);
+    if (m_inputManager.IsKeyDown('A')) m_camera.MoveRight(-0.01f);
+    if (m_inputManager.IsKeyDown('S')) m_camera.MoveForward(-0.01f);
+    if (m_inputManager.IsKeyDown('D')) m_camera.MoveRight(0.01f);
+    if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-0.01f);
+    if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(0.01f);
+
+    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
+    m_camera.Rotate(mouseMove);
+}
+
+void Renderer::PrepareConstantData()
+{
+    // Mesh
+    for (auto& mesh : m_meshes)
+    {
+        XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -5.0f, 0.0f);
+        mesh.m_meshConstantData.SetTransform(world);
+        mesh.m_meshConstantData.textureTileScale = 50.0f;
+    }
+    for (auto& mesh : m_instancedMeshes)
+    {
+        XMMATRIX prevWorld = XMMatrixTranspose(XMLoadFloat4x4(&mesh.m_meshConstantData.world));
+        XMMATRIX world = prevWorld * XMMatrixRotationRollPitchYaw(0.0f, 0.001f, 0.0f);
+        mesh.m_meshConstantData.SetTransform(world);
+        mesh.m_meshConstantData.textureTileScale = 1.0f;
+    }
+
+    // Main Camera
+    m_cameraConstantData.cameraPos = m_camera.GetPosition();
+    m_cameraConstantData.SetView(m_camera.GetViewMatrix());
+    m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());
+
+    // Material
+    m_materialConstantData.SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
+    m_materialConstantData.SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
+    m_materialConstantData.shininess = 10.0f;
+
+    // Light
+    XMVECTOR lightDir = XMLoadFloat3(&m_lights[0].m_lightConstantData.lightDir);
+    XMMATRIX rot = XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 0.001f);
+    XMVECTOR rotated = XMVector3Transform(lightDir, rot);
+    m_lights[0].m_lightConstantData.SetLightDir(rotated);
+
+    PrepareCSM();
+}
+
+void Renderer::PrepareCSM()
+{
+    // Create bounding frustum of view frustum and transform to world space.
+    BoundingFrustum boundingFrustum;
+    BoundingFrustum::CreateFromMatrix(boundingFrustum, m_camera.GetProjectionMatrix());
+    XMMATRIX inverseView = XMMatrixInverse(nullptr, m_camera.GetViewMatrix());
+    boundingFrustum.Transform(boundingFrustum, inverseView);
+
+    // Get 8 corners of view frustum.
+    //     Near    Far
+    //    0----1  4----5
+    //    |    |  |    |
+    //    |    |  |    |
+    //    3----2  7----6
+    XMFLOAT3 frustumCorners[8];
+    boundingFrustum.GetCorners(frustumCorners);
+
+    XMFLOAT3 cascadeCorners[4][8];
+    std::vector<BoundingSphere> frustumBSs(4);
+
+    // Practical Split Scheme
+    // https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus
+    const float nearPlane = m_camera.GetNearPlane();
+    const float farPlane = m_camera.GetFarPlane();
+    const float lambda = 0.9f;
+
+    float splitRatio[MAX_CASCADES];
+
+    for (UINT i = 1; i <= MAX_CASCADES; ++i)
+    {
+        float ratio = static_cast<float>(i) / MAX_CASCADES;
+        float logSplit = nearPlane * std::pow(farPlane / nearPlane, ratio);
+        float uniSplit = nearPlane + (farPlane - nearPlane) * ratio;
+
+        float dist = lambda * logSplit + (1.0f - lambda) * uniSplit;
+        m_shadowConstantData.cascadeSplits[i - 1].x = dist;
+
+        splitRatio[i - 1] = (m_shadowConstantData.cascadeSplits[i - 1].x - nearPlane) / (farPlane - nearPlane);
+    }
+
+    for (UINT i = 0; i < MAX_CASCADES; ++i)
+    {
+        // Create corners.
+        for (UINT j = 0; j < 4; ++j)
+        {
+            XMVECTOR n = XMLoadFloat3(&frustumCorners[j]);
+            XMVECTOR f = XMLoadFloat3(&frustumCorners[j + 4]);
+
+            XMVECTOR s = XMVectorLerp(n, f, i == 0 ? 0.0f : splitRatio[i - 1]);
+            XMVECTOR e = XMVectorLerp(n, f, splitRatio[i]);
+
+            XMStoreFloat3(&cascadeCorners[i][j], s);
+            XMStoreFloat3(&cascadeCorners[i][j + 4], e);
+        }
+
+        // Create bounding sphere.
+        BoundingSphere::CreateFromPoints(frustumBSs[i], 8, cascadeCorners[i], sizeof(XMFLOAT3));
+
+        XMVECTOR center = XMLoadFloat3(&frustumBSs[i].Center);
+        float radius = frustumBSs[i].Radius;
+
+        XMFLOAT3 temp = m_camera.GetPosition();
+        XMVECTOR cameraPos = XMLoadFloat3(&temp);
+
+        XMVECTOR viewOriginToCenter = center - cameraPos;
+
+        // Calculate view/projection matrix fit to light frustum
+        for (auto& light : m_lights)
+        {
+            static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+            XMVECTOR lightDir = XMLoadFloat3(&light.m_lightConstantData.lightDir);
+            lightDir = XMVector3Normalize(lightDir);
+
+            // Orthogonal projection of (center - view origin) onto lightDir.
+            // This represents where the view origin is located relative to the center on the light's Z-axis.
+            float d = XMVectorGetX(XMVector3Dot(viewOriginToCenter, lightDir));
+
+            XMMATRIX view = XMMatrixLookToLH(center, lightDir, up);
+            // Near Plane : Set to (view origin - sceneRadius) in Light Space.
+            //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
+            // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
+            XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, -d - farPlane, radius);
+
+            // Apply texel-sized increments to eliminate shadow shimmering.
+            XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+            shadowOrigin = XMVector4Transform(shadowOrigin, view * projection);
+            shadowOrigin = XMVectorScale(shadowOrigin, 1.0f / XMVectorGetW(shadowOrigin));      // Perspective divide. Can be ommitted if it uses orthographic projection.
+            // [-1, 1] -> [-resolution / 2, resolution / 2]
+            shadowOrigin = XMVectorScale(shadowOrigin, m_shadowMapResolution * 0.5f);           // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
+
+            // Calculate diff and apply as translation matrix.
+            XMVECTOR roundedOrigin = XMVectorRound(shadowOrigin);
+            XMVECTOR diff = roundedOrigin - shadowOrigin;
+            diff = XMVectorScale(diff, 2.0f / m_shadowMapResolution);                           // Since diff is texel scale, it should be transformed to NDC scale.
+            XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
+
+            light.m_cameraConstantData[i].SetView(view);
+            light.m_cameraConstantData[i].SetProjection(projection * fix);
+
+            light.m_lightConstantData.SetViewProjection(view * projection * fix, i);
+        }
+    }
+}
+
+void Renderer::UpdateConstantBuffers(FrameResource* pFrameResource)
+{
+    for (auto& mesh : m_meshes)
+        mesh.UpdateMeshConstantBuffer(pFrameResource);
+    for (auto& mesh : m_instancedMeshes)
+        mesh.UpdateMeshConstantBuffer(pFrameResource);
+
+    UpdateCameraConstantBuffer(pFrameResource);
+    UpdateMaterialConstantBuffer(pFrameResource);
+
+    for (auto& light : m_lights)
+    {
+        for (UINT i = 0; i < MAX_CASCADES; ++i)
+        {
+            light.UpdateCameraConstantBuffer(pFrameResource, i);
+        }
+        light.UpdateLightConstantBuffer(pFrameResource);
+    }
+
+    UpdateShadowConstantBuffer(pFrameResource);
+}
+
 void Renderer::UpdateCameraConstantBuffer(FrameResource* pFrameResource)
 {
     pFrameResource->m_cameraConstantBuffers[m_mainCameraIndex]->Update(&m_cameraConstantData);
@@ -1281,4 +1303,9 @@ void Renderer::UpdateCameraConstantBuffer(FrameResource* pFrameResource)
 void Renderer::UpdateMaterialConstantBuffer(FrameResource* pFrameResource)
 {
     pFrameResource->m_materialConstantBuffers[0]->Update(&m_materialConstantData);
+}
+
+void Renderer::UpdateShadowConstantBuffer(FrameResource* pFrameResource)
+{
+    pFrameResource->m_shadowConstantBuffer->Update(&m_shadowConstantData);
 }
