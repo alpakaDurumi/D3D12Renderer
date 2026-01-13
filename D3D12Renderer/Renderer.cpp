@@ -615,16 +615,10 @@ void Renderer::LoadAssets()
         FrameResource* pFrameResource = m_frameResources[i];
 
         // Main Camera
-        {
-            DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-            pFrameResource->m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get(), std::move(alloc)));
-        }
+        pFrameResource->m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get()));
 
         // Material
-        {
-            DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-            pFrameResource->m_materialConstantBuffers.push_back(std::make_unique<MaterialCB>(m_device.Get(), std::move(alloc)));
-        }
+        pFrameResource->m_materialConstantBuffers.push_back(std::make_unique<MaterialCB>(m_device.Get()));
 
         // Meshes
         for (auto& mesh : m_meshes)
@@ -654,15 +648,13 @@ void Renderer::LoadAssets()
 
             for (UINT j = 0; j < MAX_CASCADES; ++j)
             {
-                DescriptorAllocation CameraCBAlloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
                 if (i == 0) light.m_cameraConstantBufferIndex[j] = UINT(pFrameResource->m_cameraConstantBuffers.size());
-                pFrameResource->m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get(), std::move(CameraCBAlloc)));
+                pFrameResource->m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get()));
             }
         }
 
         // Shadow
-        DescriptorAllocation shadowCBAlloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-        pFrameResource->m_shadowConstantBuffer = std::make_unique<ShadowCB>(m_device.Get(), std::move(shadowCBAlloc));
+        pFrameResource->m_shadowConstantBuffer = std::make_unique<ShadowCB>(m_device.Get());
     }
 
     m_albedo = std::make_unique<Texture>(
