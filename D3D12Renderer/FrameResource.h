@@ -8,6 +8,7 @@
 
 #include <vector>
 #include <utility>
+#include <memory>
 
 #include "D3DHelper.h"
 #include "ConstantData.h"
@@ -38,29 +39,16 @@ public:
         rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
         pDevice->CreateRenderTargetView(m_renderTarget.Get(), &rtvDesc, m_rtvAllocation.GetDescriptorHandle());
     }
-    
-    ~FrameResource()
-    {
-        for (auto* pMeshCB : m_meshConstantBuffers)
-            delete pMeshCB;
-        for (auto* pMatCB : m_materialConstantBuffers)
-            delete pMatCB;
-        for (auto* pLightCB : m_lightConstantBuffers)
-            delete pLightCB;
-        for (auto* pCameraCB : m_cameraConstantBuffers)
-            delete pCameraCB;
-        delete m_shadowConstantBuffer;
-    }
 
 //private:
     ComPtr<ID3D12Resource> m_renderTarget;
     DescriptorAllocation m_rtvAllocation;
 
-    std::vector<MeshCB*> m_meshConstantBuffers;
-    std::vector<MaterialCB*> m_materialConstantBuffers;
-    std::vector<LightCB*> m_lightConstantBuffers;
-    std::vector<CameraCB*> m_cameraConstantBuffers;
-    ShadowCB* m_shadowConstantBuffer;
+    std::vector<std::unique_ptr<MeshCB>> m_meshConstantBuffers;
+    std::vector<std::unique_ptr<MaterialCB>> m_materialConstantBuffers;
+    std::vector<std::unique_ptr<LightCB>> m_lightConstantBuffers;
+    std::vector<std::unique_ptr<CameraCB>> m_cameraConstantBuffers;
+    std::unique_ptr<ShadowCB> m_shadowConstantBuffer;
 
     UINT64 m_fenceValue = 0;
 };

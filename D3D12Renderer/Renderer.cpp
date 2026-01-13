@@ -617,25 +617,21 @@ void Renderer::LoadAssets()
         // Main Camera
         {
             DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-            CameraCB* cameraCB = new CameraCB(m_device.Get(), std::move(alloc));
-            pFrameResource->m_cameraConstantBuffers.push_back(cameraCB);
+            pFrameResource->m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get(), std::move(alloc)));
         }
 
         // Material
         {
             DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-            MaterialCB* matCB = new MaterialCB(m_device.Get(), std::move(alloc));
-            pFrameResource->m_materialConstantBuffers.push_back(matCB);
+            pFrameResource->m_materialConstantBuffers.push_back(std::make_unique<MaterialCB>(m_device.Get(), std::move(alloc)));
         }
 
         // Meshes
         for (auto& mesh : m_meshes)
         {
-            MeshCB* meshCB = new MeshCB(m_device.Get());
-
             // Set index only at first iteration because indices are same in each FrameResource
             if (i == 0) mesh.m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
-            pFrameResource->m_meshConstantBuffers.push_back(meshCB);
+            pFrameResource->m_meshConstantBuffers.push_back(std::make_unique<MeshCB>(m_device.Get()));
 
             if (i == 0) mesh.m_materialConstantBufferIndex = 0;
         }
@@ -643,10 +639,8 @@ void Renderer::LoadAssets()
         // Instanced Meshes
         for (auto& mesh : m_instancedMeshes)
         {
-            MeshCB* meshCB = new MeshCB(m_device.Get());
-
             if (i == 0) mesh.m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
-            pFrameResource->m_meshConstantBuffers.push_back(meshCB);
+            pFrameResource->m_meshConstantBuffers.push_back(std::make_unique<MeshCB>(m_device.Get()));
 
             if (i == 0) mesh.m_materialConstantBufferIndex = 0;
         }
@@ -655,23 +649,20 @@ void Renderer::LoadAssets()
         for (auto& light : m_lights)
         {
             DescriptorAllocation lightCBAlloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-            LightCB* lightCB = new LightCB(m_device.Get(), std::move(lightCBAlloc));
             if (i == 0) light.m_lightConstantBufferIndex = UINT(pFrameResource->m_lightConstantBuffers.size());
-            pFrameResource->m_lightConstantBuffers.push_back(lightCB);
+            pFrameResource->m_lightConstantBuffers.push_back(std::make_unique<LightCB>(m_device.Get(), std::move(lightCBAlloc)));
 
             for (UINT j = 0; j < MAX_CASCADES; ++j)
             {
                 DescriptorAllocation CameraCBAlloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-                CameraCB* cameraCB = new CameraCB(m_device.Get(), std::move(CameraCBAlloc));
                 if (i == 0) light.m_cameraConstantBufferIndex[j] = UINT(pFrameResource->m_cameraConstantBuffers.size());
-                pFrameResource->m_cameraConstantBuffers.push_back(cameraCB);
+                pFrameResource->m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get(), std::move(CameraCBAlloc)));
             }
         }
 
         // Shadow
         DescriptorAllocation shadowCBAlloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-        ShadowCB* shadowCB = new ShadowCB(m_device.Get(), std::move(shadowCBAlloc));
-        pFrameResource->m_shadowConstantBuffer = shadowCB;
+        pFrameResource->m_shadowConstantBuffer = std::make_unique<ShadowCB>(m_device.Get(), std::move(shadowCBAlloc));
     }
 
     m_albedo = std::make_unique<Texture>(
