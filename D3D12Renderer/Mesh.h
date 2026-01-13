@@ -43,9 +43,9 @@ public:
         commandList->DrawIndexedInstanced(m_numIndices, 1, 0, 0, 0);
     }
 
-    void UpdateMeshConstantBuffer(const FrameResource* pFrameResource)
+    void UpdateMeshConstantBuffer(FrameResource& frameResource)
     {
-        pFrameResource->m_meshConstantBuffers[m_meshConstantBufferIndex]->Update(&m_meshConstantData);
+        frameResource.m_meshConstantBuffers[m_meshConstantBufferIndex]->Update(&m_meshConstantData);
     }
 
     inline static Mesh MakeCube(

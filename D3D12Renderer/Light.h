@@ -33,14 +33,14 @@ public:
         layoutTracker.RegisterResource(m_shadowMap.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, MAX_CASCADES, 1, DXGI_FORMAT_R32_TYPELESS);
     }
 
-    void UpdateCameraConstantBuffer(const FrameResource* pFrameResource, UINT idx)
+    void UpdateCameraConstantBuffer(FrameResource& frameResource, UINT idx)
     {
-        pFrameResource->m_cameraConstantBuffers[m_cameraConstantBufferIndex[idx]]->Update(&m_cameraConstantData[idx]);
+        frameResource.m_cameraConstantBuffers[m_cameraConstantBufferIndex[idx]]->Update(&m_cameraConstantData[idx]);
     }
 
-    void UpdateLightConstantBuffer(const FrameResource* pFrameResource)
+    void UpdateLightConstantBuffer(FrameResource& frameResource)
     {
-        pFrameResource->m_lightConstantBuffers[m_lightConstantBufferIndex]->Update(&m_lightConstantData);
+        frameResource.m_lightConstantBuffers[m_lightConstantBufferIndex]->Update(&m_lightConstantData);
     }
 
 public:

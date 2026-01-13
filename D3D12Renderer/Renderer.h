@@ -92,7 +92,7 @@ private:
     std::unique_ptr<ResourceLayoutTracker> m_layoutTracker;
     std::unique_ptr<UploadBuffer> m_uploadBuffer;
     std::array<std::unique_ptr<DescriptorAllocator>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
-    std::vector<FrameResource*> m_frameResources;
+    std::vector<std::unique_ptr<FrameResource>> m_frameResources;
 
     std::unordered_map<RSKey, std::unique_ptr<RootSignature>> m_rootSignatures;
     std::unordered_map<PSOKey, ComPtr<ID3D12PipelineState>> m_pipelineStates;
@@ -158,9 +158,9 @@ private:
 
     void PrepareConstantData();
     void PrepareCSM();
-    void UpdateConstantBuffers(FrameResource* pFrameResource);
+    void UpdateConstantBuffers(FrameResource& frameResource);
 
-    void UpdateCameraConstantBuffer(FrameResource* pFrameResource);
-    void UpdateMaterialConstantBuffer(FrameResource* pFrameResource);
-    void UpdateShadowConstantBuffer(FrameResource* pFrameResource);
+    void UpdateCameraConstantBuffer(FrameResource& frameResource);
+    void UpdateMaterialConstantBuffer(FrameResource& frameResource);
+    void UpdateShadowConstantBuffer(FrameResource& frameResource);
 };

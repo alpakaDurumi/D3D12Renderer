@@ -196,10 +196,10 @@ void Renderer::OnUpdate()
     HandleInput();
 
     // 이번에 드로우할 프레임에 대해 constant buffers 업데이트
-    FrameResource* pFrameResource = m_frameResources[m_frameIndex];
+    FrameResource& frameResource = *m_frameResources[m_frameIndex];
 
     PrepareConstantData();
-    UpdateConstantBuffers(pFrameResource);
+    UpdateConstantBuffers(frameResource);
 }
 
 // Render the scene.
@@ -251,12 +251,6 @@ void Renderer::OnDestroy()
     // Ensure that the GPU is no longer referencing resources that are about to be
     // cleaned up by the destructor.
     WaitForGPU();
-
-    for (auto* pFrameResource : m_frameResources)
-        delete pFrameResource;
-
-    m_albedo.reset();
-    m_normalMap.reset();
 
     // Shutdown ImGui
     ImGui_ImplDX12_Shutdown();
@@ -502,15 +496,16 @@ void Renderer::LoadPipeline()
     {
         DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate();
 
-        FrameResource* pFrameResource = new FrameResource(m_device.Get(), m_swapChain.Get(), i, std::move(alloc));
-        m_frameResources.push_back(pFrameResource);
+        auto frameResource = std::make_unique<FrameResource>(m_device.Get(), m_swapChain.Get(), i, std::move(alloc));
 
         // Register backbuffer to tracker
         // Initial layout of backbuffer is D3D12_BARRIER_LAYOUT_COMMON : https://microsoft.github.io/DirectX-Specs/d3d/D3D12EnhancedBarriers.html#initial-resource-state
         // depthOrArraySize and mipLevels for backbuffers are 1
-        ID3D12Resource* pBackBuffer = pFrameResource->m_renderTarget.Get();
+        ID3D12Resource* pBackBuffer = frameResource->m_renderTarget.Get();
         auto desc = pBackBuffer->GetDesc();
         m_layoutTracker->RegisterResource(pBackBuffer, D3D12_BARRIER_LAYOUT_COMMON, desc.DepthOrArraySize, desc.MipLevels, DXGI_FORMAT_R8G8B8A8_UNORM);
+
+        m_frameResources.push_back(std::move(frameResource));
     }
 }
 
@@ -611,20 +606,20 @@ void Renderer::LoadAssets()
     // Create constant buffers for each frame
     for (UINT i = 0; i < FrameCount; i++)
     {
-        FrameResource* pFrameResource = m_frameResources[i];
+        FrameResource& frameResource = *m_frameResources[i];
 
         // Main Camera
-        pFrameResource->m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get()));
+        frameResource.m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get()));
 
         // Material
-        pFrameResource->m_materialConstantBuffers.push_back(std::make_unique<MaterialCB>(m_device.Get()));
+        frameResource.m_materialConstantBuffers.push_back(std::make_unique<MaterialCB>(m_device.Get()));
 
         // Meshes
         for (auto& mesh : m_meshes)
         {
             // Set index only at first iteration because indices are same in each FrameResource
-            if (i == 0) mesh.m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
-            pFrameResource->m_meshConstantBuffers.push_back(std::make_unique<MeshCB>(m_device.Get()));
+            if (i == 0) mesh.m_meshConstantBufferIndex = UINT(frameResource.m_meshConstantBuffers.size());
+            frameResource.m_meshConstantBuffers.push_back(std::make_unique<MeshCB>(m_device.Get()));
 
             if (i == 0) mesh.m_materialConstantBufferIndex = 0;
         }
@@ -632,8 +627,8 @@ void Renderer::LoadAssets()
         // Instanced Meshes
         for (auto& mesh : m_instancedMeshes)
         {
-            if (i == 0) mesh.m_meshConstantBufferIndex = UINT(pFrameResource->m_meshConstantBuffers.size());
-            pFrameResource->m_meshConstantBuffers.push_back(std::make_unique<MeshCB>(m_device.Get()));
+            if (i == 0) mesh.m_meshConstantBufferIndex = UINT(frameResource.m_meshConstantBuffers.size());
+            frameResource.m_meshConstantBuffers.push_back(std::make_unique<MeshCB>(m_device.Get()));
 
             if (i == 0) mesh.m_materialConstantBufferIndex = 0;
         }
@@ -642,18 +637,18 @@ void Renderer::LoadAssets()
         for (auto& light : m_lights)
         {
             DescriptorAllocation lightCBAlloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-            if (i == 0) light.m_lightConstantBufferIndex = UINT(pFrameResource->m_lightConstantBuffers.size());
-            pFrameResource->m_lightConstantBuffers.push_back(std::make_unique<LightCB>(m_device.Get(), std::move(lightCBAlloc)));
+            if (i == 0) light.m_lightConstantBufferIndex = UINT(frameResource.m_lightConstantBuffers.size());
+            frameResource.m_lightConstantBuffers.push_back(std::make_unique<LightCB>(m_device.Get(), std::move(lightCBAlloc)));
 
             for (UINT j = 0; j < MAX_CASCADES; ++j)
             {
-                if (i == 0) light.m_cameraConstantBufferIndex[j] = UINT(pFrameResource->m_cameraConstantBuffers.size());
-                pFrameResource->m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get()));
+                if (i == 0) light.m_cameraConstantBufferIndex[j] = UINT(frameResource.m_cameraConstantBuffers.size());
+                frameResource.m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get()));
             }
         }
 
         // Shadow
-        pFrameResource->m_shadowConstantBuffer = std::make_unique<ShadowCB>(m_device.Get());
+        frameResource.m_shadowConstantBuffer = std::make_unique<ShadowCB>(m_device.Get());
     }
 
     m_albedo = std::make_unique<Texture>(
@@ -701,7 +696,7 @@ void Renderer::LoadAssets()
 
 void Renderer::PopulateCommandList(CommandList& commandList)
 {
-    FrameResource* pFrameResource = m_frameResources[m_frameIndex];
+    FrameResource& frameResource = *m_frameResources[m_frameIndex];
 
     auto cmdList = commandList.GetCommandList();
 
@@ -740,8 +735,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
                 for (const auto& mesh : m_meshes)
                 {
-                    cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-                    cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex[i]]->GetGPUVirtualAddress());
+                    cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
+                    cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[light.m_cameraConstantBufferIndex[i]]->GetGPUVirtualAddress());
                     m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
                     mesh.Render(cmdList);
@@ -752,8 +747,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
                 for (const auto& mesh : m_instancedMeshes)
                 {
-                    cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-                    cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_cameraConstantBuffers[light.m_cameraConstantBufferIndex[i]]->GetGPUVirtualAddress());
+                    cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
+                    cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[light.m_cameraConstantBufferIndex[i]]->GetGPUVirtualAddress());
                     m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
                     mesh.Render(cmdList);
@@ -779,14 +774,14 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->RSSetScissorRects(1, &m_scissorRect);
 
         commandList.Barrier(
-            pFrameResource->m_renderTarget.Get(),
+            frameResource.m_renderTarget.Get(),
             D3D12_BARRIER_SYNC_NONE,
             D3D12_BARRIER_SYNC_RENDER_TARGET,
             D3D12_BARRIER_ACCESS_NO_ACCESS,
             D3D12_BARRIER_ACCESS_RENDER_TARGET,
             D3D12_BARRIER_LAYOUT_RENDER_TARGET);
 
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = pFrameResource->m_rtvAllocation.GetDescriptorHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.m_rtvAllocation.GetDescriptorHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
         cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
@@ -802,13 +797,13 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
         for (const auto& mesh : m_meshes)
         {
-            cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(3, pFrameResource->m_shadowConstantBuffer->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(3, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
 
             for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, pFrameResource->m_lightConstantBuffers[i]->GetDescriptorHandle());
+                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[i]->GetDescriptorHandle());
 
             m_dynamicDescriptorHeap->StageDescriptors(5, 0, 1, m_albedo->GetDescriptorHandle());
             m_dynamicDescriptorHeap->StageDescriptors(5, 1, 1, m_normalMap->GetDescriptorHandle());
@@ -827,13 +822,13 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
         for (const auto& mesh : m_instancedMeshes)
         {
-            cmdList->SetGraphicsRootConstantBufferView(0, pFrameResource->m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(1, pFrameResource->m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(2, pFrameResource->m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(3, pFrameResource->m_shadowConstantBuffer->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(3, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
 
             for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, pFrameResource->m_lightConstantBuffers[i]->GetDescriptorHandle());
+                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[i]->GetDescriptorHandle());
 
             m_dynamicDescriptorHeap->StageDescriptors(5, 0, 1, m_albedo->GetDescriptorHandle());
             m_dynamicDescriptorHeap->StageDescriptors(5, 1, 1, m_normalMap->GetDescriptorHandle());
@@ -1254,40 +1249,40 @@ void Renderer::PrepareCSM()
     }
 }
 
-void Renderer::UpdateConstantBuffers(FrameResource* pFrameResource)
+void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
 {
     for (auto& mesh : m_meshes)
-        mesh.UpdateMeshConstantBuffer(pFrameResource);
+        mesh.UpdateMeshConstantBuffer(frameResource);
     for (auto& mesh : m_instancedMeshes)
-        mesh.UpdateMeshConstantBuffer(pFrameResource);
+        mesh.UpdateMeshConstantBuffer(frameResource);
 
-    UpdateCameraConstantBuffer(pFrameResource);
-    UpdateMaterialConstantBuffer(pFrameResource);
+    UpdateCameraConstantBuffer(frameResource);
+    UpdateMaterialConstantBuffer(frameResource);
 
     for (auto& light : m_lights)
     {
         for (UINT i = 0; i < MAX_CASCADES; ++i)
         {
-            light.UpdateCameraConstantBuffer(pFrameResource, i);
+            light.UpdateCameraConstantBuffer(frameResource, i);
         }
-        light.UpdateLightConstantBuffer(pFrameResource);
+        light.UpdateLightConstantBuffer(frameResource);
     }
 
-    UpdateShadowConstantBuffer(pFrameResource);
+    UpdateShadowConstantBuffer(frameResource);
 }
 
-void Renderer::UpdateCameraConstantBuffer(FrameResource* pFrameResource)
+void Renderer::UpdateCameraConstantBuffer(FrameResource& frameResource)
 {
-    pFrameResource->m_cameraConstantBuffers[m_mainCameraIndex]->Update(&m_cameraConstantData);
+    frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->Update(&m_cameraConstantData);
 }
 
 // Use index 0 for now.
-void Renderer::UpdateMaterialConstantBuffer(FrameResource* pFrameResource)
+void Renderer::UpdateMaterialConstantBuffer(FrameResource& frameResource)
 {
-    pFrameResource->m_materialConstantBuffers[0]->Update(&m_materialConstantData);
+    frameResource.m_materialConstantBuffers[0]->Update(&m_materialConstantData);
 }
 
-void Renderer::UpdateShadowConstantBuffer(FrameResource* pFrameResource)
+void Renderer::UpdateShadowConstantBuffer(FrameResource& frameResource)
 {
-    pFrameResource->m_shadowConstantBuffer->Update(&m_shadowConstantData);
+    frameResource.m_shadowConstantBuffer->Update(&m_shadowConstantData);
 }
