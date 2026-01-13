@@ -6,6 +6,16 @@
 
 using namespace D3DHelper;
 
+DescriptorAllocation::DescriptorAllocation()
+    : m_descriptor{ 0 },
+    m_offsetInHeap(0),
+    m_numHandles(0),
+    m_descriptorSize(0),
+    m_fenceValue(0),
+    m_pPage(nullptr)
+{
+}
+
 DescriptorAllocation::DescriptorAllocation(DescriptorAllocation&& other) noexcept
     : m_descriptor(other.m_descriptor),
     m_offsetInHeap(other.m_offsetInHeap),
@@ -64,6 +74,11 @@ DescriptorAllocation::DescriptorAllocation(
 DescriptorAllocation::~DescriptorAllocation()
 {
     Free();
+}
+
+bool DescriptorAllocation::IsNull() const
+{
+    return m_pPage == nullptr;
 }
 
 void DescriptorAllocation::Free()

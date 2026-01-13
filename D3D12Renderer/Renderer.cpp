@@ -255,7 +255,6 @@ void Renderer::OnDestroy()
     for (auto* pFrameResource : m_frameResources)
         delete pFrameResource;
 
-    m_dsvAllocation.reset();
     m_albedo.reset();
     m_normalMap.reset();
 
@@ -326,8 +325,8 @@ void Renderer::OnResize(UINT width, UINT height)
     }
 
     // Recreate DSV
-    m_dsvAllocation = std::make_unique<DescriptorAllocation>(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation->GetDescriptorHandle());
+    m_dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
+    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation.GetDescriptorHandle());
 }
 
 void Renderer::OnPrepareImGui()
@@ -589,8 +588,8 @@ void Renderer::LoadAssets()
     }
 
     // Create the depth stencil view
-    m_dsvAllocation = std::make_unique<DescriptorAllocation>(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation->GetDescriptorHandle());
+    m_dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
+    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation.GetDescriptorHandle());
 
     // Set viewport and scissorRect for shadow mapping
     m_shadowMapViewport = { 0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f };
@@ -788,7 +787,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             D3D12_BARRIER_LAYOUT_RENDER_TARGET);
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = pFrameResource->m_rtvAllocation.GetDescriptorHandle();
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation->GetDescriptorHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
         cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
         // Use linear color for gamma-correct rendering

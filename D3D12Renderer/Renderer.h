@@ -104,7 +104,7 @@ private:
     std::unordered_map<ShaderKey, ComPtr<ID3DBlob>> m_shaderBlobs;
 
     ComPtr<ID3D12Resource> m_depthStencilBuffer;
-    std::unique_ptr<DescriptorAllocation> m_dsvAllocation;
+    DescriptorAllocation m_dsvAllocation;
 
     // App resources
     // 

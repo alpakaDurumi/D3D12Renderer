@@ -11,7 +11,7 @@ class DescriptorAllocatorPage;
 class DescriptorAllocation
 {
 public:
-    DescriptorAllocation() = delete;
+    DescriptorAllocation();
 
     // Copies are not allowed
     DescriptorAllocation(const DescriptorAllocation&) = delete;
@@ -29,6 +29,8 @@ public:
         DescriptorAllocatorPage* pPage);
 
     ~DescriptorAllocation();
+
+    bool IsNull() const;
 
     // Get a descriptor at a particular offset in the allocation
     D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandle(UINT32 offsetInBlock = 0) const;

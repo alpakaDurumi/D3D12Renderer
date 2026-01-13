@@ -20,6 +20,7 @@ class ConstantBuffer
 public:
     // Consturctor for root descriptor
     ConstantBuffer(ID3D12Device10* pDevice)
+        : m_allocation(std::nullopt)
     {
         CreateUploadHeap(pDevice, sizeof(T), m_buffer);
 
@@ -31,6 +32,8 @@ public:
     ConstantBuffer(ID3D12Device10* pDevice, DescriptorAllocation&& allocation)
         : m_allocation(std::move(allocation))
     {
+        assert(!m_allocation->IsNull());
+
         CreateUploadHeap(pDevice, sizeof(T), m_buffer);
 
         // Create constant buffer view

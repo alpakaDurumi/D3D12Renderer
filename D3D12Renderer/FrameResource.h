@@ -32,6 +32,8 @@ public:
     FrameResource(ID3D12Device10* pDevice, IDXGISwapChain* pSwapChain, UINT frameIndex, DescriptorAllocation&& allocation)
         : m_rtvAllocation(std::move(allocation))
     {
+        assert(!m_rtvAllocation.IsNull());
+
         ThrowIfFailed(pSwapChain->GetBuffer(frameIndex, IID_PPV_ARGS(&m_renderTarget)));
 
         D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};

@@ -25,14 +25,16 @@ public:
     Texture(
         ID3D12Device10* pDevice,
         CommandList& commandList,
-        DescriptorAllocator& descriptorAllocator,
+        DescriptorAllocation&& allocation,
         UploadBuffer& uploadBuffer,
         ResourceLayoutTracker& layoutTracker,
         const std::vector<UINT8>& textureSrc,
         UINT width,
         UINT height)
-        : m_width(width), m_height(height), m_allocation(descriptorAllocator.Allocate())
+        : m_width(width), m_height(height), m_allocation(std::move(allocation))
     {
+        assert(!m_allocation.IsNull());
+
         CreateDefaultHeapForTexture(pDevice, width, height, m_texture);
 
         layoutTracker.RegisterResource(m_texture.Get(), D3D12_BARRIER_LAYOUT_COMMON, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
@@ -90,6 +92,8 @@ public:
         bool isCubeMap)
         : m_allocation(std::move(allocation))
     {
+        assert(!m_allocation.IsNull());
+
         // Find file and check validity
         std::wstring ddsFilePath = Utility::RemoveFileExtension(filePath) + L".dds";
 
