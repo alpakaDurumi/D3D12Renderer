@@ -71,6 +71,7 @@ struct LightConstantData : public ConstantData<LightConstantData>
 
     void SetLightDir(XMVECTOR lightDir)
     {
+        lightDir = XMVector3Normalize(lightDir);
         XMStoreFloat3(&this->lightDir, lightDir);
     }
 

@@ -613,11 +613,6 @@ void Renderer::LoadAssets()
     m_instancedMeshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube(), GeometryGenerator::GenerateSampleInstanceData());
 
     // Set up lights
-    std::vector<DescriptorAllocation> cbvAllocations;
-    for (int i = 0; i < FrameCount; ++i)
-    {
-        cbvAllocations.push_back(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
-    }
     m_lights.emplace_back(
         m_device.Get(),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(MAX_CASCADES),
@@ -625,7 +620,7 @@ void Renderer::LoadAssets()
         m_shadowMapResolution,
         *m_layoutTracker,
         m_frameResources,
-        std::move(cbvAllocations));
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
     m_lights[0].m_lightConstantData.lightPos = { 0.0f, 100.0f, -50.0f };
     m_lights[0].m_lightConstantData.lightDir = { -1.0f, -1.0f, 1.0f };
     m_lights[0].m_lightConstantData.lightColor = { 1.0f, 1.0f, 1.0f };

@@ -92,3 +92,53 @@ D3D12_CPU_DESCRIPTOR_HANDLE DescriptorAllocation::GetDescriptorHandle(UINT32 off
     assert(offsetInBlock < m_numHandles);
     return { m_descriptor.ptr + (m_descriptorSize * offsetInBlock) };
 }
+
+std::vector<DescriptorAllocation> DescriptorAllocation::Split()
+{
+    assert(!IsNull());
+
+    std::vector<DescriptorAllocation> ret;
+    ret.reserve(m_numHandles);
+
+    for (UINT i = 0; i < m_numHandles; ++i)
+    {
+        auto descriptor = GetCPUDescriptorHandle(m_descriptor, i, m_descriptorSize);
+
+        // Can't use emplace_back here :
+        // Required constructor is private and emplace_back delegates construction to std::allocator class,
+        // which cannot access private constructor.
+        ret.push_back(DescriptorAllocation(
+            descriptor,
+            m_offsetInHeap + i,
+            1,
+            m_descriptorSize,
+            m_fenceValue,
+            m_pPage));
+    }
+
+    m_descriptor.ptr = 0;
+    m_offsetInHeap = 0;
+    m_numHandles = 0;
+    m_descriptorSize = 0;
+    m_fenceValue = 0;
+    m_pPage = nullptr;
+
+    return ret;
+}
+
+// private constructor only for Split function.
+DescriptorAllocation::DescriptorAllocation(
+    D3D12_CPU_DESCRIPTOR_HANDLE descriptor,
+    UINT32 offsetInHeap,
+    UINT32 numHandles,
+    UINT32 descriptorSize,
+    UINT64 fenceValue,
+    DescriptorAllocatorPage* pPage)
+    : m_descriptor(descriptor),
+    m_offsetInHeap(offsetInHeap),
+    m_numHandles(numHandles),
+    m_descriptorSize(descriptorSize),
+    m_fenceValue(fenceValue),
+    m_pPage(pPage)
+{
+}

@@ -16,7 +16,7 @@ public:
     // Copies are not allowed
     DescriptorAllocation(const DescriptorAllocation&) = delete;
     DescriptorAllocation& operator=(const DescriptorAllocation&) = delete;
-    
+
     // Only move is allowed
     DescriptorAllocation(DescriptorAllocation&& other) noexcept;
     DescriptorAllocation& operator=(DescriptorAllocation&& other) noexcept;
@@ -39,7 +39,18 @@ public:
     UINT32 GetNumHandles() const { return m_numHandles; }
     UINT64 GetFenceValue() const { return m_fenceValue; }
 
+    // Split current DescriptorAllocation into 'm_numHandles' Allocations.
+    std::vector<DescriptorAllocation> Split();
+
 private:
+    DescriptorAllocation(
+        D3D12_CPU_DESCRIPTOR_HANDLE descriptor,
+        UINT32 offsetInHeap,
+        UINT32 numHandles,
+        UINT32 descriptorSize,
+        UINT64 fenceValue,
+        DescriptorAllocatorPage* pPage);
+
     void Free();
 
     D3D12_CPU_DESCRIPTOR_HANDLE m_descriptor;

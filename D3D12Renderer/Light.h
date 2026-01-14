@@ -25,7 +25,7 @@ public:
         UINT shadowMapResolution,
         ResourceLayoutTracker& layoutTracker,
         const std::vector<std::unique_ptr<FrameResource>>& frameResources,
-        std::vector<DescriptorAllocation>&& cbvAllocations)
+        DescriptorAllocation&& cbvAllocation)
         : m_shadowMapDsvAllocation(std::move(dsvAllocation)),
         m_shadowMapSrvAllocation(std::move(srvAllocation))
     {
@@ -33,6 +33,8 @@ public:
 
         CreateShadowMap(pDevice, shadowMapResolution, shadowMapResolution, m_shadowMap, m_shadowMapDsvAllocation, m_shadowMapSrvAllocation.GetDescriptorHandle());
         layoutTracker.RegisterResource(m_shadowMap.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, MAX_CASCADES, 1, DXGI_FORMAT_R32_TYPELESS);
+
+        auto cbvAllocations = cbvAllocation.Split();
 
         // Create constant buffers
         for (UINT i = 0; i < frameResources.size(); ++i)
