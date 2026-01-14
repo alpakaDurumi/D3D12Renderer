@@ -67,7 +67,7 @@ namespace D3DHelper
         UploadBuffer& uploadBuffer,
         ComPtr<ID3D12Resource>& vertexBuffer,
         D3D12_VERTEX_BUFFER_VIEW* pVertexBufferView,
-        std::vector<T>& vertices)
+        const std::vector<T>& vertices)
     {
         const UINT vertexBufferSize = UINT(vertices.size()) * UINT(sizeof(T));
 
@@ -101,7 +101,7 @@ namespace D3DHelper
         UploadBuffer& uploadBuffer,
         ComPtr<ID3D12Resource>& indexBuffer,
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
-        std::vector<UINT32>& indices);
+        const std::vector<UINT32>& indices);
 
     void CreateDepthStencilBuffer(
         ID3D12Device10* pDevice,

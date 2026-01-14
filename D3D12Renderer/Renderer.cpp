@@ -15,9 +15,8 @@
 
 #include "Win32Application.h"
 #include "D3DHelper.h"
-#include "FrameResource.h"
-#include "CommandList.h"
 #include "SharedConfig.h"
+#include "GeometryGenerator.h"
 
 // 이거 일단 빼야겠다. nuget에서도 제외시키자
 //#include <dxcapi.h>
@@ -600,8 +599,8 @@ void Renderer::LoadAssets()
     // Get command allocator and list for loading assets
     auto [commandAllocator, commandList] = m_commandQueue->GetAvailableCommandList();
 
-    m_meshes.push_back(Mesh::MakeCube(m_device.Get(), commandList, *m_uploadBuffer));
-    m_instancedMeshes.push_back(InstancedMesh::MakeCubeInstanced(m_device.Get(), commandList, *m_uploadBuffer));
+    m_meshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube());
+    m_instancedMeshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube(), GeometryGenerator::GenerateSampleInstanceData());
 
     // Create constant buffers for each frame
     for (UINT i = 0; i < FrameCount; i++)
@@ -613,25 +612,6 @@ void Renderer::LoadAssets()
 
         // Material
         frameResource.m_materialConstantBuffers.push_back(std::make_unique<MaterialCB>(m_device.Get()));
-
-        // Meshes
-        for (auto& mesh : m_meshes)
-        {
-            // Set index only at first iteration because indices are same in each FrameResource
-            if (i == 0) mesh.m_meshConstantBufferIndex = UINT(frameResource.m_meshConstantBuffers.size());
-            frameResource.m_meshConstantBuffers.push_back(std::make_unique<MeshCB>(m_device.Get()));
-
-            if (i == 0) mesh.m_materialConstantBufferIndex = 0;
-        }
-
-        // Instanced Meshes
-        for (auto& mesh : m_instancedMeshes)
-        {
-            if (i == 0) mesh.m_meshConstantBufferIndex = UINT(frameResource.m_meshConstantBuffers.size());
-            frameResource.m_meshConstantBuffers.push_back(std::make_unique<MeshCB>(m_device.Get()));
-
-            if (i == 0) mesh.m_materialConstantBufferIndex = 0;
-        }
 
         // Lights
         for (auto& light : m_lights)

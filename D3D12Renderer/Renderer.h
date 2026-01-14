@@ -15,6 +15,8 @@
 #include "InputManager.h"
 #include "ConstantData.h"
 #include "CommandQueue.h"
+#include "CommandList.h"
+#include "FrameResource.h"
 #include "ResourceLayoutTracker.h"
 #include "UploadBuffer.h"
 #include "Mesh.h"
@@ -25,9 +27,6 @@
 #include "ImGuiDescriptorAllocator.h"
 #include "CacheKeys.h"
 #include "Light.h"
-
-class FrameResource;
-class CommandList;
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;

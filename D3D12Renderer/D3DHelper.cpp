@@ -480,7 +480,7 @@ namespace D3DHelper
         UploadBuffer& uploadBuffer,
         ComPtr<ID3D12Resource>& indexBuffer,
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
-        std::vector<UINT32>& indices)
+        const std::vector<UINT32>& indices)
     {
         const UINT indexBufferSize = UINT(indices.size()) * UINT(sizeof(UINT32));
 
