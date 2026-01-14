@@ -23,7 +23,9 @@ public:
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
         UINT shadowMapResolution,
-        ResourceLayoutTracker& layoutTracker)
+        ResourceLayoutTracker& layoutTracker,
+        const std::vector<std::unique_ptr<FrameResource>>& frameResources,
+        std::vector<DescriptorAllocation>&& cbvAllocations)
         : m_shadowMapDsvAllocation(std::move(dsvAllocation)),
         m_shadowMapSrvAllocation(std::move(srvAllocation))
     {
@@ -31,6 +33,21 @@ public:
 
         CreateShadowMap(pDevice, shadowMapResolution, shadowMapResolution, m_shadowMap, m_shadowMapDsvAllocation, m_shadowMapSrvAllocation.GetDescriptorHandle());
         layoutTracker.RegisterResource(m_shadowMap.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, MAX_CASCADES, 1, DXGI_FORMAT_R32_TYPELESS);
+
+        // Create constant buffers
+        for (UINT i = 0; i < frameResources.size(); ++i)
+        {
+            FrameResource& frameResource = *frameResources[i];
+
+            if (i == 0) m_lightConstantBufferIndex = UINT(frameResource.m_lightConstantBuffers.size());
+            frameResource.m_lightConstantBuffers.push_back(std::make_unique<LightCB>(pDevice, std::move(cbvAllocations[i])));
+
+            for (UINT j = 0; j < MAX_CASCADES; ++j)
+            {
+                if (i == 0) m_cameraConstantBufferIndex[j] = UINT(frameResource.m_cameraConstantBuffers.size());
+                frameResource.m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(pDevice));
+            }
+        }
     }
 
     void UpdateCameraConstantBuffer(FrameResource& frameResource, UINT idx)

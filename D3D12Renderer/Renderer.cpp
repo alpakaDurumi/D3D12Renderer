@@ -589,18 +589,8 @@ void Renderer::LoadAssets()
     m_shadowMapViewport = { 0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f };
     m_shadowMapScissorRect = { 0, 0, static_cast<LONG>(m_shadowMapResolution), static_cast<LONG>(m_shadowMapResolution) };
 
-    // Set up lights
-    m_lights.emplace_back(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(MAX_CASCADES), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(), m_shadowMapResolution, *m_layoutTracker);
-    m_lights[0].m_lightConstantData.lightPos = { 0.0f, 100.0f, -50.0f };
-    m_lights[0].m_lightConstantData.lightDir = { -1.0f, -1.0f, 1.0f };
-    m_lights[0].m_lightConstantData.lightColor = { 1.0f, 1.0f, 1.0f };
-    m_lights[0].m_lightConstantData.lightIntensity = 1.0f;
-
     // Get command allocator and list for loading assets
     auto [commandAllocator, commandList] = m_commandQueue->GetAvailableCommandList();
-
-    m_meshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube());
-    m_instancedMeshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube(), GeometryGenerator::GenerateSampleInstanceData());
 
     // Create constant buffers for each frame
     for (UINT i = 0; i < FrameCount; i++)
@@ -608,28 +598,38 @@ void Renderer::LoadAssets()
         FrameResource& frameResource = *m_frameResources[i];
 
         // Main Camera
+        if (i == 0) m_mainCameraIndex = UINT(frameResource.m_cameraConstantBuffers.size());
         frameResource.m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get()));
 
         // Material
         frameResource.m_materialConstantBuffers.push_back(std::make_unique<MaterialCB>(m_device.Get()));
 
-        // Lights
-        for (auto& light : m_lights)
-        {
-            DescriptorAllocation lightCBAlloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-            if (i == 0) light.m_lightConstantBufferIndex = UINT(frameResource.m_lightConstantBuffers.size());
-            frameResource.m_lightConstantBuffers.push_back(std::make_unique<LightCB>(m_device.Get(), std::move(lightCBAlloc)));
-
-            for (UINT j = 0; j < MAX_CASCADES; ++j)
-            {
-                if (i == 0) light.m_cameraConstantBufferIndex[j] = UINT(frameResource.m_cameraConstantBuffers.size());
-                frameResource.m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get()));
-            }
-        }
-
         // Shadow
         frameResource.m_shadowConstantBuffer = std::make_unique<ShadowCB>(m_device.Get());
     }
+
+    // Add meshes
+    m_meshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube());
+    m_instancedMeshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube(), GeometryGenerator::GenerateSampleInstanceData());
+
+    // Set up lights
+    std::vector<DescriptorAllocation> cbvAllocations;
+    for (int i = 0; i < FrameCount; ++i)
+    {
+        cbvAllocations.push_back(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
+    }
+    m_lights.emplace_back(
+        m_device.Get(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(MAX_CASCADES),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+        m_shadowMapResolution,
+        *m_layoutTracker,
+        m_frameResources,
+        std::move(cbvAllocations));
+    m_lights[0].m_lightConstantData.lightPos = { 0.0f, 100.0f, -50.0f };
+    m_lights[0].m_lightConstantData.lightDir = { -1.0f, -1.0f, 1.0f };
+    m_lights[0].m_lightConstantData.lightColor = { 1.0f, 1.0f, 1.0f };
+    m_lights[0].m_lightConstantData.lightIntensity = 1.0f;
 
     m_albedo = std::make_unique<Texture>(
         m_device.Get(),
