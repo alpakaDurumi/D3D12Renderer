@@ -301,15 +301,12 @@ void Renderer::OnResize(UINT width, UINT height)
     // Recreate RTVs
     for (UINT i = 0; i < FrameCount; i++)
     {
-        DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate();
-
         ThrowIfFailed(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_frameResources[i]->m_renderTarget)));
 
         D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
         rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
         rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-        m_device->CreateRenderTargetView(m_frameResources[i]->m_renderTarget.Get(), &rtvDesc, alloc.GetDescriptorHandle());
-        m_frameResources[i]->m_rtvAllocation = std::move(alloc);
+        m_device->CreateRenderTargetView(m_frameResources[i]->m_renderTarget.Get(), &rtvDesc, m_frameResources[i]->m_rtvAllocation.GetDescriptorHandle());
 
         // Assume that ResizeBuffers do not preserve previous layout.
         // For now, just use D3D12_BARRIER_LAYOUT_COMMON.
@@ -318,7 +315,6 @@ void Renderer::OnResize(UINT width, UINT height)
     }
 
     // Recreate DSV
-    m_dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
     CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation.GetDescriptorHandle());
 }
 
@@ -492,11 +488,11 @@ void Renderer::LoadPipeline()
     ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_NO_ALT_ENTER));
 
     // Create frame resources : RTV and command allocator for each frame
+    auto alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(FrameCount);
+    auto rtvAllocations = alloc.Split();
     for (UINT i = 0; i < FrameCount; i++)
     {
-        DescriptorAllocation alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate();
-
-        auto frameResource = std::make_unique<FrameResource>(m_device.Get(), m_swapChain.Get(), i, std::move(alloc));
+        auto frameResource = std::make_unique<FrameResource>(m_device.Get(), m_swapChain.Get(), i, std::move(rtvAllocations[i]));
 
         // Register backbuffer to tracker
         // Initial layout of backbuffer is D3D12_BARRIER_LAYOUT_COMMON : https://microsoft.github.io/DirectX-Specs/d3d/D3D12EnhancedBarriers.html#initial-resource-state
@@ -627,10 +623,13 @@ void Renderer::LoadAssets()
     m_lights[0].m_lightConstantData.lightColor = { 1.0f, 1.0f, 1.0f };
     m_lights[0].m_lightConstantData.lightIntensity = 1.0f;
 
+    // Allocate textures
+    auto alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3);
+    auto textureAllocations = alloc.Split();
     m_albedo = std::make_unique<Texture>(
         m_device.Get(),
         commandList,
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+        std::move(textureAllocations[0]),
         *m_uploadBuffer,
         *m_layoutTracker,
         L"Assets/Textures/PavingStones150_4K-PNG_Color.png",
@@ -642,7 +641,7 @@ void Renderer::LoadAssets()
     m_normalMap = std::make_unique<Texture>(
         m_device.Get(),
         commandList,
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+        std::move(textureAllocations[1]),
         *m_uploadBuffer,
         *m_layoutTracker,
         L"Assets/Textures/PavingStones150_4K-PNG_NormalDX.png",
@@ -654,7 +653,7 @@ void Renderer::LoadAssets()
     m_heightMap = std::make_unique<Texture>(
         m_device.Get(),
         commandList,
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+        std::move(textureAllocations[2]),
         *m_uploadBuffer,
         *m_layoutTracker,
         L"Assets/Textures/PavingStones150_4K-PNG_Displacement.png",
