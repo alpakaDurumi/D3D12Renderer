@@ -59,11 +59,11 @@ ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space1);
 // Parallax Occlusion Mapping
 float2 ParallaxMapping(float2 texCoord, float3 toCamera)
 {
-    const float heightScale = 0.02f;
+    static const float heightScale = 0.02f;
     
     // Set numLayers based on view direction
-    const float minLayers = 8.0f;
-    const float maxLayers = 32.0f;
+    static const float minLayers = 8.0f;
+    static const float maxLayers = 32.0f;
     const float numLayers = lerp(maxLayers, minLayers, abs(dot(float3(0.0f, 0.0f, 1.0f), toCamera)));
     
     float layerStep = 1.0f / numLayers;
@@ -177,9 +177,31 @@ float4 main(PSInput input) : SV_TARGET
         
         float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[csmIdx]);
         lightScreen.xyz /= lightScreen.w;
-        
         float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
-        float shadowFactor = g_shadowMaps[i].SampleCmpLevelZero(g_samplerComparison, float3(lightTexCoord, float(csmIdx)), lightScreen.z);
+        
+        // PCF
+        float shadowFactor = 0.0f;
+        
+        static const int2 offset[9] =
+        {
+            int2(-1, -1),
+            int2(0, -1),
+            int2(1, -1),
+            int2(-1, 0),
+            int2(0, 0),
+            int2(1, 0),
+            int2(-1, 1),
+            int2(0, 1),
+            int2(1, 1)
+        };
+        
+        [unroll]
+        for (uint j = 0; j < 9; ++j)
+        {
+            shadowFactor += g_shadowMaps[i].SampleCmpLevelZero(g_samplerComparison, float3(lightTexCoord, float(csmIdx)), lightScreen.z, offset[j]);
+        }
+        
+        shadowFactor /= 9.0f;
         
         // Shading in world space
         float3 toLightWorld = normalize(light.lightPos - input.posWorld);
