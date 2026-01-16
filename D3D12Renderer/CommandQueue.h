@@ -40,6 +40,7 @@ public:
     UINT64 ExecuteCommandLists(const ComPtr<ID3D12CommandAllocator>& commandAllocator, const CommandList& commandList, ResourceLayoutTracker& layoutTracker);
 
     UINT64 Signal();
+    UINT64 GetCompletedFenceValue() const;
     bool IsFenceComplete(UINT64 fenceValue) const;
     void WaitForFenceValue(UINT64 fenceValue);
     void Flush();

@@ -61,6 +61,12 @@ public:
         return m_allocation->GetDescriptorHandle();
     }
 
+    DescriptorAllocation& GetAllocationRef()
+    {
+        assert(m_allocation.has_value());
+        return m_allocation.value();
+    }
+
     void Update(const T* pConstantData)
     {
         memcpy(m_pBufferBegin, pConstantData, sizeof(T));

@@ -29,7 +29,7 @@ public:
         : m_shadowMapDsvAllocation(std::move(dsvAllocation)),
         m_shadowMapSrvAllocation(std::move(srvAllocation))
     {
-        assert(!m_shadowMapDsvAllocation.IsNull() && !m_shadowMapSrvAllocation.IsNull());
+        assert(!m_shadowMapDsvAllocation.IsNull() && !m_shadowMapSrvAllocation.IsNull() && cbvAllocation.GetNumHandles() == frameResources.size());
 
         CreateShadowMap(pDevice, shadowMapResolution, shadowMapResolution, m_shadowMap, m_shadowMapDsvAllocation, m_shadowMapSrvAllocation.GetDescriptorHandle());
         layoutTracker.RegisterResource(m_shadowMap.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, MAX_CASCADES, 1, DXGI_FORMAT_R32_TYPELESS);

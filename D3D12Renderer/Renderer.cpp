@@ -446,6 +446,7 @@ void Renderer::LoadPipeline()
     {
         D3D12_DESCRIPTOR_HEAP_TYPE type = static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(i);
         m_descriptorAllocators[i] = std::make_unique<DescriptorAllocator>(m_device, type);
+        m_descriptorAllocators[i]->SetCommandQueue(m_commandQueue.get());       // Dependency injection
     }
 
     // Dependency injections
@@ -778,14 +779,14 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             cmdList->SetGraphicsRootConstantBufferView(3, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
 
             for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[i]->GetDescriptorHandle());
+                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[m_lights[i].m_lightConstantBufferIndex]->GetAllocationRef());
 
-            m_dynamicDescriptorHeap->StageDescriptors(5, 0, 1, m_albedo->GetDescriptorHandle());
-            m_dynamicDescriptorHeap->StageDescriptors(5, 1, 1, m_normalMap->GetDescriptorHandle());
-            m_dynamicDescriptorHeap->StageDescriptors(5, 2, 1, m_heightMap->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(5, 0, 1, m_albedo->GetAllocationRef());
+            m_dynamicDescriptorHeap->StageDescriptors(5, 1, 1, m_normalMap->GetAllocationRef());
+            m_dynamicDescriptorHeap->StageDescriptors(5, 2, 1, m_heightMap->GetAllocationRef());
 
             for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(6, i, 1, m_lights[i].m_shadowMapSrvAllocation.GetDescriptorHandle());
+                m_dynamicDescriptorHeap->StageDescriptors(6, i, 1, m_lights[i].m_shadowMapSrvAllocation);
 
             m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
@@ -803,14 +804,14 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             cmdList->SetGraphicsRootConstantBufferView(3, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
 
             for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[i]->GetDescriptorHandle());
+                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[m_lights[i].m_lightConstantBufferIndex]->GetAllocationRef());
 
-            m_dynamicDescriptorHeap->StageDescriptors(5, 0, 1, m_albedo->GetDescriptorHandle());
-            m_dynamicDescriptorHeap->StageDescriptors(5, 1, 1, m_normalMap->GetDescriptorHandle());
-            m_dynamicDescriptorHeap->StageDescriptors(5, 2, 1, m_heightMap->GetDescriptorHandle());
+            m_dynamicDescriptorHeap->StageDescriptors(5, 0, 1, m_albedo->GetAllocationRef());
+            m_dynamicDescriptorHeap->StageDescriptors(5, 1, 1, m_normalMap->GetAllocationRef());
+            m_dynamicDescriptorHeap->StageDescriptors(5, 2, 1, m_heightMap->GetAllocationRef());
 
             for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(6, i, 1, m_lights[i].m_shadowMapSrvAllocation.GetDescriptorHandle());
+                m_dynamicDescriptorHeap->StageDescriptors(6, i, 1, m_lights[i].m_shadowMapSrvAllocation);
 
             m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 

@@ -35,9 +35,11 @@ public:
     // Get a descriptor at a particular offset in the allocation
     D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandle(UINT32 offsetInBlock = 0) const;
 
-    UINT32 GetOffset() const { return m_offsetInHeap; }
-    UINT32 GetNumHandles() const { return m_numHandles; }
-    UINT64 GetFenceValue() const { return m_fenceValue; }
+    UINT32 GetOffset() const { assert(!IsNull()); return m_offsetInHeap; }
+    UINT32 GetNumHandles() const { assert(!IsNull()); return m_numHandles; }
+    UINT64 GetFenceValue() const { assert(!IsNull()); return m_fenceValue; }
+
+    void SetFenceValue(UINT64 fenceValue) { m_fenceValue = fenceValue; }
 
     // Split current DescriptorAllocation into 'm_numHandles' Allocations.
     std::vector<DescriptorAllocation> Split();

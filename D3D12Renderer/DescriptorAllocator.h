@@ -13,6 +13,8 @@
 #include "DescriptorAllocatorPage.h"
 #include "DescriptorAllocation.h"
 
+class CommandQueue;
+
 using Microsoft::WRL::ComPtr;
 
 // DescriptorAllocator class is used to allocate descriptors to the application when loading new resources
@@ -28,11 +30,14 @@ public:
     DescriptorAllocator(const ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap = 256);
 
     DescriptorAllocation Allocate(UINT32 numDescriptors = 1);
-    void ReleaseStaleDescriptors(UINT64 completedFenceValue);
+
+    void SetCommandQueue(const CommandQueue* pCommandQueue) { m_pCommandQueue = pCommandQueue; }
 
 private:
-    // Create a new heap with a specific number of descriptors
+    // These functions not use mutex since they assume that mutex already locked on caller's side.
+    // If this function called outside of DescriptorAllocator::Allocate, explicit mutex should be locked.
     DescriptorAllocatorPage* CreateAllocatorPage();
+    void ReleaseStaleDescriptors(UINT64 completedFenceValue);
 
     D3D12_DESCRIPTOR_HEAP_TYPE m_heapType;
     UINT32 m_numDescriptorsPerHeap;
@@ -43,4 +48,5 @@ private:
     std::mutex m_allocationMutex;
 
     ComPtr<ID3D12Device10> m_device;
+    const CommandQueue* m_pCommandQueue;
 };

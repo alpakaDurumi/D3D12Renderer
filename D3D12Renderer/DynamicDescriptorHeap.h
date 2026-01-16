@@ -8,6 +8,9 @@
 #include <memory>
 #include <queue>
 #include <functional>
+#include <unordered_set>
+
+#include "DescriptorAllocation.h"
 
 class RootSignature;
 class CommandQueue;
@@ -30,7 +33,7 @@ public:
 
     void SetCommandQueue(const CommandQueue* pCommandQueue) { m_pCommandQueue = pCommandQueue; }
 
-    void StageDescriptors(UINT32 rootParameterIndex, UINT32 offset, UINT32 numDescriptors, const D3D12_CPU_DESCRIPTOR_HANDLE srcDescriptors);
+    void StageDescriptors(UINT32 rootParameterIndex, UINT32 offsetInParameter, UINT32 numDescriptors, DescriptorAllocation& allocation, UINT32 offsetInAllocation = 0);
 
     // Copy all of the staged descriptors to the GPU visible descriptor heap and
     // bind the descriptor heap and the descriptor tables to the command list
@@ -103,6 +106,8 @@ private:
     D3D12_GPU_DESCRIPTOR_HANDLE m_currentGPUDescriptorHandle;
     D3D12_CPU_DESCRIPTOR_HANDLE m_currentCPUDescriptorHandle;
     UINT32 m_numFreeHandles;    // Number of free handles in current descriptor heap
+
+    std::unordered_set<DescriptorAllocation*> m_usedAllocations;
 
     ComPtr<ID3D12Device10> m_device;
     const CommandQueue* m_pCommandQueue;     // For IsFenceComplete

@@ -163,6 +163,11 @@ UINT64 CommandQueue::Signal()
     return m_fenceValue;
 }
 
+UINT64 CommandQueue::GetCompletedFenceValue() const
+{
+    return m_fence->GetCompletedValue();
+}
+
 bool CommandQueue::IsFenceComplete(UINT64 fenceValue) const
 {
     return m_fence->GetCompletedValue() >= fenceValue;

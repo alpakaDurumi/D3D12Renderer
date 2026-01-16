@@ -12,7 +12,6 @@
 #include "CommandList.h"
 #include "UploadBuffer.h"
 #include "ResourceLayoutTracker.h"
-#include "DescriptorAllocator.h"
 #include "DescriptorAllocation.h"
 #include "Utility.h"
 
@@ -210,6 +209,11 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandle()
     {
         return m_allocation.GetDescriptorHandle();
+    }
+
+    DescriptorAllocation& GetAllocationRef()
+    {
+        return m_allocation;
     }
 
 private:

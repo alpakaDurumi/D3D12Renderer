@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "DescriptorAllocator.h"
 
+#include "CommandQueue.h"
+
 DescriptorAllocator::DescriptorAllocator(const ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap)
     : m_device(device), m_heapType(type), m_numDescriptorsPerHeap(numDescriptorsPerHeap)
 {
@@ -10,6 +12,9 @@ DescriptorAllocator::DescriptorAllocator(const ComPtr<ID3D12Device10>& device, D
 DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
 {
     std::lock_guard<std::mutex> lock(m_allocationMutex);
+
+    // Release allocations that have finished execution before allocation.
+    ReleaseStaleDescriptors(m_pCommandQueue->GetCompletedFenceValue());
 
     std::optional<DescriptorAllocation> allocation;
 
@@ -54,8 +59,7 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
     return std::move(allocation.value());
 }
 
-// This function not use mutex since it assumes that mutex already locked on caller's side
-// If this function called outside of DescriptorAllocator::Allocate, explicit mutex should be locked
+// Create a new heap with a specific number of descriptors
 DescriptorAllocatorPage* DescriptorAllocator::CreateAllocatorPage()
 {
     m_heapPool.emplace_back(std::make_unique<DescriptorAllocatorPage>(m_device.Get(), m_heapType, m_numDescriptorsPerHeap));
@@ -65,8 +69,6 @@ DescriptorAllocatorPage* DescriptorAllocator::CreateAllocatorPage()
 
 void DescriptorAllocator::ReleaseStaleDescriptors(UINT64 completedFenceValue)
 {
-    std::lock_guard<std::mutex> lock(m_allocationMutex);
-
     for (SIZE_T i = 0; i < m_heapPool.size(); ++i)
     {
         auto& page = m_heapPool[i];
