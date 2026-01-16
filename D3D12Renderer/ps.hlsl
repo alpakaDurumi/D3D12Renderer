@@ -182,26 +182,29 @@ float4 main(PSInput input) : SV_TARGET
         // PCF
         float shadowFactor = 0.0f;
         
-        static const int2 offset[9] =
+        static const float2 poissonDisk[16] =
         {
-            int2(-1, -1),
-            int2(0, -1),
-            int2(1, -1),
-            int2(-1, 0),
-            int2(0, 0),
-            int2(1, 0),
-            int2(-1, 1),
-            int2(0, 1),
-            int2(1, 1)
+            float2(-0.94201624, -0.39906216), float2(0.94558609, -0.76890725),
+            float2(-0.094184101, -0.92938870), float2(0.34495938, 0.29387760),
+            float2(-0.91588581, 0.45771432), float2(-0.81544232, -0.87912464),
+            float2(-0.38277543, 0.27676845), float2(0.97484398, 0.75648379),
+            float2(0.44323325, -0.97511554), float2(0.53742981, -0.47373420),
+            float2(-0.26496911, -0.41893023), float2(0.79197514, 0.19090188),
+            float2(-0.24188840, 0.99706507), float2(-0.81409955, 0.91437590),
+            float2(0.19984126, 0.78641367), float2(0.14383161, -0.14100790)
         };
         
+        uint width, height, elements;
+        g_shadowMaps[i].GetDimensions(width, height, elements);
+        float dx = 1.0f / width;
+        
         [unroll]
-        for (uint j = 0; j < 9; ++j)
+        for (uint j = 0; j < 16; ++j)
         {
-            shadowFactor += g_shadowMaps[i].SampleCmpLevelZero(g_samplerComparison, float3(lightTexCoord, float(csmIdx)), lightScreen.z, offset[j]);
+            shadowFactor += g_shadowMaps[i].SampleCmpLevelZero(g_samplerComparison, float3(lightTexCoord + poissonDisk[j] * dx, float(csmIdx)), lightScreen.z);
         }
         
-        shadowFactor /= 9.0f;
+        shadowFactor /= 16.0f;
         
         // Shading in world space
         float3 toLightWorld = normalize(light.lightPos - input.posWorld);
