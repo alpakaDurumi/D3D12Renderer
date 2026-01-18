@@ -120,22 +120,30 @@ uint CalcCSMIndex(float distView)
     return index;
 }
 
-float PCF(uint lightIdx, uint csmIdx, float filterSize, float2 texCoord, float compareValue)
+float PCF(uint lightIdx, uint csmIdx, float filterSize, float2 texCoord, float compareValue, float2x2 rot)
 {
     float shadowFactor = 0.0f;
         
-    static const float2 poissonDisk[16] =
-    {
-        float2(-0.94201624, -0.39906216), float2(0.94558609, -0.76890725),
-        float2(-0.094184101, -0.92938870), float2(0.34495938, 0.29387760),
-        float2(-0.91588581, 0.45771432), float2(-0.81544232, -0.87912464),
-        float2(-0.38277543, 0.27676845), float2(0.97484398, 0.75648379),
-        float2(0.44323325, -0.97511554), float2(0.53742981, -0.47373420),
-        float2(-0.26496911, -0.41893023), float2(0.79197514, 0.19090188),
-        float2(-0.24188840, 0.99706507), float2(-0.81409955, 0.91437590),
-        float2(0.19984126, 0.78641367), float2(0.14383161, -0.14100790)
-    };
+    //static const float2 poissonDisk[16] =
+    //{
+    //    float2(-0.94201624, -0.39906216), float2(0.94558609, -0.76890725),
+    //    float2(-0.094184101, -0.92938870), float2(0.34495938, 0.29387760),
+    //    float2(-0.91588581, 0.45771432), float2(-0.81544232, -0.87912464),
+    //    float2(-0.38277543, 0.27676845), float2(0.97484398, 0.75648379),
+    //    float2(0.44323325, -0.97511554), float2(0.53742981, -0.47373420),
+    //    float2(-0.26496911, -0.41893023), float2(0.79197514, 0.19090188),
+    //    float2(-0.24188840, 0.99706507), float2(-0.81409955, 0.91437590),
+    //    float2(0.19984126, 0.78641367), float2(0.14383161, -0.14100790)
+    //};
         
+    static const float2 vogelDisk[16] =
+    {
+        float2(-0.1328, 0.1651), float2(0.3341, 0.0735), float2(-0.4042, -0.3150), float2(0.5055, -0.4124),
+        float2(-0.1985, 0.5855), float2(0.1245, -0.7340), float2(-0.6401, 0.4578), float2(0.8123, 0.1901),
+        float2(-0.6254, -0.6654), float2(0.1254, 0.9412), float2(0.4512, -0.8521), float2(-0.9254, 0.1254),
+        float2(0.8521, 0.4512), float2(-0.4512, -0.9254), float2(0.1254, -0.1254), float2(0.9412, -0.1254)
+    };
+    
     uint width, height, elements;
     g_shadowMaps[lightIdx].GetDimensions(width, height, elements);
     float dx = filterSize / width;
@@ -143,12 +151,19 @@ float PCF(uint lightIdx, uint csmIdx, float filterSize, float2 texCoord, float c
     [unroll]
     for (uint j = 0; j < 16; ++j)
     {
-        shadowFactor += g_shadowMaps[lightIdx].SampleCmpLevelZero(g_samplerComparison, float3(texCoord + poissonDisk[j] * dx, float(csmIdx)), compareValue);
+        float2 rotated = mul(vogelDisk[j], rot);
+        shadowFactor += g_shadowMaps[lightIdx].SampleCmpLevelZero(g_samplerComparison, float3(texCoord + rotated * dx, float(csmIdx)), compareValue);
     }
-        
+    
     shadowFactor /= 16.0f;
     
     return shadowFactor;
+}
+
+// https://blog.demofox.org/2022/01/01/interleaved-gradient-noise-a-different-kind-of-low-discrepancy-sequence/
+float InterleavedGradientNoise(float2 pixPos)
+{
+    return frac(52.9829189f * frac(dot(pixPos, float2(0.06711056f, 0.00583715f))));
 }
 
 float4 main(PSInput input) : SV_TARGET
@@ -165,11 +180,11 @@ float4 main(PSInput input) : SV_TARGET
     
     float2 texCoord = ParallaxMapping(input.texCoord, toCameraTangent);
 
-    // Clip if texCoord exceeds boundary
-    if (texCoord.x < 0.0 || texCoord.x > 1.0 * textureTileScale || texCoord.y < 0.0 || texCoord.y > 1.0 * textureTileScale)
-    {
-        clip(-1);
-    }
+    //// Clip if texCoord exceeds boundary
+    //if (texCoord.x < 0.0 || texCoord.x > 1.0 * textureTileScale || texCoord.y < 0.0 || texCoord.y > 1.0 * textureTileScale)
+    //{
+    //    clip(-1);
+    //}
     
     // Set up TBN matrix
     float3 B = input.tangentW * cross(input.normalWorld, input.tangentWorld);
@@ -210,7 +225,12 @@ float4 main(PSInput input) : SV_TARGET
         lightScreen.xyz /= lightScreen.w;
         float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
         
-        float shadowFactor = PCF(i, csmIdx, 5.0f, lightTexCoord, lightScreen.z);
+        // Pass random rotation to PCF based on IGN
+        float noise = InterleavedGradientNoise(input.pos.xy);
+        float angle = noise * 2.0f * 3.141592f;
+        float2x2 rot = float2x2(cos(angle), -sin(angle), sin(angle), cos(angle));
+        
+        float shadowFactor = PCF(i, csmIdx, 5.0f, lightTexCoord, lightScreen.z, rot);
         
         // Shading in world space
         float3 toLightWorld = normalize(light.lightPos - input.posWorld);
