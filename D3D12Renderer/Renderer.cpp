@@ -607,6 +607,7 @@ void Renderer::LoadAssets()
 
     // Add meshes
     m_meshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube());
+    m_meshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateSphere());
     m_instancedMeshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube(), GeometryGenerator::GenerateSampleInstanceData());
 
     // Set up lights
@@ -923,7 +924,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
 
         if (psoKey.passType == DEPTH_ONLY)
         {
-            rasterizerDesc.DepthBias = 100;
+            rasterizerDesc.DepthBias = 5000;
             rasterizerDesc.DepthBiasClamp = 0.1f;
             rasterizerDesc.SlopeScaledDepthBias = 1.5f;
         }
@@ -1086,12 +1087,20 @@ void Renderer::HandleInput()
 void Renderer::PrepareConstantData()
 {
     // Mesh
-    for (auto& mesh : m_meshes)
-    {
+    //for (auto& mesh : m_meshes)
+    //{
+    //    XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -5.0f, 0.0f);
+    //    mesh.m_meshConstantData.SetTransform(world);
+    //    mesh.m_meshConstantData.textureTileScale = 50.0f;
+    //}
+
         XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -5.0f, 0.0f);
-        mesh.m_meshConstantData.SetTransform(world);
-        mesh.m_meshConstantData.textureTileScale = 50.0f;
-    }
+    m_meshes[0].m_meshConstantData.SetTransform(world);
+    m_meshes[0].m_meshConstantData.textureTileScale = 50.0f;
+
+    XMMATRIX w = XMMatrixTranslation(0.0f, -3.5f, 0.0f);
+    m_meshes[1].m_meshConstantData.SetTransform(w);
+
     for (auto& mesh : m_instancedMeshes)
     {
         XMMATRIX prevWorld = XMMatrixTranspose(XMLoadFloat4x4(&mesh.m_meshConstantData.world));
