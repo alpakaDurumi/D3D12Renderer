@@ -703,7 +703,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 D3D12_CPU_DESCRIPTOR_HANDLE shadowMapDsvHandle = light.m_shadowMapDsvAllocation.GetDescriptorHandle(i);
                 cmdList->OMSetRenderTargets(0, nullptr, FALSE, &shadowMapDsvHandle);
 
-                cmdList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+                cmdList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
                 m_currentPSOKey.passType = DEPTH_ONLY;
                 m_currentPSOKey.vsKey = { L"vs.hlsl", {"DEPTH_ONLY"}, "vs_5_0" };
@@ -765,7 +765,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         XMVECTORF32 clearColor;
         clearColor.v = XMColorSRGBToRGB(XMVectorSet(0.5f, 0.5f, 0.5f, 1.0f));
         cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-        cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+        cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
         m_currentPSOKey.passType = DEFAULT;
         m_currentPSOKey.vsKey = { L"vs.hlsl", {}, "vs_5_0" };
@@ -902,7 +902,7 @@ RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
         rootSignature[6].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
         rootSignature.InitStaticSampler(0, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL, rsKey.filtering, rsKey.addressingMode);
-        rootSignature.InitStaticSampler(1, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_LESS_EQUAL);
+        rootSignature.InitStaticSampler(1, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_GREATER_EQUAL);
 
         rootSignature.Finalize(m_device.Get());
     }
@@ -924,9 +924,9 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
 
         if (psoKey.passType == DEPTH_ONLY)
         {
-            rasterizerDesc.DepthBias = 5000;
-            rasterizerDesc.DepthBiasClamp = 0.1f;
-            rasterizerDesc.SlopeScaledDepthBias = 1.5f;
+            rasterizerDesc.DepthBias = -5000;
+            rasterizerDesc.DepthBiasClamp = -0.1f;
+            rasterizerDesc.SlopeScaledDepthBias = -5.0f;
         }
         else
         {
@@ -960,7 +960,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
         depthStencilDesc.DepthEnable = TRUE;
         depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-        depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+        depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
         depthStencilDesc.StencilEnable = FALSE;
         depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
         depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
@@ -1131,13 +1131,15 @@ void Renderer::PrepareConstantData()
 void Renderer::PrepareCSM()
 {
     // Create bounding frustum of view frustum and transform to world space.
+    // BoundingFrustum::CreateFromMatrix and BoundingFrustum::GetCorners are implicitly assume that 0.0 is near plane and 1.0 is far plane.
+    // When using reverse-z, you need to handle this.
     BoundingFrustum boundingFrustum;
     BoundingFrustum::CreateFromMatrix(boundingFrustum, m_camera.GetProjectionMatrix());
     XMMATRIX inverseView = XMMatrixInverse(nullptr, m_camera.GetViewMatrix());
     boundingFrustum.Transform(boundingFrustum, inverseView);
 
     // Get 8 corners of view frustum.
-    //     Near    Far
+    //     Far     Near
     //    0----1  4----5
     //    |    |  |    |
     //    |    |  |    |
@@ -1173,8 +1175,10 @@ void Renderer::PrepareCSM()
         // Create corners.
         for (UINT j = 0; j < 4; ++j)
         {
-            XMVECTOR n = XMLoadFloat3(&frustumCorners[j]);
-            XMVECTOR f = XMLoadFloat3(&frustumCorners[j + 4]);
+            // 4, 5, 6, 7 are near plane.
+            // 0, 1, 2, 3 are far plane.
+            XMVECTOR n = XMLoadFloat3(&frustumCorners[j + 4]);
+            XMVECTOR f = XMLoadFloat3(&frustumCorners[j]);
 
             XMVECTOR s = XMVectorLerp(n, f, i == 0 ? 0.0f : splitRatio[i - 1]);
             XMVECTOR e = XMVectorLerp(n, f, splitRatio[i]);
@@ -1210,7 +1214,7 @@ void Renderer::PrepareCSM()
             // Near Plane : Set to (view origin - sceneRadius) in Light Space.
             //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
             // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
-            XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, -d - farPlane, radius);
+            XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, radius, -d - farPlane);
 
             // Apply texel-sized increments to eliminate shadow shimmering.
             XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);

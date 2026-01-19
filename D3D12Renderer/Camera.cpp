@@ -39,8 +39,8 @@ XMMATRIX Camera::GetViewMatrix() const
 XMMATRIX Camera::GetProjectionMatrix(bool usePerspectiveProjection) const
 {
     return usePerspectiveProjection ?
-        XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fov), m_aspectRatio, m_nearPlane, m_farPlane) :
-        XMMatrixOrthographicLH(2 * m_aspectRatio, 2.0f, m_nearPlane, m_farPlane);
+        XMMatrixPerspectiveFovLH(XMConvertToRadians(m_fov), m_aspectRatio, m_farPlane, m_nearPlane) :
+        XMMatrixOrthographicLH(2 * m_aspectRatio, 2.0f, m_farPlane, m_nearPlane);
 }
 
 void Camera::SetAspectRatio(float aspectRatio)
