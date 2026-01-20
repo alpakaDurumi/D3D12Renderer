@@ -105,19 +105,21 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera)
     return interpolatedTexCoord;
 }
 
-// Determine which index to use.
-uint CalcCSMIndex(float distView)
+// Determine which index to use and alpha for interpolation.
+void CalcCSMIndex(float distView, out uint index, out float alpha)
 {
-    uint index = 0;
-    for (; index < MAX_CASCADES; ++index)
+    static const float overlapScale = 0.1f;
+    float overlap;
+    for (index = 0; index < MAX_CASCADES - 1; ++index)
     {
-        if (distView < cascadeSplits[index])
+        overlap = (cascadeSplits[index + 1] - cascadeSplits[index]) * overlapScale;
+        if (distView < cascadeSplits[index] + overlap)
         {
             break;
         }
     }
     
-    return index;
+    alpha = smoothstep(cascadeSplits[index] - overlap, cascadeSplits[index] + overlap, distView);
 }
 
 float PCF(uint lightIdx, uint csmIdx, float filterSize, float2 texCoord, float compareValue, float2x2 rot)
@@ -192,45 +194,65 @@ float4 main(PSInput input) : SV_TARGET
     
     float3 total = float3(0.0f, 0.0f, 0.0f);
     
-    uint csmIdx = CalcCSMIndex(input.distView);
+    uint index;
+    float alpha;
+    CalcCSMIndex(input.distView, index, alpha);
     
     // Check CSM boundaries
-    //if (csmIdx == 0)
+    //if (index == 0)
     //{
-    //    return float4(1.0f, 0.0f, 0.0f, 1.0f);
+    //    return lerp(float4(1.0f, 0.0f, 0.0f, 1.0f), float4(0.0f, 1.0f, 0.0f, 1.0f), alpha);
     //}
-    //else if (csmIdx == 1)
+    //else if (index == 1)
     //{
-    //    return float4(0.0f, 1.0f, 0.0f, 1.0f);
+    //    return lerp(float4(0.0f, 1.0f, 0.0f, 1.0f), float4(0.0f, 0.0f, 1.0f, 1.0f), alpha);
     //}
-    //else if (csmIdx == 2)
+    //else if (index == 2)
     //{
-    //    return float4(0.0f, 0.0f, 1.0f, 1.0f);
+    //    return lerp(float4(0.0f, 0.0f, 1.0f, 1.0f), float4(1.0f, 0.0f, 1.0f, 1.0f), alpha);
     //}
-    //else if (csmIdx == 3)
+    //else if (index == 3)
     //{
-    //    return float4(1.0f, 1.0f, 1.0f, 1.0f);
+    //    return lerp(float4(1.0f, 0.0f, 1.0f, 1.0f), float4(0.0f, 0.0f, 0.0f, 1.0f), alpha);
     //}
     //else
     //{
     //    return float4(0.0f, 0.0f, 0.0f, 1.0f);
     //}
     
+    // Pass random rotation to PCF based on IGN
+    float noise = InterleavedGradientNoise(input.pos.xy);
+    float angle = noise * 2.0f * 3.141592f;
+    float2x2 rot = float2x2(cos(angle), -sin(angle), sin(angle), cos(angle));
+    
+    static const float filterSize = 5.0f;
+    
     [loop]
     for (uint i = 0; i < 1; ++i)
     {
         LightConstants light = LightConstantBuffers[i];
         
-        float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[csmIdx]);
+        float shadowFactor;
+        
+        // First cascade
+        {
+            float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[index]);
+            lightScreen.xyz /= lightScreen.w;
+            float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
+        
+            shadowFactor = PCF(i, index, filterSize, lightTexCoord, lightScreen.z, rot);
+        }
+        
+        // Second cascade. Only apply when overlapping can occur.
+        if (index < MAX_CASCADES - 1)
+        {
+            float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[index + 1]);
         lightScreen.xyz /= lightScreen.w;
         float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
         
-        // Pass random rotation to PCF based on IGN
-        float noise = InterleavedGradientNoise(input.pos.xy);
-        float angle = noise * 2.0f * 3.141592f;
-        float2x2 rot = float2x2(cos(angle), -sin(angle), sin(angle), cos(angle));
-        
-        float shadowFactor = PCF(i, csmIdx, 5.0f, lightTexCoord, lightScreen.z, rot);
+            float t = PCF(i, index + 1, filterSize, lightTexCoord, lightScreen.z, rot);
+            shadowFactor = lerp(shadowFactor, t, alpha);
+        }
         
         // Shading in world space
         float3 toLightWorld = normalize(light.lightPos - input.posWorld);
