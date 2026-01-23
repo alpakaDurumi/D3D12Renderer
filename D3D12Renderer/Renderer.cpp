@@ -611,7 +611,7 @@ void Renderer::LoadAssets()
     m_instancedMeshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube(), GeometryGenerator::GenerateSampleInstanceData());
 
     // Set up lights
-    m_lights.emplace_back(
+    auto light = std::make_unique<DirectionalLight>(
         m_device.Get(),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(MAX_CASCADES),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
@@ -619,10 +619,8 @@ void Renderer::LoadAssets()
         *m_layoutTracker,
         m_frameResources,
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
-    m_lights[0].m_lightConstantData.lightPos = { 0.0f, 100.0f, -50.0f };
-    m_lights[0].m_lightConstantData.lightDir = { -1.0f, -1.0f, 1.0f };
-    m_lights[0].m_lightConstantData.lightColor = { 1.0f, 1.0f, 1.0f };
-    m_lights[0].m_lightConstantData.lightIntensity = 1.0f;
+    light->SetDirection({-1.0f, -1.0f, 1.0f});
+    m_lights.push_back(std::move(light));
 
     // Allocate textures
     auto alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3);
@@ -690,7 +688,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         {
             // Barrier to change layout of shadowMap to depth write
             commandList.Barrier(
-                light.m_shadowMap.Get(),
+                light->GetShadowMap(),
                 D3D12_BARRIER_SYNC_NONE,
                 D3D12_BARRIER_SYNC_DEPTH_STENCIL,
                 D3D12_BARRIER_ACCESS_NO_ACCESS,
@@ -700,7 +698,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             // Render each cascade.
             for (UINT i = 0; i < MAX_CASCADES; ++i)
             {
-                D3D12_CPU_DESCRIPTOR_HANDLE shadowMapDsvHandle = light.m_shadowMapDsvAllocation.GetDescriptorHandle(i);
+                auto shadowMapDsvHandle = light->GetDSVDescriptorHandle(i);
                 cmdList->OMSetRenderTargets(0, nullptr, FALSE, &shadowMapDsvHandle);
 
                 cmdList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
@@ -712,7 +710,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 for (const auto& mesh : m_meshes)
                 {
                     cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-                    cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[light.m_cameraConstantBufferIndex[i]]->GetGPUVirtualAddress());
+                    cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferIndex(i)]->GetGPUVirtualAddress());
                     m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
                     mesh.Render(cmdList);
@@ -724,7 +722,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 for (const auto& mesh : m_instancedMeshes)
                 {
                     cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-                    cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[light.m_cameraConstantBufferIndex[i]]->GetGPUVirtualAddress());
+                    cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferIndex(i)]->GetGPUVirtualAddress());
                     m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
                     mesh.Render(cmdList);
@@ -733,7 +731,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
             // Barrier to change layout of shadowMap to SRV
             commandList.Barrier(
-                light.m_shadowMap.Get(),
+                light->GetShadowMap(),
                 D3D12_BARRIER_SYNC_DEPTH_STENCIL,
                 D3D12_BARRIER_SYNC_PIXEL_SHADING,
                 D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
@@ -779,14 +777,14 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             cmdList->SetGraphicsRootConstantBufferView(3, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
 
             for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[m_lights[i].m_lightConstantBufferIndex]->GetAllocationRef());
+                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[m_lights[i]->GetLightConstantBufferIndex()]->GetAllocationRef());
 
             m_dynamicDescriptorHeap->StageDescriptors(5, 0, 1, m_albedo->GetAllocationRef());
             m_dynamicDescriptorHeap->StageDescriptors(5, 1, 1, m_normalMap->GetAllocationRef());
             m_dynamicDescriptorHeap->StageDescriptors(5, 2, 1, m_heightMap->GetAllocationRef());
 
             for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(6, i, 1, m_lights[i].m_shadowMapSrvAllocation);
+                m_dynamicDescriptorHeap->StageDescriptors(6, i, 1, m_lights[i]->GetSRVAllocationRef());
 
             m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
@@ -804,14 +802,14 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             cmdList->SetGraphicsRootConstantBufferView(3, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
 
             for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[m_lights[i].m_lightConstantBufferIndex]->GetAllocationRef());
+                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[m_lights[i]->GetLightConstantBufferIndex()]->GetAllocationRef());
 
             m_dynamicDescriptorHeap->StageDescriptors(5, 0, 1, m_albedo->GetAllocationRef());
             m_dynamicDescriptorHeap->StageDescriptors(5, 1, 1, m_normalMap->GetAllocationRef());
             m_dynamicDescriptorHeap->StageDescriptors(5, 2, 1, m_heightMap->GetAllocationRef());
 
             for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(6, i, 1, m_lights[i].m_shadowMapSrvAllocation);
+                m_dynamicDescriptorHeap->StageDescriptors(6, i, 1, m_lights[i]->GetSRVAllocationRef());
 
             m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
@@ -1120,10 +1118,12 @@ void Renderer::PrepareConstantData()
     m_materialConstantData.shininess = 10.0f;
 
     // Light
-    XMVECTOR lightDir = XMLoadFloat3(&m_lights[0].m_lightConstantData.lightDir);
+    XMVECTOR lightDir = m_lights[0]->GetDirection();
     XMMATRIX rot = XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 0.001f);
     XMVECTOR rotated = XMVector3Transform(lightDir, rot);
-    m_lights[0].m_lightConstantData.SetLightDir(rotated);
+    XMFLOAT3 r;
+    XMStoreFloat3(&r, rotated);
+    m_lights[0]->SetDirection(r);
 
     PrepareCSM();
 }
@@ -1201,16 +1201,25 @@ void Renderer::PrepareCSM()
         // Calculate view/projection matrix fit to light frustum
         for (auto& light : m_lights)
         {
+            LightType type = light->GetType();
+
+            switch (type)
+            {
+            case LightType::DIRECTIONAL:
+            {
+                // Since light type is guaranteed by m_type variable,
+                // Use static_cast for downcasting instead of dynamic_cast.
+                auto pLight = static_cast<DirectionalLight*>(light.get());
+
             static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
-            XMVECTOR lightDir = XMLoadFloat3(&light.m_lightConstantData.lightDir);
-            lightDir = XMVector3Normalize(lightDir);
+                XMVECTOR dir = pLight->GetDirection();
 
             // Orthogonal projection of (center - view origin) onto lightDir.
             // This represents where the view origin is located relative to the center on the light's Z-axis.
-            float d = XMVectorGetX(XMVector3Dot(viewOriginToCenter, lightDir));
+                float d = XMVectorGetX(XMVector3Dot(viewOriginToCenter, dir));
 
-            XMMATRIX view = XMMatrixLookToLH(center, lightDir, up);
+                XMMATRIX view = XMMatrixLookToLH(center, dir, up);
             // Near Plane : Set to (view origin - sceneRadius) in Light Space.
             //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
             // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
@@ -1229,10 +1238,20 @@ void Renderer::PrepareCSM()
             diff = XMVectorScale(diff, 2.0f / m_shadowMapResolution);                           // Since diff is texel scale, it should be transformed to NDC scale.
             XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
 
-            light.m_cameraConstantData[i].SetView(view);
-            light.m_cameraConstantData[i].SetProjection(projection * fix);
+                light->SetViewProjection(view, projection * fix, i);
+                break;
+            }
+            case LightType::POINT:
+            {
 
-            light.m_lightConstantData.SetViewProjection(view * projection * fix, i);
+                break;
+            }
+            case LightType::SPOT:
+            {
+
+                break;
+            }
+            }
         }
     }
 }
@@ -1251,9 +1270,9 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
     {
         for (UINT i = 0; i < MAX_CASCADES; ++i)
         {
-            light.UpdateCameraConstantBuffer(frameResource, i);
+            light->UpdateCameraConstantBuffer(frameResource, i);
         }
-        light.UpdateLightConstantBuffer(frameResource);
+        light->UpdateLightConstantBuffer(frameResource);
     }
 
     UpdateShadowConstantBuffer(frameResource);

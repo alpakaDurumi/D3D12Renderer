@@ -124,7 +124,7 @@ private:
     std::unique_ptr<Texture> m_heightMap;
 
     // Lights, Shadows
-    std::vector<Light> m_lights;
+    std::vector<std::unique_ptr<Light>> m_lights;
     D3D12_VIEWPORT m_shadowMapViewport;
     D3D12_RECT m_shadowMapScissorRect;
     UINT m_shadowMapResolution = 2048;

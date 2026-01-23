@@ -247,15 +247,16 @@ float4 main(PSInput input) : SV_TARGET
         if (index < MAX_CASCADES - 1)
         {
             float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[index + 1]);
-        lightScreen.xyz /= lightScreen.w;
-        float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
+            lightScreen.xyz /= lightScreen.w;
+            float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
         
             float t = PCF(i, index + 1, filterSize, lightTexCoord, lightScreen.z, rot);
             shadowFactor = lerp(shadowFactor, t, alpha);
         }
         
         // Shading in world space
-        float3 toLightWorld = normalize(light.lightPos - input.posWorld);
+        //float3 toLightWorld = normalize(light.lightPos - input.posWorld);
+        float3 toLightWorld = normalize(-light.lightDir); // For directional light, exceptionally.
         float3 halfWay = normalize(toLightWorld + toCameraWorld);
     
         float3 texColor = g_albedo.Sample(g_sampler, texCoord).rgb;

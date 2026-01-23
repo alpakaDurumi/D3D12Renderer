@@ -47,6 +47,11 @@ struct CameraConstantData : public ConstantData<CameraConstantData>
     XMFLOAT4X4 projection;
     float padding1[28];
 
+    void SetPos(XMVECTOR pos)
+    {
+        XMStoreFloat3(&this->cameraPos, pos);
+    }
+
     void SetView(XMMATRIX view)
     {
         XMStoreFloat4x4(&this->view, XMMatrixTranspose(view));
@@ -61,13 +66,19 @@ struct CameraConstantData : public ConstantData<CameraConstantData>
 struct LightConstantData : public ConstantData<LightConstantData>
 {
     XMFLOAT3 lightPos;
-    float padding0;
+    float range;
     XMFLOAT3 lightDir;
-    float padding1;
-    XMFLOAT3 lightColor;
-    float lightIntensity;
+    float angle;
+    XMFLOAT3 lightColor = XMFLOAT3(1.0f, 1.0f, 1.0f);
+    float lightIntensity = 1.0f;
     XMFLOAT4X4 viewProjection[MAX_CASCADES];
-    float padding2[52];
+    UINT32 type;
+    float padding[51];
+
+    void SetPos(XMVECTOR pos)
+    {
+        XMStoreFloat3(&this->lightPos, pos);
+    }
 
     void SetLightDir(XMVECTOR lightDir)
     {
