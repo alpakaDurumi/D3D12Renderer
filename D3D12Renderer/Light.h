@@ -22,25 +22,34 @@ enum class LightType
     NUM_LIGHT_TYPES
 };
 
+static const UINT16 POINT_LIGHT_ARRAY_SIZE = 6;
+static const UINT16 SPOT_LIGHT_ARRAY_SIZE = 1;
+
 class Light
 {
-public:
-    // TODO : Implement constructor and add fields (pos, dir, etc...) and getter functions
-    Light(
+protected:
+    Light(DescriptorAllocation&& dsvAllocation, DescriptorAllocation&& srvAllocation, UINT arraySize, LightType type)
+        : m_shadowMapDsvAllocation(std::move(dsvAllocation)),
+        m_shadowMapSrvAllocation(std::move(srvAllocation)),
+        m_cameraConstantData(arraySize),
+        m_cameraConstantBufferIndex(arraySize),
+        m_type(type)
+    {
+        assert(!m_shadowMapDsvAllocation.IsNull() && !m_shadowMapSrvAllocation.IsNull());
+    }
+
+    void Init(
         ID3D12Device10* pDevice,
-        DescriptorAllocation&& dsvAllocation,
-        DescriptorAllocation&& srvAllocation,
         UINT shadowMapResolution,
         ResourceLayoutTracker& layoutTracker,
         const std::vector<std::unique_ptr<FrameResource>>& frameResources,
-        DescriptorAllocation&& cbvAllocation)
-        : m_shadowMapDsvAllocation(std::move(dsvAllocation)),
-        m_shadowMapSrvAllocation(std::move(srvAllocation))
+        DescriptorAllocation&& cbvAllocation,
+        UINT16 arraySize)
     {
-        assert(!m_shadowMapDsvAllocation.IsNull() && !m_shadowMapSrvAllocation.IsNull() && cbvAllocation.GetNumHandles() == frameResources.size());
+        assert(cbvAllocation.GetNumHandles() == frameResources.size());
 
-        CreateShadowMap(pDevice, shadowMapResolution, shadowMapResolution, m_shadowMap, m_shadowMapDsvAllocation, m_shadowMapSrvAllocation.GetDescriptorHandle());
-        layoutTracker.RegisterResource(m_shadowMap.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, MAX_CASCADES, 1, DXGI_FORMAT_R32_TYPELESS);
+        CreateShadowMap(pDevice, shadowMapResolution, shadowMapResolution, m_shadowMap, m_shadowMapDsvAllocation, m_shadowMapSrvAllocation.GetDescriptorHandle(), arraySize);
+        layoutTracker.RegisterResource(m_shadowMap.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, arraySize, 1, DXGI_FORMAT_R32_TYPELESS);
 
         auto cbvAllocations = cbvAllocation.Split();
 
@@ -52,7 +61,7 @@ public:
             if (i == 0) m_lightConstantBufferIndex = UINT(frameResource.m_lightConstantBuffers.size());
             frameResource.m_lightConstantBuffers.push_back(std::make_unique<LightCB>(pDevice, std::move(cbvAllocations[i])));
 
-            for (UINT j = 0; j < MAX_CASCADES; ++j)
+            for (UINT j = 0; j < arraySize; ++j)
             {
                 if (i == 0) m_cameraConstantBufferIndex[j] = UINT(frameResource.m_cameraConstantBuffers.size());
                 frameResource.m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(pDevice));
@@ -60,6 +69,7 @@ public:
         }
     }
 
+public:
     LightType GetType() const
     {
         return m_type;
@@ -135,8 +145,8 @@ public:
     }
 
 protected:
-    CameraConstantData m_cameraConstantData[MAX_CASCADES];
-    UINT m_cameraConstantBufferIndex[MAX_CASCADES];
+    std::vector<CameraConstantData> m_cameraConstantData;
+    std::vector<UINT> m_cameraConstantBufferIndex;
 
     LightConstantData m_lightConstantData;
     UINT m_lightConstantBufferIndex;
@@ -159,16 +169,9 @@ public:
         ResourceLayoutTracker& layoutTracker,
         const std::vector<std::unique_ptr<FrameResource>>& frameResources,
         DescriptorAllocation&& cbvAllocation)
-        : Light(
-            pDevice,
-            std::move(dsvAllocation),
-            std::move(srvAllocation),
-            shadowMapResolution,
-            layoutTracker,
-            frameResources,
-            std::move(cbvAllocation))
+        : Light(std::move(dsvAllocation), std::move(srvAllocation), MAX_CASCADES, LightType::DIRECTIONAL)
     {
-        m_type = LightType::DIRECTIONAL;
+        Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation), MAX_CASCADES);
     }
 
     void SetPosition(XMFLOAT3 pos) override
@@ -193,21 +196,15 @@ public:
         ResourceLayoutTracker& layoutTracker,
         const std::vector<std::unique_ptr<FrameResource>>& frameResources,
         DescriptorAllocation&& cbvAllocation)
-        : Light(
-            pDevice,
-            std::move(dsvAllocation),
-            std::move(srvAllocation),
-            shadowMapResolution,
-            layoutTracker,
-            frameResources,
-            std::move(cbvAllocation))
+        : Light(std::move(dsvAllocation), std::move(srvAllocation), POINT_LIGHT_ARRAY_SIZE, LightType::POINT)
     {
-        m_type = LightType::POINT;
+        Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation), POINT_LIGHT_ARRAY_SIZE);
     }
 
     XMVECTOR GetDirection() const override
     {
         assert(false);
+        return XMVectorZero();
     }
 
     void SetDirection(XMFLOAT3 dir) override
@@ -232,16 +229,9 @@ public:
         ResourceLayoutTracker& layoutTracker,
         const std::vector<std::unique_ptr<FrameResource>>& frameResources,
         DescriptorAllocation&& cbvAllocation)
-        : Light(
-            pDevice,
-            std::move(dsvAllocation),
-            std::move(srvAllocation),
-            shadowMapResolution,
-            layoutTracker,
-            frameResources,
-            std::move(cbvAllocation))
+        : Light(std::move(dsvAllocation), std::move(srvAllocation), SPOT_LIGHT_ARRAY_SIZE, LightType::SPOT)
     {
-        m_type = LightType::SPOT;
+        Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation), SPOT_LIGHT_ARRAY_SIZE);
     }
 
     void SetAngle(float angle)

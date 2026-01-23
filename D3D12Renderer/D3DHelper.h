@@ -116,7 +116,8 @@ namespace D3DHelper
         UINT height,
         ComPtr<ID3D12Resource>& shadowMap,
         DescriptorAllocation& dsvAllocation,
-        D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle);
+        D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle,
+        UINT16 arraySize);
 
     UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format);
 

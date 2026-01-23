@@ -565,7 +565,8 @@ namespace D3DHelper
         UINT height,
         ComPtr<ID3D12Resource>& shadowMap,
         DescriptorAllocation& dsvAllocation,
-        D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle)
+        D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle,
+        UINT16 arraySize)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -579,7 +580,7 @@ namespace D3DHelper
         resourceDesc.Alignment = 0;
         resourceDesc.Width = width;
         resourceDesc.Height = height;
-        resourceDesc.DepthOrArraySize = MAX_CASCADES;
+        resourceDesc.DepthOrArraySize = arraySize;
         resourceDesc.MipLevels = 1;
         resourceDesc.Format = DXGI_FORMAT_R32_TYPELESS;
         resourceDesc.SampleDesc = { 1, 0 };
@@ -610,7 +611,7 @@ namespace D3DHelper
         dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
         dsvDesc.Texture2DArray.MipSlice = 0;
         dsvDesc.Texture2DArray.ArraySize = 1;
-        for (UINT i = 0; i < MAX_CASCADES; ++i)
+        for (UINT i = 0; i < arraySize; ++i)
         {
             dsvDesc.Texture2DArray.FirstArraySlice = i;
             pDevice->CreateDepthStencilView(shadowMap.Get(), &dsvDesc, dsvAllocation.GetDescriptorHandle(i));
@@ -624,7 +625,7 @@ namespace D3DHelper
         srvDesc.Texture2DArray.MostDetailedMip = 0;
         srvDesc.Texture2DArray.MipLevels = 1;
         srvDesc.Texture2DArray.FirstArraySlice = 0;
-        srvDesc.Texture2DArray.ArraySize = MAX_CASCADES;
+        srvDesc.Texture2DArray.ArraySize = arraySize;
         srvDesc.Texture2DArray.PlaneSlice = 0;
         srvDesc.Texture2DArray.ResourceMinLODClamp = 0.0f;
 

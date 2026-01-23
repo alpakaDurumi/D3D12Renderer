@@ -622,6 +622,17 @@ void Renderer::LoadAssets()
     light->SetDirection(XMVectorSet(-1.0f, -1.0f, 1.0f, 0.0f));
     m_lights.push_back(std::move(light));
 
+    auto pointLight = std::make_unique<PointLight>(
+        m_device.Get(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(6),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+        m_shadowMapResolution,
+        *m_layoutTracker,
+        m_frameResources,
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
+    pointLight->SetPosition(XMVectorSet(0.0f, 0.0f, 3.0f, 1.0f));
+    m_lights.push_back(std::move(pointLight));
+
     // Allocate textures
     auto alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3);
     auto textureAllocations = alloc.Split();
@@ -1092,7 +1103,7 @@ void Renderer::PrepareConstantData()
     //    mesh.m_meshConstantData.textureTileScale = 50.0f;
     //}
 
-        XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -5.0f, 0.0f);
+    XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -5.0f, 0.0f);
     m_meshes[0].m_meshConstantData.SetTransform(world);
     m_meshes[0].m_meshConstantData.textureTileScale = 50.0f;
 
@@ -1103,6 +1114,7 @@ void Renderer::PrepareConstantData()
     {
         XMMATRIX prevWorld = XMMatrixTranspose(XMLoadFloat4x4(&mesh.m_meshConstantData.world));
         XMMATRIX world = prevWorld * XMMatrixRotationRollPitchYaw(0.0f, 0.001f, 0.0f);
+        world = XMMatrixIdentity();
         mesh.m_meshConstantData.SetTransform(world);
         mesh.m_meshConstantData.textureTileScale = 1.0f;
     }
@@ -1209,32 +1221,32 @@ void Renderer::PrepareCSM()
                 // Use static_cast for downcasting instead of dynamic_cast.
                 auto pLight = static_cast<DirectionalLight*>(light.get());
 
-            static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+                static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
                 XMVECTOR dir = pLight->GetDirection();
 
-            // Orthogonal projection of (center - view origin) onto lightDir.
-            // This represents where the view origin is located relative to the center on the light's Z-axis.
+                // Orthogonal projection of (center - view origin) onto lightDir.
+                // This represents where the view origin is located relative to the center on the light's Z-axis.
                 float d = XMVectorGetX(XMVector3Dot(viewOriginToCenter, dir));
 
                 XMMATRIX view = XMMatrixLookToLH(center, dir, up);
-            // Near Plane : Set to (view origin - sceneRadius) in Light Space.
-            //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
-            // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
-            XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, radius, -d - farPlane);
+                // Near Plane : Set to (view origin - sceneRadius) in Light Space.
+                //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
+                // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
+                XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, radius, -d - farPlane);
 
-            // Apply texel-sized increments to eliminate shadow shimmering.
-            XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-            shadowOrigin = XMVector4Transform(shadowOrigin, view * projection);
-            shadowOrigin = XMVectorScale(shadowOrigin, 1.0f / XMVectorGetW(shadowOrigin));      // Perspective divide. Can be ommitted if it uses orthographic projection.
-            // [-1, 1] -> [-resolution / 2, resolution / 2]
-            shadowOrigin = XMVectorScale(shadowOrigin, m_shadowMapResolution * 0.5f);           // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
+                // Apply texel-sized increments to eliminate shadow shimmering.
+                XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+                shadowOrigin = XMVector4Transform(shadowOrigin, view * projection);
+                shadowOrigin = XMVectorScale(shadowOrigin, 1.0f / XMVectorGetW(shadowOrigin));      // Perspective divide. Can be ommitted if it uses orthographic projection.
+                // [-1, 1] -> [-resolution / 2, resolution / 2]
+                shadowOrigin = XMVectorScale(shadowOrigin, m_shadowMapResolution * 0.5f);           // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
 
-            // Calculate diff and apply as translation matrix.
-            XMVECTOR roundedOrigin = XMVectorRound(shadowOrigin);
-            XMVECTOR diff = roundedOrigin - shadowOrigin;
-            diff = XMVectorScale(diff, 2.0f / m_shadowMapResolution);                           // Since diff is texel scale, it should be transformed to NDC scale.
-            XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
+                // Calculate diff and apply as translation matrix.
+                XMVECTOR roundedOrigin = XMVectorRound(shadowOrigin);
+                XMVECTOR diff = roundedOrigin - shadowOrigin;
+                diff = XMVectorScale(diff, 2.0f / m_shadowMapResolution);                           // Since diff is texel scale, it should be transformed to NDC scale.
+                XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
 
                 light->SetViewProjection(view, projection * fix, i);
                 break;
