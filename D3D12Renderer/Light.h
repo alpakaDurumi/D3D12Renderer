@@ -101,10 +101,20 @@ public:
         m_lightConstantData.SetPos(p);
     }
 
+    virtual void SetPosition(XMVECTOR pos)
+    {
+        m_lightConstantData.SetPos(pos);
+    }
+
     virtual void SetDirection(XMFLOAT3 dir)
     {
         XMVECTOR d = XMLoadFloat3(&dir);
-        m_lightConstantData.SetLightDir(XMVector3Normalize(d));
+        m_lightConstantData.SetLightDir(d);
+    }
+
+    virtual void SetDirection(XMVECTOR dir)
+    {
+        m_lightConstantData.SetLightDir(dir);
     }
 
     void SetViewProjection(XMMATRIX view, XMMATRIX projection, UINT idx)
@@ -165,6 +175,11 @@ public:
     {
         assert(false);
     }
+
+    void SetPosition(XMVECTOR pos) override
+    {
+        assert(false);
+    }
 };
 
 class PointLight : public Light
@@ -196,6 +211,11 @@ public:
     }
 
     void SetDirection(XMFLOAT3 dir) override
+    {
+        assert(false);
+    }
+
+    void SetDirection(XMVECTOR dir) override
     {
         assert(false);
     }

@@ -619,7 +619,7 @@ void Renderer::LoadAssets()
         *m_layoutTracker,
         m_frameResources,
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
-    light->SetDirection({-1.0f, -1.0f, 1.0f});
+    light->SetDirection(XMVectorSet(-1.0f, -1.0f, 1.0f, 0.0f));
     m_lights.push_back(std::move(light));
 
     // Allocate textures
@@ -1121,9 +1121,7 @@ void Renderer::PrepareConstantData()
     XMVECTOR lightDir = m_lights[0]->GetDirection();
     XMMATRIX rot = XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 0.001f);
     XMVECTOR rotated = XMVector3Transform(lightDir, rot);
-    XMFLOAT3 r;
-    XMStoreFloat3(&r, rotated);
-    m_lights[0]->SetDirection(r);
+    m_lights[0]->SetDirection(rotated);
 
     PrepareCSM();
 }
