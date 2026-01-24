@@ -22,9 +22,6 @@ enum class LightType
     NUM_LIGHT_TYPES
 };
 
-static const UINT16 POINT_LIGHT_ARRAY_SIZE = 6;
-static const UINT16 SPOT_LIGHT_ARRAY_SIZE = 1;
-
 class Light
 {
 protected:
@@ -36,6 +33,8 @@ protected:
         m_type(type)
     {
         assert(!m_shadowMapDsvAllocation.IsNull() && !m_shadowMapSrvAllocation.IsNull());
+
+        m_lightConstantData.type = static_cast<UINT32>(m_type);
     }
 
     void Init(
@@ -100,11 +99,37 @@ public:
         return m_shadowMapSrvAllocation;
     }
 
+    UINT16 GetArraySize() const
+    {
+        switch (m_type)
+        {
+        case LightType::DIRECTIONAL:
+            return MAX_CASCADES;
+        case LightType::POINT:
+            return POINT_LIGHT_ARRAY_SIZE;
+        case LightType::SPOT:
+            return SPOT_LIGHT_ARRAY_SIZE;
+        default:
+            return -1;
+        }
+    }
+
+    virtual XMVECTOR GetPosition() const
+    {
+        XMVECTOR p = XMLoadFloat3(&m_lightConstantData.lightPos);
+        return XMVectorSetW(p, 1.0f);
+    }
+
     virtual XMVECTOR GetDirection() const
     {
         return XMLoadFloat3(&m_lightConstantData.lightDir);
     }
 
+    virtual float GetRange() const
+    {
+        return m_lightConstantData.range;
+    }
+    
     virtual void SetPosition(XMFLOAT3 pos)
     {
         XMVECTOR p = XMLoadFloat3(&pos);
@@ -125,6 +150,11 @@ public:
     virtual void SetDirection(XMVECTOR dir)
     {
         m_lightConstantData.SetLightDir(dir);
+    }
+
+    virtual void SetRange(float range)
+    {
+        m_lightConstantData.range = range;
     }
 
     void SetViewProjection(XMMATRIX view, XMMATRIX projection, UINT idx)
@@ -174,12 +204,29 @@ public:
         Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation), MAX_CASCADES);
     }
 
+    virtual XMVECTOR GetPosition() const override
+    {
+        assert(false);
+        return XMVectorZero();
+    }
+
+    virtual float GetRange() const override
+    {
+        assert(false);
+        return 0.0f;
+    }
+
     void SetPosition(XMFLOAT3 pos) override
     {
         assert(false);
     }
 
     void SetPosition(XMVECTOR pos) override
+    {
+        assert(false);
+    }
+
+    virtual void SetRange(float range) override
     {
         assert(false);
     }

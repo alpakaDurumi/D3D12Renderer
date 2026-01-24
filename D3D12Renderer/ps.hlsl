@@ -49,10 +49,13 @@ cbuffer ShadowConstantBuffer : register(b3, space0)
 struct LightConstants
 {
     float3 lightPos;
+    float range;
     float3 lightDir;
+    float angle;
     float3 lightColor;
     float lightIntensity;
-    float4x4 viewProjection[MAX_CASCADES];
+    float4x4 viewProjection[POINT_LIGHT_ARRAY_SIZE];
+    uint type;
 };
 ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space1);
 
@@ -228,53 +231,69 @@ float4 main(PSInput input) : SV_TARGET
     static const float filterSize = 5.0f;
     
     [loop]
-    for (uint i = 0; i < 1; ++i)
+    for (uint i = 0; i < 2; ++i)
     {
         LightConstants light = LightConstantBuffers[i];
         
         float shadowFactor;
         
-        // First cascade
+        // Directional
+        if (light.type == 0)
         {
-            float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[index]);
-            lightScreen.xyz /= lightScreen.w;
-            float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
+            // First cascade
+            {
+                float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[index]);
+                lightScreen.xyz /= lightScreen.w;
+                float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
         
-            shadowFactor = PCF(i, index, filterSize, lightTexCoord, lightScreen.z, rot);
+                shadowFactor = PCF(i, index, filterSize, lightTexCoord, lightScreen.z, rot);
+            }
+        
+            // Second cascade. Only apply when overlapping can occur.
+            if (index < MAX_CASCADES - 1)
+            {
+                float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[index + 1]);
+                lightScreen.xyz /= lightScreen.w;
+                float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
+        
+                float t = PCF(i, index + 1, filterSize, lightTexCoord, lightScreen.z, rot);
+                shadowFactor = lerp(shadowFactor, t, alpha);
+            }
+        
+            // Shading in world space
+            //float3 toLightWorld = normalize(light.lightPos - input.posWorld);
+            float3 toLightWorld = normalize(-light.lightDir); // For directional light, exceptionally.
+            float3 halfWay = normalize(toLightWorld + toCameraWorld);
+    
+            float3 texColor = g_albedo.Sample(g_sampler, texCoord).rgb;
+            float3 normal = g_normalMap.Sample(g_sampler, texCoord).rgb * 2.0f - 1.0f;
+            float3 normalWorld = mul(normal, TBN);
+    
+            // Ambient
+            float3 ambient = materialAmbient * texColor;
+    
+            // Diffuse
+            float nDotL = max(dot(normalWorld, toLightWorld), 0.0f);
+            float3 diffuse = texColor * nDotL * light.lightColor * light.lightIntensity;
+    
+            // Specular
+            float nDotH = max(dot(normalWorld, halfWay), 0.0f);
+            float3 specular = pow(nDotH, shininess) * materialSpecular * light.lightColor * light.lightIntensity;
+        
+            total += ambient + (diffuse + specular) * shadowFactor;
         }
-        
-        // Second cascade. Only apply when overlapping can occur.
-        if (index < MAX_CASCADES - 1)
+        // Point
+        else if (light.type == 1)
         {
-            float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[index + 1]);
-            lightScreen.xyz /= lightScreen.w;
-            float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
-        
-            float t = PCF(i, index + 1, filterSize, lightTexCoord, lightScreen.z, rot);
-            shadowFactor = lerp(shadowFactor, t, alpha);
+            float dist = distance(input.posWorld ,light.lightPos);
+            if (dist <= light.range)
+                total = float3(1.0f, 1.0f, 1.0f);
         }
-        
-        // Shading in world space
-        //float3 toLightWorld = normalize(light.lightPos - input.posWorld);
-        float3 toLightWorld = normalize(-light.lightDir); // For directional light, exceptionally.
-        float3 halfWay = normalize(toLightWorld + toCameraWorld);
-    
-        float3 texColor = g_albedo.Sample(g_sampler, texCoord).rgb;
-        float3 normal = g_normalMap.Sample(g_sampler, texCoord).rgb * 2.0f - 1.0f;
-        float3 normalWorld = mul(normal, TBN);
-    
-        // Ambient
-        float3 ambient = materialAmbient * texColor;
-    
-        // Diffuse
-        float nDotL = max(dot(normalWorld, toLightWorld), 0.0f);
-        float3 diffuse = texColor * nDotL * light.lightColor * light.lightIntensity;
-    
-        // Specular
-        float nDotH = max(dot(normalWorld, halfWay), 0.0f);
-        float3 specular = pow(nDotH, shininess) * materialSpecular * light.lightColor * light.lightIntensity;
-        
-        total += ambient + (diffuse + specular) * shadowFactor;
+        // Spot
+        else if (light.type == 2)
+        {
+            
+        }
     }
     
     return float4(total, 1.0f);

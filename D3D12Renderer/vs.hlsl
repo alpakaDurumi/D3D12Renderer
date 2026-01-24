@@ -42,9 +42,9 @@ PSInput main(VSInput input)
     // Calculate position in world space
 #ifdef INSTANCED
     output.posWorld = mul(float4(input.pos, 1.0f), mul(world, input.instanceWorld)).xyz;
-#else
+#else   // INSTANCED
     output.posWorld = mul(float4(input.pos, 1.0f), world).xyz;
-#endif
+#endif  // INSTANCED
     
     float3 posView = mul(float4(output.posWorld, 1.0f), view).xyz;
     output.distView = posView.z;
@@ -60,7 +60,7 @@ PSInput main(VSInput input)
     output.normalWorld = normalize(mul(float4(input.normal, 0.0f), inverseTranspose).xyz);
 #endif  // INSTANCED
     output.tangentW = input.tangent.w;
-#endif  // SHADOW
+#endif  // DEPTH_ONLY
     
     return output;
 }

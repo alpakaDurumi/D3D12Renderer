@@ -631,6 +631,7 @@ void Renderer::LoadAssets()
         m_frameResources,
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
     pointLight->SetPosition(XMVectorSet(0.0f, 0.0f, 3.0f, 1.0f));
+    pointLight->SetRange(10.0f);
     m_lights.push_back(std::move(pointLight));
 
     // Allocate textures
@@ -707,7 +708,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
 
             // Render each cascade.
-            for (UINT i = 0; i < MAX_CASCADES; ++i)
+            UINT16 arraySize = light->GetArraySize();
+            for (UINT i = 0; i < arraySize; ++i)
             {
                 auto shadowMapDsvHandle = light->GetDSVDescriptorHandle(i);
                 cmdList->OMSetRenderTargets(0, nullptr, FALSE, &shadowMapDsvHandle);
@@ -1136,6 +1138,38 @@ void Renderer::PrepareConstantData()
     m_lights[0]->SetDirection(rotated);
 
     PrepareCSM();
+
+    // Point light
+    {
+        XMVECTOR pos = m_lights[1]->GetPosition();
+
+        // +X, -X, +Y, -Y, +Z, -Z
+        static const XMVECTOR Directions[6] = {
+            { 1.0f, 0.0f, 0.0f, 0.0f },
+            { -1.0f, 0.0f, 0.0f, 0.0f },
+            { 0.0f, 1.0f, 0.0f, 0.0f },
+            { 0.0f, -1.0f, 0.0f, 0.0f },
+            { 0.0f, 0.0f, 1.0f, 0.0f },
+            { 0.0f, 0.0f, -1.0f, 0.0f }
+        };
+        static const XMVECTOR Ups[6] = {
+            { 0.0f, 1.0f, 0.0f, 0.0f },
+            { 0.0f, 1.0f, 0.0f, 0.0f },
+            { 0.0f, 0.0f, -1.0f, 0.0f },
+            { 0.0f, 0.0f, 1.0f, 0.0f },
+            { 0.0f, 1.0f, 0.0f, 0.0f },
+            { 0.0f, 1.0f, 0.0f, 0.0f }
+        };
+
+        // 90 degree
+        XMMATRIX projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.0f, m_lights[1]->GetRange(), 0.1f);
+
+        for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
+        {
+            XMMATRIX view = XMMatrixLookToLH(pos, Directions[i], Ups[i]);
+            m_lights[1]->SetViewProjection(view, projection, i);
+        }
+    }
 }
 
 void Renderer::PrepareCSM()
@@ -1278,7 +1312,8 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
 
     for (auto& light : m_lights)
     {
-        for (UINT i = 0; i < MAX_CASCADES; ++i)
+        UINT16 arraySize = light->GetArraySize();
+        for (UINT i = 0; i < arraySize; ++i)
         {
             light->UpdateCameraConstantBuffer(frameResource, i);
         }
