@@ -171,6 +171,34 @@ float InterleavedGradientNoise(float2 pixPos)
     return frac(52.9829189f * frac(dot(pixPos, float2(0.06711056f, 0.00583715f))));
 }
 
+// Shading in world space
+// TODO : ambient add multiple times, fix this.
+float3 PhongReflection(LightConstants light, float3 toLightWorld, float3 toCameraWorld, float lightFactor, float3 texColor, float3 normalWorld)
+{
+    float3 halfWay = normalize(toLightWorld + toCameraWorld);
+    
+    // Ambient
+    float3 ambient = materialAmbient * texColor;
+    
+    // Diffuse
+    float nDotL = max(dot(normalWorld, toLightWorld), 0.0f);
+    float3 diffuse = texColor * nDotL * light.lightColor * light.lightIntensity;
+    
+    // Specular
+    float nDotH = max(dot(normalWorld, halfWay), 0.0f);
+    float3 specular = pow(nDotH, shininess) * materialSpecular * light.lightColor * light.lightIntensity;
+            
+    return ambient + (diffuse + specular) * lightFactor;
+}
+
+float CalcAttenuation(float dist, float range)
+{
+    // Linear attenuation
+    static const float fallOffStart = 0.4f;
+    
+    return saturate((range - dist) / (range - fallOffStart));
+}
+
 float4 main(PSInput input) : SV_TARGET
 {
     // For POM, use inaccurate inverse-TBN
@@ -195,8 +223,11 @@ float4 main(PSInput input) : SV_TARGET
     float3 B = input.tangentW * cross(input.normalWorld, input.tangentWorld);
     float3x3 TBN = float3x3(input.tangentWorld, B, input.normalWorld);
     
-    float3 total = float3(0.0f, 0.0f, 0.0f);
-    
+    // Sample textures
+    float3 texColor = g_albedo.Sample(g_sampler, texCoord).rgb;
+    float3 normal = g_normalMap.Sample(g_sampler, texCoord).rgb * 2.0f - 1.0f;
+    float3 normalWorld = normalize(mul(normal, TBN));
+
     uint index;
     float alpha;
     CalcCSMIndex(input.distView, index, alpha);
@@ -230,6 +261,8 @@ float4 main(PSInput input) : SV_TARGET
     
     static const float filterSize = 5.0f;
     
+    float3 total = float3(0.0f, 0.0f, 0.0f);
+    
     [loop]
     for (uint i = 0; i < 2; ++i)
     {
@@ -259,35 +292,20 @@ float4 main(PSInput input) : SV_TARGET
                 float t = PCF(i, index + 1, filterSize, lightTexCoord, lightScreen.z, rot);
                 shadowFactor = lerp(shadowFactor, t, alpha);
             }
-        
+            
             // Shading in world space
-            //float3 toLightWorld = normalize(light.lightPos - input.posWorld);
-            float3 toLightWorld = normalize(-light.lightDir); // For directional light, exceptionally.
-            float3 halfWay = normalize(toLightWorld + toCameraWorld);
-    
-            float3 texColor = g_albedo.Sample(g_sampler, texCoord).rgb;
-            float3 normal = g_normalMap.Sample(g_sampler, texCoord).rgb * 2.0f - 1.0f;
-            float3 normalWorld = mul(normal, TBN);
-    
-            // Ambient
-            float3 ambient = materialAmbient * texColor;
-    
-            // Diffuse
-            float nDotL = max(dot(normalWorld, toLightWorld), 0.0f);
-            float3 diffuse = texColor * nDotL * light.lightColor * light.lightIntensity;
-    
-            // Specular
-            float nDotH = max(dot(normalWorld, halfWay), 0.0f);
-            float3 specular = pow(nDotH, shininess) * materialSpecular * light.lightColor * light.lightIntensity;
-        
-            total += ambient + (diffuse + specular) * shadowFactor;
+            float3 toLightWorld = -light.lightDir;
+            total += PhongReflection(light, toLightWorld, toCameraWorld, shadowFactor, texColor, normalWorld);
         }
         // Point
         else if (light.type == 1)
         {
             float dist = distance(input.posWorld ,light.lightPos);
-            if (dist <= light.range)
-                total = float3(1.0f, 1.0f, 1.0f);
+            float factor = CalcAttenuation(dist, light.range);
+            
+            float3 toLightWorld = normalize(light.lightPos - input.posWorld);
+            total += PhongReflection(light, toLightWorld, toCameraWorld, factor, texColor, normalWorld);
+
         }
         // Spot
         else if (light.type == 2)
