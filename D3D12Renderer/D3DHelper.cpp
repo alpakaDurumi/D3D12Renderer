@@ -3,7 +3,6 @@
 
 #include "Utility.h"
 #include "DirectXTex.h"
-#include "SharedConfig.h"
 
 using namespace DirectX;
 
@@ -566,8 +565,10 @@ namespace D3DHelper
         ComPtr<ID3D12Resource>& shadowMap,
         DescriptorAllocation& dsvAllocation,
         D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle,
-        UINT16 arraySize)
+        LightType type)
     {
+        UINT16 arraySize = GetRequiredArraySize(type);
+
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
         heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -620,16 +621,54 @@ namespace D3DHelper
         // Create only one SRV.
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2DArray.MostDetailedMip = 0;
-        srvDesc.Texture2DArray.MipLevels = 1;
-        srvDesc.Texture2DArray.FirstArraySlice = 0;
-        srvDesc.Texture2DArray.ArraySize = arraySize;
-        srvDesc.Texture2DArray.PlaneSlice = 0;
-        srvDesc.Texture2DArray.ResourceMinLODClamp = 0.0f;
-
+        switch (type)
+        {
+        case LightType::DIRECTIONAL:
+        {
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+            srvDesc.Texture2DArray.MostDetailedMip = 0;
+            srvDesc.Texture2DArray.MipLevels = 1;
+            srvDesc.Texture2DArray.FirstArraySlice = 0;
+            srvDesc.Texture2DArray.ArraySize = arraySize;
+            srvDesc.Texture2DArray.PlaneSlice = 0;
+            srvDesc.Texture2DArray.ResourceMinLODClamp = 0.0f;
+            break;
+        }
+        case LightType::POINT:
+        {
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+            srvDesc.TextureCube.MostDetailedMip = 0;
+            srvDesc.TextureCube.MipLevels = 1;
+            srvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
+            break;
+        }
+        case LightType::SPOT:
+        {
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            srvDesc.Texture2D.MostDetailedMip = 0;
+            srvDesc.Texture2D.MipLevels = 1;
+            srvDesc.Texture2D.PlaneSlice = 0;
+            srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+            break;
+        }
+        }
         pDevice->CreateShaderResourceView(shadowMap.Get(), &srvDesc, srvCpuHandle);
+    }
+
+    UINT16 GetRequiredArraySize(LightType type)
+    {
+        switch (type)
+        {
+        case LightType::DIRECTIONAL:
+            return MAX_CASCADES;
+        case LightType::POINT:
+            return POINT_LIGHT_ARRAY_SIZE;
+        case LightType::SPOT:
+            return SPOT_LIGHT_ARRAY_SIZE;
+        default:
+            return -1;
+        }
     }
 
     UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format)

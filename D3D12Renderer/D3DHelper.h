@@ -11,6 +11,7 @@
 #include "CommandList.h"
 #include "UploadBuffer.h"
 #include "DescriptorAllocation.h"
+#include "SharedConfig.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -117,7 +118,9 @@ namespace D3DHelper
         ComPtr<ID3D12Resource>& shadowMap,
         DescriptorAllocation& dsvAllocation,
         D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle,
-        UINT16 arraySize);
+        LightType type);
+
+    UINT16 GetRequiredArraySize(LightType type);
 
     UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format);
 
