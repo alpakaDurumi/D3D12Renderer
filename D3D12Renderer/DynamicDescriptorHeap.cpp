@@ -214,11 +214,6 @@ void DynamicDescriptorHeap::CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommand
             // Flip the stale bit so the descriptor table is not recopied again unless it is updated with a new descriptor
             m_staleDescriptorTableBitMask ^= (1 << rootIndex);
         }
-
-        // Reset variables
-        m_currentOffset = 0;
-        for (auto& cache : m_descriptorTableCache)
-            cache.Reset();
     }
 }
 
@@ -280,4 +275,11 @@ void DynamicDescriptorHeap::QueueRetiredHeaps(UINT64 fenceValue)
         pAlloc->SetFenceValue(fenceValue);
     }
     m_usedAllocations.clear();
+}
+
+void DynamicDescriptorHeap::Reset()
+{
+    m_currentOffset = 0;
+    for (auto& cache : m_descriptorTableCache)
+        cache.Reset();
 }

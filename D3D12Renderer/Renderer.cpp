@@ -209,6 +209,8 @@ void Renderer::OnRender()
     // Record all the commands we need to render the scene into the command list
     PopulateCommandList(commandList);
 
+    m_dynamicDescriptorHeap->Reset();
+
     // ImGui Render
     // Is it OK to call SetDescriptorHeaps? (Does it affect performance?)
     ImGui::Render();

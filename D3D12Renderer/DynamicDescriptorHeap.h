@@ -49,6 +49,8 @@ public:
 
     void QueueRetiredHeaps(UINT64 fenceValue);
 
+    void Reset();
+
 private:
     void CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommandList7>& commandList, std::function<void(ID3D12GraphicsCommandList*, UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc);
 
