@@ -1,8 +1,6 @@
 #include "SharedConfig.h"
 
-Texture2D g_albedo : register(t0, space0);
-Texture2D g_normalMap : register(t1, space0);
-Texture2D g_heightMap : register(t2, space0);
+Texture2D g_textures[] : register(t0, space0);
 
 Texture2DArray<float> g_shadowMaps[] : register(t0, space1);
 
@@ -39,6 +37,7 @@ cbuffer MaterialConstantBuffer : register(b2, space0)
     float3 materialAmbient;
     float3 materialSpecular;
     float shininess;
+    uint4 textureIndices;
 }
 
 cbuffer ShadowConstantBuffer : register(b3, space0)
@@ -78,7 +77,7 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera)
     float2 currentTexCoord = texCoord * textureTileScale;
     float2 dx = ddx(currentTexCoord);
     float2 dy = ddy(currentTexCoord);
-    float currentHeightMapValue = 1.0f - g_heightMap.SampleGrad(g_sampler, currentTexCoord, dx, dy).r;
+    float currentHeightMapValue = 1.0f - g_textures[textureIndices[2]].SampleGrad(g_sampler, currentTexCoord, dx, dy).r;
     float currentLayerHeight = 0.0f;
     
     float2 prevTexCoord = currentTexCoord;
@@ -93,7 +92,7 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera)
         prevLayerHeight = currentLayerHeight;
         
         currentTexCoord -= deltaTexCoord;
-        currentHeightMapValue = 1.0f - g_heightMap.SampleGrad(g_sampler, currentTexCoord, dx, dy).r;
+        currentHeightMapValue = 1.0f - g_textures[textureIndices[2]].SampleGrad(g_sampler, currentTexCoord, dx, dy).r;
         currentLayerHeight += layerStep;
     }
     
@@ -224,28 +223,28 @@ float4 main(PSInput input) : SV_TARGET
     float3x3 TBN = float3x3(input.tangentWorld, B, input.normalWorld);
     
     // Sample textures
-    float3 texColor = g_albedo.Sample(g_sampler, texCoord).rgb;
-    float3 normal = g_normalMap.Sample(g_sampler, texCoord).rgb * 2.0f - 1.0f;
+    float3 texColor = g_textures[textureIndices[0]].Sample(g_sampler, texCoord).rgb;
+    float3 normal = g_textures[textureIndices[1]].Sample(g_sampler, texCoord).rgb * 2.0f - 1.0f;
     float3 normalWorld = normalize(mul(normal, TBN));
 
-    uint index;
+    uint csmIdx;
     float alpha;
-    CalcCSMIndex(input.distView, index, alpha);
+    CalcCSMIndex(input.distView, csmIdx, alpha);
     
     // Check CSM boundaries
-    //if (index == 0)
+    //if (csmIdx == 0)
     //{
     //    return lerp(float4(1.0f, 0.0f, 0.0f, 1.0f), float4(0.0f, 1.0f, 0.0f, 1.0f), alpha);
     //}
-    //else if (index == 1)
+    //else if (csmIdx == 1)
     //{
     //    return lerp(float4(0.0f, 1.0f, 0.0f, 1.0f), float4(0.0f, 0.0f, 1.0f, 1.0f), alpha);
     //}
-    //else if (index == 2)
+    //else if (csmIdx == 2)
     //{
     //    return lerp(float4(0.0f, 0.0f, 1.0f, 1.0f), float4(1.0f, 0.0f, 1.0f, 1.0f), alpha);
     //}
-    //else if (index == 3)
+    //else if (csmIdx == 3)
     //{
     //    return lerp(float4(1.0f, 0.0f, 1.0f, 1.0f), float4(0.0f, 0.0f, 0.0f, 1.0f), alpha);
     //}
@@ -275,21 +274,21 @@ float4 main(PSInput input) : SV_TARGET
         {
             // First cascade
             {
-                float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[index]);
+                float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[csmIdx]);
                 lightScreen.xyz /= lightScreen.w;
                 float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
         
-                shadowFactor = PCF(i, index, filterSize, lightTexCoord, lightScreen.z, rot);
+                shadowFactor = PCF(i, csmIdx, filterSize, lightTexCoord, lightScreen.z, rot);
             }
         
             // Second cascade. Only apply when overlapping can occur.
-            if (index < MAX_CASCADES - 1)
+            if (csmIdx < MAX_CASCADES - 1)
             {
-                float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[index + 1]);
+                float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[csmIdx + 1]);
                 lightScreen.xyz /= lightScreen.w;
                 float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
         
-                float t = PCF(i, index + 1, filterSize, lightTexCoord, lightScreen.z, rot);
+                float t = PCF(i, csmIdx + 1, filterSize, lightTexCoord, lightScreen.z, rot);
                 shadowFactor = lerp(shadowFactor, t, alpha);
             }
             

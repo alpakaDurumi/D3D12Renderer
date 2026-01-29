@@ -757,8 +757,6 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
     // Color pass
     {
-        UINT32 numLights = static_cast<UINT32>(m_lights.size());
-
         cmdList->RSSetViewports(1, &m_viewport);
         cmdList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -780,6 +778,23 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
         cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
+        UINT32 numLights = static_cast<UINT32>(m_lights.size());
+
+        // Bind light CBVs
+        for (UINT32 i = 0; i < numLights; ++i)
+            m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[m_lights[i]->GetLightConstantBufferIndex()]->GetAllocationRef());
+
+        // Bind textures
+        m_dynamicDescriptorHeap->StageDescriptors(5, 0, 1, m_albedo->GetAllocationRef());
+        m_dynamicDescriptorHeap->StageDescriptors(5, 1, 1, m_normalMap->GetAllocationRef());
+        m_dynamicDescriptorHeap->StageDescriptors(5, 2, 1, m_heightMap->GetAllocationRef());
+
+        // Bind shadow SRVs
+        for (UINT i = 0; i < m_lights.size(); ++i)
+        {
+            m_dynamicDescriptorHeap->StageDescriptors(6, i, 1, m_lights[i]->GetSRVAllocationRef());
+        }
+
         m_currentPSOKey.passType = DEFAULT;
         m_currentPSOKey.vsKey = { L"vs.hlsl", {}, "vs_5_0" };
         m_currentPSOKey.psKey = { L"ps.hlsl", {}, "ps_5_1" };
@@ -790,16 +805,6 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(3, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
-
-            for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[m_lights[i]->GetLightConstantBufferIndex()]->GetAllocationRef());
-
-            m_dynamicDescriptorHeap->StageDescriptors(5, 0, 1, m_albedo->GetAllocationRef());
-            m_dynamicDescriptorHeap->StageDescriptors(5, 1, 1, m_normalMap->GetAllocationRef());
-            m_dynamicDescriptorHeap->StageDescriptors(5, 2, 1, m_heightMap->GetAllocationRef());
-
-            for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(6, i, 1, m_lights[i]->GetSRVAllocationRef());
 
             m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
@@ -815,16 +820,6 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(3, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
-
-            for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[m_lights[i]->GetLightConstantBufferIndex()]->GetAllocationRef());
-
-            m_dynamicDescriptorHeap->StageDescriptors(5, 0, 1, m_albedo->GetAllocationRef());
-            m_dynamicDescriptorHeap->StageDescriptors(5, 1, 1, m_normalMap->GetAllocationRef());
-            m_dynamicDescriptorHeap->StageDescriptors(5, 2, 1, m_heightMap->GetAllocationRef());
-
-            for (UINT32 i = 0; i < numLights; ++i)
-                m_dynamicDescriptorHeap->StageDescriptors(6, i, 1, m_lights[i]->GetSRVAllocationRef());
 
             m_dynamicDescriptorHeap->CommitStagedDescriptorsForDraw(cmdList);
 
@@ -908,7 +903,7 @@ RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
         // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
         // GPU jobs (UpdateSubresources) are already finished when recording command list. I don't know why DATA_STATIC flag fails.
         rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootSignature[5].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+        rootSignature[5].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
         // Descriptor table for shadowMaps[]
         rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
@@ -1132,6 +1127,9 @@ void Renderer::PrepareConstantData()
     m_materialConstantData.SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
     m_materialConstantData.SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
     m_materialConstantData.shininess = 10.0f;
+    m_materialConstantData.textureIndices[0] = 0;
+    m_materialConstantData.textureIndices[1] = 1;
+    m_materialConstantData.textureIndices[2] = 2;
 
     // Light
     XMVECTOR lightDir = m_lights[0]->GetDirection();

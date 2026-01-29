@@ -98,7 +98,8 @@ struct MaterialConstantData : public ConstantData<MaterialConstantData>
     float padding0;
     XMFLOAT3 materialSpecular;
     float shininess;
-    float padding1[56];
+    UINT textureIndices[4];
+    float padding1[52];
 
     // Use linear color for gamma-correct rendering
     void SetAmbient(XMFLOAT4 ambient)
