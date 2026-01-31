@@ -196,10 +196,71 @@ PointLight::PointLight(
     UINT shadowMapResolution,
     ResourceLayoutTracker& layoutTracker,
     const std::vector<std::unique_ptr<FrameResource>>& frameResources,
-    DescriptorAllocation&& cbvAllocation)
+    DescriptorAllocation&& cbvAllocation,
+    DescriptorAllocation&& rtvAllocation)
     : Light(std::move(dsvAllocation), std::move(srvAllocation), LightType::POINT)
+    , m_rtvAllocation(std::move(rtvAllocation))
 {
+    assert(POINT_LIGHT_ARRAY_SIZE == m_rtvAllocation.GetNumHandles());
+
     Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation));
+
+    // Create render target.
+    D3D12_HEAP_PROPERTIES heapProperties = {};
+    heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProperties.CreationNodeMask = 1;
+    heapProperties.VisibleNodeMask = 1;
+
+    D3D12_RESOURCE_DESC1 resourceDesc = {};
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resourceDesc.Alignment = 0;
+    resourceDesc.Width = shadowMapResolution;
+    resourceDesc.Height = shadowMapResolution;
+    resourceDesc.DepthOrArraySize = POINT_LIGHT_ARRAY_SIZE;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+    resourceDesc.SampleDesc = { 1, 0 };
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+    resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
+
+    D3D12_CLEAR_VALUE clearValue = {};
+    clearValue.Format = DXGI_FORMAT_R32_FLOAT;
+    clearValue.Color[0] = 1.0f;
+    clearValue.Color[1] = 1.0f;
+    clearValue.Color[2] = 1.0f;
+    clearValue.Color[3] = 1.0f;
+
+    ThrowIfFailed(pDevice->CreateCommittedResource3(
+        &heapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &resourceDesc,
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+        &clearValue,
+        nullptr,
+        0,
+        nullptr,
+        IID_PPV_ARGS(&m_renderTarget)));
+
+    // Create RTVs.
+    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+    rtvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+    rtvDesc.Texture2DArray.MipSlice = 0;
+    rtvDesc.Texture2DArray.ArraySize = 1;
+    rtvDesc.Texture2DArray.PlaneSlice = 0;
+    for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
+    {
+        rtvDesc.Texture2DArray.FirstArraySlice = i;
+        pDevice->CreateRenderTargetView(m_renderTarget.Get(), &rtvDesc, m_rtvAllocation.GetDescriptorHandle(i));
+    }
+
+    layoutTracker.RegisterResource(m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_RENDER_TARGET, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS);
+
+    // Create SRV for render target we've created just before. NOT for depth buffer!
+    CreateSRVForShadow(pDevice, m_renderTarget.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
 }
 
 XMVECTOR PointLight::GetDirection() const
@@ -216,6 +277,16 @@ void PointLight::SetDirection(XMFLOAT3 dir)
 void PointLight::SetDirection(XMVECTOR dir)
 {
     assert(false);
+}
+
+ID3D12Resource* PointLight::GetRenderTarget() const
+{
+    return m_renderTarget.Get();
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE PointLight::GetRTVDescriptorHandle(UINT idx) const
+{
+    return m_rtvAllocation.GetDescriptorHandle(idx);
 }
 
 SpotLight::SpotLight(

@@ -97,12 +97,20 @@ public:
         UINT shadowMapResolution,
         ResourceLayoutTracker& layoutTracker,
         const std::vector<std::unique_ptr<FrameResource>>& frameResources,
-        DescriptorAllocation&& cbvAllocation);
+        DescriptorAllocation&& cbvAllocation,
+        DescriptorAllocation&& rtvAllocation);
 
     XMVECTOR GetDirection() const override;
 
     void SetDirection(XMFLOAT3 dir) override;
     void SetDirection(XMVECTOR dir) override;
+
+    ID3D12Resource* GetRenderTarget() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetRTVDescriptorHandle(UINT idx) const;
+
+private:
+    ComPtr<ID3D12Resource> m_renderTarget;
+    DescriptorAllocation m_rtvAllocation;
 };
 
 class SpotLight : public Light

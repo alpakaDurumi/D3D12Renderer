@@ -567,13 +567,13 @@ namespace D3DHelper
         else
         {
             dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
-        dsvDesc.Texture2DArray.MipSlice = 0;
-        dsvDesc.Texture2DArray.ArraySize = 1;
-        for (UINT i = 0; i < arraySize; ++i)
-        {
-            dsvDesc.Texture2DArray.FirstArraySlice = i;
+            dsvDesc.Texture2DArray.MipSlice = 0;
+            dsvDesc.Texture2DArray.ArraySize = 1;
+            for (UINT i = 0; i < arraySize; ++i)
+            {
+                dsvDesc.Texture2DArray.FirstArraySlice = i;
                 pDevice->CreateDepthStencilView(depthStencilBuffer.Get(), &dsvDesc, dsvAllocation.GetDescriptorHandle(i));
-        }
+            }
         }
     }
 
