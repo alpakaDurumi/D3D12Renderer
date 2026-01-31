@@ -28,7 +28,7 @@ protected:
 
 public:
     LightType GetType() const;
-    ID3D12Resource* GetShadowMap() const;
+    ID3D12Resource* GetDepthBuffer() const;
     UINT16 GetArraySize() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetDSVDescriptorHandle(UINT idx) const;
 
@@ -61,9 +61,9 @@ protected:
 
     LightType m_type;
 
-    ComPtr<ID3D12Resource> m_shadowMap;
-    DescriptorAllocation m_shadowMapDsvAllocation;
-    DescriptorAllocation m_shadowMapSrvAllocation;
+    ComPtr<ID3D12Resource> m_depthBuffer;
+    DescriptorAllocation m_dsvAllocation;
+    DescriptorAllocation m_srvAllocation;
 };
 
 class DirectionalLight : public Light

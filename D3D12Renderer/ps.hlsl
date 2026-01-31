@@ -270,7 +270,7 @@ float4 main(PSInput input) : SV_TARGET
         float shadowFactor;
         
         // Directional
-        if (light.type == 0)
+        if (light.type == LIGHT_TYPE_DIRECTIONAL)
         {
             // First cascade
             {
@@ -297,7 +297,7 @@ float4 main(PSInput input) : SV_TARGET
             total += PhongReflection(light, toLightWorld, toCameraWorld, shadowFactor, texColor, normalWorld);
         }
         // Point
-        else if (light.type == 1)
+        else if (light.type == LIGHT_TYPE_POINT)
         {
             float dist = distance(input.posWorld ,light.lightPos);
             float factor = CalcAttenuation(dist, light.range);
@@ -307,9 +307,9 @@ float4 main(PSInput input) : SV_TARGET
 
         }
         // Spot
-        else if (light.type == 2)
+        else if (light.type == LIGHT_TYPE_SPOT)
         {
-            
+            // TODO
         }
     }
     

@@ -317,7 +317,7 @@ void Renderer::OnResize(UINT width, UINT height)
     }
 
     // Recreate DSV
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation.GetDescriptorHandle());
+    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation);
 }
 
 void Renderer::OnPrepareImGui()
@@ -582,7 +582,7 @@ void Renderer::LoadAssets()
 
     // Create the depth stencil view
     m_dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation.GetDescriptorHandle());
+    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation);
 
     // Set viewport and scissorRect for shadow mapping
     m_shadowMapViewport = { 0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f };
@@ -626,7 +626,7 @@ void Renderer::LoadAssets()
 
     auto pointLight = std::make_unique<PointLight>(
         m_device.Get(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(6),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(POINT_LIGHT_ARRAY_SIZE),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
         m_shadowMapResolution,
         *m_layoutTracker,
@@ -702,7 +702,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         {
             // Barrier to change layout of shadowMap to depth write
             commandList.Barrier(
-                light->GetShadowMap(),
+                    light->GetDepthBuffer(),
                 D3D12_BARRIER_SYNC_NONE,
                 D3D12_BARRIER_SYNC_DEPTH_STENCIL,
                 D3D12_BARRIER_ACCESS_NO_ACCESS,
@@ -746,7 +746,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
             // Barrier to change layout of shadowMap to SRV
             commandList.Barrier(
-                light->GetShadowMap(),
+                    light->GetDepthBuffer(),
                 D3D12_BARRIER_SYNC_DEPTH_STENCIL,
                 D3D12_BARRIER_SYNC_PIXEL_SHADING,
                 D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,

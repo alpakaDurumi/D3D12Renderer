@@ -7,13 +7,13 @@
 using namespace D3DHelper;
 
 Light::Light(DescriptorAllocation&& dsvAllocation, DescriptorAllocation&& srvAllocation, LightType type)
-    : m_shadowMapDsvAllocation(std::move(dsvAllocation)),
-    m_shadowMapSrvAllocation(std::move(srvAllocation)),
+    : m_dsvAllocation(std::move(dsvAllocation)),
+    m_srvAllocation(std::move(srvAllocation)),
     m_type(type)
 {
     UINT16 arraySize = GetRequiredArraySize(type);
 
-    assert(m_shadowMapDsvAllocation.GetNumHandles() == arraySize && !m_shadowMapSrvAllocation.IsNull());
+    assert(m_dsvAllocation.GetNumHandles() == arraySize && !m_srvAllocation.IsNull());
 
     m_cameraConstantData.resize(arraySize);
     m_cameraConstantBufferIndex.resize(arraySize);
@@ -32,8 +32,8 @@ void Light::Init(
 
     UINT16 arraySize = GetRequiredArraySize(m_type);
 
-    CreateShadowMap(pDevice, shadowMapResolution, shadowMapResolution, m_shadowMap, m_shadowMapDsvAllocation, m_shadowMapSrvAllocation.GetDescriptorHandle(), m_type);
-    layoutTracker.RegisterResource(m_shadowMap.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, arraySize, 1, DXGI_FORMAT_R32_TYPELESS);
+    CreateDepthStencilBuffer(pDevice, shadowMapResolution, shadowMapResolution, m_depthBuffer, m_dsvAllocation, arraySize);
+    layoutTracker.RegisterResource(m_depthBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, arraySize, 1, DXGI_FORMAT_R32_TYPELESS);
 
     auto cbvAllocations = cbvAllocation.Split();
 
@@ -58,19 +58,19 @@ LightType Light::GetType() const
     return m_type;
 }
 
-ID3D12Resource* Light::GetShadowMap() const
+ID3D12Resource* Light::GetDepthBuffer() const
 {
-    return m_shadowMap.Get();
+    return m_depthBuffer.Get();
 }
 
 UINT16 Light::GetArraySize() const
 {
-    return m_shadowMap->GetDesc().DepthOrArraySize;
+    return GetRequiredArraySize(m_type);
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE Light::GetDSVDescriptorHandle(UINT idx) const
 {
-    return m_shadowMapDsvAllocation.GetDescriptorHandle(idx);
+    return m_dsvAllocation.GetDescriptorHandle(idx);
 }
 
 UINT Light::GetCameraConstantBufferIndex(UINT idx) const
@@ -85,7 +85,7 @@ UINT Light::GetLightConstantBufferIndex() const
 
 DescriptorAllocation& Light::GetSRVAllocationRef()
 {
-    return m_shadowMapSrvAllocation;
+    return m_srvAllocation;
 }
 
 XMVECTOR Light::GetPosition() const
@@ -159,6 +159,7 @@ DirectionalLight::DirectionalLight(
     : Light(std::move(dsvAllocation), std::move(srvAllocation), LightType::DIRECTIONAL)
 {
     Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation));
+    CreateSRVForShadow(pDevice, m_depthBuffer.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
 }
 
 XMVECTOR DirectionalLight::GetPosition() const

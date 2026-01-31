@@ -109,14 +109,12 @@ namespace D3DHelper
         UINT width,
         UINT height,
         ComPtr<ID3D12Resource>& depthStencilBuffer,
-        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
-
-    void CreateShadowMap(
-        ID3D12Device10* pDevice,
-        UINT width,
-        UINT height,
-        ComPtr<ID3D12Resource>& shadowMap,
         DescriptorAllocation& dsvAllocation,
+        UINT16 arraySize = 1);
+
+    void CreateSRVForShadow(
+        ID3D12Device10* pDevice,
+        ID3D12Resource* pResource,
         D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle,
         LightType type);
 
