@@ -104,6 +104,11 @@ float Light::GetRange() const
     return m_lightConstantData.range;
 }
 
+UINT Light::GetIdxInArray() const
+{
+    return m_lightConstantData.idxInArray;
+}
+
 void Light::SetPosition(XMFLOAT3 pos)
 {
     XMVECTOR p = XMLoadFloat3(&pos);
@@ -136,6 +141,11 @@ void Light::SetViewProjection(XMMATRIX view, XMMATRIX projection, UINT idx)
     m_cameraConstantData[idx].SetView(view);
     m_cameraConstantData[idx].SetProjection(projection);
     m_lightConstantData.SetViewProjection(view * projection, idx);
+}
+
+void Light::SetIdxInArray(UINT idxInArray)
+{
+    m_lightConstantData.idxInArray = idxInArray;
 }
 
 void Light::UpdateCameraConstantBuffer(FrameResource& frameResource, UINT idx)

@@ -2,10 +2,22 @@
 
 Texture2D g_textures[] : register(t0, space0);
 
-Texture2DArray<float> g_shadowMaps[] : register(t0, space1);
+// SRV for lights
+Texture2DArray<float> g_directionalShadowMaps[] : register(t0, space1);
+TextureCube<float> g_PointShadowMaps[] : register(t0, space2);
+Texture2D<float> g_SpotShadowMaps[] : register(t0, space3);
 
 SamplerState g_sampler : register(s0);
-SamplerComparisonState g_samplerComparison : register(s1);
+SamplerComparisonState g_samplerComparison0 : register(s1);
+SamplerComparisonState g_samplerComparison1 : register(s2);
+
+static const float2 vogelDisk[16] =
+{
+    float2(-0.1328, 0.1651), float2(0.3341, 0.0735), float2(-0.4042, -0.3150), float2(0.5055, -0.4124),
+    float2(-0.1985, 0.5855), float2(0.1245, -0.7340), float2(-0.6401, 0.4578), float2(0.8123, 0.1901),
+    float2(-0.6254, -0.6654), float2(0.1254, 0.9412), float2(0.4512, -0.8521), float2(-0.9254, 0.1254),
+    float2(0.8521, 0.4512), float2(-0.4512, -0.9254), float2(0.1254, -0.1254), float2(0.9412, -0.1254)
+};
 
 struct PSInput
 {
@@ -55,6 +67,7 @@ struct LightConstants
     float lightIntensity;
     float4x4 viewProjection[POINT_LIGHT_ARRAY_SIZE];
     uint type;
+    uint idxInArray;
 };
 ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space1);
 
@@ -124,39 +137,19 @@ void CalcCSMIndex(float distView, out uint index, out float alpha)
     alpha = smoothstep(cascadeSplits[index] - overlap, cascadeSplits[index] + overlap, distView);
 }
 
-float PCF(uint lightIdx, uint csmIdx, float filterSize, float2 texCoord, float compareValue, float2x2 rot)
+float PCF(uint idxInArray, uint csmIdx, float filterSize, float2 texCoord, float compareValue, float2x2 rot)
 {
     float shadowFactor = 0.0f;
         
-    //static const float2 poissonDisk[16] =
-    //{
-    //    float2(-0.94201624, -0.39906216), float2(0.94558609, -0.76890725),
-    //    float2(-0.094184101, -0.92938870), float2(0.34495938, 0.29387760),
-    //    float2(-0.91588581, 0.45771432), float2(-0.81544232, -0.87912464),
-    //    float2(-0.38277543, 0.27676845), float2(0.97484398, 0.75648379),
-    //    float2(0.44323325, -0.97511554), float2(0.53742981, -0.47373420),
-    //    float2(-0.26496911, -0.41893023), float2(0.79197514, 0.19090188),
-    //    float2(-0.24188840, 0.99706507), float2(-0.81409955, 0.91437590),
-    //    float2(0.19984126, 0.78641367), float2(0.14383161, -0.14100790)
-    //};
-        
-    static const float2 vogelDisk[16] =
-    {
-        float2(-0.1328, 0.1651), float2(0.3341, 0.0735), float2(-0.4042, -0.3150), float2(0.5055, -0.4124),
-        float2(-0.1985, 0.5855), float2(0.1245, -0.7340), float2(-0.6401, 0.4578), float2(0.8123, 0.1901),
-        float2(-0.6254, -0.6654), float2(0.1254, 0.9412), float2(0.4512, -0.8521), float2(-0.9254, 0.1254),
-        float2(0.8521, 0.4512), float2(-0.4512, -0.9254), float2(0.1254, -0.1254), float2(0.9412, -0.1254)
-    };
-    
     uint width, height, elements;
-    g_shadowMaps[lightIdx].GetDimensions(width, height, elements);
+    g_directionalShadowMaps[idxInArray].GetDimensions(width, height, elements);
     float dx = filterSize / width;
         
     [unroll]
     for (uint j = 0; j < 16; ++j)
     {
         float2 rotated = mul(vogelDisk[j], rot);
-        shadowFactor += g_shadowMaps[lightIdx].SampleCmpLevelZero(g_samplerComparison, float3(texCoord + rotated * dx, float(csmIdx)), compareValue);
+        shadowFactor += g_directionalShadowMaps[idxInArray].SampleCmpLevelZero(g_samplerComparison0, float3(texCoord + rotated * dx, float(csmIdx)), compareValue);
     }
     
     shadowFactor /= 16.0f;
@@ -278,7 +271,7 @@ float4 main(PSInput input) : SV_TARGET
                 lightScreen.xyz /= lightScreen.w;
                 float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
         
-                shadowFactor = PCF(i, csmIdx, filterSize, lightTexCoord, lightScreen.z, rot);
+                shadowFactor = PCF(light.idxInArray, csmIdx, filterSize, lightTexCoord, lightScreen.z, rot);
             }
         
             // Second cascade. Only apply when overlapping can occur.
@@ -288,7 +281,7 @@ float4 main(PSInput input) : SV_TARGET
                 lightScreen.xyz /= lightScreen.w;
                 float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
         
-                float t = PCF(i, csmIdx + 1, filterSize, lightTexCoord, lightScreen.z, rot);
+                float t = PCF(light.idxInArray, csmIdx + 1, filterSize, lightTexCoord, lightScreen.z, rot);
                 shadowFactor = lerp(shadowFactor, t, alpha);
             }
             
@@ -299,12 +292,15 @@ float4 main(PSInput input) : SV_TARGET
         // Point
         else if (light.type == LIGHT_TYPE_POINT)
         {
-            float dist = distance(input.posWorld ,light.lightPos);
-            float factor = CalcAttenuation(dist, light.range);
+            float dist = distance(light.lightPos, input.posWorld);
+            float normalizedDist = dist / light.range;
             
             float3 toLightWorld = normalize(light.lightPos - input.posWorld);
+            
+            float factor = CalcAttenuation(dist, light.range) *
+                g_PointShadowMaps[light.idxInArray].SampleCmpLevelZero(g_samplerComparison1, -toLightWorld, normalizedDist);
+            
             total += PhongReflection(light, toLightWorld, toCameraWorld, factor, texColor, normalWorld);
-
         }
         // Spot
         else if (light.type == LIGHT_TYPE_SPOT)

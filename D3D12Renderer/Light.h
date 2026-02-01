@@ -41,6 +41,8 @@ public:
     virtual XMVECTOR GetDirection() const;
     virtual float GetRange() const;
 
+    UINT GetIdxInArray() const;
+
     virtual void SetPosition(XMFLOAT3 pos);
     virtual void SetPosition(XMVECTOR pos);
     virtual void SetDirection(XMFLOAT3 dir);
@@ -48,6 +50,8 @@ public:
     virtual void SetRange(float range);
 
     void SetViewProjection(XMMATRIX view, XMMATRIX projection, UINT idx);
+
+    void SetIdxInArray(UINT idxInArray);
 
     void UpdateCameraConstantBuffer(FrameResource& frameResource, UINT idx);
     void UpdateLightConstantBuffer(FrameResource& frameResource);

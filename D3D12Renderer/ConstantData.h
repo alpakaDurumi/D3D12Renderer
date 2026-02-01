@@ -72,8 +72,9 @@ struct LightConstantData : public ConstantData<LightConstantData>
     XMFLOAT3 lightColor = XMFLOAT3(1.0f, 1.0f, 1.0f);
     float lightIntensity = 1.0f;
     XMFLOAT4X4 viewProjection[POINT_LIGHT_ARRAY_SIZE];
-    UINT32 type;
-    float padding[19];
+    UINT type;
+    UINT idxInArray;
+    float padding[18];
 
     void SetPos(XMVECTOR pos)
     {

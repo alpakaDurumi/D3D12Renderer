@@ -519,7 +519,8 @@ void Renderer::LoadAssets()
 #endif
 
         std::wstring vsName = L"vs.hlsl";
-        std::wstring psName = L"ps.hlsl";
+        std::wstring psName0 = L"ps.hlsl";
+        std::wstring psName1 = L"PointLightShadowPS.hlsl";
 
         // conditional compilation for instancing
         std::vector<std::string> definesInstanced = { "INSTANCED" };
@@ -531,7 +532,8 @@ void Renderer::LoadAssets()
         shaderKeys.push_back({ vsName, definesInstanced, "vs_5_0" });
         shaderKeys.push_back({ vsName, definesDepthOnly, "vs_5_0" });
         shaderKeys.push_back({ vsName, definesInstancedDepthOnly, "vs_5_0" });
-        shaderKeys.push_back({ psName, {}, "ps_5_1" });
+        shaderKeys.push_back({ psName0, {}, "ps_5_1" });
+        shaderKeys.push_back({ psName1, {}, "ps_5_1" });
 
         for (const ShaderKey& key : shaderKeys)
         {
@@ -694,34 +696,71 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     cmdList->SetGraphicsRootSignature(pRootSignature->GetRootSignature().Get());
     m_dynamicDescriptorHeap->ParseRootSignature(*pRootSignature);       // TODO : parse root signature only when root signature changed?
 
+    // Bind light CBVs
+    UINT32 numLights = static_cast<UINT32>(m_lights.size());
+    for (UINT32 i = 0; i < numLights; ++i)
+        m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[m_lights[i]->GetLightConstantBufferIndex()]->GetAllocationRef());
+
     // Depth-only pass for shadow mapping
     {
         cmdList->RSSetViewports(1, &m_shadowMapViewport);
         cmdList->RSSetScissorRects(1, &m_shadowMapScissorRect);
 
-        for (auto& light : m_lights)
+        for (UINT i = 0; i < m_lights.size(); ++i)
         {
-            // Barrier to change layout of shadowMap to depth write
-            commandList.Barrier(
-                    light->GetDepthBuffer(),
-                D3D12_BARRIER_SYNC_NONE,
-                D3D12_BARRIER_SYNC_DEPTH_STENCIL,
-                D3D12_BARRIER_ACCESS_NO_ACCESS,
-                D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
-                D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
+            auto& light = m_lights[i];
+            bool isPointLight = light->GetType() == LightType::POINT;
 
-            // Render each cascade.
+            if (isPointLight)
+            {
+                commandList.Barrier(
+                    static_cast<PointLight*>(light.get())->GetRenderTarget(),
+                    D3D12_BARRIER_SYNC_NONE,
+                    D3D12_BARRIER_SYNC_RENDER_TARGET,
+                    D3D12_BARRIER_ACCESS_NO_ACCESS,
+                    D3D12_BARRIER_ACCESS_RENDER_TARGET,
+                    D3D12_BARRIER_LAYOUT_RENDER_TARGET);
+
+                cmdList->SetGraphicsRoot32BitConstant(9, i, 0);
+            }
+            else
+            {
+                // Barrier to change layout of shadowMap to depth write
+                commandList.Barrier(
+                    light->GetDepthBuffer(),
+                    D3D12_BARRIER_SYNC_NONE,
+                    D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+                    D3D12_BARRIER_ACCESS_NO_ACCESS,
+                    D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+                    D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
+            }
+
+            // Render each entry of shadow map.
             UINT16 arraySize = light->GetArraySize();
             for (UINT i = 0; i < arraySize; ++i)
             {
                 auto shadowMapDsvHandle = light->GetDSVDescriptorHandle(i);
-                cmdList->OMSetRenderTargets(0, nullptr, FALSE, &shadowMapDsvHandle);
+
+                if (isPointLight)
+                {
+                    auto rtvHandle = static_cast<PointLight*>(light.get())->GetRTVDescriptorHandle(i);
+                    cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &shadowMapDsvHandle);
+                }
+                else
+                {
+                    cmdList->OMSetRenderTargets(0, nullptr, FALSE, &shadowMapDsvHandle);
+                }
 
                 cmdList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
                 m_currentPSOKey.passType = DEPTH_ONLY;
                 m_currentPSOKey.vsKey = { L"vs.hlsl", {"DEPTH_ONLY"}, "vs_5_0" };
-                m_currentPSOKey.psKey = { L"", {}, "" };
+
+                if (isPointLight)
+                    m_currentPSOKey.psKey = { L"PointLightShadowPS.hlsl", {}, "ps_5_1" };
+                else
+                    m_currentPSOKey.psKey = { L"", {}, "" };
+
                 cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
                 for (const auto& mesh : m_meshes)
                 {
@@ -745,14 +784,27 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 }
             }
 
-            // Barrier to change layout of shadowMap to SRV
-            commandList.Barrier(
+            if (isPointLight)
+            {
+                commandList.Barrier(
+                    static_cast<PointLight*>(light.get())->GetRenderTarget(),
+                    D3D12_BARRIER_SYNC_RENDER_TARGET,
+                    D3D12_BARRIER_SYNC_PIXEL_SHADING,
+                    D3D12_BARRIER_ACCESS_RENDER_TARGET,
+                    D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+                    D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
+            }
+            else
+            {
+                // Barrier to change layout of shadowMap to SRV
+                commandList.Barrier(
                     light->GetDepthBuffer(),
-                D3D12_BARRIER_SYNC_DEPTH_STENCIL,
-                D3D12_BARRIER_SYNC_PIXEL_SHADING,
-                D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
-                D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-                D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
+                    D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+                    D3D12_BARRIER_SYNC_PIXEL_SHADING,
+                    D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+                    D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+                    D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
+            }
         }
     }
 
@@ -781,19 +833,17 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
         UINT32 numLights = static_cast<UINT32>(m_lights.size());
 
-        // Bind light CBVs
-        for (UINT32 i = 0; i < numLights; ++i)
-            m_dynamicDescriptorHeap->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[m_lights[i]->GetLightConstantBufferIndex()]->GetAllocationRef());
-
         // Bind textures
         m_dynamicDescriptorHeap->StageDescriptors(5, 0, 1, m_albedo->GetAllocationRef());
         m_dynamicDescriptorHeap->StageDescriptors(5, 1, 1, m_normalMap->GetAllocationRef());
         m_dynamicDescriptorHeap->StageDescriptors(5, 2, 1, m_heightMap->GetAllocationRef());
 
         // Bind shadow SRVs
-        for (UINT i = 0; i < m_lights.size(); ++i)
+        for (const auto& light : m_lights)
         {
-            m_dynamicDescriptorHeap->StageDescriptors(6, i, 1, m_lights[i]->GetSRVAllocationRef());
+            LightType type = light->GetType();
+            UINT idxInArray = light->GetIdxInArray();
+            m_dynamicDescriptorHeap->StageDescriptors(6 + static_cast<UINT32>(type), idxInArray, 1, light->GetSRVAllocationRef());
         }
 
         m_currentPSOKey.passType = DEFAULT;
@@ -884,7 +934,7 @@ void Renderer::SetMeshType(MeshType meshType)
 
 RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
 {
-    auto [it, inserted] = m_rootSignatures.try_emplace(rsKey, std::make_unique<RootSignature>(7, 2));
+    auto [it, inserted] = m_rootSignatures.try_emplace(rsKey, std::make_unique<RootSignature>(10, 3));
     RootSignature& rootSignature = *it->second;
 
     // Create root signature if cache not exists.
@@ -907,11 +957,22 @@ RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
         rootSignature[5].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
         // Descriptor table for shadowMaps[]
+        // Directional
         rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
         rootSignature[6].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+        // Point
+        rootSignature[7].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+        rootSignature[7].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+        // Spot
+        rootSignature[8].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+        rootSignature[8].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+
+        // Root constant for PointLightShadowPS
+        rootSignature[9].InitAsConstant(4, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
         rootSignature.InitStaticSampler(0, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL, rsKey.filtering, rsKey.addressingMode);
         rootSignature.InitStaticSampler(1, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_GREATER_EQUAL);
+        rootSignature.InitStaticSampler(2, 0, 2, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_LESS_EQUAL);
 
         rootSignature.Finalize(m_device.Get());
     }
@@ -1004,7 +1065,15 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
 
         if (psoKey.passType == DEPTH_ONLY)
         {
-            psoDesc.NumRenderTargets = 0;
+            if (psoKey.psKey.fileName == L"PointLightShadowPS.hlsl")
+            {
+                psoDesc.NumRenderTargets = 1;
+                psoDesc.RTVFormats[0] = DXGI_FORMAT_R32_FLOAT;
+            }
+            else
+            {
+                psoDesc.NumRenderTargets = 0;
+            }
         }
         else
         {
@@ -1170,6 +1239,21 @@ void Renderer::PrepareConstantData()
             XMMATRIX view = XMMatrixLookToLH(pos, Directions[i], Ups[i]);
             m_lights[1]->SetViewProjection(view, projection, i);
         }
+    }
+
+    // Set idxInArray for each light.
+    UINT numDirectionalLight = 0;
+    UINT numPointLight = 0;
+    UINT numSpotLight = 0;
+    for (auto& light : m_lights)
+    {
+        LightType type = light->GetType();
+
+        UINT& cnt = (type == LightType::DIRECTIONAL) ? numDirectionalLight :
+            (type == LightType::POINT ? numPointLight : numSpotLight);
+
+        light->SetIdxInArray(cnt);
+        ++cnt;
     }
 }
 
