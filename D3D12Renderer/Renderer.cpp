@@ -687,6 +687,8 @@ void Renderer::LoadAssets()
 
 void Renderer::PopulateCommandList(CommandList& commandList)
 {
+    PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"PopulateCommandList");
+
     FrameResource& frameResource = *m_frameResources[m_frameIndex];
 
     auto cmdList = commandList.GetCommandList();

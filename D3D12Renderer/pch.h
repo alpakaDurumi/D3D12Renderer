@@ -27,3 +27,11 @@
 #include <exception>
 #include <stdexcept>
 #include <algorithm>
+
+// PIX Event
+#ifdef USE_PIX
+#include "pix3.h"
+#define PIX_SCOPED_EVENT(cmdList, color, name) PIXScopedEvent(cmdList, color, name)
+#else
+#define PIX_SCOPED_EVENT(cmdList, color, name)
+#endif  // USE_PIX
