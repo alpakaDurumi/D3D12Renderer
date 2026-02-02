@@ -27,14 +27,14 @@ enum class TextureAddressingMode
     NUM_TEXTURE_ADDRESSING_MODES
 };
 
-enum MeshType
+enum class MeshType
 {
     DEFUALT,
     INSTANCED,
     NUM_MESH_TYPES
 };
 
-enum PassType
+enum class PassType
 {
     DEFAULT,
     DEPTH_ONLY,

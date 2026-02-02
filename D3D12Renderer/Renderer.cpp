@@ -706,6 +706,24 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->RSSetViewports(1, &m_shadowMapViewport);
         cmdList->RSSetScissorRects(1, &m_shadowMapScissorRect);
 
+        // Pre-query PSOs
+        m_currentPSOKey.meshType = MeshType::DEFUALT;
+        m_currentPSOKey.passType = PassType::DEPTH_ONLY;
+        m_currentPSOKey.vsKey = { L"vs.hlsl", {"DEPTH_ONLY"}, "vs_5_0" };
+        m_currentPSOKey.psKey = { L"", {}, "" };
+        auto* shadowPSO = GetPipelineState(m_currentPSOKey);
+
+        m_currentPSOKey.meshType = MeshType::INSTANCED;
+        m_currentPSOKey.vsKey.defines = { "INSTANCED", "DEPTH_ONLY" };
+        auto* shadowPSOInstanced = GetPipelineState(m_currentPSOKey);
+
+        m_currentPSOKey.psKey = { L"PointLightShadowPS.hlsl", {}, "ps_5_1" };
+        auto* pointShadowPSOInstanced = GetPipelineState(m_currentPSOKey);
+
+        m_currentPSOKey.meshType = MeshType::DEFUALT;
+        m_currentPSOKey.vsKey.defines = { "DEPTH_ONLY" };
+        auto* pointShadowPSO = GetPipelineState(m_currentPSOKey);
+
         for (UINT i = 0; i < m_lights.size(); ++i)
         {
             auto& light = m_lights[i];
@@ -757,15 +775,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
                 cmdList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
-                m_currentPSOKey.passType = DEPTH_ONLY;
-                m_currentPSOKey.vsKey = { L"vs.hlsl", {"DEPTH_ONLY"}, "vs_5_0" };
-
-                if (isPointLight)
-                    m_currentPSOKey.psKey = { L"PointLightShadowPS.hlsl", {}, "ps_5_1" };
-                else
-                    m_currentPSOKey.psKey = { L"", {}, "" };
-
-                cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
+                cmdList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
                 for (const auto& mesh : m_meshes)
                 {
                     cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
@@ -775,9 +785,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                     mesh.Render(cmdList);
                 }
 
-                m_currentPSOKey.vsKey.defines = { "INSTANCED", "DEPTH_ONLY" };
-                SetMeshType(MeshType::INSTANCED);
-                cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
+                cmdList->SetPipelineState(isPointLight ? pointShadowPSOInstanced : shadowPSOInstanced);
                 for (const auto& mesh : m_instancedMeshes)
                 {
                     cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
@@ -817,6 +825,17 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->RSSetViewports(1, &m_viewport);
         cmdList->RSSetScissorRects(1, &m_scissorRect);
 
+        // Pre-query PSOs
+        m_currentPSOKey.meshType = MeshType::DEFUALT;
+        m_currentPSOKey.passType = PassType::DEFAULT;
+        m_currentPSOKey.vsKey = { L"vs.hlsl", {}, "vs_5_0" };
+        m_currentPSOKey.psKey = { L"ps.hlsl", {}, "ps_5_1" };
+        auto* pso = GetPipelineState(m_currentPSOKey);
+
+        m_currentPSOKey.meshType = MeshType::INSTANCED;
+        m_currentPSOKey.vsKey.defines = { "INSTANCED" };
+        auto* psoInstanced = GetPipelineState(m_currentPSOKey);
+
         commandList.Barrier(
             frameResource.m_renderTarget.Get(),
             D3D12_BARRIER_SYNC_NONE,
@@ -850,10 +869,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             m_dynamicDescriptorHeap->StageDescriptors(6 + static_cast<UINT32>(type), idxInArray, 1, light->GetSRVAllocationRef());
         }
 
-        m_currentPSOKey.passType = DEFAULT;
-        m_currentPSOKey.vsKey = { L"vs.hlsl", {}, "vs_5_0" };
-        m_currentPSOKey.psKey = { L"ps.hlsl", {}, "ps_5_1" };
-        cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
+        cmdList->SetPipelineState(pso);
         for (const auto& mesh : m_meshes)
         {
             cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
@@ -866,9 +882,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             mesh.Render(cmdList);
         }
 
-        m_currentPSOKey.vsKey.defines = { "INSTANCED" };
-        SetMeshType(MeshType::INSTANCED);
-        cmdList->SetPipelineState(GetPipelineState(m_currentPSOKey));
+        cmdList->SetPipelineState(psoInstanced);
         for (const auto& mesh : m_instancedMeshes)
         {
             cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
@@ -974,6 +988,7 @@ RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
         // Root constant for PointLightShadowPS
         rootSignature[9].InitAsConstant(4, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
+        // Static samplers
         rootSignature.InitStaticSampler(0, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL, rsKey.filtering, rsKey.addressingMode);
         rootSignature.InitStaticSampler(1, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_GREATER_EQUAL);
         rootSignature.InitStaticSampler(2, 0, 2, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_LESS_EQUAL);
@@ -996,7 +1011,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
         rasterizerDesc.FrontCounterClockwise = FALSE;
 
-        if (psoKey.passType == DEPTH_ONLY)
+        if (psoKey.passType == PassType::DEPTH_ONLY)
         {
             rasterizerDesc.DepthBias = -5000;
             rasterizerDesc.DepthBiasClamp = -0.1f;
@@ -1067,7 +1082,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         psoDesc.SampleMask = UINT_MAX;
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
-        if (psoKey.passType == DEPTH_ONLY)
+        if (psoKey.passType == PassType::DEPTH_ONLY)
         {
             if (psoKey.psKey.fileName == L"PointLightShadowPS.hlsl")
             {
