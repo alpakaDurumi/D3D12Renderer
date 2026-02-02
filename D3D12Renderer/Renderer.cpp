@@ -745,6 +745,10 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 {
                     auto rtvHandle = static_cast<PointLight*>(light.get())->GetRTVDescriptorHandle(i);
                     cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &shadowMapDsvHandle);
+
+                    XMVECTORF32 clearColor;
+                    clearColor.v = XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f);
+                    cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
                 }
                 else
                 {
