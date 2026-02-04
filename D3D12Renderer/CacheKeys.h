@@ -6,30 +6,9 @@
 
 #include "Utility.h"
 
-enum class TextureFiltering
-{
-    POINT,
-    BILINEAR,
-    ANISOTROPIC_X2,
-    ANISOTROPIC_X4,
-    ANISOTROPIC_X8,
-    ANISOTROPIC_X16,
-    NUM_TEXTURE_FILTERINGS
-};
-
-enum class TextureAddressingMode
-{
-    WRAP,
-    MIRROR,
-    CLAMP,
-    BORDER,
-    MIRROR_ONCE,
-    NUM_TEXTURE_ADDRESSING_MODES
-};
-
 enum class MeshType
 {
-    DEFUALT,
+    DEFAULT,
     INSTANCED,
     NUM_MESH_TYPES
 };
@@ -39,27 +18,6 @@ enum class PassType
     DEFAULT,
     DEPTH_ONLY,
     NUM_PASS_TYPES
-};
-
-// Key that identify unique root signature.
-// For now, only use attributes of static sampler to distinguish root signatures.
-struct RSKey
-{
-    TextureFiltering filtering;
-    TextureAddressingMode addressingMode;
-
-    bool operator==(const RSKey& other) const;
-};
-
-// Specialization for hashing RSKey (required for std::unordered_map)
-template<>
-struct std::hash<RSKey>
-{
-    std::size_t operator()(const RSKey& key) const
-    {
-        size_t combined = (static_cast<size_t>(key.filtering) << 3) | static_cast<size_t>(key.addressingMode);
-        return std::hash<size_t>()(combined);
-    }
 };
 
 // Key that identify unique ShaderBlob.
@@ -75,6 +33,7 @@ struct ShaderKey
     bool IsEmpty() const;
 };
 
+// Specialization for hashing ShaderKey (required for std::unordered_map)
 template<>
 struct std::hash<ShaderKey>
 {
@@ -99,10 +58,8 @@ struct std::hash<ShaderKey>
 // Key that identify unique PSO.
 struct PSOKey
 {
-    TextureFiltering filtering;             // 3
-    TextureAddressingMode addressingMode;   // 3
-    MeshType meshType;                      // 1
-    PassType passType;                      // 1
+    MeshType meshType;  // 1
+    PassType passType;  // 1
 
     ShaderKey vsKey;
     ShaderKey psKey;
@@ -110,7 +67,6 @@ struct PSOKey
     bool operator==(const PSOKey& other) const;
 };
 
-// Specialization for hashing PSOKey (required for std::unordered_map)
 template<>
 struct std::hash<PSOKey>
 {
@@ -119,8 +75,6 @@ struct std::hash<PSOKey>
         size_t seed = 0;
 
         size_t combinedBits =
-            (static_cast<size_t>(key.filtering) << 5) |
-            (static_cast<size_t>(key.addressingMode) << 2) |
             (static_cast<size_t>(key.meshType) << 1) |
             static_cast<size_t>(key.passType);
 

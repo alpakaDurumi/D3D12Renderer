@@ -505,6 +505,9 @@ void Renderer::LoadPipeline()
 
         m_frameResources.push_back(std::move(frameResource));
     }
+
+    CreateRootSignature();
+    m_dynamicDescriptorHeap->ParseRootSignature(*m_rootSignature);
 }
 
 // Load the sample assets.
@@ -578,7 +581,7 @@ void Renderer::LoadAssets()
             { "INSTANCE_INVTRANSPOSE", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
         };
 
-        m_inputLayouts.emplace(MeshType::DEFUALT, std::move(inputElementDescsDefault));
+        m_inputLayouts.emplace(MeshType::DEFAULT, std::move(inputElementDescsDefault));
         m_inputLayouts.emplace(MeshType::INSTANCED, std::move(inputElementDescsInstanced));
     }
 
@@ -693,10 +696,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
     auto cmdList = commandList.GetCommandList();
 
-    // Set and parse root signature
-    auto pRootSignature = GetRootSignature(m_currentRSKey);
-    cmdList->SetGraphicsRootSignature(pRootSignature->GetRootSignature().Get());
-    m_dynamicDescriptorHeap->ParseRootSignature(*pRootSignature);       // TODO : parse root signature only when root signature changed?
+    // Set root signature
+    cmdList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature().Get());
 
     // Bind light CBVs
     UINT32 numLights = static_cast<UINT32>(m_lights.size());
@@ -709,7 +710,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->RSSetScissorRects(1, &m_shadowMapScissorRect);
 
         // Pre-query PSOs
-        m_currentPSOKey.meshType = MeshType::DEFUALT;
+        m_currentPSOKey.meshType = MeshType::DEFAULT;
         m_currentPSOKey.passType = PassType::DEPTH_ONLY;
         m_currentPSOKey.vsKey = { L"vs.hlsl", {"DEPTH_ONLY"}, "vs_5_0" };
         m_currentPSOKey.psKey = { L"", {}, "" };
@@ -722,7 +723,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         m_currentPSOKey.psKey = { L"PointLightShadowPS.hlsl", {}, "ps_5_1" };
         auto* pointShadowPSOInstanced = GetPipelineState(m_currentPSOKey);
 
-        m_currentPSOKey.meshType = MeshType::DEFUALT;
+        m_currentPSOKey.meshType = MeshType::DEFAULT;
         m_currentPSOKey.vsKey.defines = { "DEPTH_ONLY" };
         auto* pointShadowPSO = GetPipelineState(m_currentPSOKey);
 
@@ -828,7 +829,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->RSSetScissorRects(1, &m_scissorRect);
 
         // Pre-query PSOs
-        m_currentPSOKey.meshType = MeshType::DEFUALT;
+        m_currentPSOKey.meshType = MeshType::DEFAULT;
         m_currentPSOKey.passType = PassType::DEFAULT;
         m_currentPSOKey.vsKey = { L"vs.hlsl", {}, "vs_5_0" };
         m_currentPSOKey.psKey = { L"ps.hlsl", {}, "ps_5_1" };
@@ -937,14 +938,7 @@ void Renderer::InitImGui()
 
 void Renderer::SetTextureFiltering(TextureFiltering filtering)
 {
-    m_currentRSKey.filtering = filtering;
-    m_currentPSOKey.filtering = filtering;
-}
-
-void Renderer::SetTextureAddressingMode(TextureAddressingMode addressingMode)
-{
-    m_currentRSKey.addressingMode = addressingMode;
-    m_currentPSOKey.addressingMode = addressingMode;
+    m_currentTextureFiltering = filtering;
 }
 
 void Renderer::SetMeshType(MeshType meshType)
@@ -952,53 +946,47 @@ void Renderer::SetMeshType(MeshType meshType)
     m_currentPSOKey.meshType = meshType;
 }
 
-RootSignature* Renderer::GetRootSignature(const RSKey& rsKey)
+void Renderer::CreateRootSignature()
 {
-    auto [it, inserted] = m_rootSignatures.try_emplace(rsKey, std::make_unique<RootSignature>(10, 3));
-    RootSignature& rootSignature = *it->second;
+    m_rootSignature = std::make_unique<RootSignature>(10, 3);
+    auto& rootSignature = *m_rootSignature;
 
-    // Create root signature if cache not exists.
-    if (inserted)
-    {
-        // Root descriptor for MeshCB, CameraCB, MaterialCB, and ShadowCB
-        rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Mesh
-        rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Camera
-        rootSignature[2].InitAsDescriptor(2, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Material
-        rootSignature[3].InitAsDescriptor(3, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Shadow
+    // Root descriptor for MeshCB, CameraCB, MaterialCB, and ShadowCB
+    rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Mesh
+    rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Camera
+    rootSignature[2].InitAsDescriptor(2, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Material
+    rootSignature[3].InitAsDescriptor(3, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Shadow
 
-        // Descriptor table for LightConstantBuffers[]
-        rootSignature[4].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootSignature[4].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    // Descriptor table for LightConstantBuffers[]
+    rootSignature[4].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[4].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
-        // Descriptor table for textures (albedo, normal map, height map)
-        // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
-        // GPU jobs (UpdateSubresources) are already finished when recording command list. I don't know why DATA_STATIC flag fails.
-        rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootSignature[5].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    // Descriptor table for textures (albedo, normal map, height map)
+    // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
+    // GPU jobs (UpdateSubresources) are already finished when recording command list. I don't know why DATA_STATIC flag fails.
+    rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[5].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
-        // Descriptor table for shadowMaps[]
-        // Directional
-        rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootSignature[6].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
-        // Point
-        rootSignature[7].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootSignature[7].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
-        // Spot
-        rootSignature[8].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-        rootSignature[8].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    // Descriptor table for shadowMaps[]
+    // Directional
+    rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[6].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    // Point
+    rootSignature[7].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[7].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    // Spot
+    rootSignature[8].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[8].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
-        // Root constant for PointLightShadowPS
-        rootSignature[9].InitAsConstant(4, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    // Root constant for PointLightShadowPS
+    rootSignature[9].InitAsConstant(4, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
-        // Static samplers
-        rootSignature.InitStaticSampler(0, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL, rsKey.filtering, rsKey.addressingMode);
-        rootSignature.InitStaticSampler(1, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_GREATER_EQUAL);
-        rootSignature.InitStaticSampler(2, 0, 2, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_LESS_EQUAL);
+    // Static samplers
+    rootSignature.InitStaticSampler(0, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL, m_currentTextureFiltering, TextureAddressingMode::WRAP);
+    rootSignature.InitStaticSampler(1, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_GREATER_EQUAL);
+    rootSignature.InitStaticSampler(2, 0, 2, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_LESS_EQUAL);
 
-        rootSignature.Finalize(m_device.Get());
-    }
-
-    return &rootSignature;
+    rootSignature.Finalize(m_device.Get());
 }
 
 ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
@@ -1066,7 +1054,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         // Describe and create the graphics pipeline state object (PSO).
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
         psoDesc.InputLayout = { m_inputLayouts[psoKey.meshType].data(), static_cast<UINT>(m_inputLayouts[psoKey.meshType].size()) };
-        psoDesc.pRootSignature = GetRootSignature(m_currentRSKey)->GetRootSignature().Get();
+        psoDesc.pRootSignature = m_rootSignature->GetRootSignature().Get();
 
         // Shader stages are selected by demand.
         // VS is essential for rasterization.

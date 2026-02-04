@@ -93,11 +93,10 @@ private:
     std::array<std::unique_ptr<DescriptorAllocator>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
     std::vector<std::unique_ptr<FrameResource>> m_frameResources;
 
-    std::unordered_map<RSKey, std::unique_ptr<RootSignature>> m_rootSignatures;
+    std::unique_ptr<RootSignature> m_rootSignature;
     std::unordered_map<PSOKey, ComPtr<ID3D12PipelineState>> m_pipelineStates;
 
-    RSKey m_currentRSKey = { TextureFiltering::ANISOTROPIC_X16, TextureAddressingMode::WRAP };
-    PSOKey m_currentPSOKey = { TextureFiltering::ANISOTROPIC_X16, TextureAddressingMode::WRAP, MeshType::DEFUALT };
+    PSOKey m_currentPSOKey = { MeshType::DEFAULT, PassType::DEFAULT };
 
     std::unordered_map<MeshType, std::vector<D3D12_INPUT_ELEMENT_DESC>> m_inputLayouts;
     std::unordered_map<ShaderKey, ComPtr<ID3DBlob>> m_shaderBlobs;
@@ -130,6 +129,9 @@ private:
     UINT m_shadowMapResolution = 2048;
     ShadowConstantData m_shadowConstantData;
 
+    // WIP : texture filtering is fixed for now.
+    TextureFiltering m_currentTextureFiltering = TextureFiltering::ANISOTROPIC_X16;
+
     // For ImGui
     std::unique_ptr<ImGuiDescriptorAllocator> m_imguiDescriptorAllocator;
     static Renderer* sm_instance;
@@ -145,10 +147,9 @@ private:
     void InitImGui();
 
     void SetTextureFiltering(TextureFiltering filtering);
-    void SetTextureAddressingMode(TextureAddressingMode addressingMode);
     void SetMeshType(MeshType meshType);
 
-    RootSignature* GetRootSignature(const RSKey& rsKey);
+    void CreateRootSignature();
     ID3D12PipelineState* GetPipelineState(const PSOKey& psoKey);
     ID3DBlob* GetShaderBlob(const ShaderKey& shaderKey);
 
