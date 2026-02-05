@@ -969,7 +969,7 @@ void Renderer::SetMeshType(MeshType meshType)
     m_currentPSOKey.meshType = meshType;
 }
 
-UINT CalcSamplerIndex(TextureFiltering filtering, TextureAddressingMode addressingMode)
+UINT Renderer::CalcSamplerIndex(TextureFiltering filtering, TextureAddressingMode addressingMode)
 {
     return static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES) * static_cast<UINT>(filtering) + static_cast<UINT>(addressingMode);
 }
