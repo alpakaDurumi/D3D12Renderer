@@ -40,8 +40,6 @@ public:
     
     bool CheckHeapChanged();
 
-    void SetAllTablesAsStale();
-
     void CommitStagedDescriptorsForDraw(ID3D12GraphicsCommandList7* pCommandList);
     void CommitStagedDescriptorsForDispatch(ID3D12GraphicsCommandList7* pCommandList);
 
@@ -94,7 +92,6 @@ private:
     UINT32 m_currentOffset;
 
     UINT m_numParameters;
-    UINT m_numStaticSamplers;
 
     // Represents the index in the root signature that contains a descriptor table
     UINT16 m_descriptorTableBitMask;

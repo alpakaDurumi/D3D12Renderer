@@ -27,7 +27,6 @@
 #include "ImGuiDescriptorAllocator.h"
 #include "CacheKeys.h"
 #include "Light.h"
-#include "Sampler.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -88,7 +87,7 @@ private:
     ComPtr<IDXGISwapChain3> m_swapChain;
 
     std::unique_ptr<DynamicDescriptorHeap> m_dynamicDescriptorHeapForCBVSRVUAV;
-    std::unique_ptr<DynamicDescriptorHeap> m_dynamicDescriptorHeapForSampler;
+    ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
     std::unique_ptr<CommandQueue> m_commandQueue;
     std::unique_ptr<ResourceLayoutTracker> m_layoutTracker;
     std::unique_ptr<UploadBuffer> m_uploadBuffer;
@@ -105,8 +104,6 @@ private:
 
     ComPtr<ID3D12Resource> m_depthStencilBuffer;
     DescriptorAllocation m_dsvAllocation;
-
-    std::vector<std::unique_ptr<Sampler>> m_samplers;
 
     // App resources
     // 
@@ -154,7 +151,7 @@ private:
     void SetMeshType(MeshType meshType);
     UINT CalcSamplerIndex(TextureFiltering filtering, TextureAddressingMode addressingMode);
 
-    void CommitStagedDescriptorsForDraw(ID3D12GraphicsCommandList7* pCommandList);
+    void BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList);
 
     void CreateRootSignature();
     ID3D12PipelineState* GetPipelineState(const PSOKey& psoKey);

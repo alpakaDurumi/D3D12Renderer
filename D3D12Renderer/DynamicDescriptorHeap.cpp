@@ -19,7 +19,6 @@ DynamicDescriptorHeap::DynamicDescriptorHeap(const ComPtr<ID3D12Device10>& devic
     , m_pCommandQueue(nullptr)
     , m_currentOffset(0)
     , m_numParameters(0)
-    , m_numStaticSamplers(0)
 {
     m_descriptorHandleIncrementSize = device->GetDescriptorHandleIncrementSize(m_heapType);
 
@@ -45,7 +44,6 @@ void DynamicDescriptorHeap::ParseRootSignature(const RootSignature& rootSignatur
     m_currentOffset = 0;
 
     m_numParameters = rootSignature.GetNumParameters();
-    m_numStaticSamplers = rootSignature.GetNumStaticSamplers();
 }
 
 // Staging new parameters MUST be done in ascending order of parameter index.
@@ -179,18 +177,15 @@ bool DynamicDescriptorHeap::CheckHeapChanged()
             m_currentGPUDescriptorHandle = m_currentHeap->GetGPUDescriptorHandleForHeapStart();
             m_numFreeHandles = m_numDescriptorsPerHeap;
 
+            // When updating the descriptor heap on the command list, all descriptor
+            // tables must be (re)recopied to the new descriptor heap (not just the stale descriptor tables)
+            m_staleDescriptorTableBitMask = m_descriptorTableBitMask;
+
             return true;
         }
     }
 
     return false;
-}
-
-// When updating the descriptor heap on the command list, all descriptor
-// tables must be (re)recopied to the new descriptor heap (not just the stale descriptor tables)
-void DynamicDescriptorHeap::SetAllTablesAsStale()
-{
-    m_staleDescriptorTableBitMask = m_descriptorTableBitMask;
 }
 
 void DynamicDescriptorHeap::CommitStagedDescriptors(ID3D12GraphicsCommandList7* pCommandList, std::function<void(ID3D12GraphicsCommandList*, UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc)

@@ -118,6 +118,12 @@ namespace D3DHelper
         D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle,
         LightType type);
 
+    void CreateSampler(
+        ID3D12Device* pDevice,
+        TextureFiltering filtering,
+        TextureAddressingMode addressingMode,
+        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
+
     UINT16 GetRequiredArraySize(LightType type);
 
     UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format);

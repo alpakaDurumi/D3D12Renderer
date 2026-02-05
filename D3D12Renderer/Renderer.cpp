@@ -210,7 +210,6 @@ void Renderer::OnRender()
     PopulateCommandList(commandList);
 
     m_dynamicDescriptorHeapForCBVSRVUAV->Reset();
-    m_dynamicDescriptorHeapForSampler->Reset();
 
     // ImGui Render
     // Is it OK to call SetDescriptorHeaps? (Does it affect performance?)
@@ -237,7 +236,6 @@ void Renderer::OnRender()
     m_frameResources[m_frameIndex]->m_fenceValue = fenceValue;
     m_uploadBuffer->QueueRetiredPages(fenceValue);
     m_dynamicDescriptorHeapForCBVSRVUAV->QueueRetiredHeaps(fenceValue);
-    m_dynamicDescriptorHeapForSampler->QueueRetiredHeaps(fenceValue);
 
     // Present the frame.
     UINT syncInterval = m_vSync ? 1 : 0;
@@ -440,7 +438,6 @@ void Renderer::LoadPipeline()
     // Instead, pass the constructor arguments directly to std::make_unique<T>()
     m_commandQueue = std::make_unique<CommandQueue>(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
     m_dynamicDescriptorHeapForCBVSRVUAV = std::make_unique<DynamicDescriptorHeap>(m_device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_dynamicDescriptorHeapForSampler = std::make_unique<DynamicDescriptorHeap>(m_device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
     m_uploadBuffer = std::make_unique<UploadBuffer>(m_device, 16 * 1024 * 1024);    // 16MB
     m_layoutTracker = std::make_unique<ResourceLayoutTracker>(m_device);
     for (UINT i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
@@ -450,10 +447,19 @@ void Renderer::LoadPipeline()
         m_descriptorAllocators[i]->SetCommandQueue(m_commandQueue.get());       // Dependency injection
     }
 
+    // Create descriptor heap for samplers
+    UINT numSamplers = static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS) * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES);
+
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+    heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+    heapDesc.NumDescriptors = numSamplers;
+    heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+    ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_samplerDescriptorHeap)));
+
     // Dependency injections
-    m_commandQueue->SetDynamicDescriptorHeap(m_dynamicDescriptorHeapForCBVSRVUAV.get(), m_dynamicDescriptorHeapForSampler.get());
+    m_commandQueue->SetDescriptorHeaps(m_dynamicDescriptorHeapForCBVSRVUAV.get(), m_samplerDescriptorHeap.Get());
     m_dynamicDescriptorHeapForCBVSRVUAV->SetCommandQueue(m_commandQueue.get());
-    m_dynamicDescriptorHeapForSampler->SetCommandQueue(m_commandQueue.get());
     m_uploadBuffer->SetCommandQueue(m_commandQueue.get());
 
     // For ImGui
@@ -512,7 +518,6 @@ void Renderer::LoadPipeline()
 
     CreateRootSignature();
     m_dynamicDescriptorHeapForCBVSRVUAV->ParseRootSignature(*m_rootSignature);
-    m_dynamicDescriptorHeapForSampler->ParseRootSignature(*m_rootSignature);
 }
 
 // Load the sample assets.
@@ -618,12 +623,16 @@ void Renderer::LoadAssets()
     }
 
     // Add samplers
+    auto baseCPUHandle = m_samplerDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+    auto incrementSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+
     for (UINT i = 0; i < static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS); ++i)
     {
         for (UINT j = 0; j < static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES); ++j)
         {
-            auto sampler = std::make_unique<Sampler>(m_device.Get(), static_cast<TextureFiltering>(i), static_cast<TextureAddressingMode>(j), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER]->Allocate());
-            m_samplers.push_back(std::move(sampler));
+            UINT idx = i * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES) + j;
+            auto cpuHandle = GetCPUDescriptorHandle(baseCPUHandle, idx, incrementSize);
+            CreateSampler(m_device.Get(), static_cast<TextureFiltering>(i), static_cast<TextureAddressingMode>(j), cpuHandle);
         }
     }
 
@@ -714,17 +723,17 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     // Set root signature
     cmdList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature().Get());
 
-    // Bind light CBVs
+    // Stage light CBVs
     UINT32 numLights = static_cast<UINT32>(m_lights.size());
     for (UINT32 i = 0; i < numLights; ++i)
         m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[m_lights[i]->GetLightConstantBufferIndex()]->GetAllocationRef());
 
-    // Bind textures
+    // Stage textures
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, 0, 1, m_albedo->GetAllocationRef());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, 1, 1, m_normalMap->GetAllocationRef());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, 2, 1, m_heightMap->GetAllocationRef());
 
-    // Bind shadow SRVs
+    // Stage shadow SRVs
     for (const auto& light : m_lights)
     {
         LightType type = light->GetType();
@@ -732,17 +741,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6 + static_cast<UINT32>(type), idxInArray, 1, light->GetSRVAllocationRef());
     }
 
-    // Bind samplers
-    for (UINT i = 0; i < static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS); ++i)
-    {
-        for (UINT j = 0; j < static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES); ++j)
-        {
-            UINT idx = i * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES) + j;
-            m_dynamicDescriptorHeapForSampler->StageDescriptors(10, idx, 1, m_samplers[idx]->GetAllocationRef());
-        }
-    }
-
-    CommitStagedDescriptorsForDraw(cmdList.Get());
+    BindDescriptorTables(cmdList.Get());
 
     // Depth-only pass for shadow mapping
     {
@@ -974,22 +973,18 @@ UINT Renderer::CalcSamplerIndex(TextureFiltering filtering, TextureAddressingMod
     return static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES) * static_cast<UINT>(filtering) + static_cast<UINT>(addressingMode);
 }
 
-void Renderer::CommitStagedDescriptorsForDraw(ID3D12GraphicsCommandList7* pCommandList)
+void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList)
 {
     bool CBVSRVUAVHeapChanged = m_dynamicDescriptorHeapForCBVSRVUAV->CheckHeapChanged();
-    bool samplerHeapChanged = m_dynamicDescriptorHeapForSampler->CheckHeapChanged();
 
-    if (CBVSRVUAVHeapChanged || samplerHeapChanged)
+    if (CBVSRVUAVHeapChanged)
     {
-        ID3D12DescriptorHeap* ppHeaps[] = { m_dynamicDescriptorHeapForCBVSRVUAV->GetCurrentDescriptorHeap(), m_dynamicDescriptorHeapForSampler->GetCurrentDescriptorHeap() };
+        ID3D12DescriptorHeap* ppHeaps[] = { m_dynamicDescriptorHeapForCBVSRVUAV->GetCurrentDescriptorHeap(), m_samplerDescriptorHeap.Get()};
         pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-
-        m_dynamicDescriptorHeapForCBVSRVUAV->SetAllTablesAsStale();
-        m_dynamicDescriptorHeapForSampler->SetAllTablesAsStale();
     }
 
     m_dynamicDescriptorHeapForCBVSRVUAV->CommitStagedDescriptorsForDraw(pCommandList);
-    m_dynamicDescriptorHeapForSampler->CommitStagedDescriptorsForDraw(pCommandList);
+    pCommandList->SetGraphicsRootDescriptorTable(10, m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart());    // Root parameter 10
 }
 
 void Renderer::CreateRootSignature()
