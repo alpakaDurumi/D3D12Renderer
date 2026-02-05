@@ -744,10 +744,6 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
     CommitStagedDescriptorsForDraw(cmdList.Get());
 
-    // Texture addressing mode should be different for each mesh.
-    // Use WRAP for now.
-    cmdList->SetGraphicsRoot32BitConstant(11, static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES) * static_cast<UINT>(TextureFiltering::ANISOTROPIC_X16) + static_cast<UINT>(TextureAddressingMode::WRAP), 0);
-
     // Depth-only pass for shadow mapping
     {
         cmdList->RSSetViewports(1, &m_shadowMapViewport);
@@ -907,6 +903,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(3, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
 
+            cmdList->SetGraphicsRoot32BitConstant(11, CalcSamplerIndex(m_currentTextureFiltering, mesh.m_textureAddressingMode), 0);
+
             mesh.Render(cmdList);
         }
 
@@ -917,6 +915,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(3, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
+
+            cmdList->SetGraphicsRoot32BitConstant(11, CalcSamplerIndex(m_currentTextureFiltering, mesh.m_textureAddressingMode), 0);
 
             mesh.Render(cmdList);
         }
@@ -967,6 +967,11 @@ void Renderer::SetTextureFiltering(TextureFiltering filtering)
 void Renderer::SetMeshType(MeshType meshType)
 {
     m_currentPSOKey.meshType = meshType;
+}
+
+UINT CalcSamplerIndex(TextureFiltering filtering, TextureAddressingMode addressingMode)
+{
+    return static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES) * static_cast<UINT>(filtering) + static_cast<UINT>(addressingMode);
 }
 
 void Renderer::CommitStagedDescriptorsForDraw(ID3D12GraphicsCommandList7* pCommandList)

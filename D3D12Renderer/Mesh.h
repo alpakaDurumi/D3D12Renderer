@@ -13,6 +13,7 @@
 #include "ConstantData.h"
 #include "FrameResource.h"
 #include "GeometryGenerator.h"
+#include "SharedConfig.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
@@ -25,7 +26,9 @@ public:
         CommandList& commandList,
         UploadBuffer& uploadBuffer,
         const std::vector<std::unique_ptr<FrameResource>>& frameResources,
-        const GeometryData& geometryData)
+        const GeometryData& geometryData,
+        TextureAddressingMode textureAddressingMode = TextureAddressingMode::WRAP)
+        : m_textureAddressingMode(textureAddressingMode)
     {
         CreateVertexBuffer(pDevice, commandList, uploadBuffer, m_vertexBuffer, &m_vertexBufferView, geometryData.vertices);
         CreateIndexBuffer(pDevice, commandList, uploadBuffer, m_indexBuffer, &m_indexBufferView, geometryData.indices);
@@ -43,9 +46,9 @@ public:
             if (i == 0) m_materialConstantBufferIndex = 0;
         }
     }
-    
+
     virtual ~Mesh() = default;
-    
+
     virtual void Render(ComPtr<ID3D12GraphicsCommandList7>& commandList) const
     {
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -70,6 +73,8 @@ public:
     UINT m_meshConstantBufferIndex;
 
     UINT m_materialConstantBufferIndex;
+
+    TextureAddressingMode m_textureAddressingMode;
 };
 
 class InstancedMesh : public Mesh
@@ -81,8 +86,9 @@ public:
         UploadBuffer& uploadBuffer,
         const std::vector<std::unique_ptr<FrameResource>>& frameResources,
         const GeometryData& geometryData,
-        const std::vector<InstanceData>& instanceData)
-        : Mesh(pDevice, commandList, uploadBuffer, frameResources, geometryData)
+        const std::vector<InstanceData>& instanceData,
+        TextureAddressingMode textureAddressingMode = TextureAddressingMode::WRAP)
+        : Mesh(pDevice, commandList, uploadBuffer, frameResources, geometryData, textureAddressingMode)
     {
         CreateVertexBuffer(pDevice, commandList, uploadBuffer, m_instanceBuffer, &m_instanceBufferView, instanceData);
         m_instanceCount = UINT(instanceData.size());

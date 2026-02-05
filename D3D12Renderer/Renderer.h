@@ -152,6 +152,7 @@ private:
 
     void SetTextureFiltering(TextureFiltering filtering);
     void SetMeshType(MeshType meshType);
+    UINT CalcSamplerIndex(TextureFiltering filtering, TextureAddressingMode addressingMode);
 
     void CommitStagedDescriptorsForDraw(ID3D12GraphicsCommandList7* pCommandList);
 
