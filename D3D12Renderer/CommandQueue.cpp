@@ -8,7 +8,7 @@
 using namespace D3DHelper;
 
 CommandQueue::CommandQueue(const ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type)
-    : m_type(type), m_fenceValue(0), m_device(device), m_pDynamicDescriptorHeap(nullptr)
+    : m_type(type), m_fenceValue(0), m_device(device), m_pDynamicDescriptorHeapForCBVSRVUAV(nullptr), m_pDynamicDescriptorHeapForSampler(nullptr)
 {
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
     queueDesc.Type = type;
@@ -78,8 +78,8 @@ std::pair<ComPtr<ID3D12CommandAllocator>, CommandList> CommandQueue::GetAvailabl
         commandList = CreateCommandList(commandAllocator.Get());
     }
 
-    // Bind with DescriptorHeap
-    ID3D12DescriptorHeap* ppHeaps[] = { m_pDynamicDescriptorHeap->GetCurrentDescriptorHeap() };
+    // Bind with DescriptorHeaps
+    ID3D12DescriptorHeap* ppHeaps[] = { m_pDynamicDescriptorHeapForCBVSRVUAV->GetCurrentDescriptorHeap(), m_pDynamicDescriptorHeapForSampler->GetCurrentDescriptorHeap() };
     commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     // 커맨드 리스트는 반환 시 래퍼로 감싼다.

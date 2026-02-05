@@ -7,9 +7,12 @@ Texture2DArray<float> g_directionalShadowMaps[] : register(t0, space1);
 TextureCube<float> g_PointShadowMaps[] : register(t0, space2);
 Texture2D<float> g_SpotShadowMaps[] : register(t0, space3);
 
-SamplerState g_sampler : register(s0);
-SamplerComparisonState g_samplerComparison0 : register(s1);
-SamplerComparisonState g_samplerComparison1 : register(s2);
+// Dynamic samplers for ordinary texture sampling
+SamplerState g_samplers[] : register(s0, space0);
+
+// Static comparison samplers for shadow mapping
+SamplerComparisonState g_comparisonSampler0 : register(s0, space1);
+SamplerComparisonState g_comparisonSampler1 : register(s1, space1);
 
 static const float2 vogelDisk[16] =
 {
@@ -71,6 +74,11 @@ struct LightConstants
 };
 ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space1);
 
+cbuffer SamplerIdx : register(b5, space0)
+{
+    uint samplerIdx;
+};
+
 // Parallax Occlusion Mapping
 float2 ParallaxMapping(float2 texCoord, float3 toCamera)
 {
@@ -90,7 +98,7 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera)
     float2 currentTexCoord = texCoord * textureTileScale;
     float2 dx = ddx(currentTexCoord);
     float2 dy = ddy(currentTexCoord);
-    float currentHeightMapValue = 1.0f - g_textures[textureIndices[2]].SampleGrad(g_sampler, currentTexCoord, dx, dy).r;
+    float currentHeightMapValue = 1.0f - g_textures[textureIndices[2]].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
     float currentLayerHeight = 0.0f;
     
     float2 prevTexCoord = currentTexCoord;
@@ -105,7 +113,7 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera)
         prevLayerHeight = currentLayerHeight;
         
         currentTexCoord -= deltaTexCoord;
-        currentHeightMapValue = 1.0f - g_textures[textureIndices[2]].SampleGrad(g_sampler, currentTexCoord, dx, dy).r;
+        currentHeightMapValue = 1.0f - g_textures[textureIndices[2]].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
         currentLayerHeight += layerStep;
     }
     
@@ -149,7 +157,7 @@ float PCF(uint idxInArray, uint csmIdx, float filterSize, float2 texCoord, float
     for (uint j = 0; j < 16; ++j)
     {
         float2 rotated = mul(vogelDisk[j], rot);
-        shadowFactor += g_directionalShadowMaps[idxInArray].SampleCmpLevelZero(g_samplerComparison0, float3(texCoord + rotated * dx, float(csmIdx)), compareValue);
+        shadowFactor += g_directionalShadowMaps[idxInArray].SampleCmpLevelZero(g_comparisonSampler0, float3(texCoord + rotated * dx, float(csmIdx)), compareValue);
     }
     
     shadowFactor /= 16.0f;
@@ -216,8 +224,8 @@ float4 main(PSInput input) : SV_TARGET
     float3x3 TBN = float3x3(input.tangentWorld, B, input.normalWorld);
     
     // Sample textures
-    float3 texColor = g_textures[textureIndices[0]].Sample(g_sampler, texCoord).rgb;
-    float3 normal = g_textures[textureIndices[1]].Sample(g_sampler, texCoord).rgb * 2.0f - 1.0f;
+    float3 texColor = g_textures[textureIndices[0]].Sample(g_samplers[samplerIdx], texCoord).rgb;
+    float3 normal = g_textures[textureIndices[1]].Sample(g_samplers[samplerIdx], texCoord).rgb * 2.0f - 1.0f;
     float3 normalWorld = normalize(mul(normal, TBN));
 
     uint csmIdx;
@@ -298,7 +306,7 @@ float4 main(PSInput input) : SV_TARGET
             float3 toLightWorld = normalize(light.lightPos - input.posWorld);
             
             float factor = CalcAttenuation(dist, light.range) *
-                g_PointShadowMaps[light.idxInArray].SampleCmpLevelZero(g_samplerComparison1, -toLightWorld, normalizedDist);
+                g_PointShadowMaps[light.idxInArray].SampleCmpLevelZero(g_comparisonSampler1, -toLightWorld, normalizedDist);
             
             total += PhongReflection(light, toLightWorld, toCameraWorld, factor, texColor, normalWorld);
         }

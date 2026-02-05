@@ -163,7 +163,7 @@ ComPtr<ID3D12DescriptorHeap> DynamicDescriptorHeap::CreateDescriptorHeap()
     return descriptorHeap;
 }
 
-void DynamicDescriptorHeap::CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommandList7>& commandList, std::function<void(ID3D12GraphicsCommandList*, UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc)
+bool DynamicDescriptorHeap::CheckHeapChanged()
 {
     // Compute the number of descriptors that need to be copied 
     UINT32 numDescriptorsToCommit = ComputeStaleDescriptorCount();
@@ -179,52 +179,59 @@ void DynamicDescriptorHeap::CommitStagedDescriptors(ComPtr<ID3D12GraphicsCommand
             m_currentGPUDescriptorHandle = m_currentHeap->GetGPUDescriptorHandleForHeapStart();
             m_numFreeHandles = m_numDescriptorsPerHeap;
 
-            ID3D12DescriptorHeap* ppHeaps[] = { m_currentHeap };
-            commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-
-            // When updating the descriptor heap on the command list, all descriptor
-            // tables must be (re)recopied to the new descriptor heap (not just the stale descriptor tables)
-            m_staleDescriptorTableBitMask = m_descriptorTableBitMask;
+            return true;
         }
+    }
 
-        DWORD rootIndex;
-        while (_BitScanForward(&rootIndex, m_staleDescriptorTableBitMask))
-        {
-            UINT numSrcDescriptors = m_descriptorTableCache[rootIndex].NumDescriptors;
-            D3D12_CPU_DESCRIPTOR_HANDLE* pSrcDescriptorHandles = m_descriptorTableCache[rootIndex].BaseDescriptor;
+    return false;
+}
 
-            D3D12_CPU_DESCRIPTOR_HANDLE pDestDescriptorRangeStarts[] = { m_currentCPUDescriptorHandle };
-            UINT pDestDescriptorRangeSizes[] = { numSrcDescriptors };
+// When updating the descriptor heap on the command list, all descriptor
+// tables must be (re)recopied to the new descriptor heap (not just the stale descriptor tables)
+void DynamicDescriptorHeap::SetAllTablesAsStale()
+{
+    m_staleDescriptorTableBitMask = m_descriptorTableBitMask;
+}
 
-            // Copy the staged CPU visible descriptors to the GPU visible descriptor heap.
-            // Assume that descriptors in m_descriptorHandleCache are discontinuous or reside in different heap.
-            m_device->CopyDescriptors(
-                1, pDestDescriptorRangeStarts, pDestDescriptorRangeSizes,
-                numSrcDescriptors, pSrcDescriptorHandles, nullptr,
-                m_heapType);
+void DynamicDescriptorHeap::CommitStagedDescriptors(ID3D12GraphicsCommandList7* pCommandList, std::function<void(ID3D12GraphicsCommandList*, UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc)
+{
+    DWORD rootIndex;
+    while (_BitScanForward(&rootIndex, m_staleDescriptorTableBitMask))
+    {
+        UINT numSrcDescriptors = m_descriptorTableCache[rootIndex].NumDescriptors;
+        D3D12_CPU_DESCRIPTOR_HANDLE* pSrcDescriptorHandles = m_descriptorTableCache[rootIndex].BaseDescriptor;
 
-            // Set the descriptors on the command list using the passed-in setter function.
-            setFunc(commandList.Get(), rootIndex, m_currentGPUDescriptorHandle);
+        D3D12_CPU_DESCRIPTOR_HANDLE pDestDescriptorRangeStarts[] = { m_currentCPUDescriptorHandle };
+        UINT pDestDescriptorRangeSizes[] = { numSrcDescriptors };
 
-            // Offset current CPU and GPU descriptor handles.
-            m_currentCPUDescriptorHandle = GetCPUDescriptorHandle(m_currentCPUDescriptorHandle, numSrcDescriptors, m_descriptorHandleIncrementSize);
-            m_currentGPUDescriptorHandle = GetGPUDescriptorHandle(m_currentGPUDescriptorHandle, numSrcDescriptors, m_descriptorHandleIncrementSize);
-            m_numFreeHandles -= numSrcDescriptors;
+        // Copy the staged CPU visible descriptors to the GPU visible descriptor heap.
+        // Assume that descriptors in m_descriptorHandleCache are discontinuous or reside in different heap.
+        m_device->CopyDescriptors(
+            1, pDestDescriptorRangeStarts, pDestDescriptorRangeSizes,
+            numSrcDescriptors, pSrcDescriptorHandles, nullptr,
+            m_heapType);
 
-            // Flip the stale bit so the descriptor table is not recopied again unless it is updated with a new descriptor
-            m_staleDescriptorTableBitMask ^= (1 << rootIndex);
-        }
+        // Set the descriptors on the command list using the passed-in setter function.
+        setFunc(pCommandList, rootIndex, m_currentGPUDescriptorHandle);
+
+        // Offset current CPU and GPU descriptor handles.
+        m_currentCPUDescriptorHandle = GetCPUDescriptorHandle(m_currentCPUDescriptorHandle, numSrcDescriptors, m_descriptorHandleIncrementSize);
+        m_currentGPUDescriptorHandle = GetGPUDescriptorHandle(m_currentGPUDescriptorHandle, numSrcDescriptors, m_descriptorHandleIncrementSize);
+        m_numFreeHandles -= numSrcDescriptors;
+
+        // Flip the stale bit so the descriptor table is not recopied again unless it is updated with a new descriptor
+        m_staleDescriptorTableBitMask ^= (1 << rootIndex);
     }
 }
 
-void DynamicDescriptorHeap::CommitStagedDescriptorsForDraw(ComPtr<ID3D12GraphicsCommandList7>& commandList)
+void DynamicDescriptorHeap::CommitStagedDescriptorsForDraw(ID3D12GraphicsCommandList7* pCommandList)
 {
-    CommitStagedDescriptors(commandList, &ID3D12GraphicsCommandList::SetGraphicsRootDescriptorTable);
+    CommitStagedDescriptors(pCommandList, &ID3D12GraphicsCommandList::SetGraphicsRootDescriptorTable);
 }
 
-void DynamicDescriptorHeap::CommitStagedDescriptorsForDispatch(ComPtr<ID3D12GraphicsCommandList7>& commandList)
+void DynamicDescriptorHeap::CommitStagedDescriptorsForDispatch(ID3D12GraphicsCommandList7* pCommandList)
 {
-    CommitStagedDescriptors(commandList, &ID3D12GraphicsCommandList::SetComputeRootDescriptorTable);
+    CommitStagedDescriptors(pCommandList, &ID3D12GraphicsCommandList::SetComputeRootDescriptorTable);
 }
 
 // Copy a single CPU visible descriptor to a GPU visible descriptor heap

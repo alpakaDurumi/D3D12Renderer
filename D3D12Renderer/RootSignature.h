@@ -126,7 +126,7 @@ public:
     UINT GetNumStaticSamplers() const { return m_numStaticSamplers; }
     UINT32 GetDescriptorTableBitMask(D3D12_DESCRIPTOR_HEAP_TYPE heapType) const
     {
-        return heapType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV ? m_descriptorTableBitMask : m_samplerTableBitMask;
+        return heapType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV ? m_CBVSRVUAVTableBitMask : m_samplerTableBitMask;
     }
     UINT32 GetTableSize(UINT parameterIndex) const
     {
@@ -247,7 +247,7 @@ public:
                 }
                 else
                 {
-                    m_descriptorTableBitMask |= (1 << i);
+                    m_CBVSRVUAVTableBitMask |= (1 << i);
                 }
 
                 for (UINT rangeIndex = 0; rangeIndex < param.DescriptorTable.NumDescriptorRanges; ++rangeIndex)
@@ -312,7 +312,7 @@ private:
     UINT m_numParameters;
     UINT m_numStaticSamplers;
 
-    UINT32 m_descriptorTableBitMask = 0;
+    UINT32 m_CBVSRVUAVTableBitMask = 0;
     UINT32 m_samplerTableBitMask = 0;
     UINT32 m_descriptorTableSize[16] = {};  // Maximum number of tables is limited to 16
 
