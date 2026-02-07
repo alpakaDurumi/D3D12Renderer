@@ -1245,7 +1245,7 @@ void Renderer::PrepareConstantData()
     }
 
     // Main Camera
-    m_cameraConstantData.cameraPos = m_camera.GetPosition();
+    m_cameraConstantData.SetPos(m_camera.GetPosition());
     m_cameraConstantData.SetView(m_camera.GetViewMatrix());
     m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());
 
@@ -1375,8 +1375,7 @@ void Renderer::PrepareDirectionalLight(DirectionalLight& light, const std::vecto
 {
     static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
-    XMFLOAT3 temp = m_camera.GetPosition();
-    XMVECTOR cameraPos = XMLoadFloat3(&temp);
+    XMVECTOR cameraPos = m_camera.GetPosition();
     XMVECTOR dir = light.GetDirection();
 
     for (UINT i = 0; i < MAX_CASCADES; ++i)

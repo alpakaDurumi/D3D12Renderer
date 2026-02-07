@@ -8,7 +8,7 @@ class Camera {
 public:
     Camera(XMFLOAT3 initialPosition = { 0.0f, 0.0f, 0.0f });
 
-    XMFLOAT3 GetPosition() const;
+    XMVECTOR GetPosition() const;
     float GetNearPlane() const;
     float GetFarPlane() const;
     XMMATRIX GetViewMatrix() const;

@@ -16,9 +16,10 @@ Camera::Camera(XMFLOAT3 initialPosition)
     m_farPlane = 1000.0f;
 }
 
-XMFLOAT3 Camera::GetPosition() const
+XMVECTOR Camera::GetPosition() const
 {
-    return m_position;
+    XMVECTOR p = XMLoadFloat3(&m_position);
+    return XMVectorSetW(p, 1.0f);
 }
 
 float Camera::GetNearPlane() const
