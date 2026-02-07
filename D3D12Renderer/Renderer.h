@@ -5,6 +5,7 @@
 
 #include <d3d12.h>
 #include <dxgi1_6.h>    // DXGI 1.6
+#include <DirectXCollision.h>
 
 #include <string>
 #include <vector>
@@ -161,7 +162,10 @@ private:
     void HandleInput();
 
     void PrepareConstantData();
-    void PrepareCSM();
+    std::vector<BoundingSphere> CalcCascadeSpheres();
+    void PrepareDirectionalLight(DirectionalLight& light, const std::vector<BoundingSphere>& cascadeSpheres);
+    void PreparePointLight(PointLight& light);
+
     void UpdateConstantBuffers(FrameResource& frameResource);
 
     void UpdateCameraConstantBuffer(FrameResource& frameResource);

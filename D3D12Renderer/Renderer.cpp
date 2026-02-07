@@ -1,8 +1,6 @@
 #include "pch.h"
 #include "Renderer.h"
 
-#include <DirectXCollision.h>
-
 #include <D3Dcompiler.h>
 #include <dxgidebug.h>
 #include <chrono>
@@ -979,7 +977,7 @@ void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList)
 
     if (CBVSRVUAVHeapChanged)
     {
-        ID3D12DescriptorHeap* ppHeaps[] = { m_dynamicDescriptorHeapForCBVSRVUAV->GetCurrentDescriptorHeap(), m_samplerDescriptorHeap.Get()};
+        ID3D12DescriptorHeap* ppHeaps[] = { m_dynamicDescriptorHeapForCBVSRVUAV->GetCurrentDescriptorHeap(), m_samplerDescriptorHeap.Get() };
         pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
     }
 
@@ -1265,41 +1263,9 @@ void Renderer::PrepareConstantData()
     XMVECTOR rotated = XMVector3Transform(lightDir, rot);
     m_lights[0]->SetDirection(rotated);
 
-    PrepareCSM();
+    // Pre-calculate common data for CSM.
+    std::vector<BoundingSphere> cascadeSpheres = CalcCascadeSpheres();
 
-    // Point light
-    {
-        XMVECTOR pos = m_lights[1]->GetPosition();
-
-        // +X, -X, +Y, -Y, +Z, -Z
-        static const XMVECTOR Directions[6] = {
-            { 1.0f, 0.0f, 0.0f, 0.0f },
-            { -1.0f, 0.0f, 0.0f, 0.0f },
-            { 0.0f, 1.0f, 0.0f, 0.0f },
-            { 0.0f, -1.0f, 0.0f, 0.0f },
-            { 0.0f, 0.0f, 1.0f, 0.0f },
-            { 0.0f, 0.0f, -1.0f, 0.0f }
-        };
-        static const XMVECTOR Ups[6] = {
-            { 0.0f, 1.0f, 0.0f, 0.0f },
-            { 0.0f, 1.0f, 0.0f, 0.0f },
-            { 0.0f, 0.0f, -1.0f, 0.0f },
-            { 0.0f, 0.0f, 1.0f, 0.0f },
-            { 0.0f, 1.0f, 0.0f, 0.0f },
-            { 0.0f, 1.0f, 0.0f, 0.0f }
-        };
-
-        // 90 degree
-        XMMATRIX projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.0f, m_lights[1]->GetRange(), 0.1f);
-
-        for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
-        {
-            XMMATRIX view = XMMatrixLookToLH(pos, Directions[i], Ups[i]);
-            m_lights[1]->SetViewProjection(view, projection, i);
-        }
-    }
-
-    // Set idxInArray for each light.
     UINT numDirectionalLight = 0;
     UINT numPointLight = 0;
     UINT numSpotLight = 0;
@@ -1307,15 +1273,39 @@ void Renderer::PrepareConstantData()
     {
         LightType type = light->GetType();
 
-        UINT& cnt = (type == LightType::DIRECTIONAL) ? numDirectionalLight :
-            (type == LightType::POINT ? numPointLight : numSpotLight);
+        switch (type)
+        {
+        case LightType::DIRECTIONAL:
+        {
+            // Since light type is guaranteed by m_type variable,
+            // Use static_cast for downcasting instead of dynamic_cast.
+            PrepareDirectionalLight(static_cast<DirectionalLight&>(*light), cascadeSpheres);
 
-        light->SetIdxInArray(cnt);
-        ++cnt;
+            light->SetIdxInArray(numDirectionalLight);
+            ++numDirectionalLight;
+            break;
+        }
+        case LightType::POINT:
+        {
+            PreparePointLight(static_cast<PointLight&>(*light));
+
+            light->SetIdxInArray(numPointLight);
+            ++numPointLight;
+            break;
+        }
+        case LightType::SPOT:
+        {
+            // TODO:
+
+            light->SetIdxInArray(numSpotLight);
+            ++numSpotLight;
+            break;
+        }
+        }
     }
 }
 
-void Renderer::PrepareCSM()
+std::vector<BoundingSphere> Renderer::CalcCascadeSpheres()
 {
     // Create bounding frustum of view frustum and transform to world space.
     // BoundingFrustum::CreateFromMatrix and BoundingFrustum::GetCorners are implicitly assume that 0.0 is near plane and 1.0 is far plane.
@@ -1376,70 +1366,84 @@ void Renderer::PrepareCSM()
 
         // Create bounding sphere.
         BoundingSphere::CreateFromPoints(frustumBSs[i], 8, cascadeCorners[i], sizeof(XMFLOAT3));
+    }
 
-        XMVECTOR center = XMLoadFloat3(&frustumBSs[i].Center);
-        float radius = frustumBSs[i].Radius;
+    return frustumBSs;
+}
 
-        XMFLOAT3 temp = m_camera.GetPosition();
-        XMVECTOR cameraPos = XMLoadFloat3(&temp);
+void Renderer::PrepareDirectionalLight(DirectionalLight& light, const std::vector<BoundingSphere>& cascadeSpheres)
+{
+    static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+    XMFLOAT3 temp = m_camera.GetPosition();
+    XMVECTOR cameraPos = XMLoadFloat3(&temp);
+    XMVECTOR dir = light.GetDirection();
+
+    for (UINT i = 0; i < MAX_CASCADES; ++i)
+    {
+        XMVECTOR center = XMLoadFloat3(&cascadeSpheres[i].Center);
+        float radius = cascadeSpheres[i].Radius;
 
         XMVECTOR viewOriginToCenter = center - cameraPos;
 
         // Calculate view/projection matrix fit to light frustum
-        for (auto& light : m_lights)
-        {
-            LightType type = light->GetType();
 
-            switch (type)
-            {
-            case LightType::DIRECTIONAL:
-            {
-                // Since light type is guaranteed by m_type variable,
-                // Use static_cast for downcasting instead of dynamic_cast.
-                auto pLight = static_cast<DirectionalLight*>(light.get());
+        // Orthogonal projection of (center - view origin) onto lightDir.
+        // This represents where the view origin is located relative to the center on the light's Z-axis.
+        float d = XMVectorGetX(XMVector3Dot(viewOriginToCenter, dir));
 
-                static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+        XMMATRIX view = XMMatrixLookToLH(center, dir, up);
+        // Near Plane : Set to (view origin - sceneRadius) in Light Space.
+        //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
+        // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
+        XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, radius, -d - m_camera.GetFarPlane());
 
-                XMVECTOR dir = pLight->GetDirection();
+        // Apply texel-sized increments to eliminate shadow shimmering.
+        XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+        shadowOrigin = XMVector4Transform(shadowOrigin, view * projection);
+        shadowOrigin = XMVectorScale(shadowOrigin, 1.0f / XMVectorGetW(shadowOrigin));      // Perspective divide. Can be ommitted if it uses orthographic projection.
+        // [-1, 1] -> [-resolution / 2, resolution / 2]
+        shadowOrigin = XMVectorScale(shadowOrigin, m_shadowMapResolution * 0.5f);           // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
 
-                // Orthogonal projection of (center - view origin) onto lightDir.
-                // This represents where the view origin is located relative to the center on the light's Z-axis.
-                float d = XMVectorGetX(XMVector3Dot(viewOriginToCenter, dir));
+        // Calculate diff and apply as translation matrix.
+        XMVECTOR roundedOrigin = XMVectorRound(shadowOrigin);
+        XMVECTOR diff = roundedOrigin - shadowOrigin;
+        diff = XMVectorScale(diff, 2.0f / m_shadowMapResolution);                           // Since diff is texel scale, it should be transformed to NDC scale.
+        XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
 
-                XMMATRIX view = XMMatrixLookToLH(center, dir, up);
-                // Near Plane : Set to (view origin - sceneRadius) in Light Space.
-                //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
-                // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
-                XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, radius, -d - farPlane);
+        light.SetViewProjection(view, projection * fix, i);
+    }
+}
 
-                // Apply texel-sized increments to eliminate shadow shimmering.
-                XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-                shadowOrigin = XMVector4Transform(shadowOrigin, view * projection);
-                shadowOrigin = XMVectorScale(shadowOrigin, 1.0f / XMVectorGetW(shadowOrigin));      // Perspective divide. Can be ommitted if it uses orthographic projection.
-                // [-1, 1] -> [-resolution / 2, resolution / 2]
-                shadowOrigin = XMVectorScale(shadowOrigin, m_shadowMapResolution * 0.5f);           // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
+void Renderer::PreparePointLight(PointLight& light)
+{
+    XMVECTOR pos = light.GetPosition();
 
-                // Calculate diff and apply as translation matrix.
-                XMVECTOR roundedOrigin = XMVectorRound(shadowOrigin);
-                XMVECTOR diff = roundedOrigin - shadowOrigin;
-                diff = XMVectorScale(diff, 2.0f / m_shadowMapResolution);                           // Since diff is texel scale, it should be transformed to NDC scale.
-                XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
+    // +X, -X, +Y, -Y, +Z, -Z
+    static const XMVECTOR Directions[6] = {
+        { 1.0f, 0.0f, 0.0f, 0.0f },
+        { -1.0f, 0.0f, 0.0f, 0.0f },
+        { 0.0f, 1.0f, 0.0f, 0.0f },
+        { 0.0f, -1.0f, 0.0f, 0.0f },
+        { 0.0f, 0.0f, 1.0f, 0.0f },
+        { 0.0f, 0.0f, -1.0f, 0.0f }
+    };
+    static const XMVECTOR Ups[6] = {
+        { 0.0f, 1.0f, 0.0f, 0.0f },
+        { 0.0f, 1.0f, 0.0f, 0.0f },
+        { 0.0f, 0.0f, -1.0f, 0.0f },
+        { 0.0f, 0.0f, 1.0f, 0.0f },
+        { 0.0f, 1.0f, 0.0f, 0.0f },
+        { 0.0f, 1.0f, 0.0f, 0.0f }
+    };
 
-                light->SetViewProjection(view, projection * fix, i);
-                break;
-            }
-            case LightType::POINT:
-            {
+    // Set FOV as 90 degree
+    XMMATRIX projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.0f, light.GetRange(), 0.1f);
 
-                break;
-            }
-            case LightType::SPOT:
-            {
-
-                break;
-            }
-            }
-        }
+    for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
+    {
+        XMMATRIX view = XMMatrixLookToLH(pos, Directions[i], Ups[i]);
+        light.SetViewProjection(view, projection, i);
     }
 }
 
