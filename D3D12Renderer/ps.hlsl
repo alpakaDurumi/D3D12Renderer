@@ -74,9 +74,10 @@ struct LightConstants
 };
 ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space1);
 
-cbuffer SamplerIdx : register(b5, space0)
+cbuffer GlobalConstants : register(b5, space0)
 {
     uint samplerIdx;
+    uint numLights;
 };
 
 // Parallax Occlusion Mapping
@@ -264,7 +265,7 @@ float4 main(PSInput input) : SV_TARGET
     float3 total = float3(0.0f, 0.0f, 0.0f);
     
     [loop]
-    for (uint i = 0; i < 2; ++i)
+    for (uint i = 0; i < numLights; ++i)
     {
         LightConstants light = LightConstantBuffers[i];
         

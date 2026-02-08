@@ -34,7 +34,7 @@ cbuffer IdxConstant : register(b4, space0)
 float4 main(PSInput input) : SV_TARGET
 {
     float dist = distance(input.posWorld, LightConstantBuffers[currentLightIdx].lightPos);
-    float normalizedDist = dist / LightConstantBuffers[1].range;
+    float normalizedDist = dist / LightConstantBuffers[currentLightIdx].range;
     
     return float4(normalizedDist, 0.0f, 0.0f, 1.0f);
 }

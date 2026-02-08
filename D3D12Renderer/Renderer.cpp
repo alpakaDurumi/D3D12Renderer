@@ -892,6 +892,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
         cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
+        cmdList->SetGraphicsRoot32BitConstant(11, numLights, 1);
+
         cmdList->SetPipelineState(pso);
         for (const auto& mesh : m_meshes)
         {
@@ -1026,8 +1028,8 @@ void Renderer::CreateRootSignature()
         static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS) * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES),
         D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
 
-    // Root constant for selecting sampler to use.
-    rootSignature[11].InitAsConstant(5, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    // Root constants for sampler idx and number of lights.
+    rootSignature[11].InitAsConstant(5, 0, 2, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Static samplers
     rootSignature.InitStaticSampler(0, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_GREATER_EQUAL);
