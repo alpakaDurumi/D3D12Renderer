@@ -660,8 +660,8 @@ void Renderer::LoadAssets()
         m_frameResources,
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(POINT_LIGHT_ARRAY_SIZE));
-    pointLight->SetPosition(XMVectorSet(0.0f, 0.0f, 3.0f, 1.0f));
-    pointLight->SetRange(10.0f);
+    pointLight->SetPosition(XMVectorSet(0.0f, 4.0f, 3.0f, 1.0f));
+    pointLight->SetRange(30.0f);
     m_lights.push_back(std::move(pointLight));
 
     // Allocate textures
