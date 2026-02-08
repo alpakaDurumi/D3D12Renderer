@@ -146,7 +146,7 @@ void CalcCSMIndex(float distView, out uint index, out float alpha)
     alpha = smoothstep(cascadeSplits[index] - overlap, cascadeSplits[index] + overlap, distView);
 }
 
-float PCF(uint idxInArray, uint csmIdx, float filterSize, float2 texCoord, float compareValue, float2x2 rot)
+float PCFDirectional(uint idxInArray, uint csmIdx, float filterSize, float2 texCoord, float compareValue, float2x2 rot)
 {
     float shadowFactor = 0.0f;
         
@@ -158,7 +158,33 @@ float PCF(uint idxInArray, uint csmIdx, float filterSize, float2 texCoord, float
     for (uint j = 0; j < 16; ++j)
     {
         float2 rotated = mul(vogelDisk[j], rot);
-        shadowFactor += g_directionalShadowMaps[idxInArray].SampleCmpLevelZero(g_comparisonSampler0, float3(texCoord + rotated * dx, float(csmIdx)), compareValue);
+        float2 offset = rotated * dx;
+        shadowFactor += g_directionalShadowMaps[idxInArray].SampleCmpLevelZero(g_comparisonSampler0, float3(texCoord + offset, float(csmIdx)), compareValue);
+    }
+    
+    shadowFactor /= 16.0f;
+    
+    return shadowFactor;
+}
+
+float PCFPoint(uint idxInArray, float filterSize, float3 lightToPixel, float compareValue, float2x2 rot)
+{
+    float shadowFactor = 0.0f;
+    
+    uint width, height;
+    g_PointShadowMaps[idxInArray].GetDimensions(width, height);
+    float dx = filterSize / width;
+    
+    float3 up = abs(lightToPixel.y) < 0.999f ? float3(0.0f, 1.0f, 0.0f) : float3(0.0f, 0.0f, -1.0f);
+    float3 T = normalize(cross(up, lightToPixel));
+    float3 B = cross(T, lightToPixel);
+    
+    [unroll]
+    for (uint j = 0; j < 16; ++j)
+    {
+        float2 rotated = mul(vogelDisk[j], rot);
+        float3 offset = (T * rotated.x + B * rotated.y) * dx;
+        shadowFactor += g_PointShadowMaps[idxInArray].SampleCmpLevelZero(g_comparisonSampler1, lightToPixel + offset, compareValue);
     }
     
     shadowFactor /= 16.0f;
@@ -280,7 +306,7 @@ float4 main(PSInput input) : SV_TARGET
                 lightScreen.xyz /= lightScreen.w;
                 float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
         
-                shadowFactor = PCF(light.idxInArray, csmIdx, filterSize, lightTexCoord, lightScreen.z, rot);
+                shadowFactor = PCFDirectional(light.idxInArray, csmIdx, filterSize, lightTexCoord, lightScreen.z, rot);
             }
         
             // Second cascade. Only apply when overlapping can occur.
@@ -290,7 +316,7 @@ float4 main(PSInput input) : SV_TARGET
                 lightScreen.xyz /= lightScreen.w;
                 float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
         
-                float t = PCF(light.idxInArray, csmIdx + 1, filterSize, lightTexCoord, lightScreen.z, rot);
+                float t = PCFDirectional(light.idxInArray, csmIdx + 1, filterSize, lightTexCoord, lightScreen.z, rot);
                 shadowFactor = lerp(shadowFactor, t, alpha);
             }
             
@@ -307,7 +333,7 @@ float4 main(PSInput input) : SV_TARGET
             float3 toLightWorld = normalize(light.lightPos - input.posWorld);
             
             float factor = CalcAttenuation(dist, light.range) *
-                g_PointShadowMaps[light.idxInArray].SampleCmpLevelZero(g_comparisonSampler1, -toLightWorld, normalizedDist);
+                PCFPoint(light.idxInArray, filterSize, -toLightWorld, normalizedDist, rot);
             
             total += PhongReflection(light, toLightWorld, toCameraWorld, factor, texColor, normalWorld);
         }
