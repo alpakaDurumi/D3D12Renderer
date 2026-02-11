@@ -664,6 +664,20 @@ void Renderer::LoadAssets()
     pointLight->SetRange(30.0f);
     m_lights.push_back(std::move(pointLight));
 
+    auto spotLight = std::make_unique<SpotLight>(
+        m_device.Get(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(SPOT_LIGHT_ARRAY_SIZE),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+        m_shadowMapResolution,
+        *m_layoutTracker,
+        m_frameResources,
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
+    spotLight->SetPosition(XMVectorSet(0.0f, 2.0f, -5.0f, 1.0f));
+    spotLight->SetDirection(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f));
+    spotLight->SetRange(50.0f);
+    spotLight->SetAngles(35.0f, 20.0f);
+    m_lights.push_back(std::move(spotLight));
+
     // Allocate textures
     auto alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3);
     auto textureAllocations = alloc.Split();
@@ -1297,7 +1311,7 @@ void Renderer::PrepareConstantData()
         }
         case LightType::SPOT:
         {
-            // TODO:
+            PrepareSpotLight(static_cast<SpotLight&>(*light));
 
             light->SetIdxInArray(numSpotLight);
             ++numSpotLight;
@@ -1446,6 +1460,15 @@ void Renderer::PreparePointLight(PointLight& light)
         XMMATRIX view = XMMatrixLookToLH(pos, Directions[i], Ups[i]);
         light.SetViewProjection(view, projection, i);
     }
+}
+
+void Renderer::PrepareSpotLight(SpotLight& light)
+{
+    static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+    XMMATRIX view = XMMatrixLookToLH(light.GetPosition(), light.GetDirection(), up);
+    XMMATRIX projection = XMMatrixPerspectiveFovLH(light.GetOuterAngle(), 1.0f, light.GetRange(), m_camera.GetNearPlane());
+    light.SetViewProjection(view, projection, 0);
 }
 
 void Renderer::UpdateConstantBuffers(FrameResource& frameResource)

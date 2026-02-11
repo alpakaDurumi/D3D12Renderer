@@ -129,5 +129,10 @@ public:
         const std::vector<std::unique_ptr<FrameResource>>& frameResources,
         DescriptorAllocation&& cbvAllocation);
 
-    void SetAngle(float angle);
+    float GetOuterAngle() const;
+    void SetAngles(float outerAngle, float innerAngle);
+
+private:
+    float m_outerAngle;
+    float m_innerAngle;
 };

@@ -65,12 +65,13 @@ struct LightConstants
     float3 lightPos;
     float range;
     float3 lightDir;
-    float angle;
+    float cosOuterAngle;
     float3 lightColor;
-    float lightIntensity;
+    float cosInnerAngle;
     float4x4 viewProjection[POINT_LIGHT_ARRAY_SIZE];
     uint type;
     uint idxInArray;
+    float lightIntensity;
 };
 ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space1);
 
@@ -340,7 +341,15 @@ float4 main(PSInput input) : SV_TARGET
         // Spot
         else if (light.type == LIGHT_TYPE_SPOT)
         {
-            // TODO
+            float3 toLightWorld = normalize(light.lightPos - input.posWorld);
+            float cosTheta = dot(-toLightWorld, light.lightDir);
+            
+            float dist = distance(light.lightPos, input.posWorld);
+
+            float distAtt = CalcAttenuation(dist, light.range);
+            float angularAttenuation = saturate((cosTheta - light.cosOuterAngle) / (light.cosInnerAngle - light.cosOuterAngle));
+            
+            total += PhongReflection(light, toLightWorld, toCameraWorld, distAtt * angularAttenuation, texColor, normalWorld);
         }
     }
     

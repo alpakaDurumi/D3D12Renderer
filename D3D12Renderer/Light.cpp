@@ -310,9 +310,21 @@ SpotLight::SpotLight(
     : Light(std::move(dsvAllocation), std::move(srvAllocation), LightType::SPOT)
 {
     Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation));
+    CreateSRVForShadow(pDevice, m_depthBuffer.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
 }
 
-void SpotLight::SetAngle(float angle)
+float SpotLight::GetOuterAngle() const
 {
-    m_lightConstantData.angle = angle;
+    return m_outerAngle;
+}
+
+void SpotLight::SetAngles(float outerAngleDegree, float innerAngleDegree)
+{
+    assert(outerAngleDegree >= innerAngleDegree);
+
+    m_outerAngle = XMConvertToRadians(outerAngleDegree);
+    m_innerAngle = XMConvertToRadians(innerAngleDegree);
+    // We need cosine value that calculated from half angle.
+    m_lightConstantData.cosOuterAngle = std::cos(m_outerAngle * 0.5f);
+    m_lightConstantData.cosInnerAngle = std::cos(m_innerAngle * 0.5f);
 }
