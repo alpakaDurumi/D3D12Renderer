@@ -96,7 +96,8 @@ XMVECTOR Light::GetPosition() const
 
 XMVECTOR Light::GetDirection() const
 {
-    return XMLoadFloat3(&m_lightConstantData.lightDir);
+    XMVECTOR d = XMLoadFloat3(&m_lightConstantData.lightDir);
+    return XMVectorSetW(d, 0.0f);
 }
 
 float Light::GetRange() const
@@ -111,8 +112,7 @@ UINT Light::GetIdxInArray() const
 
 void Light::SetPosition(XMFLOAT3 pos)
 {
-    XMVECTOR p = XMLoadFloat3(&pos);
-    m_lightConstantData.SetPos(p);
+    m_lightConstantData.lightPos = pos;
 }
 
 void Light::SetPosition(XMVECTOR pos)
@@ -122,8 +122,7 @@ void Light::SetPosition(XMVECTOR pos)
 
 void Light::SetDirection(XMFLOAT3 dir)
 {
-    XMVECTOR d = XMLoadFloat3(&dir);
-    m_lightConstantData.SetLightDir(d);
+    m_lightConstantData.lightDir = dir;
 }
 
 void Light::SetDirection(XMVECTOR dir)
