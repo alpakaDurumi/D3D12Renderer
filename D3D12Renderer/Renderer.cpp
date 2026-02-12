@@ -1453,7 +1453,7 @@ void Renderer::PreparePointLight(PointLight& light)
     };
 
     // Set FOV as 90 degree
-    XMMATRIX projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.0f, light.GetRange(), 0.1f);
+    XMMATRIX projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.0f, light.GetRange(), m_camera.GetNearPlane());
 
     for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
     {

@@ -15,12 +15,15 @@ public:
     XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection = true) const;
 
     void SetAspectRatio(float aspectRatio);
+    void SetHorizontalFOV(float horizontalFOV);
     void MoveForward(float speedScale);
     void MoveRight(float speedScale);
     void MoveUp(float speedScale);
     void Rotate(XMINT2 mouseMove);
 
 private:
+    float CalcVerticalFOV(float horizontalFOV);
+
     XMFLOAT3 m_position;
     XMFLOAT3 m_orientation;
     XMFLOAT3 m_up;
@@ -28,7 +31,7 @@ private:
     float m_yaw;
     float m_pitch;
 
-    float m_fov;
+    float m_verticalFOV;
     float m_aspectRatio;
     float m_nearPlane;
     float m_farPlane;
