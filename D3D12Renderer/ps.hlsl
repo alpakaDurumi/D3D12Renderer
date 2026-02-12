@@ -193,6 +193,27 @@ float PCFPoint(uint idxInArray, float filterSize, float3 lightToPixel, float com
     return shadowFactor;
 }
 
+float PCFSpot(uint idxInArray, float filterSize, float2 texCoord, float compareValue, float2x2 rot)
+{
+    float shadowFactor = 0.0f;
+        
+    uint width, height;
+    g_SpotShadowMaps[idxInArray].GetDimensions(width, height);
+    float dx = filterSize / width;
+        
+    [unroll]
+    for (uint j = 0; j < 16; ++j)
+    {
+        float2 rotated = mul(vogelDisk[j], rot);
+        float2 offset = rotated * dx;
+        shadowFactor += g_SpotShadowMaps[idxInArray].SampleCmpLevelZero(g_comparisonSampler0, texCoord + offset, compareValue);
+    }
+    
+    shadowFactor /= 16.0f;
+    
+    return shadowFactor;
+}
+
 // https://blog.demofox.org/2022/01/01/interleaved-gradient-noise-a-different-kind-of-low-discrepancy-sequence/
 float InterleavedGradientNoise(float2 pixPos)
 {
@@ -225,6 +246,13 @@ float CalcAttenuation(float dist, float range)
     static const float fallOffStart = 0.4f;
     
     return saturate((range - dist) / (range - fallOffStart));
+}
+
+float CalcAngularAttenuation(LightConstants light, float3 lightToPixel)
+{
+    float cosTheta = dot(lightToPixel, light.lightDir);
+    
+    return saturate((cosTheta - light.cosOuterAngle) / (light.cosInnerAngle - light.cosOuterAngle));
 }
 
 float4 main(PSInput input) : SV_TARGET
@@ -342,14 +370,18 @@ float4 main(PSInput input) : SV_TARGET
         else if (light.type == LIGHT_TYPE_SPOT)
         {
             float3 toLightWorld = normalize(light.lightPos - input.posWorld);
-            float cosTheta = dot(-toLightWorld, light.lightDir);
-            
             float dist = distance(light.lightPos, input.posWorld);
 
             float distAtt = CalcAttenuation(dist, light.range);
-            float angularAttenuation = saturate((cosTheta - light.cosOuterAngle) / (light.cosInnerAngle - light.cosOuterAngle));
+            float angularAtt = CalcAngularAttenuation(light, -toLightWorld);
             
-            total += PhongReflection(light, toLightWorld, toCameraWorld, distAtt * angularAttenuation, texColor, normalWorld);
+            float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[0]);
+            lightScreen.xyz /= lightScreen.w;
+            float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
+            
+            float factor = distAtt * angularAtt * PCFSpot(light.idxInArray, filterSize, lightTexCoord, lightScreen.z, rot);
+            
+            total += PhongReflection(light, toLightWorld, toCameraWorld, factor, texColor, normalWorld);
         }
     }
     

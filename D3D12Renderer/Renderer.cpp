@@ -672,10 +672,10 @@ void Renderer::LoadAssets()
         *m_layoutTracker,
         m_frameResources,
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
-    spotLight->SetPosition(XMVectorSet(0.0f, 2.0f, -5.0f, 1.0f));
-    spotLight->SetDirection(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f));
+    spotLight->SetPosition(XMVectorSet(0.0f, 10.0f, -5.0f, 1.0f));
+    spotLight->SetDirection(XMVectorSet(0.0f, -1.0f, 1.0f, 0.0f));
     spotLight->SetRange(50.0f);
-    spotLight->SetAngles(35.0f, 20.0f);
+    spotLight->SetAngles(50.0f, 10.0f);
     m_lights.push_back(std::move(spotLight));
 
     // Allocate textures
