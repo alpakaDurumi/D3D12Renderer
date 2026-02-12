@@ -11,7 +11,7 @@ Camera::Camera(XMFLOAT3 initialPosition)
     m_pitch = 0.0f;
 
     m_aspectRatio = 16.0f / 9.0f;
-    m_verticalFOV = CalcVerticalFOV(90.0f);
+    SetHorizontalFOV(90.0f);
     m_nearPlane = 0.1f;
     m_farPlane = 1000.0f;
 }
@@ -47,10 +47,12 @@ XMMATRIX Camera::GetProjectionMatrix(bool usePerspectiveProjection) const
 void Camera::SetAspectRatio(float aspectRatio)
 {
     m_aspectRatio = aspectRatio;
+    m_verticalFOV = CalcVerticalFOV(m_horizontalFOV);
 }
 
 void Camera::SetHorizontalFOV(float horizontalFOV)
 {
+    m_horizontalFOV = horizontalFOV;
     m_verticalFOV = CalcVerticalFOV(horizontalFOV);
 }
 

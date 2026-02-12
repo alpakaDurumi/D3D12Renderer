@@ -32,6 +32,7 @@ private:
     float m_pitch;
 
     float m_verticalFOV;
+    float m_horizontalFOV;
     float m_aspectRatio;
     float m_nearPlane;
     float m_farPlane;
