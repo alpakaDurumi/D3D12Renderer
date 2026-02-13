@@ -161,6 +161,8 @@ private:
     void PrintFPS();
     void HandleInput();
 
+    void FixedUpdate(double fixedDt);
+
     void PrepareConstantData();
     std::vector<BoundingSphere> CalcCascadeSpheres();
     void PrepareDirectionalLight(DirectionalLight& light, const std::vector<BoundingSphere>& cascadeSpheres);

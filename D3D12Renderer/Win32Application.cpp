@@ -70,22 +70,20 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     MSG msg = {};
     while (msg.message != WM_QUIT)
     {
-        if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
+        while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
         {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
-        else
-        {
-            // Start the Dear ImGui frame
-            ImGui_ImplDX12_NewFrame();
-            ImGui_ImplWin32_NewFrame();
-            ImGui::NewFrame();
 
-            pRenderer->OnPrepareImGui();
-            pRenderer->OnUpdate();
-            pRenderer->OnRender();
-        }
+        // Start the Dear ImGui frame
+        ImGui_ImplDX12_NewFrame();
+        ImGui_ImplWin32_NewFrame();
+        ImGui::NewFrame();
+
+        pRenderer->OnPrepareImGui();
+        pRenderer->OnUpdate();
+        pRenderer->OnRender();
     }
 
     pRenderer->OnDestroy();

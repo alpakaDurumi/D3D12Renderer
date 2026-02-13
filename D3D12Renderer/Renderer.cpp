@@ -189,8 +189,27 @@ void Renderer::OnInit()
 
 void Renderer::OnUpdate()
 {
-    PrintFPS();
+    static double fixedDtMs = 1000.0 / 60.0;     // Target to 60Hz fixed time step
+    static double accumulatedMs = 0.0;
+
+    static std::chrono::high_resolution_clock clock;
+    static auto t0 = clock.now();
+
+    auto t1 = clock.now();
+    auto deltaTime = t1 - t0;
+    t0 = t1;
+
+    accumulatedMs += std::chrono::duration<double, std::milli>(deltaTime).count();
+
     HandleInput();
+
+    while (accumulatedMs >= fixedDtMs)
+    {
+        FixedUpdate(fixedDtMs);
+        accumulatedMs -= fixedDtMs;
+    }
+
+    //PrintFPS();
 
     // 이번에 드로우할 프레임에 대해 constant buffers 업데이트
     FrameResource& frameResource = *m_frameResources[m_frameIndex];
@@ -1222,43 +1241,43 @@ void Renderer::HandleInput()
         swprintf_s(buffer, L"m_vSync : %d\n", m_vSync);
         OutputDebugStringW(buffer);
     }
+}
 
-    if (m_inputManager.IsKeyDown('W')) m_camera.MoveForward(0.01f);
-    if (m_inputManager.IsKeyDown('A')) m_camera.MoveRight(-0.01f);
-    if (m_inputManager.IsKeyDown('S')) m_camera.MoveForward(-0.01f);
-    if (m_inputManager.IsKeyDown('D')) m_camera.MoveRight(0.01f);
-    if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-0.01f);
-    if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(0.01f);
+void Renderer::FixedUpdate(double fixedDtMs)
+{
+    float fixedDtSec = static_cast<float>(fixedDtMs) * 0.001f;
 
-    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
-    m_camera.Rotate(mouseMove);
+    static float cameraMoveSpeed = 10.0f;
+
+    float temp = cameraMoveSpeed * fixedDtSec;
+    if (m_inputManager.IsKeyDown('W')) m_camera.MoveForward(temp);
+    if (m_inputManager.IsKeyDown('A')) m_camera.MoveRight(-temp);
+    if (m_inputManager.IsKeyDown('S')) m_camera.MoveForward(-temp);
+    if (m_inputManager.IsKeyDown('D')) m_camera.MoveRight(temp);
+    if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-temp);
+    if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(temp);
+
+    m_camera.Rotate(m_inputManager.GetAndResetMouseMove());
+
+    static float rotationSpeed = 1.0f;
+
+    for (auto& mesh : m_instancedMeshes)
+    {
+        XMMATRIX prevWorld = XMMatrixTranspose(XMLoadFloat4x4(&mesh.m_meshConstantData.world));
+        XMMATRIX world = prevWorld * XMMatrixRotationRollPitchYaw(0.0f, rotationSpeed * fixedDtSec, 0.0f);
+        mesh.m_meshConstantData.SetTransform(world);
+}
 }
 
 void Renderer::PrepareConstantData()
 {
     // Mesh
-    //for (auto& mesh : m_meshes)
-    //{
-    //    XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -5.0f, 0.0f);
-    //    mesh.m_meshConstantData.SetTransform(world);
-    //    mesh.m_meshConstantData.textureTileScale = 50.0f;
-    //}
-
     XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -5.0f, 0.0f);
     m_meshes[0].m_meshConstantData.SetTransform(world);
     m_meshes[0].m_meshConstantData.textureTileScale = 50.0f;
 
     XMMATRIX w = XMMatrixTranslation(0.0f, -3.5f, 0.0f);
     m_meshes[1].m_meshConstantData.SetTransform(w);
-
-    for (auto& mesh : m_instancedMeshes)
-    {
-        XMMATRIX prevWorld = XMMatrixTranspose(XMLoadFloat4x4(&mesh.m_meshConstantData.world));
-        XMMATRIX world = prevWorld * XMMatrixRotationRollPitchYaw(0.0f, 0.001f, 0.0f);
-        world = XMMatrixIdentity();
-        mesh.m_meshConstantData.SetTransform(world);
-        mesh.m_meshConstantData.textureTileScale = 1.0f;
-    }
 
     // Main Camera
     m_cameraConstantData.SetPos(m_camera.GetPosition());
@@ -1274,10 +1293,10 @@ void Renderer::PrepareConstantData()
     m_materialConstantData.textureIndices[2] = 2;
 
     // Light
-    XMVECTOR lightDir = m_lights[0]->GetDirection();
-    XMMATRIX rot = XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 0.001f);
-    XMVECTOR rotated = XMVector3Transform(lightDir, rot);
-    m_lights[0]->SetDirection(rotated);
+    //XMVECTOR lightDir = m_lights[0]->GetDirection();
+    //XMMATRIX rot = XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 0.001f);
+    //XMVECTOR rotated = XMVector3Transform(lightDir, rot);
+    //m_lights[0]->SetDirection(rotated);
 
     // Pre-calculate common data for CSM.
     std::vector<BoundingSphere> cascadeSpheres = CalcCascadeSpheres();

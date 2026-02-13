@@ -31,10 +31,14 @@ public:
         return m_keyPressed[key];
     }
 
+    // Accumulate mouse moves.
     void CalcMouseMove(int posX, int posY)
     {
         if (!(m_lastPosX == -1 && m_lastPosY == -1))
-            m_mouseMove = { posX - m_lastPosX, posY - m_lastPosY };
+        {
+            m_mouseMove.x += posX - m_lastPosX;
+            m_mouseMove.y += posY - m_lastPosY;
+        }
 
         m_lastPosX = posX;
         m_lastPosY = posY;
