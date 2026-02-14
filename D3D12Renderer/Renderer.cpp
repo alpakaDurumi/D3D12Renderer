@@ -207,12 +207,14 @@ void Renderer::OnUpdate()
         accumulatedMs -= fixedDtMs;
     }
 
+    float alpha = std::clamp(static_cast<float>(accumulatedMs / fixedDtMs), 0.0f, 1.0f);
+
     //PrintFPS();
 
     // 이번에 드로우할 프레임에 대해 constant buffers 업데이트
     FrameResource& frameResource = *m_frameResources[m_frameIndex];
 
-    PrepareConstantData();
+    PrepareConstantData(alpha);
     UpdateConstantBuffers(frameResource);
 }
 
@@ -653,6 +655,11 @@ void Renderer::LoadAssets()
     m_meshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube());
     m_meshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateSphere());
     m_instancedMeshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube(), GeometryGenerator::GenerateSampleInstanceData());
+
+    m_meshes[0].Transform(XMMatrixScaling(1000.0f, 0.5f, 1000.0f)* XMMatrixTranslation(0.0f, -5.0f, 0.0f));
+    m_meshes[0].m_meshConstantData.textureTileScale = 50.0f;
+
+    m_meshes[1].Transform(XMMatrixTranslation(0.0f, -3.5f, 0.0f));
 
     // Set up lights
     auto light = std::make_unique<DirectionalLight>(
@@ -1250,9 +1257,13 @@ void Renderer::FixedUpdate(double fixedDtMs)
 
     m_inputManager.ResetKeyPressed();
 
+    // Camera
     static float cameraMoveSpeed = 10.0f;
 
     float dist = cameraMoveSpeed * fixedDtSec;
+
+    m_camera.SnapshotState();
+
     if (m_inputManager.IsKeyDown('W')) m_camera.MoveForward(dist);
     if (m_inputManager.IsKeyDown('A')) m_camera.MoveRight(-dist);
     if (m_inputManager.IsKeyDown('S')) m_camera.MoveForward(-dist);
@@ -1260,27 +1271,38 @@ void Renderer::FixedUpdate(double fixedDtMs)
     if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-dist);
     if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(dist);
 
+    // Mesh
     static float rotationSpeed = 1.0f;
 
+    for (auto& mesh : m_meshes)
+    {
+        mesh.SnapshotState();
+    }
     for (auto& mesh : m_instancedMeshes)
     {
-        XMMATRIX prevWorld = XMMatrixTranspose(XMLoadFloat4x4(&mesh.m_meshConstantData.world));
-        XMMATRIX world = prevWorld * XMMatrixRotationRollPitchYaw(0.0f, rotationSpeed * fixedDtSec, 0.0f);
-        mesh.m_meshConstantData.SetTransform(world);
-}
+        mesh.SnapshotState();
+    }
+
+    XMMATRIX rot = XMMatrixRotationRollPitchYaw(0.0f, rotationSpeed * fixedDtSec, 0.0f);
+    m_instancedMeshes[0].Transform(rot);
 }
 
-void Renderer::PrepareConstantData()
+void Renderer::PrepareConstantData(float alpha)
 {
     // Mesh
-    XMMATRIX world = XMMatrixScaling(1000.0f, 0.5f, 1000.0f) * XMMatrixTranslation(0.0f, -5.0f, 0.0f);
-    m_meshes[0].m_meshConstantData.SetTransform(world);
-    m_meshes[0].m_meshConstantData.textureTileScale = 50.0f;
-
-    XMMATRIX w = XMMatrixTranslation(0.0f, -3.5f, 0.0f);
-    m_meshes[1].m_meshConstantData.SetTransform(w);
+    for (auto& mesh : m_meshes)
+    {
+        mesh.UpdateRenderState(alpha);
+        mesh.m_meshConstantData.SetTransform(mesh.m_renderTransform);
+    }
+    for (auto& mesh : m_instancedMeshes)
+    {
+        mesh.UpdateRenderState(alpha);
+        mesh.m_meshConstantData.SetTransform(mesh.m_renderTransform);
+    }
 
     // Main Camera
+    m_camera.UpdateRenderState(alpha);
     m_camera.Rotate(m_inputManager.GetAndResetMouseMove());
     m_cameraConstantData.SetPos(m_camera.GetPosition());
     m_cameraConstantData.SetView(m_camera.GetViewMatrix());

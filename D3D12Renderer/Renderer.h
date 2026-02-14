@@ -162,7 +162,7 @@ private:
 
     void FixedUpdate(double fixedDt);
 
-    void PrepareConstantData();
+    void PrepareConstantData(float alpha);
     std::vector<BoundingSphere> CalcCascadeSpheres();
     void PrepareDirectionalLight(DirectionalLight& light, const std::vector<BoundingSphere>& cascadeSpheres);
     void PreparePointLight(PointLight& light);

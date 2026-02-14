@@ -8,6 +8,8 @@ class Camera {
 public:
     Camera(XMFLOAT3 initialPosition = { 0.0f, 0.0f, 0.0f });
 
+    void UpdateRenderState(float alpha);
+
     XMVECTOR GetPosition() const;
     float GetNearPlane() const;
     float GetFarPlane() const;
@@ -16,6 +18,8 @@ public:
 
     void SetAspectRatio(float aspectRatio);
     void SetHorizontalFOV(float horizontalFOV);
+
+    void SnapshotState();
     void MoveForward(float speedScale);
     void MoveRight(float speedScale);
     void MoveUp(float speedScale);
@@ -24,7 +28,9 @@ public:
 private:
     float CalcVerticalFOV(float horizontalFOV);
 
-    XMFLOAT3 m_position;
+    XMFLOAT3 m_prevPosition;
+    XMFLOAT3 m_currPosition;
+    XMFLOAT3 m_renderPosition;
     XMFLOAT3 m_orientation;
     XMFLOAT3 m_up;
 

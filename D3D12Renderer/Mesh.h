@@ -45,6 +45,9 @@ public:
 
             if (i == 0) m_materialConstantBufferIndex = 0;
         }
+
+        m_prevTransform = XMMatrixIdentity();
+        m_currTransform = XMMatrixIdentity();
     }
 
     virtual ~Mesh() = default;
@@ -62,6 +65,31 @@ public:
         frameResource.m_meshConstantBuffers[m_meshConstantBufferIndex]->Update(&m_meshConstantData);
     }
 
+    void SnapshotState()
+    {
+        m_prevTransform = m_currTransform;
+    }
+
+    void Transform(XMMATRIX transform)
+    {
+        m_currTransform *= transform;
+    }
+
+    void UpdateRenderState(float alpha)
+    {
+        XMVECTOR prevS, prevR, prevT;
+        XMMatrixDecompose(&prevS, &prevR, &prevT, m_prevTransform);
+
+        XMVECTOR currS, currR, currT;
+        XMMatrixDecompose(&currS, &currR, &currT, m_currTransform);
+
+        XMVECTOR s = XMVectorLerp(prevS, currS, alpha);
+        XMVECTOR r = XMQuaternionSlerp(prevR, currR, alpha);
+        XMVECTOR t = XMVectorLerp(prevT, currT, alpha);
+        
+        m_renderTransform = XMMatrixAffineTransformation(s, XMVectorZero(), r, t);
+    }
+
     ComPtr<ID3D12Resource> m_vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 
@@ -75,6 +103,10 @@ public:
     UINT m_materialConstantBufferIndex;
 
     TextureAddressingMode m_textureAddressingMode;
+
+    XMMATRIX m_prevTransform;
+    XMMATRIX m_currTransform;
+    XMMATRIX m_renderTransform;
 };
 
 class InstancedMesh : public Mesh

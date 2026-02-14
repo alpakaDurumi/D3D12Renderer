@@ -3,7 +3,8 @@
 
 Camera::Camera(XMFLOAT3 initialPosition)
 {
-    m_position = initialPosition;
+    m_prevPosition = initialPosition;
+    m_currPosition = initialPosition;
     m_orientation = { 0.0f, 0.0f, 1.0f };
     m_up = { 0.0f, 1.0f, 0.0f };
 
@@ -16,10 +17,17 @@ Camera::Camera(XMFLOAT3 initialPosition)
     m_farPlane = 1000.0f;
 }
 
+void Camera::UpdateRenderState(float alpha)
+{
+    XMVECTOR prev = XMLoadFloat3(&m_prevPosition);
+    XMVECTOR curr = XMLoadFloat3(&m_currPosition);
+    XMVECTOR interpolated = XMVectorLerp(prev, curr, alpha);
+    XMStoreFloat3(&m_renderPosition, interpolated);
+}
+
 XMVECTOR Camera::GetPosition() const
 {
-    XMVECTOR p = XMLoadFloat3(&m_position);
-    return XMVectorSetW(p, 1.0f);
+    return XMVectorSetW(XMLoadFloat3(&m_renderPosition), 1.0f);
 }
 
 float Camera::GetNearPlane() const
@@ -34,7 +42,7 @@ float Camera::GetFarPlane() const
 
 XMMATRIX Camera::GetViewMatrix() const
 {
-    return XMMatrixLookToLH(XMLoadFloat3(&m_position), XMLoadFloat3(&m_orientation), XMLoadFloat3(&m_up));
+    return XMMatrixLookToLH(XMLoadFloat3(&m_renderPosition), XMLoadFloat3(&m_orientation), XMLoadFloat3(&m_up));
 }
 
 XMMATRIX Camera::GetProjectionMatrix(bool usePerspectiveProjection) const
@@ -56,19 +64,24 @@ void Camera::SetHorizontalFOV(float horizontalFOV)
     m_verticalFOV = CalcVerticalFOV(horizontalFOV);
 }
 
+void Camera::SnapshotState()
+{
+    m_prevPosition = m_currPosition;
+}
+
 void Camera::MoveForward(float speedScale)
 {
-    XMVECTOR position = XMLoadFloat3(&m_position);
+    XMVECTOR position = XMLoadFloat3(&m_currPosition);
     XMVECTOR orientation = XMLoadFloat3(&m_orientation);
 
     XMVECTOR nextPosition = position + orientation * speedScale;
 
-    XMStoreFloat3(&m_position, nextPosition);
+    XMStoreFloat3(&m_currPosition, nextPosition);
 }
 
 void Camera::MoveRight(float speedScale)
 {
-    XMVECTOR position = XMLoadFloat3(&m_position);
+    XMVECTOR position = XMLoadFloat3(&m_currPosition);
     XMVECTOR orientation = XMLoadFloat3(&m_orientation);
     XMVECTOR up = XMLoadFloat3(&m_up);
 
@@ -76,17 +89,17 @@ void Camera::MoveRight(float speedScale)
 
     XMVECTOR nextPosition = position + right * speedScale;
 
-    XMStoreFloat3(&m_position, nextPosition);
+    XMStoreFloat3(&m_currPosition, nextPosition);
 }
 
 void Camera::MoveUp(float speedScale)
 {
-    XMVECTOR position = XMLoadFloat3(&m_position);
+    XMVECTOR position = XMLoadFloat3(&m_currPosition);
     XMVECTOR up = XMLoadFloat3(&m_up);
 
     XMVECTOR nextPosition = position + up * speedScale;
 
-    XMStoreFloat3(&m_position, nextPosition);
+    XMStoreFloat3(&m_currPosition, nextPosition);
 }
 
 void Camera::Rotate(XMINT2 mouseMove)
