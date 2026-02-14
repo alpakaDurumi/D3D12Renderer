@@ -201,8 +201,6 @@ void Renderer::OnUpdate()
 
     accumulatedMs += std::chrono::duration<double, std::milli>(deltaTime).count();
 
-    HandleInput();
-
     while (accumulatedMs >= fixedDtMs)
     {
         FixedUpdate(fixedDtMs);
@@ -258,8 +256,6 @@ void Renderer::OnRender()
     UINT syncInterval = m_vSync ? 1 : 0;
     UINT presentFlags = m_tearingSupported && !m_vSync ? DXGI_PRESENT_ALLOW_TEARING : 0;
     ThrowIfFailed(m_swapChain->Present(syncInterval, presentFlags));
-
-    m_inputManager.OnFrameEnd();
 
     MoveToNextFrame();
 }
@@ -1221,12 +1217,22 @@ void Renderer::PrintFPS()
     }
 }
 
-void Renderer::HandleInput()
+void Renderer::FixedUpdate(double fixedDtMs)
 {
+    float fixedDtSec = static_cast<float>(fixedDtMs) * 0.001f;
+
     if (m_inputManager.IsKeyPressed(VK_ESCAPE))
     {
-        PostQuitMessage(0);
-        return;
+        if (!PostMessageW(Win32Application::GetHwnd(), WM_CLOSE, 0, 0))
+        {
+            DWORD err = GetLastError();
+            WCHAR buf[128];
+            swprintf_s(buf, L"PostMessageW(WM_CLOSE) failed. GetLastError=%lu\n", err);
+            OutputDebugStringW(buf);
+
+            // fallback
+            PostQuitMessage(static_cast<int>(err));
+    }
     }
 
     if (m_inputManager.IsKeyPressed(VK_F11))
@@ -1241,21 +1247,18 @@ void Renderer::HandleInput()
         swprintf_s(buffer, L"m_vSync : %d\n", m_vSync);
         OutputDebugStringW(buffer);
     }
-}
 
-void Renderer::FixedUpdate(double fixedDtMs)
-{
-    float fixedDtSec = static_cast<float>(fixedDtMs) * 0.001f;
+    m_inputManager.ResetKeyPressed();
 
     static float cameraMoveSpeed = 10.0f;
 
-    float temp = cameraMoveSpeed * fixedDtSec;
-    if (m_inputManager.IsKeyDown('W')) m_camera.MoveForward(temp);
-    if (m_inputManager.IsKeyDown('A')) m_camera.MoveRight(-temp);
-    if (m_inputManager.IsKeyDown('S')) m_camera.MoveForward(-temp);
-    if (m_inputManager.IsKeyDown('D')) m_camera.MoveRight(temp);
-    if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-temp);
-    if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(temp);
+    float dist = cameraMoveSpeed * fixedDtSec;
+    if (m_inputManager.IsKeyDown('W')) m_camera.MoveForward(dist);
+    if (m_inputManager.IsKeyDown('A')) m_camera.MoveRight(-dist);
+    if (m_inputManager.IsKeyDown('S')) m_camera.MoveForward(-dist);
+    if (m_inputManager.IsKeyDown('D')) m_camera.MoveRight(dist);
+    if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-dist);
+    if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(dist);
 
     m_camera.Rotate(m_inputManager.GetAndResetMouseMove());
 

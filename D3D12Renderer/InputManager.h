@@ -51,7 +51,7 @@ public:
         return delta;
     }
 
-    void OnFrameEnd()
+    void ResetKeyPressed()
     {
         memset(m_keyPressed, false, sizeof(m_keyPressed));
     }

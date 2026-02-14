@@ -159,7 +159,6 @@ private:
     ID3DBlob* GetShaderBlob(const ShaderKey& shaderKey);
 
     void PrintFPS();
-    void HandleInput();
 
     void FixedUpdate(double fixedDt);
 
