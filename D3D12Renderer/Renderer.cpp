@@ -1260,8 +1260,6 @@ void Renderer::FixedUpdate(double fixedDtMs)
     if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-dist);
     if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(dist);
 
-    m_camera.Rotate(m_inputManager.GetAndResetMouseMove());
-
     static float rotationSpeed = 1.0f;
 
     for (auto& mesh : m_instancedMeshes)
@@ -1283,6 +1281,7 @@ void Renderer::PrepareConstantData()
     m_meshes[1].m_meshConstantData.SetTransform(w);
 
     // Main Camera
+    m_camera.Rotate(m_inputManager.GetAndResetMouseMove());
     m_cameraConstantData.SetPos(m_camera.GetPosition());
     m_cameraConstantData.SetView(m_camera.GetViewMatrix());
     m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());
