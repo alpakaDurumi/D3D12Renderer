@@ -56,6 +56,17 @@ public:
 
     virtual ~Mesh() = default;
 
+    void SetInitialTransform(const XMFLOAT3& s, const XMFLOAT3& eulerRad, const XMFLOAT3& t)
+    {
+        m_prevS = m_currS = s;
+
+        XMVECTOR r = XMQuaternionRotationRollPitchYaw(eulerRad.x, eulerRad.y, eulerRad.z);
+        XMStoreFloat4(&m_prevR, r);
+        m_currR = m_prevR;
+
+        m_prevT = m_currT = t;
+    }
+
     virtual void Render(ComPtr<ID3D12GraphicsCommandList7>& commandList) const
     {
         commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -77,7 +88,7 @@ public:
     }
 
     // Accumulate each component
-    void Transform(const XMFLOAT3& s, const XMFLOAT3& eularRad, const XMFLOAT3& t)
+    void Transform(const XMFLOAT3& s, const XMFLOAT3& eulerRad, const XMFLOAT3& t)
     {
         // S
         m_currS.x *= s.x;
@@ -86,7 +97,7 @@ public:
 
         // R
         XMVECTOR currR = XMLoadFloat4(&m_currR);
-        XMVECTOR deltaR = XMQuaternionRotationRollPitchYaw(eularRad.x, eularRad.y, eularRad.z);
+        XMVECTOR deltaR = XMQuaternionRotationRollPitchYaw(eulerRad.x, eulerRad.y, eulerRad.z);
         currR = XMQuaternionNormalize(XMQuaternionMultiply(currR, deltaR));
         XMStoreFloat4(&m_currR, currR);
 
