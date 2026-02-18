@@ -46,8 +46,12 @@ public:
             if (i == 0) m_materialConstantBufferIndex = 0;
         }
 
-        m_prevTransform = XMMatrixIdentity();
-        m_currTransform = XMMatrixIdentity();
+        m_prevS = XMFLOAT3(1.0f, 1.0f, 1.0f);
+        m_currS = XMFLOAT3(1.0f, 1.0f, 1.0f);
+        m_prevR = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
+        m_currR = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
+        m_prevT = XMFLOAT3(0.0f, 0.0f, 0.0f);
+        m_currT = XMFLOAT3(0.0f, 0.0f, 0.0f);
     }
 
     virtual ~Mesh() = default;
@@ -67,27 +71,45 @@ public:
 
     void SnapshotState()
     {
-        m_prevTransform = m_currTransform;
+        m_prevS = m_currS;
+        m_prevR = m_currR;
+        m_prevT = m_currT;
     }
 
-    void Transform(XMMATRIX transform)
+    // Accumulate each component
+    void Transform(const XMFLOAT3& s, const XMFLOAT3& eularRad, const XMFLOAT3& t)
     {
-        m_currTransform *= transform;
+        // S
+        m_currS.x *= s.x;
+        m_currS.y *= s.y;
+        m_currS.z *= s.z;
+
+        // R
+        XMVECTOR currR = XMLoadFloat4(&m_currR);
+        XMVECTOR deltaR = XMQuaternionRotationRollPitchYaw(eularRad.x, eularRad.y, eularRad.z);
+        currR = XMQuaternionNormalize(XMQuaternionMultiply(currR, deltaR));
+        XMStoreFloat4(&m_currR, currR);
+
+        // T
+        m_currT.x += t.x;
+        m_currT.y += t.y;
+        m_currT.z += t.z;
     }
 
     void UpdateRenderState(float alpha)
     {
-        XMVECTOR prevS, prevR, prevT;
-        XMMatrixDecompose(&prevS, &prevR, &prevT, m_prevTransform);
+        XMVECTOR prevS = XMVectorSetW(XMLoadFloat3(&m_prevS), 0.0f);
+        XMVECTOR currS = XMVectorSetW(XMLoadFloat3(&m_currS), 0.0f);
+        XMVECTOR prevR = XMLoadFloat4(&m_prevR);
+        XMVECTOR currR = XMLoadFloat4(&m_currR);
+        XMVECTOR prevT = XMVectorSetW(XMLoadFloat3(&m_prevT), 0.0f);
+        XMVECTOR currT = XMVectorSetW(XMLoadFloat3(&m_currT), 0.0f);
 
-        XMVECTOR currS, currR, currT;
-        XMMatrixDecompose(&currS, &currR, &currT, m_currTransform);
+        XMVECTOR renderS = XMVectorLerp(prevS, currS, alpha);
+        XMVECTOR renderR = XMQuaternionSlerp(prevR, currR, alpha);
+        XMVECTOR renderT = XMVectorLerp(prevT, currT, alpha);
 
-        XMVECTOR s = XMVectorLerp(prevS, currS, alpha);
-        XMVECTOR r = XMQuaternionSlerp(prevR, currR, alpha);
-        XMVECTOR t = XMVectorLerp(prevT, currT, alpha);
-        
-        m_renderTransform = XMMatrixAffineTransformation(s, XMVectorZero(), r, t);
+        XMStoreFloat4x4(&m_renderTransform, XMMatrixAffineTransformation(renderS, XMVectorZero(), renderR, renderT));
     }
 
     ComPtr<ID3D12Resource> m_vertexBuffer;
@@ -104,9 +126,11 @@ public:
 
     TextureAddressingMode m_textureAddressingMode;
 
-    XMMATRIX m_prevTransform;
-    XMMATRIX m_currTransform;
-    XMMATRIX m_renderTransform;
+    XMFLOAT3 m_prevS, m_currS;
+    XMFLOAT4 m_prevR, m_currR;
+    XMFLOAT3 m_prevT, m_currT;
+
+    XMFLOAT4X4 m_renderTransform;
 };
 
 class InstancedMesh : public Mesh

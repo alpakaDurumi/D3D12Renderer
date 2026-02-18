@@ -656,10 +656,10 @@ void Renderer::LoadAssets()
     m_meshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateSphere());
     m_instancedMeshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube(), GeometryGenerator::GenerateSampleInstanceData());
 
-    m_meshes[0].Transform(XMMatrixScaling(1000.0f, 0.5f, 1000.0f)* XMMatrixTranslation(0.0f, -5.0f, 0.0f));
+    m_meshes[0].Transform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
     m_meshes[0].m_meshConstantData.textureTileScale = 50.0f;
 
-    m_meshes[1].Transform(XMMatrixTranslation(0.0f, -3.5f, 0.0f));
+    m_meshes[1].Transform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
 
     // Set up lights
     auto light = std::make_unique<DirectionalLight>(
@@ -1272,7 +1272,7 @@ void Renderer::FixedUpdate(double fixedDtMs)
     if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(dist);
 
     // Mesh
-    static float rotationSpeed = 1.0f;
+    static float rotationSpeed = 1.0f;  // unit : rad/s
 
     for (auto& mesh : m_meshes)
     {
@@ -1283,8 +1283,7 @@ void Renderer::FixedUpdate(double fixedDtMs)
         mesh.SnapshotState();
     }
 
-    XMMATRIX rot = XMMatrixRotationRollPitchYaw(0.0f, rotationSpeed * fixedDtSec, 0.0f);
-    m_instancedMeshes[0].Transform(rot);
+    m_instancedMeshes[0].Transform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
 }
 
 void Renderer::PrepareConstantData(float alpha)
@@ -1293,12 +1292,12 @@ void Renderer::PrepareConstantData(float alpha)
     for (auto& mesh : m_meshes)
     {
         mesh.UpdateRenderState(alpha);
-        mesh.m_meshConstantData.SetTransform(mesh.m_renderTransform);
+        mesh.m_meshConstantData.SetTransform(XMLoadFloat4x4(&mesh.m_renderTransform));
     }
     for (auto& mesh : m_instancedMeshes)
     {
         mesh.UpdateRenderState(alpha);
-        mesh.m_meshConstantData.SetTransform(mesh.m_renderTransform);
+        mesh.m_meshConstantData.SetTransform(XMLoadFloat4x4(&mesh.m_renderTransform));
     }
 
     // Main Camera
