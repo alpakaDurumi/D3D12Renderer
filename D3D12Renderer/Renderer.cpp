@@ -223,12 +223,12 @@ void Renderer::OnRender()
 {
     auto [commandAllocator, commandList] = m_commandQueue->GetAvailableCommandList();
 
-    // Record all the commands we need to render the scene into the command list
+    BuildImGuiFrame();
     PopulateCommandList(commandList);
 
     m_dynamicDescriptorHeapForCBVSRVUAV->Reset();
 
-    // ImGui Render
+    // Populate commands for ImGui
     // Is it OK to call SetDescriptorHeaps? (Does it affect performance?)
     ImGui::Render();
     ID3D12DescriptorHeap* ppHeaps[] = { m_imguiDescriptorAllocator->GetDescriptorHeap() };
@@ -335,7 +335,7 @@ void Renderer::OnResize(UINT width, UINT height)
     CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation);
 }
 
-void Renderer::OnPrepareImGui()
+void Renderer::BuildImGuiFrame()
 {
     //ImGui::ShowDemoWindow(); // Show demo window! :)
 

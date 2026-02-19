@@ -58,7 +58,6 @@ public:
     void OnKeyUp(WPARAM key);
     void OnMouseMove(int xPos, int yPos);
     void OnResize(UINT width, UINT height);
-    void OnPrepareImGui();
 
     static void ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle);
     static void ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle);
@@ -144,6 +143,7 @@ private:
     void LoadPipeline();
     void LoadAssets();
     void PopulateCommandList(CommandList& commandList);
+    void BuildImGuiFrame();
     void WaitForGPU();
     void MoveToNextFrame();
     void InitImGui();
