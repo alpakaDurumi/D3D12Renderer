@@ -3,7 +3,6 @@
 
 #include <D3Dcompiler.h>
 #include <dxgidebug.h>
-#include <chrono>
 #include <filesystem>
 #include <shlobj.h>
 
@@ -185,22 +184,17 @@ void Renderer::OnInit()
     LoadPipeline();
     LoadAssets();
     InitImGui();
+    m_prevTime = m_clock.now();
 }
 
 void Renderer::OnUpdate()
 {
+    CalcDeltaTime();
+
     static double fixedDtMs = 1000.0 / 60.0;     // Target to 60Hz fixed time step
     static double accumulatedMs = 0.0;
 
-    static std::chrono::high_resolution_clock clock;
-    static auto t0 = clock.now();
-
-    auto t1 = clock.now();
-    auto deltaTime = t1 - t0;
-    t0 = t1;
-
-    accumulatedMs += std::chrono::duration<double, std::milli>(deltaTime).count();
-
+    accumulatedMs += std::chrono::duration<double, std::milli>(m_deltaTime).count();
     while (accumulatedMs >= fixedDtMs)
     {
         FixedUpdate(fixedDtMs);
@@ -340,6 +334,27 @@ void Renderer::BuildImGuiFrame()
     //ImGui::ShowDemoWindow(); // Show demo window! :)
 
     ImGui::Begin("Test");
+
+    static UINT64 frameCounter = 0;
+    static double elapsedSeconds = 0.0;
+
+    ++frameCounter;
+
+    static double fps = 0.0;
+    static double frameTime = 0.0;
+
+    elapsedSeconds += std::chrono::duration<double>(m_deltaTime).count();
+    if (elapsedSeconds >= 1.0)
+    {
+        fps = frameCounter / elapsedSeconds;
+        frameTime = 1000.0 / fps;
+
+        frameCounter = 0;
+        elapsedSeconds = 0.0;
+    }
+
+    ImGui::Text("FPS: %.1f", fps);
+    ImGui::Text("Latency: %.3f", frameTime);
 
     const char* items[] = { "Point", "Bilinear", "AnisotropicX2", "AnisotropicX4", "AnisotropicX8", "AnisotropicX16" };
     static int item_selected_idx = 5;
@@ -1200,30 +1215,11 @@ ID3DBlob* Renderer::GetShaderBlob(const ShaderKey& shaderKey)
     return it->second.Get();
 }
 
-void Renderer::PrintFPS()
+void Renderer::CalcDeltaTime()
 {
-    static UINT64 frameCounter = 0;
-    static double elapsedSeconds = 0.0;
-    static std::chrono::high_resolution_clock clock;
-    static auto t0 = clock.now();
-
-    frameCounter++;
-    auto t1 = clock.now();
-    auto deltaTime = t1 - t0;
-    t0 = t1;
-
-    elapsedSeconds += deltaTime.count() * 1e-9;
-    if (elapsedSeconds > 1.0)
-    {
-        WCHAR buffer[500];
-        auto fps = frameCounter / elapsedSeconds;
-        auto frameTime = 1000.0 / fps;
-        swprintf_s(buffer, L"FPS: %f, Frame Time: %fms\n", fps, frameTime);
-        OutputDebugStringW(buffer);
-
-        frameCounter = 0;
-        elapsedSeconds = 0.0;
-    }
+    auto currTime = m_clock.now();
+    m_deltaTime = currTime - m_prevTime;
+    m_prevTime = currTime;
 }
 
 void Renderer::FixedUpdate(double fixedDtMs)

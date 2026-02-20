@@ -11,6 +11,7 @@
 #include <vector>
 #include <memory>
 #include <array>
+#include <chrono>
 
 #include "Camera.h"
 #include "InputManager.h"
@@ -137,6 +138,10 @@ private:
     std::unique_ptr<ImGuiDescriptorAllocator> m_imguiDescriptorAllocator;
     static Renderer* sm_instance;
 
+    std::chrono::steady_clock m_clock;
+    std::chrono::time_point<std::chrono::steady_clock> m_prevTime;
+    std::chrono::nanoseconds m_deltaTime;
+
     // Synchronization objects
     UINT m_frameIndex;
 
@@ -158,8 +163,7 @@ private:
     ID3D12PipelineState* GetPipelineState(const PSOKey& psoKey);
     ID3DBlob* GetShaderBlob(const ShaderKey& shaderKey);
 
-    void PrintFPS();
-
+    void CalcDeltaTime();
     void FixedUpdate(double fixedDt);
 
     void PrepareConstantData(float alpha);
