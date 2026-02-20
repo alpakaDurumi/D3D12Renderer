@@ -24,6 +24,8 @@ using namespace D3DHelper;
 // Definition for static member
 Renderer* Renderer::sm_instance = nullptr;
 
+constexpr float DefaultDPI = 96.0f;
+
 // Generate a simple black and white checkerboard texture.
 std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UINT texturePixelSize)
 {
@@ -183,6 +185,9 @@ void Renderer::OnInit()
     ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED));   // For initializing DirectXTex
     LoadPipeline();
     LoadAssets();
+
+    m_dpiScale = static_cast<float>(GetDpiForWindow(Win32Application::GetHwnd())) / DefaultDPI;
+
     InitImGui();
     m_prevTime = m_clock.now();
 }
@@ -327,6 +332,12 @@ void Renderer::OnResize(UINT width, UINT height)
 
     // Recreate DSV
     CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation);
+}
+
+void Renderer::OnDpiChanged()
+{
+    m_dpiScale = static_cast<float>(GetDpiForWindow(Win32Application::GetHwnd())) / DefaultDPI;
+    ImGui::GetStyle().FontScaleMain = m_dpiScale;
 }
 
 void Renderer::BuildImGuiFrame()
@@ -1009,6 +1020,8 @@ void Renderer::InitImGui()
     init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle) { return ImGuiSrvDescriptorAllocate(out_cpu_handle, out_gpu_handle); };
     init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) { return ImGuiSrvDescriptorFree(cpu_handle, gpu_handle); };
     ImGui_ImplDX12_Init(&init_info);
+
+    ImGui::GetStyle().FontScaleMain = m_dpiScale;
 }
 
 void Renderer::SetTextureFiltering(TextureFiltering filtering)

@@ -59,6 +59,7 @@ public:
     void OnKeyUp(WPARAM key);
     void OnMouseMove(int xPos, int yPos);
     void OnResize(UINT width, UINT height);
+    void OnDpiChanged();
 
     static void ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle);
     static void ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle);
@@ -141,6 +142,8 @@ private:
     std::chrono::steady_clock m_clock;
     std::chrono::time_point<std::chrono::steady_clock> m_prevTime;
     std::chrono::nanoseconds m_deltaTime;
+
+    float m_dpiScale;
 
     // Synchronization objects
     UINT m_frameIndex;

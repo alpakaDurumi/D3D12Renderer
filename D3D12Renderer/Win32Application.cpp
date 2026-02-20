@@ -145,7 +145,6 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
         }
         return 0;
     case WM_SIZE:
-    {
         if (renderer)
         {
             int width = LOWORD(lParam);
@@ -153,7 +152,12 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
             renderer->OnResize(width, height);
         }
         return 0;
-    }
+    case WM_DPICHANGED:
+        if (renderer)
+        {
+            renderer->OnDpiChanged();
+        }
+        return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
