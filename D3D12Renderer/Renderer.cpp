@@ -5,6 +5,7 @@
 #include <dxgidebug.h>
 #include <filesystem>
 #include <shlobj.h>
+#include <thread>
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
@@ -190,11 +191,34 @@ void Renderer::OnInit()
 
     InitImGui();
     m_prevTime = m_clock.now();
+    m_deadLine = m_prevTime;
 }
 
 void Renderer::OnUpdate()
 {
-    CalcDeltaTime();
+    auto now = m_clock.now();
+
+    if (!m_vSync && m_fpsCap > 0)
+    {
+        auto targetMs = std::chrono::duration<double, std::milli>(1000.0 / m_fpsCap);
+
+        if (now < m_deadLine)
+        {
+            std::this_thread::sleep_until(m_deadLine);
+        }
+
+        m_deadLine += std::chrono::duration_cast<std::chrono::steady_clock::duration>(targetMs);
+
+        now = m_clock.now();
+        // If too late, re-sync
+        if (m_deadLine < now && (now - m_deadLine) > 2 * targetMs)
+        {
+            m_deadLine = now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(targetMs);
+        }
+    }
+
+    m_deltaTime = now - m_prevTime;
+    m_prevTime = now;
 
     static double fixedDtMs = 1000.0 / 60.0;     // Target to 60Hz fixed time step
     static double accumulatedMs = 0.0;
@@ -207,8 +231,6 @@ void Renderer::OnUpdate()
     }
 
     float alpha = std::clamp(static_cast<float>(accumulatedMs / fixedDtMs), 0.0f, 1.0f);
-
-    //PrintFPS();
 
     // 이번에 드로우할 프레임에 대해 constant buffers 업데이트
     FrameResource& frameResource = *m_frameResources[m_frameIndex];
@@ -366,6 +388,31 @@ void Renderer::BuildImGuiFrame()
 
     ImGui::Text("FPS: %.1f", fps);
     ImGui::Text("Latency: %.3f", frameTime);
+
+    if (ImGui::Checkbox("vSync", &m_vSync))
+    {
+        if (!m_vSync)
+        {
+            m_deadLine = m_clock.now();
+        }
+    }
+
+    const char* items0[] = { "Unlimited", "30", "60", "120", "144", "160", "240" };
+    static int item0_selected_idx = 0;
+
+    if (ImGui::BeginCombo("FPS Cap", items0[item0_selected_idx]))
+    {
+        for (int n = 0; n < IM_ARRAYSIZE(items0); ++n)
+        {
+            const bool is_selected = item0_selected_idx == n;
+            if (ImGui::Selectable(items0[n], is_selected))
+            {
+                item0_selected_idx = n;
+                SetFpsCap(std::string(items0[n]));
+            }
+        }
+        ImGui::EndCombo();
+    }
 
     const char* items[] = { "Point", "Bilinear", "AnisotropicX2", "AnisotropicX4", "AnisotropicX8", "AnisotropicX16" };
     static int item_selected_idx = 5;
@@ -1039,6 +1086,19 @@ UINT Renderer::CalcSamplerIndex(TextureFiltering filtering, TextureAddressingMod
     return static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES) * static_cast<UINT>(filtering) + static_cast<UINT>(addressingMode);
 }
 
+void Renderer::SetFpsCap(std::string fps)
+{
+    if (fps == "Unlimited")
+    {
+        m_fpsCap = -1;
+    }
+    else
+    {
+        m_fpsCap = std::stoi(fps);
+        m_deadLine = m_clock.now();
+    }
+}
+
 void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList)
 {
     bool CBVSRVUAVHeapChanged = m_dynamicDescriptorHeapForCBVSRVUAV->CheckHeapChanged();
@@ -1261,6 +1321,10 @@ void Renderer::FixedUpdate(double fixedDtMs)
     if (m_inputManager.IsKeyPressed('V'))
     {
         m_vSync = !m_vSync;
+        if (!m_vSync)
+        {
+            m_deadLine = m_clock.now();
+        }
         WCHAR buffer[500];
         swprintf_s(buffer, L"m_vSync : %d\n", m_vSync);
         OutputDebugStringW(buffer);

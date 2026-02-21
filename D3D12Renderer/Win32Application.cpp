@@ -5,6 +5,7 @@
 
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx12.h"
+#include <timeapi.h>
 
 #include "Renderer.h"
 
@@ -66,6 +67,14 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
 
     ShowWindow(m_hwnd, nCmdShow);
 
+    // Set periodic timer resolution.
+    MMRESULT mm = timeBeginPeriod(1);
+    bool timerResolutionSet = (mm == TIMERR_NOERROR);
+    if (!timerResolutionSet)
+    {
+        OutputDebugStringW(L"timeBeginPeriod(1) failed\n");
+    }
+
     // main loop
     MSG msg = {};
     while (msg.message != WM_QUIT)
@@ -86,6 +95,15 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     }
 
     pRenderer->OnDestroy();
+
+    // Unset periodic timer resolution.
+    if (timerResolutionSet)
+    {
+        if (timeEndPeriod(1) == TIMERR_NOCANDO)
+        {
+            OutputDebugStringW(L"timeEndPeriod(1) failed\n");
+        }
+    }
 
     // return exit code that delivered by PostQuitMessage()
     return static_cast<int>(msg.wParam);

@@ -74,6 +74,7 @@ private:
     bool m_vSync = false;
     bool m_tearingSupported = false;
     bool m_fullScreen = false;
+    int m_fpsCap = -1;
 
     RECT m_windowRect;
     D3D12_VIEWPORT m_viewport;
@@ -141,7 +142,8 @@ private:
 
     std::chrono::steady_clock m_clock;
     std::chrono::time_point<std::chrono::steady_clock> m_prevTime;
-    std::chrono::nanoseconds m_deltaTime;
+    std::chrono::time_point<std::chrono::steady_clock> m_deadLine;
+    std::chrono::duration<double, std::milli> m_deltaTime;
 
     float m_dpiScale;
 
@@ -159,6 +161,8 @@ private:
     void SetTextureFiltering(TextureFiltering filtering);
     void SetMeshType(MeshType meshType);
     UINT CalcSamplerIndex(TextureFiltering filtering, TextureAddressingMode addressingMode);
+
+    void SetFpsCap(std::string fps);
 
     void BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList);
 
