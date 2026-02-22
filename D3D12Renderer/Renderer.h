@@ -170,7 +170,6 @@ private:
     ID3D12PipelineState* GetPipelineState(const PSOKey& psoKey);
     ID3DBlob* GetShaderBlob(const ShaderKey& shaderKey);
 
-    void CalcDeltaTime();
     void FixedUpdate(double fixedDt);
 
     void PrepareConstantData(float alpha);

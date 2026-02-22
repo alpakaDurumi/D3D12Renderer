@@ -389,17 +389,13 @@ void Renderer::BuildImGuiFrame()
     ImGui::Text("FPS: %.1f", fps);
     ImGui::Text("Latency: %.3f", frameTime);
 
-    if (ImGui::Checkbox("vSync", &m_vSync))
-    {
-        if (!m_vSync)
-        {
-            m_deadLine = m_clock.now();
-        }
-    }
+    ImGui::Checkbox("vSync", &m_vSync);
 
     const char* items0[] = { "Unlimited", "30", "60", "120", "144", "160", "240" };
     static int item0_selected_idx = 0;
 
+    // FPS cap can be set when vSync enabled.
+    ImGui::BeginDisabled(m_vSync);
     if (ImGui::BeginCombo("FPS Cap", items0[item0_selected_idx]))
     {
         for (int n = 0; n < IM_ARRAYSIZE(items0); ++n)
@@ -413,6 +409,7 @@ void Renderer::BuildImGuiFrame()
         }
         ImGui::EndCombo();
     }
+    ImGui::EndDisabled();
 
     const char* items[] = { "Point", "Bilinear", "AnisotropicX2", "AnisotropicX4", "AnisotropicX8", "AnisotropicX16" };
     static int item_selected_idx = 5;
@@ -1288,13 +1285,6 @@ ID3DBlob* Renderer::GetShaderBlob(const ShaderKey& shaderKey)
     return it->second.Get();
 }
 
-void Renderer::CalcDeltaTime()
-{
-    auto currTime = m_clock.now();
-    m_deltaTime = currTime - m_prevTime;
-    m_prevTime = currTime;
-}
-
 void Renderer::FixedUpdate(double fixedDtMs)
 {
     float fixedDtSec = static_cast<float>(fixedDtMs) * 0.001f;
@@ -1321,13 +1311,6 @@ void Renderer::FixedUpdate(double fixedDtMs)
     if (m_inputManager.IsKeyPressed('V'))
     {
         m_vSync = !m_vSync;
-        if (!m_vSync)
-        {
-            m_deadLine = m_clock.now();
-        }
-        WCHAR buffer[500];
-        swprintf_s(buffer, L"m_vSync : %d\n", m_vSync);
-        OutputDebugStringW(buffer);
     }
 
     m_inputManager.ResetKeyPressed();
