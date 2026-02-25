@@ -47,18 +47,19 @@ cbuffer CameraConstantBuffer : register(b1, space0)
     float4x4 projection;
 }
 
-cbuffer MaterialConstantBuffer : register(b2, space0)
+cbuffer ShadowConstantBuffer : register(b2, space0)
+{
+    float cascadeSplits[MAX_CASCADES];
+}
+
+struct MaterialConstants
 {
     float3 materialAmbient;
     float3 materialSpecular;
     float shininess;
     uint4 textureIndices;
-}
-
-cbuffer ShadowConstantBuffer : register(b3, space0)
-{
-    float cascadeSplits[MAX_CASCADES];
-}
+};
+ConstantBuffer<MaterialConstants> MaterialConstantBuffers[] : register(b0, space1);
 
 struct LightConstants
 {
@@ -73,16 +74,17 @@ struct LightConstants
     uint idxInArray;
     float lightIntensity;
 };
-ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space1);
+ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space2);
 
-cbuffer GlobalConstants : register(b5, space0)
+cbuffer GlobalConstants : register(b4, space0)
 {
     uint samplerIdx;
     uint numLights;
+    uint materialIdx;
 };
 
 // Parallax Occlusion Mapping
-float2 ParallaxMapping(float2 texCoord, float3 toCamera)
+float2 ParallaxMapping(float2 texCoord, float3 toCamera, uint heightMapIdx)
 {
     static const float heightScale = 0.02f;
     
@@ -100,7 +102,9 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera)
     float2 currentTexCoord = texCoord * textureTileScale;
     float2 dx = ddx(currentTexCoord);
     float2 dy = ddy(currentTexCoord);
-    float currentHeightMapValue = 1.0f - g_textures[textureIndices[2]].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
+    
+    //float currentHeightMapValue = 1.0f - g_textures[heightMapIdx].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
+    float currentHeightMapValue = 1.0f - g_textures[2].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
     float currentLayerHeight = 0.0f;
     
     float2 prevTexCoord = currentTexCoord;
@@ -115,7 +119,8 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera)
         prevLayerHeight = currentLayerHeight;
         
         currentTexCoord -= deltaTexCoord;
-        currentHeightMapValue = 1.0f - g_textures[textureIndices[2]].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
+        //currentHeightMapValue = 1.0f - g_textures[heightMapIdx].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
+        currentHeightMapValue = 1.0f - g_textures[2].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
         currentLayerHeight += layerStep;
     }
     
@@ -227,7 +232,7 @@ float3 PhongReflection(LightConstants light, float3 toLightWorld, float3 toCamer
     float3 halfWay = normalize(toLightWorld + toCameraWorld);
     
     // Ambient
-    float3 ambient = materialAmbient * texColor;
+    float3 ambient = MaterialConstantBuffers[materialIdx].materialAmbient * texColor;
     
     // Diffuse
     float nDotL = max(dot(normalWorld, toLightWorld), 0.0f);
@@ -235,7 +240,7 @@ float3 PhongReflection(LightConstants light, float3 toLightWorld, float3 toCamer
     
     // Specular
     float nDotH = max(dot(normalWorld, halfWay), 0.0f);
-    float3 specular = pow(nDotH, shininess) * materialSpecular * light.lightColor * light.lightIntensity;
+    float3 specular = pow(nDotH, MaterialConstantBuffers[materialIdx].shininess) * MaterialConstantBuffers[materialIdx].materialSpecular * light.lightColor * light.lightIntensity;
             
     return ambient + (diffuse + specular) * lightFactor;
 }
@@ -257,6 +262,11 @@ float CalcAngularAttenuation(LightConstants light, float3 lightToPixel)
 
 float4 main(PSInput input) : SV_TARGET
 {
+    uint4 textureIndices = MaterialConstantBuffers[materialIdx].textureIndices;
+    uint albedoIdx = textureIndices[0];
+    uint normalMapIdx = textureIndices[1];
+    uint heightMapIdx = textureIndices[2];
+    
     // For POM, use inaccurate inverse-TBN
     float3 iT = normalize(input.tangentWorld);
     float3 iN = normalize(input.normalWorld);
@@ -267,8 +277,8 @@ float4 main(PSInput input) : SV_TARGET
     float3 toCameraWorld = normalize(cameraPos - input.posWorld);
     float3 toCameraTangent = normalize(mul(toCameraWorld, iiTBN));
     
-    float2 texCoord = ParallaxMapping(input.texCoord, toCameraTangent);
-
+    float2 texCoord = ParallaxMapping(input.texCoord, toCameraTangent, heightMapIdx);
+    
     //// Clip if texCoord exceeds boundary
     //if (texCoord.x < 0.0 || texCoord.x > 1.0 * textureTileScale || texCoord.y < 0.0 || texCoord.y > 1.0 * textureTileScale)
     //{
@@ -280,8 +290,10 @@ float4 main(PSInput input) : SV_TARGET
     float3x3 TBN = float3x3(input.tangentWorld, B, input.normalWorld);
     
     // Sample textures
-    float3 texColor = g_textures[textureIndices[0]].Sample(g_samplers[samplerIdx], texCoord).rgb;
-    float3 normal = g_textures[textureIndices[1]].Sample(g_samplers[samplerIdx], texCoord).rgb * 2.0f - 1.0f;
+    //float3 texColor = g_textures[albedoIdx].Sample(g_samplers[samplerIdx], texCoord).rgb;
+    //float3 normal = g_textures[normalMapIdx].Sample(g_samplers[samplerIdx], texCoord).rgb * 2.0f - 1.0f;
+    float3 texColor = g_textures[0].Sample(g_samplers[samplerIdx], texCoord).rgb;
+    float3 normal = g_textures[1].Sample(g_samplers[samplerIdx], texCoord).rgb * 2.0f - 1.0f;
     float3 normalWorld = normalize(mul(normal, TBN));
 
     uint csmIdx;

@@ -29,6 +29,7 @@
 #include "ImGuiDescriptorAllocator.h"
 #include "CacheKeys.h"
 #include "Light.h"
+#include "Material.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -120,7 +121,7 @@ private:
     std::vector<Mesh> m_meshes;
     std::vector<InstancedMesh> m_instancedMeshes;
 
-    MaterialConstantData m_materialConstantData;
+    std::vector<std::unique_ptr<Material>> m_materials;
     
     std::unique_ptr<Texture> m_albedo;
     std::unique_ptr<Texture> m_normalMap;
@@ -181,6 +182,5 @@ private:
     void UpdateConstantBuffers(FrameResource& frameResource);
 
     void UpdateCameraConstantBuffer(FrameResource& frameResource);
-    void UpdateMaterialConstantBuffer(FrameResource& frameResource);
     void UpdateShadowConstantBuffer(FrameResource& frameResource);
 };

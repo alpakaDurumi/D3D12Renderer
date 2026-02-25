@@ -642,7 +642,14 @@ void Renderer::LoadAssets()
                 shaderMacros.push_back({ define.c_str(), NULL });
             }
             shaderMacros.push_back({ NULL, NULL });
-            ThrowIfFailed(D3DCompileFromFile(key.fileName.c_str(), shaderMacros.data(), D3D_COMPILE_STANDARD_FILE_INCLUDE, "main", key.target.c_str(), compileFlags, 0, &it->second, nullptr));
+
+            ComPtr<ID3DBlob> errorBlob;
+            HRESULT hr = D3DCompileFromFile(key.fileName.c_str(), shaderMacros.data(), D3D_COMPILE_STANDARD_FILE_INCLUDE, "main", key.target.c_str(), compileFlags, 0, &it->second, &errorBlob);
+            if (FAILED(hr))
+            {
+                OutputDebugStringA(static_cast<const char*>(errorBlob->GetBufferPointer()));
+                throw std::exception();
+            }
         }
     }
 
@@ -700,9 +707,6 @@ void Renderer::LoadAssets()
         if (i == 0) m_mainCameraIndex = UINT(frameResource.m_cameraConstantBuffers.size());
         frameResource.m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get()));
 
-        // Material
-        frameResource.m_materialConstantBuffers.push_back(std::make_unique<MaterialCB>(m_device.Get()));
-
         // Shadow
         frameResource.m_shadowConstantBuffer = std::make_unique<ShadowCB>(m_device.Get());
     }
@@ -732,6 +736,18 @@ void Renderer::LoadAssets()
     m_meshes[1].SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
 
     m_instancedMeshes[0].SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3());
+
+    // Add materials
+    auto material = std::make_unique<Material>(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount), m_frameResources);
+    material->SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
+    material->SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
+    material->SetShininess(10.0f);
+    material->SetTextureIndices(0, 1, 2);
+    m_materials.push_back(std::move(material));
+
+    m_meshes[0].SetMaterial(m_materials[0].get());
+    m_meshes[1].SetMaterial(m_materials[0].get());
+    m_instancedMeshes[0].SetMaterial(m_materials[0].get());
 
     // Set up lights
     auto light = std::make_unique<DirectionalLight>(
@@ -828,6 +844,11 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
     // Set root signature
     cmdList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature().Get());
+
+    // Stage material CBVs
+    UINT32 numMaterials = static_cast<UINT32>(m_materials.size());
+    for (UINT i = 0; i < numMaterials; ++i)
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(3, i, 1, frameResource.m_materialConstantBuffers[m_materials[i]->GetMaterialConstantBufferIndex()]->GetAllocationRef());
 
     // Stage light CBVs
     UINT32 numLights = static_cast<UINT32>(m_lights.size());
@@ -1007,10 +1028,10 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         {
             cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(3, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
 
             cmdList->SetGraphicsRoot32BitConstant(11, CalcSamplerIndex(m_currentTextureFiltering, mesh.m_textureAddressingMode), 0);
+            cmdList->SetGraphicsRoot32BitConstant(11, mesh.m_pMaterial->GetMaterialConstantBufferIndex(), 2);
 
             mesh.Render(cmdList);
         }
@@ -1020,10 +1041,10 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         {
             cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_materialConstantBuffers[mesh.m_materialConstantBufferIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(3, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
+            cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
 
             cmdList->SetGraphicsRoot32BitConstant(11, CalcSamplerIndex(m_currentTextureFiltering, mesh.m_textureAddressingMode), 0);
+            cmdList->SetGraphicsRoot32BitConstant(11, mesh.m_pMaterial->GetMaterialConstantBufferIndex(), 2);
 
             mesh.Render(cmdList);
         }
@@ -1118,12 +1139,15 @@ void Renderer::CreateRootSignature()
     // Root descriptor for MeshCB, CameraCB, MaterialCB, and ShadowCB
     rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Mesh
     rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Camera
-    rootSignature[2].InitAsDescriptor(2, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Material
-    rootSignature[3].InitAsDescriptor(3, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Shadow
+    rootSignature[2].InitAsDescriptor(2, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Shadow
+
+    // Descriptor table for MaterialConstantBuffers[]
+    rootSignature[3].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[3].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
     // Descriptor table for LightConstantBuffers[]
     rootSignature[4].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[4].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[4].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
     // Descriptor table for textures (albedo, normal map, height map)
     // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
@@ -1143,7 +1167,7 @@ void Renderer::CreateRootSignature()
     rootSignature[8].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
     // Root constant for PointLightShadowPS
-    rootSignature[9].InitAsConstant(4, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[9].InitAsConstant(3, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Descriptor table for samplers
     rootSignature[10].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
@@ -1152,7 +1176,7 @@ void Renderer::CreateRootSignature()
         D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
 
     // Root constants for sampler idx and number of lights.
-    rootSignature[11].InitAsConstant(5, 0, 2, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[11].InitAsConstant(4, 0, 3, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Static samplers
     rootSignature.InitStaticSampler(0, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_GREATER_EQUAL);
@@ -1365,14 +1389,6 @@ void Renderer::PrepareConstantData(float alpha)
     m_cameraConstantData.SetView(m_camera.GetViewMatrix());
     m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());
 
-    // Material
-    m_materialConstantData.SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
-    m_materialConstantData.SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
-    m_materialConstantData.shininess = 10.0f;
-    m_materialConstantData.textureIndices[0] = 0;
-    m_materialConstantData.textureIndices[1] = 1;
-    m_materialConstantData.textureIndices[2] = 2;
-
     // Light
     //XMVECTOR lightDir = m_lights[0]->GetDirection();
     //XMMATRIX rot = XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 0.001f);
@@ -1579,7 +1595,11 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
         mesh.UpdateMeshConstantBuffer(frameResource);
 
     UpdateCameraConstantBuffer(frameResource);
-    UpdateMaterialConstantBuffer(frameResource);
+
+    for (auto& material : m_materials)
+    {
+        material->UpdateMaterialConstantBuffer(frameResource);
+    }
 
     for (auto& light : m_lights)
     {
@@ -1597,12 +1617,6 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
 void Renderer::UpdateCameraConstantBuffer(FrameResource& frameResource)
 {
     frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->Update(&m_cameraConstantData);
-}
-
-// Use index 0 for now.
-void Renderer::UpdateMaterialConstantBuffer(FrameResource& frameResource)
-{
-    frameResource.m_materialConstantBuffers[0]->Update(&m_materialConstantData);
 }
 
 void Renderer::UpdateShadowConstantBuffer(FrameResource& frameResource)

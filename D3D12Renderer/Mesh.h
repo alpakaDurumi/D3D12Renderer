@@ -14,6 +14,7 @@
 #include "FrameResource.h"
 #include "GeometryGenerator.h"
 #include "SharedConfig.h"
+#include "Material.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
@@ -42,8 +43,6 @@ public:
             // Set index only at first iteration because indices are same in each FrameResource
             if (i == 0) m_meshConstantBufferIndex = UINT(frameResource.m_meshConstantBuffers.size());
             frameResource.m_meshConstantBuffers.push_back(std::make_unique<MeshCB>(pDevice));
-
-            if (i == 0) m_materialConstantBufferIndex = 0;
         }
 
         m_prevS = XMFLOAT3(1.0f, 1.0f, 1.0f);
@@ -123,6 +122,11 @@ public:
         XMStoreFloat4x4(&m_renderTransform, XMMatrixAffineTransformation(renderS, XMVectorZero(), renderR, renderT));
     }
 
+    void SetMaterial(Material* mat)
+    {
+        m_pMaterial = mat;
+    }
+
     ComPtr<ID3D12Resource> m_vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 
@@ -133,7 +137,7 @@ public:
     MeshConstantData m_meshConstantData;
     UINT m_meshConstantBufferIndex;
 
-    UINT m_materialConstantBufferIndex;
+    Material* m_pMaterial = nullptr;
 
     TextureAddressingMode m_textureAddressingMode;
 

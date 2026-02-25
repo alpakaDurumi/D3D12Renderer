@@ -24,9 +24,9 @@ struct LightConstants
     uint idxInArray;
     float lightIntensity;
 };
-ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space1);
+ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space2);
 
-cbuffer IdxConstant : register(b4, space0)
+cbuffer IdxConstant : register(b3, space0)
 {
     uint currentLightIdx;
 };
