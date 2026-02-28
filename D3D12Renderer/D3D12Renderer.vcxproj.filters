@@ -102,6 +102,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="ShaderCompile.targets" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Win32Application.h">
@@ -209,16 +210,19 @@
     <ClInclude Include="GeometryGenerator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Material.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="vs.hlsl">
+    <CustomBuild Include="vs.hlsl">
       <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="ps.hlsl">
+    </CustomBuild>
+    <CustomBuild Include="ps.hlsl">
       <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="PointLightShadowPS.hlsl">
+    </CustomBuild>
+    <CustomBuild Include="PointLightShadowPS.hlsl">
       <Filter>Shaders</Filter>
-    </FxCompile>
+    </CustomBuild>
   </ItemGroup>
 </Project>
