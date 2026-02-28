@@ -1,0 +1,92 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ShaderOutDir>$(OutDir)Shaders\</ShaderOutDir>
+    <ShaderPdbDir>$(IntDir)Shaders\</ShaderPdbDir>
+
+    <DxcExe>$(SolutionDir)packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\bin\x64\dxc.exe</DxcExe>
+    <DxcCommonFlags>-nologo -HV 2016 -I "$(ProjectDir)."</DxcCommonFlags>
+
+    <DxcConfigFlags Condition="'$(Configuration)'=='Debug'">-Od -Zi</DxcConfigFlags>
+    <DxcConfigFlags Condition="'$(Configuration)'!='Debug'">-O3</DxcConfigFlags>
+
+    <!--<DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>-->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- VS -->
+    <CustomBuild Update="vs.hlsl">
+      <Message>DXC: vs.hlsl (all variants)</Message>
+
+      <PdbFlagDefault Condition="'$(Configuration)'=='Debug'">-Fd "$(ShaderPdbDir)vs_default.pdb"</PdbFlagDefault>
+      <PdbFlagInstanced Condition="'$(Configuration)'=='Debug'">-Fd "$(ShaderPdbDir)vs_instanced.pdb"</PdbFlagInstanced>
+      <PdbFlagDepthOnly Condition="'$(Configuration)'=='Debug'">-Fd "$(ShaderPdbDir)vs_depth_only.pdb"</PdbFlagDepthOnly>
+      <PdbFlagInstDepth Condition="'$(Configuration)'=='Debug'">-Fd "$(ShaderPdbDir)vs_instanced_depth_only.pdb"</PdbFlagInstDepth>
+      <PdbFlagDefault Condition="'$(Configuration)'!='Debug'"></PdbFlagDefault>
+      <PdbFlagInstanced Condition="'$(Configuration)'!='Debug'"></PdbFlagInstanced>
+      <PdbFlagDepthOnly Condition="'$(Configuration)'!='Debug'"></PdbFlagDepthOnly>
+      <PdbFlagInstDepth Condition="'$(Configuration)'!='Debug'"></PdbFlagInstDepth>
+
+      <Command>
+        "$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlagDefault) -Fo "$(ShaderOutDir)vs_default.cso" ^
+        &amp;&amp; "$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 -D INSTANCED=1 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlagInstanced) -Fo "$(ShaderOutDir)vs_instanced.cso" ^
+        &amp;&amp; "$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 -D DEPTH_ONLY=1 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlagDepthOnly) -Fo "$(ShaderOutDir)vs_depth_only.cso" ^
+        &amp;&amp; "$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 -D INSTANCED=1 -D DEPTH_ONLY=1 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlagInstDepth) -Fo "$(ShaderOutDir)vs_instanced_depth_only.cso"
+      </Command>
+
+      <Outputs Condition="'$(Configuration)'=='Debug'">
+        $(ShaderOutDir)vs_default.cso;
+        $(ShaderOutDir)vs_instanced.cso;
+        $(ShaderOutDir)vs_depth_only.cso;
+        $(ShaderOutDir)vs_instanced_depth_only.cso;
+        $(ShaderPdbDir)vs_default.pdb;
+        $(ShaderPdbDir)vs_instanced.pdb;
+        $(ShaderPdbDir)vs_depth_only.pdb;
+        $(ShaderPdbDir)vs_instanced_depth_only.pdb
+      </Outputs>
+      <Outputs Condition="'$(Configuration)'!='Debug'">
+        $(ShaderOutDir)vs_default.cso;
+        $(ShaderOutDir)vs_instanced.cso;
+        $(ShaderOutDir)vs_depth_only.cso;
+        $(ShaderOutDir)vs_instanced_depth_only.cso;
+      </Outputs>
+      <AdditionalInputs>SharedConfig.h</AdditionalInputs>
+    </CustomBuild>
+
+    <!-- PS -->
+    <CustomBuild Update="ps.hlsl">
+      <Message>DXC: ps.hlsl</Message>
+
+      <PdbFlag Condition="'$(Configuration)'=='Debug'">-Fd "$(ShaderPdbDir)ps.pdb"</PdbFlag>
+      <PdbFlag Condition="'$(Configuration)'!='Debug'"></PdbFlag>
+
+      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)ps.cso"</Command>
+
+      <Outputs Condition="'$(Configuration)'=='Debug'">
+        $(ShaderOutDir)ps.cso;
+        $(ShaderPdbDir)ps.pdb;
+      </Outputs>
+      <Outputs Condition="'$(Configuration)'!='Debug'">
+        $(ShaderOutDir)ps.cso;
+      </Outputs>
+      <AdditionalInputs>SharedConfig.h</AdditionalInputs>
+    </CustomBuild>
+
+    <CustomBuild Update="PointLightShadowPS.hlsl">
+      <Message>DXC: PointLightShadowPS.hlsl</Message>
+
+      <PdbFlag Condition="'$(Configuration)'=='Debug'">-Fd "$(ShaderPdbDir)ps_point_shadow.pdb"</PdbFlag>
+      <PdbFlag Condition="'$(Configuration)'!='Debug'"></PdbFlag>
+
+      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)ps_point_shadow.cso"</Command>
+
+      <Outputs Condition="'$(Configuration)'=='Debug'">
+        $(ShaderOutDir)ps_point_shadow.cso;
+        $(ShaderPdbDir)ps_point_shadow.pdb;
+      </Outputs>
+      <Outputs Condition="'$(Configuration)'!='Debug'">
+        $(ShaderOutDir)ps_point_shadow.cso;
+      </Outputs>
+      <AdditionalInputs>SharedConfig.h</AdditionalInputs>
+    </CustomBuild>
+  </ItemGroup>
+</Project>
