@@ -1,7 +1,7 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <ShaderOutDir>$(OutDir)Shaders\</ShaderOutDir>
-    <ShaderPdbDir>$(IntDir)Shaders\</ShaderPdbDir>
+    <ShaderOutDir>$(OutDir)shaders\</ShaderOutDir>
+    <ShaderPdbDir>$(IntDir)pdb\</ShaderPdbDir>
 
     <DxcExe>$(SolutionDir)packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\bin\x64\dxc.exe</DxcExe>
     <DxcCommonFlags>-nologo -HV 2016 -I "$(ProjectDir)."</DxcCommonFlags>
