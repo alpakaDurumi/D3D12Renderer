@@ -29,7 +29,7 @@ Custom 3D rendering engine using Direct3D 12, C++17 and Win32 API
 # Build
 
 1. Download assets from [here](https://drive.google.com/drive/folders/1CGZupYVKDUj7CQFzVJCZiTwuaJ--kPri?usp=sharing)
-2. copy `Assets` folder to `D3D12Renderer` project directory
+2. copy `assets` folder to `D3D12Renderer` project directory
 3. Open `D3D12Renderer.sln` solution and build the project (Debug/Release)
 
 # References
