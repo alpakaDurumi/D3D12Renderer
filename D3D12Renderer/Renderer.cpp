@@ -1,11 +1,11 @@
 #include "pch.h"
 #include "Renderer.h"
 
-#include <D3Dcompiler.h>
 #include <dxgidebug.h>
 #include <filesystem>
 #include <shlobj.h>
 #include <thread>
+#include <fstream>
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
@@ -15,10 +15,6 @@
 #include "D3DHelper.h"
 #include "SharedConfig.h"
 #include "GeometryGenerator.h"
-
-// 이거 일단 빼야겠다. nuget에서도 제외시키자
-//#include <dxcapi.h>
-//#include <d3d12shader.h>
 
 using namespace D3DHelper;
 
@@ -608,48 +604,43 @@ void Renderer::LoadPipeline()
 // Load the sample assets.
 void Renderer::LoadAssets()
 {
-    // Compile shaders
+    // Read shaders
     {
-        UINT compileFlags = D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES;
-#if defined(_DEBUG)
-        // Enable better shader debugging with the graphics debugging tools.
-        compileFlags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#endif
-
         std::wstring vsName = L"vs.hlsl";
         std::wstring psName0 = L"ps.hlsl";
         std::wstring psName1 = L"PointLightShadowPS.hlsl";
 
-        // conditional compilation for instancing
-        std::vector<std::string> definesInstanced = { "INSTANCED" };
-        std::vector<std::string> definesDepthOnly = { "DEPTH_ONLY" };
-        std::vector<std::string> definesInstancedDepthOnly = { "INSTANCED", "DEPTH_ONLY" };
+        std::vector<std::wstring> csoNames;
 
-        std::vector<ShaderKey> shaderKeys;
-        shaderKeys.push_back({ vsName, {}, "vs_5_0" });
-        shaderKeys.push_back({ vsName, definesInstanced, "vs_5_0" });
-        shaderKeys.push_back({ vsName, definesDepthOnly, "vs_5_0" });
-        shaderKeys.push_back({ vsName, definesInstancedDepthOnly, "vs_5_0" });
-        shaderKeys.push_back({ psName0, {}, "ps_5_1" });
-        shaderKeys.push_back({ psName1, {}, "ps_5_1" });
-
-        for (const ShaderKey& key : shaderKeys)
+        // VS
+        for (UINT i = 0; i < static_cast<UINT>(MeshType::NUM_MESH_TYPES); ++i)
         {
-            auto it = m_shaderBlobs.emplace(key, nullptr).first;
-            std::vector<D3D_SHADER_MACRO> shaderMacros;
-            for (const std::string& define : key.defines)
+            for (UINT j = 0; j < static_cast<UINT>(PassType::NUM_PASS_TYPES); ++j)
             {
-                shaderMacros.push_back({ define.c_str(), NULL });
-            }
-            shaderMacros.push_back({ NULL, NULL });
+                std::wstring temp = Utility::RemoveFileExtension(vsName);
+                if (i == 1)
+                    temp += L"_instanced";
+                if (j == 1)
+                    temp += L"_depth_only";
+                temp += L".cso";
 
-            ComPtr<ID3DBlob> errorBlob;
-            HRESULT hr = D3DCompileFromFile(key.fileName.c_str(), shaderMacros.data(), D3D_COMPILE_STANDARD_FILE_INCLUDE, "main", key.target.c_str(), compileFlags, 0, &it->second, &errorBlob);
-            if (FAILED(hr))
-            {
-                OutputDebugStringA(static_cast<const char*>(errorBlob->GetBufferPointer()));
-                throw std::exception();
+                csoNames.push_back(temp);
             }
+        }
+
+        // PS
+        csoNames.push_back(Utility::RemoveFileExtension(psName0) + L".cso");
+        csoNames.push_back(Utility::RemoveFileExtension(psName1) + L".cso");
+
+        for (const auto& name : csoNames)
+            {
+            std::ifstream file(std::filesystem::path(L"shaders") / name, std::ios::binary);
+            if (!file)
+            {
+                throw std::runtime_error("Failed to open .cso file.");
+            }
+
+            m_shaderBlobs.try_emplace(ShaderKey{ name }, std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
         }
     }
 
@@ -878,19 +869,17 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         // Pre-query PSOs
         m_currentPSOKey.meshType = MeshType::DEFAULT;
         m_currentPSOKey.passType = PassType::DEPTH_ONLY;
-        m_currentPSOKey.vsKey = { L"vs.hlsl", {"DEPTH_ONLY"}, "vs_5_0" };
-        m_currentPSOKey.psKey = { L"", {}, "" };
+        m_currentPSOKey.vsName = L"vs.hlsl";
+        m_currentPSOKey.psName = L"";
         auto* shadowPSO = GetPipelineState(m_currentPSOKey);
 
         m_currentPSOKey.meshType = MeshType::INSTANCED;
-        m_currentPSOKey.vsKey.defines = { "INSTANCED", "DEPTH_ONLY" };
         auto* shadowPSOInstanced = GetPipelineState(m_currentPSOKey);
 
-        m_currentPSOKey.psKey = { L"PointLightShadowPS.hlsl", {}, "ps_5_1" };
+        m_currentPSOKey.psName = L"PointLightShadowPS.hlsl";
         auto* pointShadowPSOInstanced = GetPipelineState(m_currentPSOKey);
 
         m_currentPSOKey.meshType = MeshType::DEFAULT;
-        m_currentPSOKey.vsKey.defines = { "DEPTH_ONLY" };
         auto* pointShadowPSO = GetPipelineState(m_currentPSOKey);
 
         for (UINT i = 0; i < m_lights.size(); ++i)
@@ -995,12 +984,11 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         // Pre-query PSOs
         m_currentPSOKey.meshType = MeshType::DEFAULT;
         m_currentPSOKey.passType = PassType::DEFAULT;
-        m_currentPSOKey.vsKey = { L"vs.hlsl", {}, "vs_5_0" };
-        m_currentPSOKey.psKey = { L"ps.hlsl", {}, "ps_5_1" };
+        m_currentPSOKey.vsName = L"vs.hlsl";
+        m_currentPSOKey.psName = L"ps.hlsl";
         auto* pso = GetPipelineState(m_currentPSOKey);
 
         m_currentPSOKey.meshType = MeshType::INSTANCED;
-        m_currentPSOKey.vsKey.defines = { "INSTANCED" };
         auto* psoInstanced = GetPipelineState(m_currentPSOKey);
 
         commandList.Barrier(
@@ -1244,9 +1232,6 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         depthStencilDesc.FrontFace = defaultStencilOp;
         depthStencilDesc.BackFace = defaultStencilOp;
 
-        ID3DBlob* vsBlob = GetShaderBlob(psoKey.vsKey);
-        ID3DBlob* psBlob = GetShaderBlob(psoKey.psKey);
-
         // Describe and create the graphics pipeline state object (PSO).
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
         psoDesc.InputLayout = { m_inputLayouts[psoKey.meshType].data(), static_cast<UINT>(m_inputLayouts[psoKey.meshType].size()) };
@@ -1255,10 +1240,23 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         // Shader stages are selected by demand.
         // VS is essential for rasterization.
         // PS is optional. (e.g. Depth-only pass)
-        psoDesc.VS = { vsBlob->GetBufferPointer(), vsBlob->GetBufferSize() };
-        if (psBlob)
+        std::wstring vsCsoName = Utility::RemoveFileExtension(psoKey.vsName) +
+            (psoKey.meshType == MeshType::INSTANCED ? L"_instanced" : L"") +
+            (psoKey.passType == PassType::DEPTH_ONLY ? L"_depth_only" : L"") +
+            L".cso";
+
+        std::wstring psCsoName = Utility::RemoveFileExtension(psoKey.psName) + L".cso";
+
+        const std::vector<char>& vsBlob = GetShaderBlobRef(ShaderKey{ vsCsoName });
+
+        psoDesc.VS = { vsBlob.data(), vsBlob.size() };
+
+        const std::vector<char>* psBlob = nullptr;
+
+        if (!psoKey.psName.empty())
         {
-            psoDesc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
+            psBlob = &GetShaderBlobRef(ShaderKey{ psCsoName });
+            psoDesc.PS = { psBlob->data(), psBlob->size() };
         }
 
         psoDesc.RasterizerState = rasterizerDesc;
@@ -1270,7 +1268,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
 
         if (psoKey.passType == PassType::DEPTH_ONLY)
         {
-            if (psoKey.psKey.fileName == L"PointLightShadowPS.hlsl")
+            if (psoKey.psName == L"PointLightShadowPS.hlsl")
             {
                 psoDesc.NumRenderTargets = 1;
                 psoDesc.RTVFormats[0] = DXGI_FORMAT_R32_FLOAT;
@@ -1292,13 +1290,8 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
     return it->second.Get();
 }
 
-ID3DBlob* Renderer::GetShaderBlob(const ShaderKey& shaderKey)
+const std::vector<char>& Renderer::GetShaderBlobRef(const ShaderKey& shaderKey) const
 {
-    if (shaderKey.IsEmpty())
-    {
-        return nullptr;
-    }
-
     auto it = m_shaderBlobs.find(shaderKey);
 
     if (it == m_shaderBlobs.end())
@@ -1306,7 +1299,7 @@ ID3DBlob* Renderer::GetShaderBlob(const ShaderKey& shaderKey)
         throw std::runtime_error("Shaders should be baked in initialization or first run.");
     }
 
-    return it->second.Get();
+    return it->second;
 }
 
 void Renderer::FixedUpdate(double fixedDtMs)

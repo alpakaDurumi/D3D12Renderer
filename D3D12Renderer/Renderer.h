@@ -104,7 +104,7 @@ private:
     PSOKey m_currentPSOKey = { MeshType::DEFAULT, PassType::DEFAULT };
 
     std::unordered_map<MeshType, std::vector<D3D12_INPUT_ELEMENT_DESC>> m_inputLayouts;
-    std::unordered_map<ShaderKey, ComPtr<ID3DBlob>> m_shaderBlobs;
+    std::unordered_map<ShaderKey, std::vector<char>> m_shaderBlobs;
 
     ComPtr<ID3D12Resource> m_depthStencilBuffer;
     DescriptorAllocation m_dsvAllocation;
@@ -169,7 +169,7 @@ private:
 
     void CreateRootSignature();
     ID3D12PipelineState* GetPipelineState(const PSOKey& psoKey);
-    ID3DBlob* GetShaderBlob(const ShaderKey& shaderKey);
+    const std::vector<char>& GetShaderBlobRef(const ShaderKey& shaderKey) const;
 
     void FixedUpdate(double fixedDt);
 
