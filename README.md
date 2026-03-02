@@ -11,9 +11,11 @@ Custom 3D rendering engine using Direct3D 12, C++17 and Win32 API
 
 |Package|Version|
 |--|--|
-|DirectXMath|2024.10.15.1|
-|DirectXTex|2025.10.28.1|
-|DirectX 12 Agility SDK|1.717.1-preview|
+|directxmath|2024.10.15.1|
+|directxtex_desktop_win10|2025.10.28.1|
+|Microsoft.Direct3D.D3D12|1.717.1-preview|
+|Microsoft.Direct3D.DXC|1.8.2505.32|
+|WinPixEventRuntime|1.0.240308001|
 
 ## Included files or codes
 
