@@ -103,8 +103,7 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera, uint heightMapIdx)
     float2 dx = ddx(currentTexCoord);
     float2 dy = ddy(currentTexCoord);
     
-    //float currentHeightMapValue = 1.0f - g_textures[heightMapIdx].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
-    float currentHeightMapValue = 1.0f - g_textures[2].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
+    float currentHeightMapValue = 1.0f - g_textures[heightMapIdx].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
     float currentLayerHeight = 0.0f;
     
     float2 prevTexCoord = currentTexCoord;
@@ -119,8 +118,7 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera, uint heightMapIdx)
         prevLayerHeight = currentLayerHeight;
         
         currentTexCoord -= deltaTexCoord;
-        //currentHeightMapValue = 1.0f - g_textures[heightMapIdx].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
-        currentHeightMapValue = 1.0f - g_textures[2].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
+        currentHeightMapValue = 1.0f - g_textures[heightMapIdx].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
         currentLayerHeight += layerStep;
     }
     
@@ -290,10 +288,8 @@ float4 main(PSInput input) : SV_TARGET
     float3x3 TBN = float3x3(input.tangentWorld, B, input.normalWorld);
     
     // Sample textures
-    //float3 texColor = g_textures[albedoIdx].Sample(g_samplers[samplerIdx], texCoord).rgb;
-    //float3 normal = g_textures[normalMapIdx].Sample(g_samplers[samplerIdx], texCoord).rgb * 2.0f - 1.0f;
-    float3 texColor = g_textures[0].Sample(g_samplers[samplerIdx], texCoord).rgb;
-    float3 normal = g_textures[1].Sample(g_samplers[samplerIdx], texCoord).rgb * 2.0f - 1.0f;
+    float3 texColor = g_textures[albedoIdx].Sample(g_samplers[samplerIdx], texCoord).rgb;
+    float3 normal = g_textures[normalMapIdx].Sample(g_samplers[samplerIdx], texCoord).rgb * 2.0f - 1.0f;
     float3 normalWorld = normalize(mul(normal, TBN));
 
     uint csmIdx;
