@@ -913,13 +913,13 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
             // Render each entry of shadow map.
             UINT16 arraySize = light->GetArraySize();
-            for (UINT i = 0; i < arraySize; ++i)
+            for (UINT j = 0; j < arraySize; ++j)
             {
-                auto shadowMapDsvHandle = light->GetDSVDescriptorHandle(i);
+                auto shadowMapDsvHandle = light->GetDSVDescriptorHandle(j);
 
                 if (isPointLight)
                 {
-                    auto rtvHandle = static_cast<PointLight*>(light.get())->GetRTVDescriptorHandle(i);
+                    auto rtvHandle = static_cast<PointLight*>(light.get())->GetRTVDescriptorHandle(j);
                     cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &shadowMapDsvHandle);
 
                     XMVECTORF32 clearColor;
@@ -937,7 +937,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 for (const auto& mesh : m_meshes)
                 {
                     cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-                    cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferIndex(i)]->GetGPUVirtualAddress());
+                    cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferIndex(j)]->GetGPUVirtualAddress());
 
                     mesh.Render(cmdList);
                 }
@@ -946,7 +946,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 for (const auto& mesh : m_instancedMeshes)
                 {
                     cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-                    cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferIndex(i)]->GetGPUVirtualAddress());
+                    cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferIndex(j)]->GetGPUVirtualAddress());
 
                     mesh.Render(cmdList);
                 }
