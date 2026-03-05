@@ -5,10 +5,20 @@
 #include <vector>
 #include <memory>
 #include <utility>
+#include <array>
 
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
 #include "FrameResource.h"
+#include "SharedConfig.h"
+
+enum class TextureSlot
+{
+    ALBEDO,
+    NORMALMAP,
+    HEIGHTMAP,
+    NUM_TEXTURE_SLOTS
+};
 
 class Material
 {
@@ -30,6 +40,8 @@ public:
             if (i == 0) m_constantBufferIndex = UINT(frameResource.m_materialConstantBuffers.size());
             frameResource.m_materialConstantBuffers.push_back(std::make_unique<MaterialCB>(pDevice, std::move(allocations[i])));
         }
+
+        m_textureAddressingModes.fill(TextureAddressingMode::WRAP);
     }
 
     UINT GetMaterialConstantBufferIndex() const
@@ -52,11 +64,29 @@ public:
         m_constantData.shininess = shininess;
     }
 
+    void SetTextureIndex(TextureSlot textureSlot, UINT index)
+    {
+        m_constantData.textureIndices[static_cast<UINT>(textureSlot)] = index;
+    }
+
     void SetTextureIndices(UINT albedoIdx, UINT normalMapIdx, UINT heightMapIdx)
     {
-        m_constantData.textureIndices[0] = albedoIdx;
-        m_constantData.textureIndices[1] = normalMapIdx;
-        m_constantData.textureIndices[2] = heightMapIdx;
+        SetTextureIndex(TextureSlot::ALBEDO, albedoIdx);
+        SetTextureIndex(TextureSlot::NORMALMAP, normalMapIdx);
+        SetTextureIndex(TextureSlot::HEIGHTMAP, heightMapIdx);
+    }
+
+    void SetTextureAddressingMode(TextureSlot textureSlot, TextureAddressingMode addressingMode)
+    {
+        m_textureAddressingModes[static_cast<UINT>(textureSlot)] = addressingMode;
+    }
+
+    void BuildSamplerIndices(TextureFiltering filtering)
+    {
+        for (UINT i = 0; i < static_cast<UINT>(TextureSlot::NUM_TEXTURE_SLOTS); ++i)
+        {
+            m_constantData.samplerIndices[i] = CalcSamplerIndex(filtering, m_textureAddressingModes[i]);
+    }
     }
 
     void UpdateMaterialConstantBuffer(FrameResource& frameResource)
@@ -65,6 +95,13 @@ public:
     }
 
 private:
+    UINT CalcSamplerIndex(TextureFiltering filtering, TextureAddressingMode addressingMode)
+    {
+        return static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES) * static_cast<UINT>(filtering) + static_cast<UINT>(addressingMode);
+    }
+
     MaterialConstantData m_constantData;
     UINT m_constantBufferIndex;
+
+    std::array<TextureAddressingMode, static_cast<UINT>(TextureSlot::NUM_TEXTURE_SLOTS)> m_textureAddressingModes;
 };

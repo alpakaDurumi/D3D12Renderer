@@ -58,6 +58,7 @@ struct MaterialConstants
     float3 materialSpecular;
     float shininess;
     uint4 textureIndices;
+    uint4 samplerIndices;
 };
 ConstantBuffer<MaterialConstants> MaterialConstantBuffers[] : register(b0, space1);
 
@@ -78,13 +79,12 @@ ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space2);
 
 cbuffer GlobalConstants : register(b4, space0)
 {
-    uint samplerIdx;
     uint numLights;
     uint materialIdx;
 };
 
 // Parallax Occlusion Mapping
-float2 ParallaxMapping(float2 texCoord, float3 toCamera, uint heightMapIdx)
+float2 ParallaxMapping(float2 texCoord, float3 toCamera, uint heightMapIdx, uint heightMapSamplerIdx)
 {
     static const float heightScale = 0.02f;
     
@@ -103,7 +103,7 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera, uint heightMapIdx)
     float2 dx = ddx(currentTexCoord);
     float2 dy = ddy(currentTexCoord);
     
-    float currentHeightMapValue = 1.0f - g_textures[heightMapIdx].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
+    float currentHeightMapValue = 1.0f - g_textures[heightMapIdx].SampleGrad(g_samplers[heightMapSamplerIdx], currentTexCoord, dx, dy).r;
     float currentLayerHeight = 0.0f;
     
     float2 prevTexCoord = currentTexCoord;
@@ -118,7 +118,7 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera, uint heightMapIdx)
         prevLayerHeight = currentLayerHeight;
         
         currentTexCoord -= deltaTexCoord;
-        currentHeightMapValue = 1.0f - g_textures[heightMapIdx].SampleGrad(g_samplers[samplerIdx], currentTexCoord, dx, dy).r;
+        currentHeightMapValue = 1.0f - g_textures[heightMapIdx].SampleGrad(g_samplers[heightMapSamplerIdx], currentTexCoord, dx, dy).r;
         currentLayerHeight += layerStep;
     }
     
@@ -265,6 +265,11 @@ float4 main(PSInput input) : SV_TARGET
     uint normalMapIdx = textureIndices[1];
     uint heightMapIdx = textureIndices[2];
     
+    uint4 samplerIndices = MaterialConstantBuffers[materialIdx].samplerIndices;
+    uint albedoSamplerIdx = samplerIndices[0];
+    uint normalMapSamplerIdx = samplerIndices[1];
+    uint heightMapSamplerIdx = samplerIndices[2];
+    
     // For POM, use inaccurate inverse-TBN
     float3 iT = normalize(input.tangentWorld);
     float3 iN = normalize(input.normalWorld);
@@ -275,7 +280,7 @@ float4 main(PSInput input) : SV_TARGET
     float3 toCameraWorld = normalize(cameraPos - input.posWorld);
     float3 toCameraTangent = normalize(mul(toCameraWorld, iiTBN));
     
-    float2 texCoord = ParallaxMapping(input.texCoord, toCameraTangent, heightMapIdx);
+    float2 texCoord = ParallaxMapping(input.texCoord, toCameraTangent, heightMapIdx, heightMapSamplerIdx);
     
     //// Clip if texCoord exceeds boundary
     //if (texCoord.x < 0.0 || texCoord.x > 1.0 * textureTileScale || texCoord.y < 0.0 || texCoord.y > 1.0 * textureTileScale)
@@ -288,8 +293,8 @@ float4 main(PSInput input) : SV_TARGET
     float3x3 TBN = float3x3(input.tangentWorld, B, input.normalWorld);
     
     // Sample textures
-    float3 texColor = g_textures[albedoIdx].Sample(g_samplers[samplerIdx], texCoord).rgb;
-    float3 normal = g_textures[normalMapIdx].Sample(g_samplers[samplerIdx], texCoord).rgb * 2.0f - 1.0f;
+    float3 texColor = g_textures[albedoIdx].Sample(g_samplers[albedoSamplerIdx], texCoord).rgb;
+    float3 normal = g_textures[normalMapIdx].Sample(g_samplers[normalMapSamplerIdx], texCoord).rgb * 2.0f - 1.0f;
     float3 normalWorld = normalize(mul(normal, TBN));
 
     uint csmIdx;

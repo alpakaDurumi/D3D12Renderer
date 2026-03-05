@@ -134,7 +134,6 @@ private:
     UINT m_shadowMapResolution = 2048;
     ShadowConstantData m_shadowConstantData;
 
-    // WIP : texture filtering is fixed for now.
     TextureFiltering m_currentTextureFiltering = TextureFiltering::ANISOTROPIC_X16;
 
     // For ImGui
@@ -161,7 +160,6 @@ private:
 
     void SetTextureFiltering(TextureFiltering filtering);
     void SetMeshType(MeshType meshType);
-    UINT CalcSamplerIndex(TextureFiltering filtering, TextureAddressingMode addressingMode);
 
     void SetFpsCap(std::string fps);
 

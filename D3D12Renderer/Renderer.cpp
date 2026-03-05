@@ -733,7 +733,14 @@ void Renderer::LoadAssets()
     material->SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
     material->SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
     material->SetShininess(10.0f);
+
     material->SetTextureIndices(0, 1, 2);
+    material->SetTextureAddressingMode(TextureSlot::ALBEDO, TextureAddressingMode::WRAP);
+    material->SetTextureAddressingMode(TextureSlot::NORMALMAP, TextureAddressingMode::WRAP);
+    material->SetTextureAddressingMode(TextureSlot::HEIGHTMAP, TextureAddressingMode::WRAP);
+
+    material->BuildSamplerIndices(m_currentTextureFiltering);
+
     m_materials.push_back(std::move(material));
 
     m_meshes[0].SetMaterial(m_materials[0].get());
@@ -1009,7 +1016,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
         cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
-        cmdList->SetGraphicsRoot32BitConstant(11, numLights, 1);
+        cmdList->SetGraphicsRoot32BitConstant(11, numLights, 0);
 
         cmdList->SetPipelineState(pso);
         for (const auto& mesh : m_meshes)
@@ -1018,8 +1025,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
 
-            cmdList->SetGraphicsRoot32BitConstant(11, CalcSamplerIndex(m_currentTextureFiltering, mesh.m_textureAddressingMode), 0);
-            cmdList->SetGraphicsRoot32BitConstant(11, mesh.m_pMaterial->GetMaterialConstantBufferIndex(), 2);
+            cmdList->SetGraphicsRoot32BitConstant(11, mesh.m_pMaterial->GetMaterialConstantBufferIndex(), 1);
 
             mesh.Render(cmdList);
         }
@@ -1031,8 +1037,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
             cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
 
-            cmdList->SetGraphicsRoot32BitConstant(11, CalcSamplerIndex(m_currentTextureFiltering, mesh.m_textureAddressingMode), 0);
-            cmdList->SetGraphicsRoot32BitConstant(11, mesh.m_pMaterial->GetMaterialConstantBufferIndex(), 2);
+            cmdList->SetGraphicsRoot32BitConstant(11, mesh.m_pMaterial->GetMaterialConstantBufferIndex(), 1);
 
             mesh.Render(cmdList);
         }
@@ -1080,16 +1085,15 @@ void Renderer::InitImGui()
 void Renderer::SetTextureFiltering(TextureFiltering filtering)
 {
     m_currentTextureFiltering = filtering;
+    for (auto& material : m_materials)
+    {
+        material->BuildSamplerIndices(m_currentTextureFiltering);
+    }
 }
 
 void Renderer::SetMeshType(MeshType meshType)
 {
     m_currentPSOKey.meshType = meshType;
-}
-
-UINT Renderer::CalcSamplerIndex(TextureFiltering filtering, TextureAddressingMode addressingMode)
-{
-    return static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES) * static_cast<UINT>(filtering) + static_cast<UINT>(addressingMode);
 }
 
 void Renderer::SetFpsCap(std::string fps)
@@ -1163,8 +1167,8 @@ void Renderer::CreateRootSignature()
         static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS) * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES),
         D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
 
-    // Root constants for sampler idx and number of lights.
-    rootSignature[11].InitAsConstant(4, 0, 3, D3D12_SHADER_VISIBILITY_PIXEL);
+    // Root constants for number of lights and material index.
+    rootSignature[11].InitAsConstant(4, 0, 2, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Static samplers
     rootSignature.InitStaticSampler(0, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_GREATER_EQUAL);
