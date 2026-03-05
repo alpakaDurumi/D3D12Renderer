@@ -37,7 +37,6 @@ cbuffer MeshConstantBuffer : register(b0, space0)
 {
     float4x4 world;
     float4x4 inverseTranspose;
-    float textureTileScale;
 };
 
 cbuffer CameraConstantBuffer : register(b1, space0)
@@ -59,6 +58,7 @@ struct MaterialConstants
     float shininess;
     uint4 textureIndices;
     uint4 samplerIndices;
+    float4 textureTileScales;
 };
 ConstantBuffer<MaterialConstants> MaterialConstantBuffers[] : register(b0, space1);
 
@@ -99,7 +99,7 @@ float2 ParallaxMapping(float2 texCoord, float3 toCamera, uint heightMapIdx, uint
     // xy / z = offset / (1.0 * heightScale)
     float2 deltaTexCoord = toCamera.xy / max(toCamera.z, 0.001f) * heightScale / numLayers;
     
-    float2 currentTexCoord = texCoord * textureTileScale;
+    float2 currentTexCoord = texCoord;
     float2 dx = ddx(currentTexCoord);
     float2 dy = ddy(currentTexCoord);
     
@@ -270,6 +270,11 @@ float4 main(PSInput input) : SV_TARGET
     uint normalMapSamplerIdx = samplerIndices[1];
     uint heightMapSamplerIdx = samplerIndices[2];
     
+    float4 textureTileScales = MaterialConstantBuffers[materialIdx].textureTileScales;
+    float albedoScale = textureTileScales[0];
+    float normalMapScale = textureTileScales[1];
+    float heightMapScale = textureTileScales[2];
+    
     // For POM, use inaccurate inverse-TBN
     float3 iT = normalize(input.tangentWorld);
     float3 iN = normalize(input.normalWorld);
@@ -280,7 +285,9 @@ float4 main(PSInput input) : SV_TARGET
     float3 toCameraWorld = normalize(cameraPos - input.posWorld);
     float3 toCameraTangent = normalize(mul(toCameraWorld, iiTBN));
     
-    float2 texCoord = ParallaxMapping(input.texCoord, toCameraTangent, heightMapIdx, heightMapSamplerIdx);
+    float2 texCoord = ParallaxMapping(input.texCoord * heightMapScale, toCameraTangent, heightMapIdx, heightMapSamplerIdx);
+    float2 albedoTexCoord = texCoord * albedoScale / heightMapScale;
+    float2 normalMapTexCoord = texCoord * normalMapScale / heightMapScale;
     
     //// Clip if texCoord exceeds boundary
     //if (texCoord.x < 0.0 || texCoord.x > 1.0 * textureTileScale || texCoord.y < 0.0 || texCoord.y > 1.0 * textureTileScale)
@@ -293,8 +300,8 @@ float4 main(PSInput input) : SV_TARGET
     float3x3 TBN = float3x3(input.tangentWorld, B, input.normalWorld);
     
     // Sample textures
-    float3 texColor = g_textures[albedoIdx].Sample(g_samplers[albedoSamplerIdx], texCoord).rgb;
-    float3 normal = g_textures[normalMapIdx].Sample(g_samplers[normalMapSamplerIdx], texCoord).rgb * 2.0f - 1.0f;
+    float3 texColor = g_textures[albedoIdx].Sample(g_samplers[albedoSamplerIdx], albedoTexCoord).rgb;
+    float3 normal = g_textures[normalMapIdx].Sample(g_samplers[normalMapSamplerIdx], normalMapTexCoord).rgb * 2.0f - 1.0f;
     float3 normalWorld = normalize(mul(normal, TBN));
 
     uint csmIdx;

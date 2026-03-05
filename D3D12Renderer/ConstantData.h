@@ -27,8 +27,7 @@ struct MeshConstantData : public ConstantData<MeshConstantData>
         0.0f, 0.0f, 0.0f, 1.0f
     };
     XMFLOAT4X4 inverseTranspose;
-    float textureTileScale = 1.0f;
-    float padding[31];
+    float padding[32];
 
     void SetTransform(XMMATRIX world)
     {
@@ -102,7 +101,8 @@ struct MaterialConstantData : public ConstantData<MaterialConstantData>
     float shininess;
     UINT textureIndices[4];
     UINT samplerIndices[4];
-    float padding1[48];
+    float textureTileScales[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    float padding1[44];
 
     // Use linear color for gamma-correct rendering
     void SetAmbient(XMFLOAT4 ambient)

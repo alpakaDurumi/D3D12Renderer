@@ -81,12 +81,31 @@ public:
         m_textureAddressingModes[static_cast<UINT>(textureSlot)] = addressingMode;
     }
 
+    void SetTextureAddressingModes(TextureAddressingMode albedoAddressingMode, TextureAddressingMode normalMapAddressingMode, TextureAddressingMode heightMapAddressingMode)
+    {
+        SetTextureAddressingMode(TextureSlot::ALBEDO, albedoAddressingMode);
+        SetTextureAddressingMode(TextureSlot::NORMALMAP, normalMapAddressingMode);
+        SetTextureAddressingMode(TextureSlot::HEIGHTMAP, heightMapAddressingMode);
+    }
+
     void BuildSamplerIndices(TextureFiltering filtering)
     {
         for (UINT i = 0; i < static_cast<UINT>(TextureSlot::NUM_TEXTURE_SLOTS); ++i)
         {
             m_constantData.samplerIndices[i] = CalcSamplerIndex(filtering, m_textureAddressingModes[i]);
     }
+    }
+
+    void SetTextureTileScale(TextureSlot textureSlot, float tileScale)
+    {
+        m_constantData.textureTileScales[static_cast<UINT>(textureSlot)] = tileScale;
+    }
+
+    void SetTextureTileScales(float albedo, float normal, float height)
+    {
+        SetTextureTileScale(TextureSlot::ALBEDO, albedo);
+        SetTextureTileScale(TextureSlot::NORMALMAP, normal);
+        SetTextureTileScale(TextureSlot::HEIGHTMAP, height);
     }
 
     void UpdateMaterialConstantBuffer(FrameResource& frameResource)

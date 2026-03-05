@@ -722,7 +722,6 @@ void Renderer::LoadAssets()
     m_instancedMeshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube(), GeometryGenerator::GenerateSampleInstanceData());
 
     m_meshes[0].SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
-    m_meshes[0].m_meshConstantData.textureTileScale = 50.0f;
 
     m_meshes[1].SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
 
@@ -735,9 +734,7 @@ void Renderer::LoadAssets()
     material->SetShininess(10.0f);
 
     material->SetTextureIndices(0, 1, 2);
-    material->SetTextureAddressingMode(TextureSlot::ALBEDO, TextureAddressingMode::WRAP);
-    material->SetTextureAddressingMode(TextureSlot::NORMALMAP, TextureAddressingMode::WRAP);
-    material->SetTextureAddressingMode(TextureSlot::HEIGHTMAP, TextureAddressingMode::WRAP);
+    material->SetTextureAddressingModes(TextureAddressingMode::WRAP, TextureAddressingMode::WRAP, TextureAddressingMode::WRAP);
 
     material->BuildSamplerIndices(m_currentTextureFiltering);
 
