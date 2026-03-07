@@ -4,10 +4,9 @@ struct VSInput
     float2 texCoord : TEXCOORD;
     float4 tangent : TANGENT;
     float3 normal : NORMAL;
-#ifdef INSTANCED
     float4x4 instanceWorld : INSTANCE_WORLD;
     float4x4 instanceInverseTranspose : INSTANCE_INVTRANSPOSE;
-#endif
+    uint materialIndex : INSTANCE_MATERIAL_INDEX;
 };
 
 struct PSInput
@@ -19,6 +18,7 @@ struct PSInput
     float3 normalWorld : NORMAL;
     nointerpolation float tangentW : TEXCOORD1;     // Do not interpolate w component of tangent vector.
     float distView : TEXCOORD2;                     // Distance in view space for determining CSM index.
+    nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
 };
 
 cbuffer MeshConstantBuffer : register(b0)
@@ -39,11 +39,7 @@ PSInput main(VSInput input)
     PSInput output;
     
     // Calculate position in world space
-#ifdef INSTANCED
-    output.posWorld = mul(float4(input.pos, 1.0f), mul(world, input.instanceWorld)).xyz;
-#else   // INSTANCED
-    output.posWorld = mul(float4(input.pos, 1.0f), world).xyz;
-#endif  // INSTANCED
+    output.posWorld = mul(float4(input.pos, 1.0f), input.instanceWorld).xyz;
     
     float3 posView = mul(float4(output.posWorld, 1.0f), view).xyz;
     output.distView = posView.z;
@@ -51,14 +47,10 @@ PSInput main(VSInput input)
     output.texCoord = input.texCoord;
     
 #ifndef DEPTH_ONLY
-#ifdef INSTANCED
-    output.tangentWorld = normalize(mul(float4(input.tangent.xyz, 0.0f), mul(input.instanceInverseTranspose, inverseTranspose)).xyz);
-    output.normalWorld = normalize(mul(float4(input.normal, 0.0f), mul(input.instanceInverseTranspose, inverseTranspose)).xyz);
-#else   // INSTANCED
-    output.tangentWorld = normalize(mul(float4(input.tangent.xyz, 0.0f), inverseTranspose).xyz);
-    output.normalWorld = normalize(mul(float4(input.normal, 0.0f), inverseTranspose).xyz);
-#endif  // INSTANCED
+    output.tangentWorld = normalize(mul(float4(input.tangent.xyz, 0.0f), input.instanceInverseTranspose).xyz);
+    output.normalWorld = normalize(mul(float4(input.normal, 0.0f), input.instanceInverseTranspose).xyz);
     output.tangentW = input.tangent.w;
+    output.materialIndex = input.materialIndex;
 #endif  // DEPTH_ONLY
     
     return output;

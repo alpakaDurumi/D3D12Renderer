@@ -31,6 +31,7 @@ struct PSInput
     float3 normalWorld : NORMAL;
     nointerpolation float tangentW : TEXCOORD1;     // Do not interpolate w component of tangent vector.
     float distView : TEXCOORD2;                     // Distance in view space for determining CSM index.
+    nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
 };
 
 cbuffer MeshConstantBuffer : register(b0, space0)
@@ -80,7 +81,6 @@ ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space2);
 cbuffer GlobalConstants : register(b4, space0)
 {
     uint numLights;
-    uint materialIdx;
 };
 
 // Parallax Occlusion Mapping
@@ -225,7 +225,7 @@ float InterleavedGradientNoise(float2 pixPos)
 
 // Shading in world space
 // TODO : ambient add multiple times, fix this.
-float3 PhongReflection(LightConstants light, float3 toLightWorld, float3 toCameraWorld, float lightFactor, float3 texColor, float3 normalWorld)
+float3 PhongReflection(LightConstants light, float3 toLightWorld, float3 toCameraWorld, float lightFactor, float3 texColor, float3 normalWorld, uint materialIdx)
 {
     float3 halfWay = normalize(toLightWorld + toCameraWorld);
     
@@ -260,6 +260,8 @@ float CalcAngularAttenuation(LightConstants light, float3 lightToPixel)
 
 float4 main(PSInput input) : SV_TARGET
 {
+    uint materialIdx = input.materialIndex;
+    
     uint4 textureIndices = MaterialConstantBuffers[materialIdx].textureIndices;
     uint albedoIdx = textureIndices[0];
     uint normalMapIdx = textureIndices[1];
@@ -371,7 +373,7 @@ float4 main(PSInput input) : SV_TARGET
             
             // Shading in world space
             float3 toLightWorld = -light.lightDir;
-            total += PhongReflection(light, toLightWorld, toCameraWorld, shadowFactor, texColor, normalWorld);
+            total += PhongReflection(light, toLightWorld, toCameraWorld, shadowFactor, texColor, normalWorld, materialIdx);
         }
         // Point
         else if (light.type == LIGHT_TYPE_POINT)
@@ -384,7 +386,7 @@ float4 main(PSInput input) : SV_TARGET
             float factor = CalcAttenuation(dist, light.range) *
                 PCFPoint(light.idxInArray, filterSize, -toLightWorld, normalizedDist, rot);
             
-            total += PhongReflection(light, toLightWorld, toCameraWorld, factor, texColor, normalWorld);
+            total += PhongReflection(light, toLightWorld, toCameraWorld, factor, texColor, normalWorld, materialIdx);
         }
         // Spot
         else if (light.type == LIGHT_TYPE_SPOT)
@@ -401,7 +403,7 @@ float4 main(PSInput input) : SV_TARGET
             
             float factor = distAtt * angularAtt * PCFSpot(light.idxInArray, filterSize, lightTexCoord, lightScreen.z, rot);
             
-            total += PhongReflection(light, toLightWorld, toCameraWorld, factor, texColor, normalWorld);
+            total += PhongReflection(light, toLightWorld, toCameraWorld, factor, texColor, normalWorld, materialIdx);
         }
     }
     

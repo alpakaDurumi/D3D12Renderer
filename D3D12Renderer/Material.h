@@ -93,7 +93,7 @@ public:
         for (UINT i = 0; i < static_cast<UINT>(TextureSlot::NUM_TEXTURE_SLOTS); ++i)
         {
             m_constantData.samplerIndices[i] = CalcSamplerIndex(filtering, m_textureAddressingModes[i]);
-    }
+        }
     }
 
     void SetTextureTileScale(TextureSlot textureSlot, float tileScale)

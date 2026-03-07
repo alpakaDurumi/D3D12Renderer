@@ -18,36 +18,24 @@
       <Message>DXC: vs.hlsl (all variants)</Message>
 
       <PdbFlagDefault Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)vs.pdb"</PdbFlagDefault>
-      <PdbFlagInstanced Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)vs_instanced.pdb"</PdbFlagInstanced>
       <PdbFlagDepthOnly Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)vs_depth_only.pdb"</PdbFlagDepthOnly>
-      <PdbFlagInstDepth Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)vs_instanced_depth_only.pdb"</PdbFlagInstDepth>
       <PdbFlagDefault Condition="'$(Configuration)'=='Release'"></PdbFlagDefault>
-      <PdbFlagInstanced Condition="'$(Configuration)'=='Release'"></PdbFlagInstanced>
       <PdbFlagDepthOnly Condition="'$(Configuration)'=='Release'"></PdbFlagDepthOnly>
-      <PdbFlagInstDepth Condition="'$(Configuration)'=='Release'"></PdbFlagInstDepth>
 
       <Command>
         "$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlagDefault) -Fo "$(ShaderOutDir)vs.cso" ^
-        &amp;&amp; "$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 -D INSTANCED=1 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlagInstanced) -Fo "$(ShaderOutDir)vs_instanced.cso" ^
-        &amp;&amp; "$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 -D DEPTH_ONLY=1 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlagDepthOnly) -Fo "$(ShaderOutDir)vs_depth_only.cso" ^
-        &amp;&amp; "$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 -D INSTANCED=1 -D DEPTH_ONLY=1 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlagInstDepth) -Fo "$(ShaderOutDir)vs_instanced_depth_only.cso"
+        &amp;&amp; "$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 -D DEPTH_ONLY=1 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlagDepthOnly) -Fo "$(ShaderOutDir)vs_depth_only.cso"
       </Command>
 
       <Outputs Condition="'$(Configuration)'!='Release'">
         $(ShaderOutDir)vs.cso;
-        $(ShaderOutDir)vs_instanced.cso;
         $(ShaderOutDir)vs_depth_only.cso;
-        $(ShaderOutDir)vs_instanced_depth_only.cso;
         $(ShaderPdbDir)vs.pdb;
-        $(ShaderPdbDir)vs_instanced.pdb;
         $(ShaderPdbDir)vs_depth_only.pdb;
-        $(ShaderPdbDir)vs_instanced_depth_only.pdb
       </Outputs>
       <Outputs Condition="'$(Configuration)'=='Release'">
         $(ShaderOutDir)vs.cso;
-        $(ShaderOutDir)vs_instanced.cso;
         $(ShaderOutDir)vs_depth_only.cso;
-        $(ShaderOutDir)vs_instanced_depth_only.cso;
       </Outputs>
       <AdditionalInputs>SharedConfig.h</AdditionalInputs>
     </CustomBuild>

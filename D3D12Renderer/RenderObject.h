@@ -9,7 +9,7 @@ public:
     RenderObject(Mesh* pMesh)
         : m_pMesh(pMesh)
     {
-        m_pMaterial = pMesh->m_pMaterial;
+        m_pMaterial = pMesh->m_pDefaultMaterial;
 
         m_prevS = XMFLOAT3(1.0f, 1.0f, 1.0f);
         m_currS = XMFLOAT3(1.0f, 1.0f, 1.0f);
@@ -84,7 +84,7 @@ public:
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
         XMStoreFloat4x4(&ret.inverseTranspose, XMMatrixInverse(nullptr, world));
 
-        //ret.textureTileScale = m_textureTileScale;
+        ret.materialIndex = m_pMaterial->GetMaterialConstantBufferIndex();
 
         return ret;
     }
@@ -104,11 +104,6 @@ private:
     XMFLOAT4X4 m_renderTransform;
 
     bool m_visible;
-
-    //float m_textureTileScale = 1.0f;
-
-    //MeshConstantData m_meshConstantData;
-    //UINT m_meshConstantBufferIndex;
 
     bool m_materialOverride = false;
     UINT m_materialConstantBufferOverrideIndex;

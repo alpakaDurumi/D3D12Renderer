@@ -6,8 +6,6 @@
 
 #include <vector>
 
-#include "SharedConfig.h"
-
 using namespace DirectX;
 
 struct Vertex
@@ -140,27 +138,5 @@ public:
         }
 
         return { vertices, indices };
-    }
-
-    static std::vector<InstanceData> GenerateSampleInstanceData()
-    {
-        GeometryData t = GenerateCube();
-
-        std::vector<InstanceData> instanceData;
-
-        for (int i = 0; i < 100; i++)
-        {
-            for (int j = 0; j < 100; j++)
-            {
-                InstanceData data;
-                XMMATRIX world = XMMatrixTranslation((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, 10.0f);
-                XMStoreFloat4x4(&data.world, XMMatrixTranspose(world));
-                world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-                XMStoreFloat4x4(&data.inverseTranspose, XMMatrixInverse(nullptr, world));
-                instanceData.push_back(data);
-            }
-        }
-
-        return instanceData;
     }
 };

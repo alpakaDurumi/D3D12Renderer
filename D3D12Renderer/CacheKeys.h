@@ -5,13 +5,6 @@
 
 #include "Utility.h"
 
-enum class MeshType
-{
-    DEFAULT,
-    INSTANCED,
-    NUM_MESH_TYPES
-};
-
 enum class PassType
 {
     DEFAULT,
@@ -41,7 +34,6 @@ struct std::hash<ShaderKey>
 // Key that identify unique PSO.
 struct PSOKey
 {
-    MeshType meshType;  // 1
     PassType passType;  // 1
 
     std::wstring vsName;
@@ -57,11 +49,7 @@ struct std::hash<PSOKey>
     {
         size_t seed = 0;
 
-        size_t combinedBits =
-            (static_cast<size_t>(key.meshType) << 1) |
-            static_cast<size_t>(key.passType);
-
-        Utility::HashCombine(seed, combinedBits);
+        Utility::HashCombine(seed, static_cast<size_t>(key.passType));
         Utility::HashCombine(seed, key.vsName);
         Utility::HashCombine(seed, key.psName);
 

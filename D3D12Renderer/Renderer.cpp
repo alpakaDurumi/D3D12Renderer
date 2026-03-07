@@ -613,19 +613,13 @@ void Renderer::LoadAssets()
         std::vector<std::wstring> csoNames;
 
         // VS
-        for (UINT i = 0; i < static_cast<UINT>(MeshType::NUM_MESH_TYPES); ++i)
+        for (UINT i = 0; i < static_cast<UINT>(PassType::NUM_PASS_TYPES); ++i)
         {
-            for (UINT j = 0; j < static_cast<UINT>(PassType::NUM_PASS_TYPES); ++j)
-            {
-                std::wstring temp = Utility::RemoveFileExtension(vsName);
-                if (i == 1)
-                    temp += L"_instanced";
-                if (j == 1)
-                    temp += L"_depth_only";
-                temp += L".cso";
+            std::wstring temp = Utility::RemoveFileExtension(vsName);
+            if (i == 1) temp += L"_depth_only";
+            temp += L".cso";
 
-                csoNames.push_back(temp);
-            }
+            csoNames.push_back(temp);
         }
 
         // PS
@@ -633,7 +627,7 @@ void Renderer::LoadAssets()
         csoNames.push_back(Utility::RemoveFileExtension(psName1) + L".cso");
 
         for (const auto& name : csoNames)
-            {
+        {
             std::ifstream file(std::filesystem::path(L"shaders") / name, std::ios::binary);
             if (!file)
             {
@@ -644,39 +638,28 @@ void Renderer::LoadAssets()
         }
     }
 
-    // Define input layouts
+    // Define input layout
+    m_inputLayout =
     {
-        std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescsDefault =
-        {
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-        };
+        // Slot 0 for per-vertex data
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 
-        std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescsInstanced =
-        {
-            // Slot 0 for per-vertex data
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        // Slot 1 for instanced data
+        { "INSTANCE_WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+        { "INSTANCE_WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+        { "INSTANCE_WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+        { "INSTANCE_WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 
-            // Slot 1 for instanced data
-            { "INSTANCE_WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-            { "INSTANCE_WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-            { "INSTANCE_WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-            { "INSTANCE_WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+        { "INSTANCE_INVTRANSPOSE", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+        { "INSTANCE_INVTRANSPOSE", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+        { "INSTANCE_INVTRANSPOSE", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+        { "INSTANCE_INVTRANSPOSE", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
 
-            { "INSTANCE_INVTRANSPOSE", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-            { "INSTANCE_INVTRANSPOSE", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-            { "INSTANCE_INVTRANSPOSE", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-            { "INSTANCE_INVTRANSPOSE", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
-        };
-
-        m_inputLayouts.emplace(MeshType::DEFAULT, std::move(inputElementDescsDefault));
-        m_inputLayouts.emplace(MeshType::INSTANCED, std::move(inputElementDescsInstanced));
-    }
+        { "INSTANCE_MATERIAL_INDEX", 0, DXGI_FORMAT_R32_UINT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
+    };
 
     // Create the depth stencil view
     m_dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
@@ -715,72 +698,6 @@ void Renderer::LoadAssets()
             CreateSampler(m_device.Get(), static_cast<TextureFiltering>(i), static_cast<TextureAddressingMode>(j), cpuHandle);
         }
     }
-
-    // Add meshes
-    m_meshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube());
-    m_meshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateSphere());
-    m_instancedMeshes.emplace_back(m_device.Get(), commandList, *m_uploadBuffer, m_frameResources, GeometryGenerator::GenerateCube(), GeometryGenerator::GenerateSampleInstanceData());
-
-    m_meshes[0].SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
-
-    m_meshes[1].SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
-
-    m_instancedMeshes[0].SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3());
-
-    // Add materials
-    auto* pBaseMat = CreateMaterial();
-    pBaseMat->SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
-    pBaseMat->SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
-    pBaseMat->SetShininess(10.0f);
-    pBaseMat->SetTextureIndices(0, 1, 2);
-    pBaseMat->SetTextureAddressingModes(TextureAddressingMode::WRAP, TextureAddressingMode::WRAP, TextureAddressingMode::WRAP);
-    pBaseMat->BuildSamplerIndices(m_currentTextureFiltering);
-
-    auto* pPlaneMat = CloneMaterial(*pBaseMat);
-    pPlaneMat->SetTextureTileScales(50.0f, 50.0f, 50.0f);
-
-    m_meshes[0].SetMaterial(pPlaneMat);
-    m_meshes[1].SetMaterial(pBaseMat);
-    m_instancedMeshes[0].SetMaterial(pBaseMat);
-
-    // Set up lights
-    auto light = std::make_unique<DirectionalLight>(
-        m_device.Get(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(MAX_CASCADES),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
-        m_shadowMapResolution,
-        *m_layoutTracker,
-        m_frameResources,
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
-    light->SetDirection(XMVectorSet(-1.0f, -1.0f, 1.0f, 0.0f));
-    m_lights.push_back(std::move(light));
-
-    auto pointLight = std::make_unique<PointLight>(
-        m_device.Get(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(POINT_LIGHT_ARRAY_SIZE),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
-        m_shadowMapResolution,
-        *m_layoutTracker,
-        m_frameResources,
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(POINT_LIGHT_ARRAY_SIZE));
-    pointLight->SetPosition(XMVectorSet(0.0f, 4.0f, 3.0f, 1.0f));
-    pointLight->SetRange(30.0f);
-    m_lights.push_back(std::move(pointLight));
-
-    auto spotLight = std::make_unique<SpotLight>(
-        m_device.Get(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(SPOT_LIGHT_ARRAY_SIZE),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
-        m_shadowMapResolution,
-        *m_layoutTracker,
-        m_frameResources,
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
-    spotLight->SetPosition(XMVectorSet(0.0f, 10.0f, -5.0f, 1.0f));
-    spotLight->SetDirection(XMVectorSet(0.0f, -1.0f, 1.0f, 0.0f));
-    spotLight->SetRange(50.0f);
-    spotLight->SetAngles(50.0f, 10.0f);
-    m_lights.push_back(std::move(spotLight));
 
     // Allocate textures
     auto alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3);
@@ -821,6 +738,84 @@ void Renderer::LoadAssets()
         false,
         false);
 
+    // Add materials
+    auto* pBaseMat = CreateMaterial();
+    pBaseMat->SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
+    pBaseMat->SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
+    pBaseMat->SetShininess(10.0f);
+    pBaseMat->SetTextureIndices(0, 1, 2);
+    pBaseMat->SetTextureAddressingModes(TextureAddressingMode::WRAP, TextureAddressingMode::WRAP, TextureAddressingMode::WRAP);
+    pBaseMat->BuildSamplerIndices(m_currentTextureFiltering);
+
+    auto* pPlaneMat = CloneMaterial(*pBaseMat);
+    pPlaneMat->SetTextureTileScales(50.0f, 50.0f, 50.0f);
+
+    // Add meshes
+    m_meshes.push_back(std::make_unique<Mesh>(m_device.Get(), commandList, *m_uploadBuffer, GeometryGenerator::GenerateCube()));
+    m_meshes.push_back(std::make_unique<Mesh>(m_device.Get(), commandList, *m_uploadBuffer, GeometryGenerator::GenerateSphere()));
+
+    // Add RenderObjects
+    auto& cubes = m_renderObjects[m_meshes[0].get()];
+
+    cubes.emplace_back(m_meshes[0].get());
+    cubes.back().SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
+    cubes.back().SetMaterial(pPlaneMat);
+
+    for (int i = 0; i < 100; i++)
+    {
+        for (int j = 0; j < 100; j++)
+        {
+            cubes.emplace_back(m_meshes[0].get());
+            cubes.back().SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, 10.0f));
+            cubes.back().SetMaterial(pBaseMat);
+        }
+    }
+
+    auto& spheres = m_renderObjects[m_meshes[1].get()];
+
+    spheres.emplace_back(m_meshes[1].get());
+    spheres.back().SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
+    spheres.back().SetMaterial(pBaseMat);
+
+    // Set up lights
+    auto light = std::make_unique<DirectionalLight>(
+        m_device.Get(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(MAX_CASCADES),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+        m_shadowMapResolution,
+        *m_layoutTracker,
+        m_frameResources,
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
+    light->SetDirection(XMVectorSet(-1.0f, -1.0f, 1.0f, 0.0f));
+    m_lights.push_back(std::move(light));
+
+    auto pointLight = std::make_unique<PointLight>(
+        m_device.Get(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(POINT_LIGHT_ARRAY_SIZE),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+        m_shadowMapResolution,
+        *m_layoutTracker,
+        m_frameResources,
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(POINT_LIGHT_ARRAY_SIZE));
+    pointLight->SetPosition(XMVectorSet(0.0f, 4.0f, 3.0f, 1.0f));
+    pointLight->SetRange(30.0f);
+    m_lights.push_back(std::move(pointLight));
+
+    auto spotLight = std::make_unique<SpotLight>(
+        m_device.Get(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(SPOT_LIGHT_ARRAY_SIZE),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+        m_shadowMapResolution,
+        *m_layoutTracker,
+        m_frameResources,
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
+    spotLight->SetPosition(XMVectorSet(0.0f, 10.0f, -5.0f, 1.0f));
+    spotLight->SetDirection(XMVectorSet(0.0f, -1.0f, 1.0f, 0.0f));
+    spotLight->SetRange(50.0f);
+    spotLight->SetAngles(50.0f, 10.0f);
+    m_lights.push_back(std::move(spotLight));
+
     // Execute commands for loading assets and store fence value
     m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
 
@@ -833,6 +828,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"PopulateCommandList");
 
     FrameResource& frameResource = *m_frameResources[m_frameIndex];
+    frameResource.ResetInstanceOffsetByte();
 
     auto cmdList = commandList.GetCommandList();
 
@@ -842,7 +838,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     // Stage material CBVs
     UINT32 numMaterials = static_cast<UINT32>(m_materials.size());
     for (UINT i = 0; i < numMaterials; ++i)
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(3, i, 1, frameResource.m_materialConstantBuffers[m_materials[i]->GetMaterialConstantBufferIndex()]->GetAllocationRef());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(3, i, 1, frameResource.m_materialConstantBuffers[i]->GetAllocationRef());
 
     // Stage light CBVs
     UINT32 numLights = static_cast<UINT32>(m_lights.size());
@@ -864,25 +860,37 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
     BindDescriptorTables(cmdList.Get());
 
+    UINT requiredCount = 0;
+    for (auto& [pMesh, objects] : m_renderObjects)
+    {
+        requiredCount += objects.size();
+    }
+    frameResource.EnsureInstanceCapacity(requiredCount);
+
+    for (auto& [pMesh, objects] : m_renderObjects)
+    {
+        std::vector<InstanceData> temp(objects.size());
+        for (UINT i = 0; i < objects.size(); ++i)
+        {
+            temp[i] = objects[i].BuildInstanceData();
+        }
+        memcpy(frameResource.m_instanceBufferBegin + frameResource.m_instanceOffsetByte, temp.data(), sizeof(InstanceData) * objects.size());
+
+        frameResource.m_instanceOffsetByte += sizeof(InstanceData) * objects.size();
+    }
+
     // Depth-only pass for shadow mapping
     {
         cmdList->RSSetViewports(1, &m_shadowMapViewport);
         cmdList->RSSetScissorRects(1, &m_shadowMapScissorRect);
 
         // Pre-query PSOs
-        m_currentPSOKey.meshType = MeshType::DEFAULT;
         m_currentPSOKey.passType = PassType::DEPTH_ONLY;
         m_currentPSOKey.vsName = L"vs.hlsl";
         m_currentPSOKey.psName = L"";
         auto* shadowPSO = GetPipelineState(m_currentPSOKey);
 
-        m_currentPSOKey.meshType = MeshType::INSTANCED;
-        auto* shadowPSOInstanced = GetPipelineState(m_currentPSOKey);
-
         m_currentPSOKey.psName = L"PointLightShadowPS.hlsl";
-        auto* pointShadowPSOInstanced = GetPipelineState(m_currentPSOKey);
-
-        m_currentPSOKey.meshType = MeshType::DEFAULT;
         auto* pointShadowPSO = GetPipelineState(m_currentPSOKey);
 
         for (UINT i = 0; i < m_lights.size(); ++i)
@@ -937,21 +945,25 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 cmdList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
                 cmdList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
-                for (const auto& mesh : m_meshes)
+
+                cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferIndex(j)]->GetGPUVirtualAddress());
+
+                UINT offset = 0;
+                for (auto& [pMesh, objects] : m_renderObjects)
                 {
-                    cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-                    cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferIndex(j)]->GetGPUVirtualAddress());
+                    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-                    mesh.Render(cmdList);
-                }
+                    D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
+                    instanceBufferView.BufferLocation = frameResource.m_instanceUploadBuffer->GetGPUVirtualAddress() + offset;
+                    instanceBufferView.StrideInBytes = sizeof(InstanceData);
+                    instanceBufferView.SizeInBytes = sizeof(InstanceData) * objects.size();
+                    offset += sizeof(InstanceData) * objects.size();
 
-                cmdList->SetPipelineState(isPointLight ? pointShadowPSOInstanced : shadowPSOInstanced);
-                for (const auto& mesh : m_instancedMeshes)
-                {
-                    cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-                    cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferIndex(j)]->GetGPUVirtualAddress());
+                    D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->m_vertexBufferView, instanceBufferView };
+                    cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
+                    cmdList->IASetIndexBuffer(&pMesh->m_indexBufferView);
 
-                    mesh.Render(cmdList);
+                    cmdList->DrawIndexedInstanced(pMesh->m_numIndices, objects.size(), 0, 0, 0);
                 }
             }
 
@@ -985,14 +997,10 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->RSSetScissorRects(1, &m_scissorRect);
 
         // Pre-query PSOs
-        m_currentPSOKey.meshType = MeshType::DEFAULT;
         m_currentPSOKey.passType = PassType::DEFAULT;
         m_currentPSOKey.vsName = L"vs.hlsl";
         m_currentPSOKey.psName = L"ps.hlsl";
         auto* pso = GetPipelineState(m_currentPSOKey);
-
-        m_currentPSOKey.meshType = MeshType::INSTANCED;
-        auto* psoInstanced = GetPipelineState(m_currentPSOKey);
 
         commandList.Barrier(
             frameResource.m_renderTarget.Get(),
@@ -1015,27 +1023,26 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->SetGraphicsRoot32BitConstant(11, numLights, 0);
 
         cmdList->SetPipelineState(pso);
-        for (const auto& mesh : m_meshes)
+
+        cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
+        cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
+
+        UINT offset = 0;
+        for (auto& [pMesh, objects] : m_renderObjects)
         {
-            cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
+            cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-            cmdList->SetGraphicsRoot32BitConstant(11, mesh.m_pMaterial->GetMaterialConstantBufferIndex(), 1);
+            D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
+            instanceBufferView.BufferLocation = frameResource.m_instanceUploadBuffer->GetGPUVirtualAddress() + offset;
+            instanceBufferView.StrideInBytes = sizeof(InstanceData);
+            instanceBufferView.SizeInBytes = sizeof(InstanceData) * objects.size();
+            offset += sizeof(InstanceData) * objects.size();
 
-            mesh.Render(cmdList);
-        }
+            D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->m_vertexBufferView, instanceBufferView };
+            cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
+            cmdList->IASetIndexBuffer(&pMesh->m_indexBufferView);
 
-        cmdList->SetPipelineState(psoInstanced);
-        for (const auto& mesh : m_instancedMeshes)
-        {
-            cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_meshConstantBuffers[mesh.m_meshConstantBufferIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
-            cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
-
-            cmdList->SetGraphicsRoot32BitConstant(11, mesh.m_pMaterial->GetMaterialConstantBufferIndex(), 1);
-
-            mesh.Render(cmdList);
+            cmdList->DrawIndexedInstanced(pMesh->m_numIndices, objects.size(), 0, 0, 0);
         }
     }
 }
@@ -1085,11 +1092,6 @@ void Renderer::SetTextureFiltering(TextureFiltering filtering)
     {
         material->BuildSamplerIndices(m_currentTextureFiltering);
     }
-}
-
-void Renderer::SetMeshType(MeshType meshType)
-{
-    m_currentPSOKey.meshType = meshType;
 }
 
 Material* Renderer::CreateMaterial()
@@ -1178,8 +1180,8 @@ void Renderer::CreateRootSignature()
         static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS) * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES),
         D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
 
-    // Root constants for number of lights and material index.
-    rootSignature[11].InitAsConstant(4, 0, 2, D3D12_SHADER_VISIBILITY_PIXEL);
+    // Root constants for number of lights
+    rootSignature[11].InitAsConstant(4, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Static samplers
     rootSignature.InitStaticSampler(0, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_GREATER_EQUAL);
@@ -1249,14 +1251,13 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
 
         // Describe and create the graphics pipeline state object (PSO).
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-        psoDesc.InputLayout = { m_inputLayouts[psoKey.meshType].data(), static_cast<UINT>(m_inputLayouts[psoKey.meshType].size()) };
+        psoDesc.InputLayout = { m_inputLayout.data(), static_cast<UINT>(m_inputLayout.size()) };
         psoDesc.pRootSignature = m_rootSignature->GetRootSignature().Get();
 
         // Shader stages are selected by demand.
         // VS is essential for rasterization.
         // PS is optional. (e.g. Depth-only pass)
         std::wstring vsCsoName = Utility::RemoveFileExtension(psoKey.vsName) +
-            (psoKey.meshType == MeshType::INSTANCED ? L"_instanced" : L"") +
             (psoKey.passType == PassType::DEPTH_ONLY ? L"_depth_only" : L"") +
             L".cso";
 
@@ -1332,7 +1333,7 @@ void Renderer::FixedUpdate(double fixedDtMs)
 
             // fallback
             PostQuitMessage(static_cast<int>(err));
-    }
+        }
     }
 
     if (m_inputManager.IsKeyPressed(VK_F11))
@@ -1361,33 +1362,32 @@ void Renderer::FixedUpdate(double fixedDtMs)
     if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-dist);
     if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(dist);
 
-    // Mesh
+    // RenderObjects
     static float rotationSpeed = 1.0f;  // unit : rad/s
 
-    for (auto& mesh : m_meshes)
+    for (auto& [pMesh, objects] : m_renderObjects)
     {
-        mesh.SnapshotState();
-    }
-    for (auto& mesh : m_instancedMeshes)
-    {
-        mesh.SnapshotState();
+        for (auto& ob : objects)
+        {
+            ob.SnapshotState();
+        }
     }
 
-    m_instancedMeshes[0].Transform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
+    for (auto& ob : m_renderObjects[m_meshes[0].get()])
+    {
+        ob.Transform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
+    }
 }
 
 void Renderer::PrepareConstantData(float alpha)
 {
-    // Mesh
-    for (auto& mesh : m_meshes)
+    // RenderObjects
+    for (auto& [pMesh, objects] : m_renderObjects)
     {
-        mesh.UpdateRenderState(alpha);
-        mesh.m_meshConstantData.SetTransform(XMLoadFloat4x4(&mesh.m_renderTransform));
-    }
-    for (auto& mesh : m_instancedMeshes)
-    {
-        mesh.UpdateRenderState(alpha);
-        mesh.m_meshConstantData.SetTransform(XMLoadFloat4x4(&mesh.m_renderTransform));
+        for (auto& ob : objects)
+        {
+            ob.UpdateRenderState(alpha);
+        }
     }
 
     // Main Camera
@@ -1597,11 +1597,6 @@ void Renderer::PrepareSpotLight(SpotLight& light)
 
 void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
 {
-    for (auto& mesh : m_meshes)
-        mesh.UpdateMeshConstantBuffer(frameResource);
-    for (auto& mesh : m_instancedMeshes)
-        mesh.UpdateMeshConstantBuffer(frameResource);
-
     UpdateCameraConstantBuffer(frameResource);
 
     for (auto& material : m_materials)

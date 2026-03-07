@@ -9,8 +9,7 @@ bool ShaderKey::operator==(const ShaderKey& other) const
 
 bool PSOKey::operator==(const PSOKey& other) const
 {
-    return meshType == other.meshType &&
-        passType == other.passType &&
+    return passType == other.passType &&
         vsName == other.vsName &&
         psName == other.psName;
 }

@@ -30,6 +30,7 @@
 #include "CacheKeys.h"
 #include "Light.h"
 #include "Material.h"
+#include "RenderObject.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -101,9 +102,9 @@ private:
     std::unique_ptr<RootSignature> m_rootSignature;
     std::unordered_map<PSOKey, ComPtr<ID3D12PipelineState>> m_pipelineStates;
 
-    PSOKey m_currentPSOKey = { MeshType::DEFAULT, PassType::DEFAULT };
+    PSOKey m_currentPSOKey = { PassType::DEFAULT };
 
-    std::unordered_map<MeshType, std::vector<D3D12_INPUT_ELEMENT_DESC>> m_inputLayouts;
+    std::vector<D3D12_INPUT_ELEMENT_DESC> m_inputLayout;
     std::unordered_map<ShaderKey, std::vector<char>> m_shaderBlobs;
 
     ComPtr<ID3D12Resource> m_depthStencilBuffer;
@@ -118,11 +119,11 @@ private:
 
     InputManager m_inputManager;
 
-    std::vector<Mesh> m_meshes;
-    std::vector<InstancedMesh> m_instancedMeshes;
+    std::vector<std::unique_ptr<Mesh>> m_meshes;
+    std::unordered_map<Mesh*, std::vector<RenderObject>> m_renderObjects;
 
     std::vector<std::unique_ptr<Material>> m_materials;
-    
+
     std::unique_ptr<Texture> m_albedo;
     std::unique_ptr<Texture> m_normalMap;
     std::unique_ptr<Texture> m_heightMap;
@@ -159,7 +160,6 @@ private:
     void InitImGui();
 
     void SetTextureFiltering(TextureFiltering filtering);
-    void SetMeshType(MeshType meshType);
 
     Material* CreateMaterial();
     Material* CloneMaterial(const Material& material);

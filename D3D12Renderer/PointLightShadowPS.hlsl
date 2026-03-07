@@ -9,6 +9,7 @@ struct PSInput
     float3 normalWorld : NORMAL;
     nointerpolation float tangentW : TEXCOORD1; // Do not interpolate w component of tangent vector.
     float distView : TEXCOORD2; // Distance in view space for determining CSM index.
+    nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
 };
 
 struct LightConstants
