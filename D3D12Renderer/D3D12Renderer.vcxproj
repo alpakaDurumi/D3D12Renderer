@@ -235,6 +235,7 @@
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="RenderObject.h" />
     <ClInclude Include="ResourceLayoutTracker.h" />
     <ClInclude Include="RootSignature.h" />
     <ClInclude Include="SharedConfig.h" />

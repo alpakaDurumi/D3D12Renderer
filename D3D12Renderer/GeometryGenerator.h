@@ -6,6 +6,8 @@
 
 #include <vector>
 
+#include "SharedConfig.h"
+
 using namespace DirectX;
 
 struct Vertex
@@ -20,12 +22,6 @@ struct GeometryData
 {
     std::vector<Vertex> vertices;
     std::vector<UINT32> indices;
-};
-
-struct InstanceData
-{
-    XMFLOAT4X4 world;
-    XMFLOAT4X4 inverseTranspose;
 };
 
 class GeometryGenerator

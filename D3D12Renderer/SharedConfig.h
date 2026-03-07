@@ -6,6 +6,8 @@
 #ifdef __cplusplus
 // For CPP
 #include <Windows.h>
+#include <DirectXMath.h>
+
 constexpr UINT MAX_CASCADES = 4;
 constexpr UINT POINT_LIGHT_ARRAY_SIZE = 6;
 constexpr UINT SPOT_LIGHT_ARRAY_SIZE = 1;
@@ -37,6 +39,12 @@ enum class TextureAddressingMode
     BORDER,
     MIRROR_ONCE,
     NUM_TEXTURE_ADDRESSING_MODES
+};
+
+struct InstanceData
+{
+    DirectX::XMFLOAT4X4 world;
+    DirectX::XMFLOAT4X4 inverseTranspose;
 };
 #else   // __cplusplus
 // For HLSL

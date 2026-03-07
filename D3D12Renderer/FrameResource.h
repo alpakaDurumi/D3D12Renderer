@@ -27,6 +27,11 @@ class FrameResource
 {
 public:
     FrameResource(ID3D12Device10* pDevice, IDXGISwapChain* pSwapChain, UINT frameIndex, DescriptorAllocation&& allocation);
+    ~FrameResource();
+
+    void ResetInstanceOffsetByte();
+    void EnsureInstanceCapacity(UINT requiredSize);
+    //void AllocateInstanceData();
 
 //private:
     ComPtr<ID3D12Resource> m_renderTarget;
@@ -38,5 +43,12 @@ public:
     std::vector<std::unique_ptr<CameraCB>> m_cameraConstantBuffers;
     std::unique_ptr<ShadowCB> m_shadowConstantBuffer;
 
+    ComPtr<ID3D12Resource> m_instanceUploadBuffer;
+    UINT8* m_instanceBufferBegin = nullptr;
+    UINT m_instanceCapacity = 1024;
+    UINT m_instanceOffsetByte = 0;
+
     UINT64 m_fenceValue = 0;
+
+    ID3D12Device10* m_pDevice;
 };

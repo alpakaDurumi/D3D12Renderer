@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Windows.h>
+
 #include <string>
 
 namespace Utility
@@ -17,4 +19,6 @@ namespace Utility
         std::hash<T> hasher;
         seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
     }
+
+    UINT CeilPowerOfTwo(UINT x);
 }
