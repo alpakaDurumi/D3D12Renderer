@@ -728,19 +728,13 @@ void Renderer::LoadAssets()
     m_instancedMeshes[0].SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3());
 
     // Add materials
-    auto material = std::make_unique<Material>(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount), m_frameResources);
-    material->SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
-    material->SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
-    material->SetShininess(10.0f);
-
-    material->SetTextureIndices(0, 1, 2);
-    material->SetTextureAddressingModes(TextureAddressingMode::WRAP, TextureAddressingMode::WRAP, TextureAddressingMode::WRAP);
-
-    material->BuildSamplerIndices(m_currentTextureFiltering);
-
-    auto* pBaseMat = material.get();
-
-    m_materials.push_back(std::move(material));
+    auto* pBaseMat = CreateMaterial();
+    pBaseMat->SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
+    pBaseMat->SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
+    pBaseMat->SetShininess(10.0f);
+    pBaseMat->SetTextureIndices(0, 1, 2);
+    pBaseMat->SetTextureAddressingModes(TextureAddressingMode::WRAP, TextureAddressingMode::WRAP, TextureAddressingMode::WRAP);
+    pBaseMat->BuildSamplerIndices(m_currentTextureFiltering);
 
     auto* pPlaneMat = CloneMaterial(*pBaseMat);
     pPlaneMat->SetTextureTileScales(50.0f, 50.0f, 50.0f);
@@ -1098,13 +1092,19 @@ void Renderer::SetMeshType(MeshType meshType)
     m_currentPSOKey.meshType = meshType;
 }
 
-Material* Renderer::CloneMaterial(const Material& src)
+Material* Renderer::CreateMaterial()
 {
     auto material = std::make_unique<Material>(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount), m_frameResources);
-
-    material->CopyDataFrom(src);
+    auto* pMat = material.get();
     m_materials.push_back(std::move(material));
-    return m_materials.back().get();
+    return pMat;
+}
+
+Material* Renderer::CloneMaterial(const Material& src)
+{
+    auto pMat = CreateMaterial();
+    pMat->CopyDataFrom(src);
+    return pMat;
 }
 
 void Renderer::SetFpsCap(std::string fps)

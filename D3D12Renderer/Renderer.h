@@ -161,6 +161,7 @@ private:
     void SetTextureFiltering(TextureFiltering filtering);
     void SetMeshType(MeshType meshType);
 
+    Material* CreateMaterial();
     Material* CloneMaterial(const Material& material);
 
     void SetFpsCap(std::string fps);
