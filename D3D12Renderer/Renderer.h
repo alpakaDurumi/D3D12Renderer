@@ -161,6 +161,8 @@ private:
     void SetTextureFiltering(TextureFiltering filtering);
     void SetMeshType(MeshType meshType);
 
+    Material* CloneMaterial(const Material& material);
+
     void SetFpsCap(std::string fps);
 
     void BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList);

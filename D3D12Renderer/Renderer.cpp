@@ -738,11 +738,16 @@ void Renderer::LoadAssets()
 
     material->BuildSamplerIndices(m_currentTextureFiltering);
 
+    auto* pBaseMat = material.get();
+
     m_materials.push_back(std::move(material));
 
-    m_meshes[0].SetMaterial(m_materials[0].get());
-    m_meshes[1].SetMaterial(m_materials[0].get());
-    m_instancedMeshes[0].SetMaterial(m_materials[0].get());
+    auto* pPlaneMat = CloneMaterial(*pBaseMat);
+    pPlaneMat->SetTextureTileScales(50.0f, 50.0f, 50.0f);
+
+    m_meshes[0].SetMaterial(pPlaneMat);
+    m_meshes[1].SetMaterial(pBaseMat);
+    m_instancedMeshes[0].SetMaterial(pBaseMat);
 
     // Set up lights
     auto light = std::make_unique<DirectionalLight>(
@@ -1091,6 +1096,15 @@ void Renderer::SetTextureFiltering(TextureFiltering filtering)
 void Renderer::SetMeshType(MeshType meshType)
 {
     m_currentPSOKey.meshType = meshType;
+}
+
+Material* Renderer::CloneMaterial(const Material& src)
+{
+    auto material = std::make_unique<Material>(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount), m_frameResources);
+
+    material->CopyDataFrom(src);
+    m_materials.push_back(std::move(material));
+    return m_materials.back().get();
 }
 
 void Renderer::SetFpsCap(std::string fps)

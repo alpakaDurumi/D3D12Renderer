@@ -113,6 +113,12 @@ public:
         frameResource.m_materialConstantBuffers[m_constantBufferIndex]->Update(&m_constantData);
     }
 
+    void CopyDataFrom(const Material& src)
+    {
+        m_constantData = src.m_constantData;
+        m_textureAddressingModes = src.m_textureAddressingModes;
+    }
+
 private:
     UINT CalcSamplerIndex(TextureFiltering filtering, TextureAddressingMode addressingMode)
     {
