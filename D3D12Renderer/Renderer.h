@@ -166,6 +166,9 @@ private:
     Material* CreateMaterial();
     Material* CloneMaterial(const Material& material);
 
+    template <typename T>
+    T* CreateLight();
+
     void SetFpsCap(std::string fps);
 
     void BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList);
@@ -187,3 +190,12 @@ private:
     void UpdateCameraConstantBuffer(FrameResource& frameResource);
     void UpdateShadowConstantBuffer(FrameResource& frameResource);
 };
+
+template <>
+DirectionalLight* Renderer::CreateLight<DirectionalLight>();
+
+template <>
+PointLight* Renderer::CreateLight<PointLight>();
+
+template <>
+SpotLight* Renderer::CreateLight<SpotLight>();

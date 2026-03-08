@@ -783,43 +783,18 @@ void Renderer::LoadAssets()
     spheres.back().SetMaterial(pBaseMat);
 
     // Set up lights
-    auto light = std::make_unique<DirectionalLight>(
-        m_device.Get(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(MAX_CASCADES),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
-        m_shadowMapResolution,
-        *m_layoutTracker,
-        m_frameResources,
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
-    light->SetDirection(XMVectorSet(-1.0f, -1.0f, 1.0f, 0.0f));
-    m_lights.push_back(std::move(light));
+    auto* pDirectionalLight = CreateLight<DirectionalLight>();
+    pDirectionalLight->SetDirection(XMVectorSet(-1.0f, -1.0f, 1.0f, 0.0f));
 
-    auto pointLight = std::make_unique<PointLight>(
-        m_device.Get(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(POINT_LIGHT_ARRAY_SIZE),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
-        m_shadowMapResolution,
-        *m_layoutTracker,
-        m_frameResources,
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(POINT_LIGHT_ARRAY_SIZE));
-    pointLight->SetPosition(XMVectorSet(0.0f, 4.0f, 3.0f, 1.0f));
-    pointLight->SetRange(30.0f);
-    m_lights.push_back(std::move(pointLight));
+    auto* pPointLight = CreateLight<PointLight>();
+    pPointLight->SetPosition(XMVectorSet(0.0f, 4.0f, 3.0f, 1.0f));
+    pPointLight->SetRange(30.0f);
 
-    auto spotLight = std::make_unique<SpotLight>(
-        m_device.Get(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(SPOT_LIGHT_ARRAY_SIZE),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
-        m_shadowMapResolution,
-        *m_layoutTracker,
-        m_frameResources,
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
-    spotLight->SetPosition(XMVectorSet(0.0f, 10.0f, -5.0f, 1.0f));
-    spotLight->SetDirection(XMVectorSet(0.0f, -1.0f, 1.0f, 0.0f));
-    spotLight->SetRange(50.0f);
-    spotLight->SetAngles(50.0f, 10.0f);
-    m_lights.push_back(std::move(spotLight));
+    auto* pSpotLight = CreateLight<SpotLight>();
+    pSpotLight->SetPosition(XMVectorSet(0.0f, 10.0f, -5.0f, 1.0f));
+    pSpotLight->SetDirection(XMVectorSet(0.0f, -1.0f, 1.0f, 0.0f));
+    pSpotLight->SetRange(50.0f);
+    pSpotLight->SetAngles(50.0f, 10.0f);
 
     // Execute commands for loading assets and store fence value
     m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
@@ -1636,4 +1611,71 @@ void Renderer::UpdateCameraConstantBuffer(FrameResource& frameResource)
 void Renderer::UpdateShadowConstantBuffer(FrameResource& frameResource)
 {
     frameResource.m_shadowConstantBuffer->Update(&m_shadowConstantData);
+}
+
+template <>
+DirectionalLight* Renderer::CreateLight<DirectionalLight>()
+{
+    auto dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(MAX_CASCADES);
+    auto srvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
+    auto cbvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount);
+
+    auto light = std::make_unique<DirectionalLight>(
+        m_device.Get(),
+        std::move(dsvAllocation),
+        std::move(srvAllocation),
+        m_shadowMapResolution,
+        *m_layoutTracker,
+        m_frameResources,
+        std::move(cbvAllocation));
+
+    auto* pLight = light.get();
+    m_lights.push_back(std::move(light));
+
+    return pLight;
+}
+
+template <>
+PointLight* Renderer::CreateLight<PointLight>()
+{
+    auto dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(POINT_LIGHT_ARRAY_SIZE);
+    auto srvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
+    auto cbvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount);
+
+    auto light = std::make_unique<PointLight>(
+        m_device.Get(),
+        std::move(dsvAllocation),
+        std::move(srvAllocation),
+        m_shadowMapResolution,
+        *m_layoutTracker,
+        m_frameResources,
+        std::move(cbvAllocation),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(POINT_LIGHT_ARRAY_SIZE));
+
+    auto* pLight = light.get();
+    m_lights.push_back(std::move(light));
+
+    return pLight;
+}
+
+template <>
+SpotLight* Renderer::CreateLight<SpotLight>()
+{
+    auto dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(SPOT_LIGHT_ARRAY_SIZE);
+    auto srvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
+    auto cbvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount);
+
+    auto light = std::make_unique<SpotLight>(
+        m_device.Get(),
+        std::move(dsvAllocation),
+        std::move(srvAllocation),
+        m_shadowMapResolution,
+        *m_layoutTracker,
+        m_frameResources,
+        std::move(cbvAllocation));
+
+    auto* pLight = light.get();
+    m_lights.push_back(std::move(light));
+
+    return pLight;
 }
