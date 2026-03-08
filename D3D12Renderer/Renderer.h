@@ -122,6 +122,8 @@ private:
     std::vector<std::unique_ptr<Mesh>> m_meshes;
     std::unordered_map<Mesh*, std::vector<RenderObject>> m_renderObjects;
 
+    std::vector<RenderObject*> m_previewRotations;
+
     std::vector<std::unique_ptr<Material>> m_materials;
 
     std::unique_ptr<Texture> m_albedo;

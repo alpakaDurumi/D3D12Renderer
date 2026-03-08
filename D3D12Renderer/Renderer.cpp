@@ -771,6 +771,11 @@ void Renderer::LoadAssets()
         }
     }
 
+    for (int i = 1; i < cubes.size(); ++i)
+    {
+        m_previewRotations.push_back(&cubes[i]);
+    }
+
     auto& spheres = m_renderObjects[m_meshes[1].get()];
 
     spheres.emplace_back(m_meshes[1].get());
@@ -1373,9 +1378,9 @@ void Renderer::FixedUpdate(double fixedDtMs)
         }
     }
 
-    for (auto& ob : m_renderObjects[m_meshes[0].get()])
+    for (auto& ob : m_previewRotations)
     {
-        ob.Transform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
+        ob->Transform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
     }
 }
 
