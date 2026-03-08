@@ -761,9 +761,9 @@ void Renderer::LoadAssets()
     cubes.back().SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
     cubes.back().SetMaterial(pPlaneMat);
 
-    for (int i = 0; i < 100; i++)
+    for (UINT i = 0; i < 100; i++)
     {
-        for (int j = 0; j < 100; j++)
+        for (UINT j = 0; j < 100; j++)
         {
             cubes.emplace_back(m_meshes[0].get());
             cubes.back().SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, 10.0f));
@@ -771,7 +771,7 @@ void Renderer::LoadAssets()
         }
     }
 
-    for (int i = 1; i < cubes.size(); ++i)
+    for (UINT i = 1; i < cubes.size(); ++i)
     {
         m_previewRotations.push_back(&cubes[i]);
     }
@@ -868,9 +868,11 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     UINT requiredCount = 0;
     for (auto& [pMesh, objects] : m_renderObjects)
     {
-        requiredCount += objects.size();
+        requiredCount += static_cast<UINT>(objects.size());
     }
     frameResource.EnsureInstanceCapacity(requiredCount);
+
+    static const UINT instantDataSize = static_cast<UINT>(sizeof(InstanceData));
 
     for (auto& [pMesh, objects] : m_renderObjects)
     {
@@ -879,9 +881,9 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         {
             temp[i] = objects[i].BuildInstanceData();
         }
-        memcpy(frameResource.m_instanceBufferBegin + frameResource.m_instanceOffsetByte, temp.data(), sizeof(InstanceData) * objects.size());
+        memcpy(frameResource.m_instanceBufferBegin + frameResource.m_instanceOffsetByte, temp.data(), instantDataSize * objects.size());
 
-        frameResource.m_instanceOffsetByte += sizeof(InstanceData) * objects.size();
+        frameResource.m_instanceOffsetByte += instantDataSize * static_cast<UINT>(objects.size());
     }
 
     // Depth-only pass for shadow mapping
@@ -956,19 +958,21 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 UINT offset = 0;
                 for (auto& [pMesh, objects] : m_renderObjects)
                 {
+                    const UINT objectCount = static_cast<UINT>(objects.size());
+
                     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
                     D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
                     instanceBufferView.BufferLocation = frameResource.m_instanceUploadBuffer->GetGPUVirtualAddress() + offset;
-                    instanceBufferView.StrideInBytes = sizeof(InstanceData);
-                    instanceBufferView.SizeInBytes = sizeof(InstanceData) * objects.size();
-                    offset += sizeof(InstanceData) * objects.size();
+                    instanceBufferView.StrideInBytes = instantDataSize;
+                    instanceBufferView.SizeInBytes = instantDataSize * objectCount;
+                    offset += instantDataSize * objectCount;
 
                     D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->m_vertexBufferView, instanceBufferView };
                     cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
                     cmdList->IASetIndexBuffer(&pMesh->m_indexBufferView);
 
-                    cmdList->DrawIndexedInstanced(pMesh->m_numIndices, objects.size(), 0, 0, 0);
+                    cmdList->DrawIndexedInstanced(pMesh->m_numIndices, objectCount, 0, 0, 0);
                 }
             }
 
@@ -1035,19 +1039,21 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         UINT offset = 0;
         for (auto& [pMesh, objects] : m_renderObjects)
         {
+            const UINT objectCount = static_cast<UINT>(objects.size());
+
             cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
             D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
             instanceBufferView.BufferLocation = frameResource.m_instanceUploadBuffer->GetGPUVirtualAddress() + offset;
-            instanceBufferView.StrideInBytes = sizeof(InstanceData);
-            instanceBufferView.SizeInBytes = sizeof(InstanceData) * objects.size();
-            offset += sizeof(InstanceData) * objects.size();
+            instanceBufferView.StrideInBytes = instantDataSize;
+            instanceBufferView.SizeInBytes = instantDataSize * objectCount;
+            offset += instantDataSize * objectCount;
 
             D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->m_vertexBufferView, instanceBufferView };
             cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
             cmdList->IASetIndexBuffer(&pMesh->m_indexBufferView);
 
-            cmdList->DrawIndexedInstanced(pMesh->m_numIndices, objects.size(), 0, 0, 0);
+            cmdList->DrawIndexedInstanced(pMesh->m_numIndices, objectCount, 0, 0, 0);
         }
     }
 }
