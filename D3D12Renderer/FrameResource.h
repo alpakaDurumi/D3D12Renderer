@@ -8,12 +8,20 @@
 
 #include <vector>
 #include <memory>
+#include <array>
 
 #include "ConstantData.h"
 #include "ConstantBuffer.h"
 #include "DescriptorAllocation.h"
 
 using Microsoft::WRL::ComPtr;
+
+enum class GBufferSlot
+{
+    ALBEDO,
+    NORMAL,
+    NUM_GBUFFER_SLOTS
+};
 
 // aliasing
 using MaterialCB = ConstantBuffer<MaterialConstantData>;
@@ -25,7 +33,13 @@ using ShadowCB = ConstantBuffer<ShadowConstantData>;
 class FrameResource
 {
 public:
-    FrameResource(ID3D12Device10* pDevice, IDXGISwapChain* pSwapChain, UINT frameIndex, DescriptorAllocation&& allocation);
+    FrameResource(
+        ID3D12Device10* pDevice,
+        IDXGISwapChain* pSwapChain,
+        UINT frameIndex,
+        DescriptorAllocation&& rtvAllocation,
+        DescriptorAllocation&& gBufferRTVAllocation,
+        DescriptorAllocation&& gBufferSRVAllocation);
     ~FrameResource();
 
     void ResetInstanceOffsetByte();
@@ -35,6 +49,10 @@ public:
 //private:
     ComPtr<ID3D12Resource> m_renderTarget;
     DescriptorAllocation m_rtvAllocation;
+
+    std::array<ComPtr<ID3D12Resource>, static_cast<std::size_t>(GBufferSlot::NUM_GBUFFER_SLOTS)> m_gBuffers;
+    DescriptorAllocation m_gBufferRTVAllocation;
+    DescriptorAllocation m_gBufferSRVAllocation;
 
     std::vector<std::unique_ptr<MaterialCB>> m_materialConstantBuffers;
     std::vector<std::unique_ptr<LightCB>> m_lightConstantBuffers;
