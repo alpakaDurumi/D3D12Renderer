@@ -702,7 +702,8 @@ void Renderer::LoadAssets()
     // Allocate textures
     auto alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3);
     auto textureAllocations = alloc.Split();
-    m_albedo = std::make_unique<Texture>(
+
+    m_textures.push_back(std::make_unique<Texture>(
         m_device.Get(),
         commandList,
         std::move(textureAllocations[0]),
@@ -712,9 +713,9 @@ void Renderer::LoadAssets()
         true,
         true,
         false,
-        false);
+        false));
 
-    m_normalMap = std::make_unique<Texture>(
+    m_textures.push_back(std::make_unique<Texture>(
         m_device.Get(),
         commandList,
         std::move(textureAllocations[1]),
@@ -724,9 +725,9 @@ void Renderer::LoadAssets()
         false,
         true,
         false,
-        false);
+        false));
 
-    m_heightMap = std::make_unique<Texture>(
+    m_textures.push_back(std::make_unique<Texture>(
         m_device.Get(),
         commandList,
         std::move(textureAllocations[2]),
@@ -736,7 +737,7 @@ void Renderer::LoadAssets()
         false,
         true,
         false,
-        false);
+        false));
 
     // Add materials
     auto* pBaseMat = CreateMaterial();
@@ -815,27 +816,29 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     // Set root signature
     cmdList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature().Get());
 
+    UINT numLights = static_cast<UINT>(m_lights.size());
+    cmdList->SetGraphicsRoot32BitConstant(2, numLights, 0);
+
     // Stage material CBVs
-    UINT32 numMaterials = static_cast<UINT32>(m_materials.size());
+    UINT numMaterials = static_cast<UINT>(m_materials.size());
     for (UINT i = 0; i < numMaterials; ++i)
         m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, i, 1, frameResource.m_materialConstantBuffers[i]->GetAllocationRef());
 
     // Stage light CBVs
-    UINT32 numLights = static_cast<UINT32>(m_lights.size());
-    for (UINT32 i = 0; i < numLights; ++i)
+    for (UINT i = 0; i < numLights; ++i)
         m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, i, 1, frameResource.m_lightConstantBuffers[i]->GetAllocationRef());
 
     // Stage textures
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, 0, 1, m_albedo->GetAllocationRef());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, 1, 1, m_normalMap->GetAllocationRef());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, 2, 1, m_heightMap->GetAllocationRef());
+    UINT numTextures = static_cast<UINT>(m_textures.size());
+    for (UINT i = 0; i < numTextures; ++i)
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, i, 1, m_textures[i]->GetAllocationRef());
 
     // Stage shadow SRVs
     for (const auto& light : m_lights)
     {
         LightType type = light->GetType();
         UINT idxInArray = light->GetIdxInArray();
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7 + static_cast<UINT32>(type), idxInArray, 1, light->GetSRVAllocationRef());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7 + static_cast<UINT>(type), idxInArray, 1, light->GetSRVAllocationRef());
     }
 
     BindDescriptorTables(cmdList.Get());
@@ -1008,7 +1011,6 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
         cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
         cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
-        cmdList->SetGraphicsRoot32BitConstant(2, numLights, 0);
 
         UINT offset = 0;
         for (auto& [pMesh, objects] : m_renderObjects)

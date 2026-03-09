@@ -126,9 +126,7 @@ private:
 
     std::vector<std::unique_ptr<Material>> m_materials;
 
-    std::unique_ptr<Texture> m_albedo;
-    std::unique_ptr<Texture> m_normalMap;
-    std::unique_ptr<Texture> m_heightMap;
+    std::vector<std::unique_ptr<Texture>> m_textures;
 
     // Lights, Shadows
     std::vector<std::unique_ptr<Light>> m_lights;
