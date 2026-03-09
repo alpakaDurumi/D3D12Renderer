@@ -818,24 +818,24 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     // Stage material CBVs
     UINT32 numMaterials = static_cast<UINT32>(m_materials.size());
     for (UINT i = 0; i < numMaterials; ++i)
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(3, i, 1, frameResource.m_materialConstantBuffers[i]->GetAllocationRef());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, i, 1, frameResource.m_materialConstantBuffers[i]->GetAllocationRef());
 
     // Stage light CBVs
     UINT32 numLights = static_cast<UINT32>(m_lights.size());
     for (UINT32 i = 0; i < numLights; ++i)
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, i, 1, frameResource.m_lightConstantBuffers[m_lights[i]->GetLightConstantBufferIndex()]->GetAllocationRef());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, i, 1, frameResource.m_lightConstantBuffers[m_lights[i]->GetLightConstantBufferIndex()]->GetAllocationRef());
 
     // Stage textures
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, 0, 1, m_albedo->GetAllocationRef());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, 1, 1, m_normalMap->GetAllocationRef());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, 2, 1, m_heightMap->GetAllocationRef());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, 0, 1, m_albedo->GetAllocationRef());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, 1, 1, m_normalMap->GetAllocationRef());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, 2, 1, m_heightMap->GetAllocationRef());
 
     // Stage shadow SRVs
     for (const auto& light : m_lights)
     {
         LightType type = light->GetType();
         UINT idxInArray = light->GetIdxInArray();
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6 + static_cast<UINT32>(type), idxInArray, 1, light->GetSRVAllocationRef());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7 + static_cast<UINT32>(type), idxInArray, 1, light->GetSRVAllocationRef());
     }
 
     BindDescriptorTables(cmdList.Get());
@@ -890,7 +890,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                     D3D12_BARRIER_ACCESS_RENDER_TARGET,
                     D3D12_BARRIER_LAYOUT_RENDER_TARGET);
 
-                cmdList->SetGraphicsRoot32BitConstant(9, i, 0);
+                cmdList->SetGraphicsRoot32BitConstant(3, i, 0);
             }
             else
             {
@@ -928,7 +928,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
                 cmdList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
 
-                cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferIndex(j)]->GetGPUVirtualAddress());
+                cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferIndex(j)]->GetGPUVirtualAddress());
 
                 UINT offset = 0;
                 for (auto& [pMesh, objects] : m_renderObjects)
@@ -1004,12 +1004,11 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
         cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
-        cmdList->SetGraphicsRoot32BitConstant(11, numLights, 0);
-
         cmdList->SetPipelineState(pso);
 
-        cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
-        cmdList->SetGraphicsRootConstantBufferView(2, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
+        cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
+        cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
+        cmdList->SetGraphicsRoot32BitConstant(2, numLights, 0);
 
         UINT offset = 0;
         for (auto& [pMesh, objects] : m_renderObjects)
@@ -1124,50 +1123,49 @@ void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList)
 
 void Renderer::CreateRootSignature()
 {
-    m_rootSignature = std::make_unique<RootSignature>(12, 2);
+    m_rootSignature = std::make_unique<RootSignature>(11, 2);
     auto& rootSignature = *m_rootSignature;
 
-    // Root descriptor for MeshCB, CameraCB, MaterialCB, and ShadowCB
-    rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Mesh
-    rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Camera
-    rootSignature[2].InitAsDescriptor(2, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Shadow
+    // Root descriptor for CameraCB and ShadowCB
+    rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);        // Camera
+    rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);      // Shadow
+
+    // Root constants for number of lights
+    rootSignature[2].InitAsConstant(2, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+
+    // Root constant for PointLightShadowPS
+    rootSignature[3].InitAsConstant(3, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Descriptor table for MaterialConstantBuffers[]
-    rootSignature[3].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[3].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[4].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[4].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
     // Descriptor table for LightConstantBuffers[]
-    rootSignature[4].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[4].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[5].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
     // Descriptor table for textures (albedo, normal map, height map)
     // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
     // GPU jobs (UpdateSubresources) are already finished when recording command list. I don't know why DATA_STATIC flag fails.
-    rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[5].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[6].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
     // Descriptor table for shadowMaps[]
     // Directional
-    rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[6].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
-    // Point
     rootSignature[7].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[7].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
-    // Spot
+    rootSignature[7].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    // Point
     rootSignature[8].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[8].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
-
-    // Root constant for PointLightShadowPS
-    rootSignature[9].InitAsConstant(3, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[8].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    // Spot
+    rootSignature[9].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[9].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
     // Descriptor table for samplers
     rootSignature[10].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
     rootSignature[10].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
         static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS) * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES),
         D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
-
-    // Root constants for number of lights
-    rootSignature[11].InitAsConstant(4, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Static samplers
     rootSignature.InitStaticSampler(0, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_GREATER_EQUAL);

@@ -18,26 +18,6 @@ struct ConstantData
     }
 };
 
-struct MeshConstantData : public ConstantData<MeshConstantData>
-{
-    XMFLOAT4X4 world = {
-        1.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f, 1.0f
-    };
-    XMFLOAT4X4 inverseTranspose;
-    float padding[32];
-
-    void SetTransform(XMMATRIX world)
-    {
-        XMStoreFloat4x4(&this->world, XMMatrixTranspose(world));
-
-        world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        XMStoreFloat4x4(&this->inverseTranspose, XMMatrixInverse(nullptr, world));
-    }
-};
-
 struct CameraConstantData : public ConstantData<CameraConstantData>
 {
     XMFLOAT3 cameraPos;

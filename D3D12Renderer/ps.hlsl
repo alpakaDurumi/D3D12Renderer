@@ -34,23 +34,22 @@ struct PSInput
     nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
 };
 
-cbuffer MeshConstantBuffer : register(b0, space0)
-{
-    float4x4 world;
-    float4x4 inverseTranspose;
-};
-
-cbuffer CameraConstantBuffer : register(b1, space0)
+cbuffer CameraConstantBuffer : register(b0, space0)
 {
     float3 cameraPos;
     float4x4 view;
     float4x4 projection;
 }
 
-cbuffer ShadowConstantBuffer : register(b2, space0)
+cbuffer ShadowConstantBuffer : register(b1, space0)
 {
     float cascadeSplits[MAX_CASCADES];
 }
+
+cbuffer GlobalConstants : register(b2, space0)
+{
+    uint numLights;
+};
 
 struct MaterialConstants
 {
@@ -77,11 +76,6 @@ struct LightConstants
     float lightIntensity;
 };
 ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space2);
-
-cbuffer GlobalConstants : register(b4, space0)
-{
-    uint numLights;
-};
 
 // Parallax Occlusion Mapping
 float2 ParallaxMapping(float2 texCoord, float3 toCamera, uint heightMapIdx, uint heightMapSamplerIdx)

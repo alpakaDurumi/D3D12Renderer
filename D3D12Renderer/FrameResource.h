@@ -16,7 +16,6 @@
 using Microsoft::WRL::ComPtr;
 
 // aliasing
-using MeshCB = ConstantBuffer<MeshConstantData>;
 using MaterialCB = ConstantBuffer<MaterialConstantData>;
 using LightCB = ConstantBuffer<LightConstantData>;
 using CameraCB = ConstantBuffer<CameraConstantData>;
@@ -37,7 +36,6 @@ public:
     ComPtr<ID3D12Resource> m_renderTarget;
     DescriptorAllocation m_rtvAllocation;
 
-    std::vector<std::unique_ptr<MeshCB>> m_meshConstantBuffers;
     std::vector<std::unique_ptr<MaterialCB>> m_materialConstantBuffers;
     std::vector<std::unique_ptr<LightCB>> m_lightConstantBuffers;
     std::vector<std::unique_ptr<CameraCB>> m_cameraConstantBuffers;

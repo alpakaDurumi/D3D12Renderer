@@ -21,13 +21,7 @@ struct PSInput
     nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
 };
 
-cbuffer MeshConstantBuffer : register(b0)
-{
-    float4x4 world;
-    float4x4 inverseTranspose;
-};
-
-cbuffer CameraConstantBuffer : register(b1)
+cbuffer CameraConstantBuffer : register(b0)
 {
     float3 cameraPos;
     float4x4 view;
