@@ -167,6 +167,15 @@ private:
     template <typename T>
     T* CreateLight();
 
+    Texture* CreateTexture(
+        CommandList& commandList,
+        DescriptorAllocation&& allocation,
+        const std::wstring& filePath,
+        bool isSRGB,
+        bool useBlockCompress,
+        bool flipImage,
+        bool isCubeMap);
+
     void SetFpsCap(std::string fps);
 
     void BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList);

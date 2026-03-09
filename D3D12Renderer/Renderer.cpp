@@ -703,41 +703,32 @@ void Renderer::LoadAssets()
     auto alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3);
     auto textureAllocations = alloc.Split();
 
-    m_textures.push_back(std::make_unique<Texture>(
-        m_device.Get(),
+    CreateTexture(
         commandList,
         std::move(textureAllocations[0]),
-        *m_uploadBuffer,
-        *m_layoutTracker,
         L"assets/textures/PavingStones150_4K-PNG_Color.png",
         true,
         true,
         false,
-        false));
+        false);
 
-    m_textures.push_back(std::make_unique<Texture>(
-        m_device.Get(),
+    CreateTexture(
         commandList,
         std::move(textureAllocations[1]),
-        *m_uploadBuffer,
-        *m_layoutTracker,
         L"assets/textures/PavingStones150_4K-PNG_NormalDX.png",
         false,
         true,
         false,
-        false));
+        false);
 
-    m_textures.push_back(std::make_unique<Texture>(
-        m_device.Get(),
+    CreateTexture(
         commandList,
         std::move(textureAllocations[2]),
-        *m_uploadBuffer,
-        *m_layoutTracker,
         L"assets/textures/PavingStones150_4K-PNG_Displacement.png",
         false,
         true,
         false,
-        false));
+        false);
 
     // Add materials
     auto* pBaseMat = CreateMaterial();
@@ -1094,6 +1085,33 @@ Material* Renderer::CloneMaterial(const Material& src)
     auto pMat = CreateMaterial();
     pMat->CopyDataFrom(src);
     return pMat;
+}
+
+Texture* Renderer::CreateTexture(
+    CommandList& commandList,
+    DescriptorAllocation&& allocation,
+    const std::wstring& filePath,
+    bool isSRGB,
+    bool useBlockCompress,
+    bool flipImage,
+    bool isCubeMap)
+{
+    auto texture = std::make_unique<Texture>(
+        m_device.Get(),
+        commandList,
+        std::move(allocation),
+        *m_uploadBuffer,
+        *m_layoutTracker,
+        filePath,
+        isSRGB,
+        useBlockCompress,
+        flipImage,
+        isCubeMap);
+
+    auto* pTexture = texture.get();
+    m_textures.push_back(std::move(texture));
+
+    return pTexture;
 }
 
 void Renderer::SetFpsCap(std::string fps)
