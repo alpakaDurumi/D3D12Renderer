@@ -15,10 +15,8 @@ Light::Light(DescriptorAllocation&& dsvAllocation, DescriptorAllocation&& srvAll
 
     assert(m_dsvAllocation.GetNumHandles() == arraySize && !m_srvAllocation.IsNull());
 
-    m_cameraConstantData.resize(arraySize);
-    m_cameraConstantBufferIndex.resize(arraySize);
-
     m_lightConstantData.type = static_cast<UINT32>(m_type);
+    m_cameraConstantData.resize(arraySize);
 }
 
 void Light::Init(
@@ -42,12 +40,11 @@ void Light::Init(
     {
         FrameResource& frameResource = *frameResources[i];
 
-        if (i == 0) m_lightConstantBufferIndex = UINT(frameResource.m_lightConstantBuffers.size());
         frameResource.m_lightConstantBuffers.push_back(std::make_unique<LightCB>(pDevice, std::move(cbvAllocations[i])));
+        if (i == 0) m_cameraConstantBufferBaseIndex = UINT(frameResource.m_cameraConstantBuffers.size());
 
         for (UINT j = 0; j < arraySize; ++j)
         {
-            if (i == 0) m_cameraConstantBufferIndex[j] = UINT(frameResource.m_cameraConstantBuffers.size());
             frameResource.m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(pDevice));
         }
     }
@@ -73,15 +70,15 @@ D3D12_CPU_DESCRIPTOR_HANDLE Light::GetDSVDescriptorHandle(UINT idx) const
     return m_dsvAllocation.GetDescriptorHandle(idx);
 }
 
-UINT Light::GetCameraConstantBufferIndex(UINT idx) const
+UINT Light::GetCameraConstantBufferBaseIndex() const
 {
-    return m_cameraConstantBufferIndex[idx];
+    return m_cameraConstantBufferBaseIndex;
 }
-
-UINT Light::GetLightConstantBufferIndex() const
-{
-    return m_lightConstantBufferIndex;
-}
+//
+//UINT Light::GetLightConstantBufferIndex() const
+//{
+//    return m_lightConstantBufferIndex;
+//}
 
 DescriptorAllocation& Light::GetSRVAllocationRef()
 {
@@ -147,14 +144,18 @@ void Light::SetIdxInArray(UINT idxInArray)
     m_lightConstantData.idxInArray = idxInArray;
 }
 
-void Light::UpdateCameraConstantBuffer(FrameResource& frameResource, UINT idx)
+void Light::UpdateCameraConstantBuffer(FrameResource& frameResource)
 {
-    frameResource.m_cameraConstantBuffers[m_cameraConstantBufferIndex[idx]]->Update(&m_cameraConstantData[idx]);
+    UINT16 arraySize = GetArraySize();
+    for (UINT i = 0; i < arraySize; ++i)
+    {
+        frameResource.m_cameraConstantBuffers[m_cameraConstantBufferBaseIndex + i]->Update(&m_cameraConstantData[i]);
+    }
 }
 
-void Light::UpdateLightConstantBuffer(FrameResource& frameResource)
+void Light::UpdateLightConstantBuffer(FrameResource& frameResource, UINT lightIndex)
 {
-    frameResource.m_lightConstantBuffers[m_lightConstantBufferIndex]->Update(&m_lightConstantData);
+    frameResource.m_lightConstantBuffers[lightIndex]->Update(&m_lightConstantData);
 }
 
 DirectionalLight::DirectionalLight(

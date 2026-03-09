@@ -32,8 +32,7 @@ public:
     UINT16 GetArraySize() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetDSVDescriptorHandle(UINT idx) const;
 
-    UINT GetCameraConstantBufferIndex(UINT idx) const;
-    UINT GetLightConstantBufferIndex() const;
+    UINT GetCameraConstantBufferBaseIndex() const;
 
     DescriptorAllocation& GetSRVAllocationRef();
 
@@ -53,15 +52,14 @@ public:
 
     void SetIdxInArray(UINT idxInArray);
 
-    void UpdateCameraConstantBuffer(FrameResource& frameResource, UINT idx);
-    void UpdateLightConstantBuffer(FrameResource& frameResource);
+    void UpdateCameraConstantBuffer(FrameResource& frameResource);
+    void UpdateLightConstantBuffer(FrameResource& frameResource, UINT lightIndex);
 
 protected:
     std::vector<CameraConstantData> m_cameraConstantData;
-    std::vector<UINT> m_cameraConstantBufferIndex;
+    UINT m_cameraConstantBufferBaseIndex;
 
     LightConstantData m_lightConstantData;
-    UINT m_lightConstantBufferIndex;
 
     LightType m_type;
 

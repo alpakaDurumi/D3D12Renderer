@@ -823,7 +823,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     // Stage light CBVs
     UINT32 numLights = static_cast<UINT32>(m_lights.size());
     for (UINT32 i = 0; i < numLights; ++i)
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, i, 1, frameResource.m_lightConstantBuffers[m_lights[i]->GetLightConstantBufferIndex()]->GetAllocationRef());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, i, 1, frameResource.m_lightConstantBuffers[i]->GetAllocationRef());
 
     // Stage textures
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, 0, 1, m_albedo->GetAllocationRef());
@@ -928,7 +928,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
                 cmdList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
 
-                cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferIndex(j)]->GetGPUVirtualAddress());
+                cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferBaseIndex() + j]->GetGPUVirtualAddress());
 
                 UINT offset = 0;
                 for (auto& [pMesh, objects] : m_renderObjects)
@@ -1588,14 +1588,11 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
         material->UpdateMaterialConstantBuffer(frameResource);
     }
 
-    for (auto& light : m_lights)
+    for (UINT i = 0; i < m_lights.size(); ++i)
     {
-        UINT16 arraySize = light->GetArraySize();
-        for (UINT i = 0; i < arraySize; ++i)
-        {
-            light->UpdateCameraConstantBuffer(frameResource, i);
-        }
-        light->UpdateLightConstantBuffer(frameResource);
+        auto& light = m_lights[i];
+        light->UpdateCameraConstantBuffer(frameResource);
+        light->UpdateLightConstantBuffer(frameResource, i);
     }
 
     UpdateShadowConstantBuffer(frameResource);
