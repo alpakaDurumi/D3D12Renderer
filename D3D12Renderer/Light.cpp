@@ -223,6 +223,7 @@ PointLight::PointLight(
     clearValue.Color[3] = 1.0f;
 
     CreateRenderTarget(pDevice, shadowMapResolution, shadowMapResolution, DXGI_FORMAT_R32_TYPELESS, POINT_LIGHT_ARRAY_SIZE, m_renderTarget, &clearValue);
+    layoutTracker.RegisterResource(m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_RENDER_TARGET, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS);
 
     // Create RTVs.
     D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
@@ -236,8 +237,6 @@ PointLight::PointLight(
         rtvDesc.Texture2DArray.FirstArraySlice = i;
         pDevice->CreateRenderTargetView(m_renderTarget.Get(), &rtvDesc, m_rtvAllocation.GetDescriptorHandle(i));
     }
-
-    layoutTracker.RegisterResource(m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_RENDER_TARGET, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS);
 
     // Create SRV for render target we've created just before. NOT for depth buffer!
     CreateSRVForShadow(pDevice, m_renderTarget.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);

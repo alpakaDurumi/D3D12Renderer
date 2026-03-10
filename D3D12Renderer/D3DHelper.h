@@ -34,8 +34,8 @@ namespace D3DHelper
 
     void CreateUploadBuffer(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadBuffer);
     void CreateDefaultBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultBuffer);
-    void CreateDefaultTexture(ID3D12Device10* pDevice, UINT width, UINT height, ComPtr<ID3D12Resource>& defaultTexture);
-    void CreateRenderTarget(ID3D12Device10* pDevice, UINT64 width, UINT64 height, DXGI_FORMAT format, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& renderTarget, D3D12_CLEAR_VALUE* pClearValue = nullptr);
+    void CreateDefaultTexture(ID3D12Device10* pDevice, UINT64 width, UINT height, ComPtr<ID3D12Resource>& defaultTexture);
+    void CreateRenderTarget(ID3D12Device10* pDevice, UINT64 width, UINT height, DXGI_FORMAT format, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& renderTarget, D3D12_CLEAR_VALUE* pClearValue = nullptr);
 
     void UpdateSubresources(
         ID3D12Device* pDevice,
@@ -107,7 +107,7 @@ namespace D3DHelper
 
     void CreateDepthStencilBuffer(
         ID3D12Device10* pDevice,
-        UINT width,
+        UINT64 width,
         UINT height,
         ComPtr<ID3D12Resource>& depthStencilBuffer,
         DescriptorAllocation& dsvAllocation,

@@ -344,8 +344,7 @@ void Renderer::OnResize(UINT width, UINT height)
 
         // Assume that ResizeBuffers do not preserve previous layout.
         // For now, just use D3D12_BARRIER_LAYOUT_COMMON.
-        auto desc = m_frameResources[i]->m_renderTarget->GetDesc();
-        m_layoutTracker->RegisterResource(m_frameResources[i]->m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_COMMON, desc.DepthOrArraySize, desc.MipLevels, DXGI_FORMAT_R8G8B8A8_UNORM);
+        m_layoutTracker->RegisterResource(m_frameResources[i]->m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_COMMON, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
     }
 
     // Recreate DSV
@@ -590,13 +589,6 @@ void Renderer::LoadPipeline()
             std::move(rtvAllocations[i]),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)));
-
-        // Register backbuffer to tracker
-        // Initial layout of backbuffer is D3D12_BARRIER_LAYOUT_COMMON : https://microsoft.github.io/DirectX-Specs/d3d/D3D12EnhancedBarriers.html#initial-resource-state
-        // depthOrArraySize and mipLevels for backbuffers are 1
-        ID3D12Resource* pBackBuffer = frameResource->m_renderTarget.Get();
-        auto desc = pBackBuffer->GetDesc();
-        m_layoutTracker->RegisterResource(pBackBuffer, D3D12_BARRIER_LAYOUT_COMMON, desc.DepthOrArraySize, desc.MipLevels, DXGI_FORMAT_R8G8B8A8_UNORM);
 
         m_frameResources.push_back(std::move(frameResource));
     }

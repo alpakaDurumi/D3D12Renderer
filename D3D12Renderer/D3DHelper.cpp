@@ -235,7 +235,7 @@ namespace D3DHelper
             IID_PPV_ARGS(&defaultBuffer)));
     }
 
-    void CreateDefaultTexture(ID3D12Device10* pDevice, UINT width, UINT height, ComPtr<ID3D12Resource>& defaultTexture)
+    void CreateDefaultTexture(ID3D12Device10* pDevice, UINT64 width, UINT height, ComPtr<ID3D12Resource>& defaultTexture)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -269,7 +269,7 @@ namespace D3DHelper
             IID_PPV_ARGS(&defaultTexture)));
     }
 
-    void CreateRenderTarget(ID3D12Device10* pDevice, UINT64 width, UINT64 height, DXGI_FORMAT format, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& renderTarget, D3D12_CLEAR_VALUE* pClearValue)
+    void CreateRenderTarget(ID3D12Device10* pDevice, UINT64 width, UINT height, DXGI_FORMAT format, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& renderTarget, D3D12_CLEAR_VALUE* pClearValue)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -543,7 +543,7 @@ namespace D3DHelper
 
     void CreateDepthStencilBuffer(
         ID3D12Device10* pDevice,
-        UINT width,
+        UINT64 width,
         UINT height,
         ComPtr<ID3D12Resource>& depthStencilBuffer,
         DescriptorAllocation& dsvAllocation,

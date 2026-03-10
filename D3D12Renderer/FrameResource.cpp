@@ -24,6 +24,10 @@ FrameResource::FrameResource(
 
     D3DHelper::ThrowIfFailed(pSwapChain->GetBuffer(frameIndex, IID_PPV_ARGS(&m_renderTarget)));
 
+    // Register backbuffer to tracker
+    // Initial layout of backbuffer is D3D12_BARRIER_LAYOUT_COMMON : https://microsoft.github.io/DirectX-Specs/d3d/D3D12EnhancedBarriers.html#initial-resource-state
+    layoutTracker.RegisterResource(m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_COMMON, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
+
     D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
     rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
     rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
@@ -36,7 +40,7 @@ FrameResource::FrameResource(
     // Create deffered rendering stuffs
     auto rtDesc = m_renderTarget->GetDesc();
     const UINT64 width = rtDesc.Width;
-    const UINT64 height = rtDesc.Height;
+    const UINT height = rtDesc.Height;
 
     for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
     {
