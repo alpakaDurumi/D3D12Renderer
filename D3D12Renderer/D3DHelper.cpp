@@ -303,6 +303,14 @@ namespace D3DHelper
             IID_PPV_ARGS(&renderTarget)));
     }
 
+    void CreateRTV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
+    {
+        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+        rtvDesc.Format = format;
+        rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+        pDevice->CreateRenderTargetView(pResource, &rtvDesc, cpuHandle);
+    }
+
     void UpdateSubresources(
         ID3D12Device* pDevice,
         CommandList& commandList,

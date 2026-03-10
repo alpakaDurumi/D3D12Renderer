@@ -337,14 +337,11 @@ void Renderer::OnResize(UINT width, UINT height)
     {
         ThrowIfFailed(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_frameResources[i]->m_renderTarget)));
 
-        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-        rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-        rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-        m_device->CreateRenderTargetView(m_frameResources[i]->m_renderTarget.Get(), &rtvDesc, m_frameResources[i]->m_rtvAllocation.GetDescriptorHandle());
-
         // Assume that ResizeBuffers do not preserve previous layout.
         // For now, just use D3D12_BARRIER_LAYOUT_COMMON.
         m_layoutTracker->RegisterResource(m_frameResources[i]->m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_COMMON, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
+
+        CreateRTV(m_device.Get(), m_frameResources[i]->m_renderTarget.Get(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_frameResources[i]->m_rtvAllocation.GetDescriptorHandle());
     }
 
     // Recreate DSV
