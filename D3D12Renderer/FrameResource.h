@@ -45,6 +45,7 @@ public:
 
     void ResetInstanceOffsetByte();
     void EnsureInstanceCapacity(UINT requiredSize);
+    void CreateGBuffers(UINT64 width, UINT height, ResourceLayoutTracker& layoutTracker);
     //void AllocateInstanceData();
 
 //private:

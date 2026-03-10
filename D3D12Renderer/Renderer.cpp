@@ -323,6 +323,15 @@ void Renderer::OnResize(UINT width, UINT height)
     {
         m_layoutTracker->UnregisterResource(m_frameResources[i]->m_renderTarget.Get());
         m_frameResources[i]->m_renderTarget.Reset();
+
+        // Release previous gbuffers and create new ones
+        for (UINT j = 0; j < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++j)
+        {
+            m_layoutTracker->UnregisterResource(m_frameResources[i]->m_gBuffers[j].Get());
+            m_frameResources[i]->m_gBuffers[j].Reset();
+        }
+        m_frameResources[i]->CreateGBuffers(width, height, *m_layoutTracker);
+
         m_frameResources[i]->m_fenceValue = m_frameResources[m_frameIndex]->m_fenceValue;
     }
     m_depthStencilBuffer.Reset();
