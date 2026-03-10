@@ -32,9 +32,10 @@ namespace D3DHelper
     void DowngradeRootDescriptor(const D3D12_ROOT_DESCRIPTOR1* src, D3D12_ROOT_DESCRIPTOR* dst);
     void DowngradeRootParameters(const D3D12_ROOT_PARAMETER1* src, UINT numParameters, D3D12_ROOT_PARAMETER* dst, std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges, UINT& offset);
 
-    void CreateUploadHeap(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadHeap);
-    void CreateDefaultHeapForBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultHeap);
-    void CreateDefaultHeapForTexture(ID3D12Device10* pDevice, UINT width, UINT height, ComPtr<ID3D12Resource>& defaultHeap);
+    void CreateUploadBuffer(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadBuffer);
+    void CreateDefaultBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultBuffer);
+    void CreateDefaultTexture(ID3D12Device10* pDevice, UINT width, UINT height, ComPtr<ID3D12Resource>& defaultTexture);
+    void CreateRenderTarget(ID3D12Device10* pDevice, UINT64 width, UINT64 height, DXGI_FORMAT format, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& renderTarget, D3D12_CLEAR_VALUE* pClearValue = nullptr);
 
     void UpdateSubresources(
         ID3D12Device* pDevice,
@@ -72,7 +73,7 @@ namespace D3DHelper
     {
         const UINT vertexBufferSize = UINT(vertices.size()) * UINT(sizeof(T));
 
-        CreateDefaultHeapForBuffer(pDevice, vertexBufferSize, vertexBuffer);
+        CreateDefaultBuffer(pDevice, vertexBufferSize, vertexBuffer);
 
         auto uploadAllocation = uploadBuffer.Allocate(vertexBufferSize, sizeof(T));
 

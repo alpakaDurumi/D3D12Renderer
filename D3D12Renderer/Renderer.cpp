@@ -585,7 +585,9 @@ void Renderer::LoadPipeline()
     auto rtvAllocations = alloc.Split();
     for (UINT i = 0; i < FrameCount; i++)
     {
-        auto frameResource = std::make_unique<FrameResource>(m_device.Get(), m_swapChain.Get(), i, std::move(rtvAllocations[i]),
+        auto frameResource = std::make_unique<FrameResource>(m_device.Get(), m_swapChain.Get(), i,
+            *m_layoutTracker,
+            std::move(rtvAllocations[i]),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)));
 

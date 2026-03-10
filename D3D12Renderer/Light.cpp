@@ -215,27 +215,6 @@ PointLight::PointLight(
 
     Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation));
 
-    // Create render target.
-    D3D12_HEAP_PROPERTIES heapProperties = {};
-    heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-    heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProperties.CreationNodeMask = 1;
-    heapProperties.VisibleNodeMask = 1;
-
-    D3D12_RESOURCE_DESC1 resourceDesc = {};
-    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    resourceDesc.Alignment = 0;
-    resourceDesc.Width = shadowMapResolution;
-    resourceDesc.Height = shadowMapResolution;
-    resourceDesc.DepthOrArraySize = POINT_LIGHT_ARRAY_SIZE;
-    resourceDesc.MipLevels = 1;
-    resourceDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-    resourceDesc.SampleDesc = { 1, 0 };
-    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-    resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
-
     D3D12_CLEAR_VALUE clearValue = {};
     clearValue.Format = DXGI_FORMAT_R32_FLOAT;
     clearValue.Color[0] = 1.0f;
@@ -243,16 +222,7 @@ PointLight::PointLight(
     clearValue.Color[2] = 1.0f;
     clearValue.Color[3] = 1.0f;
 
-    ThrowIfFailed(pDevice->CreateCommittedResource3(
-        &heapProperties,
-        D3D12_HEAP_FLAG_NONE,
-        &resourceDesc,
-        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-        &clearValue,
-        nullptr,
-        0,
-        nullptr,
-        IID_PPV_ARGS(&m_renderTarget)));
+    CreateRenderTarget(pDevice, shadowMapResolution, shadowMapResolution, DXGI_FORMAT_R32_TYPELESS, POINT_LIGHT_ARRAY_SIZE, m_renderTarget, &clearValue);
 
     // Create RTVs.
     D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};

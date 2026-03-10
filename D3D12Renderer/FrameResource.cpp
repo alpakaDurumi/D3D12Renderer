@@ -9,6 +9,7 @@ FrameResource::FrameResource(
     ID3D12Device10* pDevice,
     IDXGISwapChain* pSwapChain,
     UINT frameIndex,
+    ResourceLayoutTracker& layoutTracker,
     DescriptorAllocation&& rtvAllocation,
     DescriptorAllocation&& gBufferRTVAllocation,
     DescriptorAllocation&& gBufferSRVAllocation)
@@ -28,7 +29,7 @@ FrameResource::FrameResource(
     rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
     m_pDevice->CreateRenderTargetView(m_renderTarget.Get(), &rtvDesc, m_rtvAllocation.GetDescriptorHandle());
 
-    CreateUploadHeap(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, m_instanceUploadBuffer);
+    CreateUploadBuffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, m_instanceUploadBuffer);
     D3D12_RANGE readRange = { 0, 0 };
     D3DHelper::ThrowIfFailed(m_instanceUploadBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
 
@@ -39,36 +40,8 @@ FrameResource::FrameResource(
 
     for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
     {
-        D3D12_HEAP_PROPERTIES heapProperties = {};
-        heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProperties.CreationNodeMask = 1;
-        heapProperties.VisibleNodeMask = 1;
-
-        D3D12_RESOURCE_DESC1 resourceDesc = {};
-        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        resourceDesc.Alignment = 0;
-        resourceDesc.Width = width;
-        resourceDesc.Height = height;
-        resourceDesc.DepthOrArraySize = 1;
-        resourceDesc.MipLevels = 1;
-        resourceDesc.Format = (i == 0 ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R16G16B16A16_FLOAT);
-        resourceDesc.SampleDesc = { 1, 0 };
-        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
-
-        ThrowIfFailed(pDevice->CreateCommittedResource3(
-            &heapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &resourceDesc,
-            D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-            nullptr,
-            nullptr,
-            0,
-            nullptr,
-            IID_PPV_ARGS(&m_gBuffers[i])));
+        CreateRenderTarget(m_pDevice, width, height, (i == 0 ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R16G16B16A16_FLOAT), 1, m_gBuffers[i]);
+        layoutTracker.RegisterResource(m_gBuffers[i].Get(), D3D12_BARRIER_LAYOUT_RENDER_TARGET, 1, 1, (i == 0 ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R16G16B16A16_FLOAT));
 
         D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
         rtvDesc.Format = (i == 0 ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R16G16B16A16_FLOAT);
@@ -106,7 +79,7 @@ void FrameResource::EnsureInstanceCapacity(UINT requiredSize)
 
         m_instanceCapacity = Utility::CeilPowerOfTwo(requiredSize);
 
-        CreateUploadHeap(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, m_instanceUploadBuffer);
+        CreateUploadBuffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, m_instanceUploadBuffer);
         D3D12_RANGE readRange = { 0, 0 };
         D3DHelper::ThrowIfFailed(m_instanceUploadBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
     }

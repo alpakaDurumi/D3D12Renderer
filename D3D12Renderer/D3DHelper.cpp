@@ -166,7 +166,7 @@ namespace D3DHelper
         }
     }
 
-    void CreateUploadHeap(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadHeap)
+    void CreateUploadBuffer(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadBuffer)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -197,11 +197,11 @@ namespace D3DHelper
             nullptr,
             0,
             nullptr,
-            IID_PPV_ARGS(&uploadHeap)));
+            IID_PPV_ARGS(&uploadBuffer)));
     }
 
     // For vertex buffer and index buffer
-    void CreateDefaultHeapForBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultHeap)
+    void CreateDefaultBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultBuffer)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -232,10 +232,10 @@ namespace D3DHelper
             nullptr,
             0,
             nullptr,
-            IID_PPV_ARGS(&defaultHeap)));
+            IID_PPV_ARGS(&defaultBuffer)));
     }
 
-    void CreateDefaultHeapForTexture(ID3D12Device10* pDevice, UINT width, UINT height, ComPtr<ID3D12Resource>& defaultHeap)
+    void CreateDefaultTexture(ID3D12Device10* pDevice, UINT width, UINT height, ComPtr<ID3D12Resource>& defaultTexture)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -266,7 +266,41 @@ namespace D3DHelper
             nullptr,
             0,
             nullptr,
-            IID_PPV_ARGS(&defaultHeap)));
+            IID_PPV_ARGS(&defaultTexture)));
+    }
+
+    void CreateRenderTarget(ID3D12Device10* pDevice, UINT64 width, UINT64 height, DXGI_FORMAT format, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& renderTarget, D3D12_CLEAR_VALUE* pClearValue)
+    {
+        D3D12_HEAP_PROPERTIES heapProperties = {};
+        heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProperties.CreationNodeMask = 1;
+        heapProperties.VisibleNodeMask = 1;
+
+        D3D12_RESOURCE_DESC1 resourceDesc = {};
+        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        resourceDesc.Alignment = 0;
+        resourceDesc.Width = width;
+        resourceDesc.Height = height;
+        resourceDesc.DepthOrArraySize = depthOrArraySize;
+        resourceDesc.MipLevels = 1;
+        resourceDesc.Format = format;
+        resourceDesc.SampleDesc = { 1, 0 };
+        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
+
+        ThrowIfFailed(pDevice->CreateCommittedResource3(
+            &heapProperties,
+            D3D12_HEAP_FLAG_NONE,
+            &resourceDesc,
+            D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+            pClearValue,
+            nullptr,
+            0,
+            nullptr,
+            IID_PPV_ARGS(&renderTarget)));
     }
 
     void UpdateSubresources(
@@ -483,7 +517,7 @@ namespace D3DHelper
     {
         const UINT indexBufferSize = UINT(indices.size()) * UINT(sizeof(UINT32));
 
-        CreateDefaultHeapForBuffer(pDevice, indexBufferSize, indexBuffer);
+        CreateDefaultBuffer(pDevice, indexBufferSize, indexBuffer);
 
         auto uploadAllocation = uploadBuffer.Allocate(indexBufferSize, sizeof(UINT32));
 

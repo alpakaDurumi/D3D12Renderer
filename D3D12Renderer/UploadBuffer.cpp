@@ -125,7 +125,7 @@ UploadBuffer::Page::Page(ID3D12Device10* pDevice, SIZE_T sizeInBytes)
     m_CPUBasePtr(nullptr),
     m_GPUBasePtr(D3D12_GPU_VIRTUAL_ADDRESS(0))
 {
-    CreateUploadHeap(pDevice, m_pageSize, m_resource);
+    CreateUploadBuffer(pDevice, m_pageSize, m_resource);
     
     D3D12_RANGE readRange = { 0, 0 };
     m_resource->Map(0, &readRange, &m_CPUBasePtr);

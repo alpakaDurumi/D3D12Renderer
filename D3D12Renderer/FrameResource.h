@@ -37,6 +37,7 @@ public:
         ID3D12Device10* pDevice,
         IDXGISwapChain* pSwapChain,
         UINT frameIndex,
+        ResourceLayoutTracker& layoutTracker,
         DescriptorAllocation&& rtvAllocation,
         DescriptorAllocation&& gBufferRTVAllocation,
         DescriptorAllocation&& gBufferSRVAllocation);
