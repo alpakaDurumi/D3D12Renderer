@@ -48,6 +48,8 @@ public:
     void CreateGBuffers(UINT64 width, UINT height, ResourceLayoutTracker& layoutTracker);
     //void AllocateInstanceData();
 
+    DXGI_FORMAT GetGBufferFormat(GBufferSlot slot);
+
 //private:
     ComPtr<ID3D12Resource> m_renderTarget;
     DescriptorAllocation m_rtvAllocation;

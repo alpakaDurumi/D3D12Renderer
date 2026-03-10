@@ -70,13 +70,15 @@ void FrameResource::CreateGBuffers(UINT64 width, UINT height, ResourceLayoutTrac
 {
     for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
     {
-        CreateRenderTarget(m_pDevice, width, height, (i == 0 ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R16G16B16A16_FLOAT), 1, m_gBuffers[i]);
-        layoutTracker.RegisterResource(m_gBuffers[i].Get(), D3D12_BARRIER_LAYOUT_RENDER_TARGET, 1, 1, (i == 0 ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R16G16B16A16_FLOAT));
+        auto format = GetGBufferFormat(static_cast<GBufferSlot>(i));
 
-        CreateRTV(m_pDevice, m_gBuffers[i].Get(), (i == 0 ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R16G16B16A16_FLOAT), m_gBufferRTVAllocation.GetDescriptorHandle(i));
+        CreateRenderTarget(m_pDevice, width, height, format, 1, m_gBuffers[i]);
+        layoutTracker.RegisterResource(m_gBuffers[i].Get(), D3D12_BARRIER_LAYOUT_RENDER_TARGET, 1, 1, format);
+
+        CreateRTV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferRTVAllocation.GetDescriptorHandle(i));
 
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = (i == 0 ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R16G16B16A16_FLOAT);
+        srvDesc.Format = format;
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         srvDesc.Texture2D.MostDetailedMip = 0;
@@ -85,5 +87,19 @@ void FrameResource::CreateGBuffers(UINT64 width, UINT height, ResourceLayoutTrac
         srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 
         m_pDevice->CreateShaderResourceView(m_gBuffers[i].Get(), &srvDesc, m_gBufferSRVAllocation.GetDescriptorHandle(i));
+    }
+}
+
+DXGI_FORMAT FrameResource::GetGBufferFormat(GBufferSlot slot)
+{
+    switch (slot)
+    {
+    case GBufferSlot::ALBEDO:
+        return DXGI_FORMAT_R8G8B8A8_UNORM;
+    case GBufferSlot::NORMAL:
+        return DXGI_FORMAT_R16G16B16A16_FLOAT;
+    default:
+        assert(false);
+        return DXGI_FORMAT_UNKNOWN;
     }
 }
