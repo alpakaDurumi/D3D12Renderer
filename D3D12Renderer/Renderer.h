@@ -193,9 +193,6 @@ private:
     void PrepareSpotLight(SpotLight& light);
 
     void UpdateConstantBuffers(FrameResource& frameResource);
-
-    void UpdateCameraConstantBuffer(FrameResource& frameResource);
-    void UpdateShadowConstantBuffer(FrameResource& frameResource);
 };
 
 template <>

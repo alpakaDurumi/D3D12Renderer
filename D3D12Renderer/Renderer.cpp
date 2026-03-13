@@ -257,7 +257,7 @@ void Renderer::OnRender()
     // and presentation requires the back buffer is using D3D12_BARRIER_LAYOUT_COMMON.
     // LAYOUT_PRESENT is alias for LAYOUT_COMMON.
     commandList.Barrier(
-        m_frameResources[m_frameIndex]->m_renderTarget.Get(),
+        m_frameResources[m_frameIndex]->GetRenderTarget(),
         D3D12_BARRIER_SYNC_RENDER_TARGET,
         D3D12_BARRIER_SYNC_NONE,
         D3D12_BARRIER_ACCESS_RENDER_TARGET,
@@ -267,7 +267,7 @@ void Renderer::OnRender()
     // Execute the command lists and store the fence value
     // And notify fenceValue to UploadBuffer
     UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
-    m_frameResources[m_frameIndex]->m_fenceValue = fenceValue;
+    m_frameResources[m_frameIndex]->SetFenceValue(fenceValue);
     m_uploadBuffer->QueueRetiredPages(fenceValue);
     m_dynamicDescriptorHeapForCBVSRVUAV->QueueRetiredHeaps(fenceValue);
 
@@ -321,18 +321,19 @@ void Renderer::OnResize(UINT width, UINT height)
     // Unregister and release current render target, set frame fence values to the current fence value
     for (UINT i = 0; i < FrameCount; i++)
     {
-        m_layoutTracker->UnregisterResource(m_frameResources[i]->m_renderTarget.Get());
-        m_frameResources[i]->m_renderTarget.Reset();
+        m_layoutTracker->UnregisterResource(m_frameResources[i]->GetRenderTarget());
+        m_frameResources[i]->ResetRenderTarget();
 
         // Release previous gbuffers and create new ones
         for (UINT j = 0; j < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++j)
         {
-            m_layoutTracker->UnregisterResource(m_frameResources[i]->m_gBuffers[j].Get());
-            m_frameResources[i]->m_gBuffers[j].Reset();
+            auto slot = static_cast<GBufferSlot>(j);
+            m_layoutTracker->UnregisterResource(m_frameResources[i]->GetGBuffer(slot));
+            m_frameResources[i]->ResetGBuffer(slot);
         }
         m_frameResources[i]->CreateGBuffers(width, height, *m_layoutTracker);
 
-        m_frameResources[i]->m_fenceValue = m_frameResources[m_frameIndex]->m_fenceValue;
+        m_frameResources[i]->SetFenceValue(m_frameResources[m_frameIndex]->GetFenceValue());
     }
     m_depthStencilBuffer.Reset();
 
@@ -344,13 +345,13 @@ void Renderer::OnResize(UINT width, UINT height)
     // Recreate RTVs
     for (UINT i = 0; i < FrameCount; i++)
     {
-        ThrowIfFailed(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_frameResources[i]->m_renderTarget)));
+        m_frameResources[i]->AcquireBackBuffer(m_swapChain.Get(), i);
 
         // Assume that ResizeBuffers do not preserve previous layout.
         // For now, just use D3D12_BARRIER_LAYOUT_COMMON.
-        m_layoutTracker->RegisterResource(m_frameResources[i]->m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_COMMON, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
+        m_layoutTracker->RegisterResource(m_frameResources[i]->GetRenderTarget(), D3D12_BARRIER_LAYOUT_COMMON, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
 
-        CreateRTV(m_device.Get(), m_frameResources[i]->m_renderTarget.Get(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_frameResources[i]->m_rtvAllocation.GetDescriptorHandle());
+        CreateRTV(m_device.Get(), m_frameResources[i]->GetRenderTarget(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_frameResources[i]->GetRTVHandle());
     }
 
     // Recreate DSV
@@ -680,11 +681,11 @@ void Renderer::LoadAssets()
         FrameResource& frameResource = *m_frameResources[i];
 
         // Main Camera
-        if (i == 0) m_mainCameraIndex = UINT(frameResource.m_cameraConstantBuffers.size());
-        frameResource.m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get()));
+        if (i == 0) m_mainCameraIndex = frameResource.GetCameraConstantBufferCount();
+        frameResource.AddCameraConstantBuffer();
 
         // Shadow
-        frameResource.m_shadowConstantBuffer = std::make_unique<ShadowCB>(m_device.Get());
+        frameResource.CreateShadowConstantBuffer();
     }
 
     // Add samplers
@@ -791,7 +792,7 @@ void Renderer::LoadAssets()
     pSpotLight->SetAngles(50.0f, 10.0f);
 
     // Execute commands for loading assets and store fence value
-    m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
+    m_frameResources[m_frameIndex]->SetFenceValue(m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker));
 
     // Wait until assets have been uploaded to the GPU
     WaitForGPU();
@@ -815,11 +816,11 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     // Stage material CBVs
     UINT numMaterials = static_cast<UINT>(m_materials.size());
     for (UINT i = 0; i < numMaterials; ++i)
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, i, 1, frameResource.m_materialConstantBuffers[i]->GetAllocationRef());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, i, 1, frameResource.GetMaterialCBVAllocationRef(i));
 
     // Stage light CBVs
     for (UINT i = 0; i < numLights; ++i)
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, i, 1, frameResource.m_lightConstantBuffers[i]->GetAllocationRef());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, i, 1, frameResource.GetLightCBVAllocationRef(i));
 
     // Stage textures
     UINT numTextures = static_cast<UINT>(m_textures.size());
@@ -849,12 +850,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     {
         std::vector<InstanceData> temp(objects.size());
         for (UINT i = 0; i < objects.size(); ++i)
-        {
             temp[i] = objects[i].BuildInstanceData();
-        }
-        memcpy(frameResource.m_instanceBufferBegin + frameResource.m_instanceOffsetByte, temp.data(), instantDataSize * objects.size());
-
-        frameResource.m_instanceOffsetByte += instantDataSize * static_cast<UINT>(objects.size());
+        frameResource.PushInstanceData(temp);
     }
 
     // Depth-only pass for shadow mapping
@@ -924,7 +921,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
                 cmdList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
 
-                cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferBaseIndex() + j]->GetGPUVirtualAddress());
+                cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(light->GetCameraConstantBufferBaseIndex() + j));
 
                 UINT offset = 0;
                 for (auto& [pMesh, objects] : m_renderObjects)
@@ -934,7 +931,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
                     D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
-                    instanceBufferView.BufferLocation = frameResource.m_instanceUploadBuffer->GetGPUVirtualAddress() + offset;
+                    instanceBufferView.BufferLocation = frameResource.GetInstanceBufferVirtualAddress() + offset;
                     instanceBufferView.StrideInBytes = instantDataSize;
                     instanceBufferView.SizeInBytes = instantDataSize * objectCount;
                     offset += instantDataSize * objectCount;
@@ -983,14 +980,14 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
 
         commandList.Barrier(
-            frameResource.m_renderTarget.Get(),
+            frameResource.GetRenderTarget(),
             D3D12_BARRIER_SYNC_NONE,
             D3D12_BARRIER_SYNC_RENDER_TARGET,
             D3D12_BARRIER_ACCESS_NO_ACCESS,
             D3D12_BARRIER_ACCESS_RENDER_TARGET,
             D3D12_BARRIER_LAYOUT_RENDER_TARGET);
 
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.m_rtvAllocation.GetDescriptorHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetRTVHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
         cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
@@ -1002,8 +999,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
         cmdList->SetPipelineState(pso);
 
-        cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
-        cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
+        cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
+        cmdList->SetGraphicsRootConstantBufferView(1, frameResource.GetShadowCBVirtualAddress());
 
         UINT offset = 0;
         for (auto& [pMesh, objects] : m_renderObjects)
@@ -1013,7 +1010,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
             D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
-            instanceBufferView.BufferLocation = frameResource.m_instanceUploadBuffer->GetGPUVirtualAddress() + offset;
+            instanceBufferView.BufferLocation = frameResource.GetInstanceBufferVirtualAddress() + offset;
             instanceBufferView.StrideInBytes = instantDataSize;
             instanceBufferView.SizeInBytes = instantDataSize * objectCount;
             offset += instantDataSize * objectCount;
@@ -1037,7 +1034,7 @@ void Renderer::MoveToNextFrame()
 {
     // Update frame index and wait for fence value
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-    m_commandQueue->WaitForFenceValue(m_frameResources[m_frameIndex]->m_fenceValue);
+    m_commandQueue->WaitForFenceValue(m_frameResources[m_frameIndex]->GetFenceValue());
 }
 
 // Setup Dear ImGui context
@@ -1603,31 +1600,24 @@ void Renderer::PrepareSpotLight(SpotLight& light)
 
 void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
 {
-    UpdateCameraConstantBuffer(frameResource);
+    frameResource.UpdateCameraConstantBuffer(m_mainCameraIndex, &m_cameraConstantData);
+    frameResource.UpdateShadowConstantBuffer(&m_shadowConstantData);
 
-    for (auto& material : m_materials)
+    for (UINT i = 0; i < m_materials.size(); ++i)
     {
-        material->UpdateMaterialConstantBuffer(frameResource);
+        frameResource.UpdateMaterialConstantBuffer(i, m_materials[i]->GetConstantDataPtr());
     }
 
     for (UINT i = 0; i < m_lights.size(); ++i)
     {
         auto& light = m_lights[i];
-        light->UpdateCameraConstantBuffer(frameResource);
-        light->UpdateLightConstantBuffer(frameResource, i);
+        UINT16 arraySize = light->GetArraySize();
+        for (UINT j = 0; j < arraySize; ++j)
+        {
+            frameResource.UpdateCameraConstantBuffer(light->GetCameraConstantBufferBaseIndex() + j, light->GetCameraConstantDataPtr(j));
+        }
+        frameResource.UpdateLightConstantBuffer(i, light->GetLightConstantDataPtr());
     }
-
-    UpdateShadowConstantBuffer(frameResource);
-}
-
-void Renderer::UpdateCameraConstantBuffer(FrameResource& frameResource)
-{
-    frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->Update(&m_cameraConstantData);
-}
-
-void Renderer::UpdateShadowConstantBuffer(FrameResource& frameResource)
-{
-    frameResource.m_shadowConstantBuffer->Update(&m_shadowConstantData);
 }
 
 template <>

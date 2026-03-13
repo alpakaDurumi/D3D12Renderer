@@ -9,6 +9,7 @@
 #include <vector>
 #include <memory>
 #include <array>
+#include <cstddef>
 
 #include "ConstantData.h"
 #include "ConstantBuffer.h"
@@ -46,11 +47,44 @@ public:
     void ResetInstanceOffsetByte();
     void EnsureInstanceCapacity(UINT requiredSize);
     void CreateGBuffers(UINT64 width, UINT height, ResourceLayoutTracker& layoutTracker);
-    //void AllocateInstanceData();
+    void AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameIndex);
 
+    // back buffers
+    ID3D12Resource* GetRenderTarget() const;
+    ID3D12Resource* GetGBuffer(GBufferSlot slot) const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetRTVHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferRTVHandle(GBufferSlot slot) const;
+    DescriptorAllocation& GetGBufferSRVAllocationRef();
+    UINT64 GetFenceValue() const;
+
+    // CB
+    UINT GetCameraConstantBufferCount() const;
+    UINT GetMaterialConstantBufferCount() const;
+    void AddCameraConstantBuffer();
+    void CreateShadowConstantBuffer();
+    void AddMaterialConstantBuffer(DescriptorAllocation&& allocation);
+    void AddLightConstantBuffer(DescriptorAllocation&& allocation);
+    D3D12_GPU_VIRTUAL_ADDRESS GetCameraCBVirtualAddress(UINT idx) const;
+    D3D12_GPU_VIRTUAL_ADDRESS GetShadowCBVirtualAddress() const;
+    DescriptorAllocation& GetMaterialCBVAllocationRef(UINT idx);
+    DescriptorAllocation& GetLightCBVAllocationRef(UINT idx);
+    void UpdateCameraConstantBuffer(UINT idx, CameraConstantData* pData);
+    void UpdateShadowConstantBuffer(ShadowConstantData* pData);
+    void UpdateMaterialConstantBuffer(UINT idx, MaterialConstantData* pData);
+    void UpdateLightConstantBuffer(UINT idx, LightConstantData* pData);
+
+    // instance data
+    void PushInstanceData(std::vector<InstanceData>& data);
+    D3D12_GPU_VIRTUAL_ADDRESS GetInstanceBufferVirtualAddress() const;
+
+    void SetFenceValue(UINT64 fenceValue);
+
+    void ResetRenderTarget();
+    void ResetGBuffer(GBufferSlot slot);
+
+private:
     DXGI_FORMAT GetGBufferFormat(GBufferSlot slot);
 
-//private:
     ComPtr<ID3D12Resource> m_renderTarget;
     DescriptorAllocation m_rtvAllocation;
 
@@ -58,9 +92,9 @@ public:
     DescriptorAllocation m_gBufferRTVAllocation;
     DescriptorAllocation m_gBufferSRVAllocation;
 
+    std::vector<std::unique_ptr<CameraCB>> m_cameraConstantBuffers;
     std::vector<std::unique_ptr<MaterialCB>> m_materialConstantBuffers;
     std::vector<std::unique_ptr<LightCB>> m_lightConstantBuffers;
-    std::vector<std::unique_ptr<CameraCB>> m_cameraConstantBuffers;
     std::unique_ptr<ShadowCB> m_shadowConstantBuffer;
 
     ComPtr<ID3D12Resource> m_instanceUploadBuffer;

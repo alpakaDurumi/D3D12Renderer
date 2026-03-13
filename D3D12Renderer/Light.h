@@ -52,8 +52,8 @@ public:
 
     void SetIdxInArray(UINT idxInArray);
 
-    void UpdateCameraConstantBuffer(FrameResource& frameResource);
-    void UpdateLightConstantBuffer(FrameResource& frameResource, UINT lightIndex);
+    CameraConstantData* GetCameraConstantDataPtr(UINT idx);
+    LightConstantData* GetLightConstantDataPtr();
 
 protected:
     std::vector<CameraConstantData> m_cameraConstantData;

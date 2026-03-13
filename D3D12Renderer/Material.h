@@ -37,8 +37,8 @@ public:
         {
             FrameResource& frameResource = *frameResources[i];
 
-            if (i == 0) m_constantBufferIndex = UINT(frameResource.m_materialConstantBuffers.size());
-            frameResource.m_materialConstantBuffers.push_back(std::make_unique<MaterialCB>(pDevice, std::move(allocations[i])));
+            if (i == 0) m_constantBufferIndex = frameResource.GetMaterialConstantBufferCount();
+            frameResource.AddMaterialConstantBuffer(std::move(allocations[i]));
         }
 
         m_textureAddressingModes.fill(TextureAddressingMode::WRAP);
@@ -108,9 +108,9 @@ public:
         SetTextureTileScale(TextureSlot::HEIGHTMAP, height);
     }
 
-    void UpdateMaterialConstantBuffer(FrameResource& frameResource)
+    MaterialConstantData* GetConstantDataPtr()
     {
-        frameResource.m_materialConstantBuffers[m_constantBufferIndex]->Update(&m_constantData);
+        return &m_constantData;
     }
 
     void CopyDataFrom(const Material& src)

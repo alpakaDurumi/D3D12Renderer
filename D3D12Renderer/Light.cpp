@@ -40,12 +40,12 @@ void Light::Init(
     {
         FrameResource& frameResource = *frameResources[i];
 
-        frameResource.m_lightConstantBuffers.push_back(std::make_unique<LightCB>(pDevice, std::move(cbvAllocations[i])));
-        if (i == 0) m_cameraConstantBufferBaseIndex = UINT(frameResource.m_cameraConstantBuffers.size());
+        frameResource.AddLightConstantBuffer(std::move(cbvAllocations[i]));
+        if (i == 0) m_cameraConstantBufferBaseIndex = frameResource.GetCameraConstantBufferCount();
 
         for (UINT j = 0; j < arraySize; ++j)
         {
-            frameResource.m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(pDevice));
+            frameResource.AddCameraConstantBuffer();
         }
     }
 }
@@ -144,18 +144,14 @@ void Light::SetIdxInArray(UINT idxInArray)
     m_lightConstantData.idxInArray = idxInArray;
 }
 
-void Light::UpdateCameraConstantBuffer(FrameResource& frameResource)
+CameraConstantData* Light::GetCameraConstantDataPtr(UINT idx)
 {
-    UINT16 arraySize = GetArraySize();
-    for (UINT i = 0; i < arraySize; ++i)
-    {
-        frameResource.m_cameraConstantBuffers[m_cameraConstantBufferBaseIndex + i]->Update(&m_cameraConstantData[i]);
-    }
+    return &m_cameraConstantData[idx];
 }
 
-void Light::UpdateLightConstantBuffer(FrameResource& frameResource, UINT lightIndex)
+LightConstantData* Light::GetLightConstantDataPtr()
 {
-    frameResource.m_lightConstantBuffers[lightIndex]->Update(&m_lightConstantData);
+    return &m_lightConstantData;
 }
 
 DirectionalLight::DirectionalLight(

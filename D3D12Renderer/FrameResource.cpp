@@ -22,7 +22,7 @@ FrameResource::FrameResource(
         m_gBufferRTVAllocation.GetNumHandles() == static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS) &&
         m_gBufferSRVAllocation.GetNumHandles() == static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS));
 
-    D3DHelper::ThrowIfFailed(pSwapChain->GetBuffer(frameIndex, IID_PPV_ARGS(&m_renderTarget)));
+    AcquireBackBuffer(pSwapChain, frameIndex);
 
     // Register backbuffer to tracker
     // Initial layout of backbuffer is D3D12_BARRIER_LAYOUT_COMMON : https://microsoft.github.io/DirectX-Specs/d3d/D3D12EnhancedBarriers.html#initial-resource-state
@@ -88,6 +88,137 @@ void FrameResource::CreateGBuffers(UINT64 width, UINT height, ResourceLayoutTrac
 
         m_pDevice->CreateShaderResourceView(m_gBuffers[i].Get(), &srvDesc, m_gBufferSRVAllocation.GetDescriptorHandle(i));
     }
+}
+
+void FrameResource::AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameIndex)
+{
+    D3DHelper::ThrowIfFailed(pSwapChain->GetBuffer(frameIndex, IID_PPV_ARGS(&m_renderTarget)));
+}
+
+ID3D12Resource* FrameResource::GetRenderTarget() const
+{
+    return m_renderTarget.Get();
+}
+
+ID3D12Resource* FrameResource::GetGBuffer(GBufferSlot slot) const
+{
+    return m_gBuffers[static_cast<UINT>(slot)].Get();
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetRTVHandle() const
+{
+    return m_rtvAllocation.GetDescriptorHandle();
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetGBufferRTVHandle(GBufferSlot slot) const
+{
+    return m_gBufferRTVAllocation.GetDescriptorHandle(static_cast<UINT>(slot));
+}
+
+DescriptorAllocation& FrameResource::GetGBufferSRVAllocationRef()
+{
+    return m_gBufferSRVAllocation;
+}
+
+UINT64 FrameResource::GetFenceValue() const
+{
+    return m_fenceValue;
+}
+
+UINT FrameResource::GetCameraConstantBufferCount() const
+{
+    return static_cast<UINT>(m_cameraConstantBuffers.size());
+}
+
+UINT FrameResource::GetMaterialConstantBufferCount() const
+{
+    return static_cast<UINT>(m_materialConstantBuffers.size());
+}
+
+void FrameResource::AddCameraConstantBuffer()
+{
+    m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_pDevice));
+}
+
+void FrameResource::CreateShadowConstantBuffer()
+{
+    m_shadowConstantBuffer = std::make_unique<ShadowCB>(m_pDevice);
+}
+
+void FrameResource::AddLightConstantBuffer(DescriptorAllocation&& allocation)
+{
+    m_lightConstantBuffers.push_back(std::make_unique<LightCB>(m_pDevice, std::move(allocation)));
+}
+
+void FrameResource::AddMaterialConstantBuffer(DescriptorAllocation&& allocation)
+{
+    m_materialConstantBuffers.push_back(std::make_unique<MaterialCB>(m_pDevice, std::move(allocation)));
+}
+
+DescriptorAllocation& FrameResource::GetMaterialCBVAllocationRef(UINT idx)
+{
+    return m_materialConstantBuffers[idx]->GetAllocationRef();
+}
+
+DescriptorAllocation& FrameResource::GetLightCBVAllocationRef(UINT idx)
+{
+    return m_lightConstantBuffers[idx]->GetAllocationRef();
+}
+
+D3D12_GPU_VIRTUAL_ADDRESS FrameResource::GetCameraCBVirtualAddress(UINT idx) const
+{
+    return m_cameraConstantBuffers[idx]->GetGPUVirtualAddress();
+}
+
+D3D12_GPU_VIRTUAL_ADDRESS FrameResource::GetShadowCBVirtualAddress() const
+{
+    return m_shadowConstantBuffer->GetGPUVirtualAddress();
+}
+
+void FrameResource::UpdateCameraConstantBuffer(UINT idx, CameraConstantData* pData)
+{
+    m_cameraConstantBuffers[idx]->Update(pData);
+}
+
+void FrameResource::UpdateShadowConstantBuffer(ShadowConstantData* pData)
+{
+    m_shadowConstantBuffer->Update(pData);
+}
+
+void FrameResource::UpdateMaterialConstantBuffer(UINT idx, MaterialConstantData* pData)
+{
+    m_materialConstantBuffers[idx]->Update(pData);
+}
+
+void FrameResource::UpdateLightConstantBuffer(UINT idx, LightConstantData* pData)
+{
+    m_lightConstantBuffers[idx]->Update(pData);
+}
+
+void FrameResource::PushInstanceData(std::vector<InstanceData>& data)
+{
+    memcpy(m_instanceBufferBegin + m_instanceOffsetByte, data.data(), sizeof(InstanceData) * data.size());
+    m_instanceOffsetByte += sizeof(InstanceData) * static_cast<UINT>(data.size());
+}
+
+D3D12_GPU_VIRTUAL_ADDRESS FrameResource::GetInstanceBufferVirtualAddress() const
+{
+    return m_instanceUploadBuffer->GetGPUVirtualAddress();
+}
+
+void FrameResource::SetFenceValue(UINT64 fenceValue)
+{
+    m_fenceValue = fenceValue;
+}
+
+void FrameResource::ResetRenderTarget()
+{
+    m_renderTarget.Reset();
+}
+
+void FrameResource::ResetGBuffer(GBufferSlot slot)
+{
+    m_gBuffers[static_cast<UINT>(slot)].Reset();
 }
 
 DXGI_FORMAT FrameResource::GetGBufferFormat(GBufferSlot slot)
