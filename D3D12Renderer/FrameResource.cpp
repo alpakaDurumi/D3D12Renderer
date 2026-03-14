@@ -72,21 +72,11 @@ void FrameResource::CreateGBuffers(UINT64 width, UINT height, ResourceLayoutTrac
     {
         auto format = GetGBufferFormat(static_cast<GBufferSlot>(i));
 
-        CreateRenderTarget(m_pDevice, width, height, format, 1, m_gBuffers[i]);
+        CreateRenderTarget(m_pDevice, width, height, format, format, 1, m_gBuffers[i]);
         layoutTracker.RegisterResource(m_gBuffers[i].Get(), D3D12_BARRIER_LAYOUT_RENDER_TARGET, 1, 1, format);
 
         CreateRTV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferRTVAllocation.GetDescriptorHandle(i));
-
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = format;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2D.MostDetailedMip = 0;
-        srvDesc.Texture2D.MipLevels = 1;
-        srvDesc.Texture2D.PlaneSlice = 0;
-        srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-
-        m_pDevice->CreateShaderResourceView(m_gBuffers[i].Get(), &srvDesc, m_gBufferSRVAllocation.GetDescriptorHandle(i));
+        CreateSRV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferSRVAllocation.GetDescriptorHandle(i));
     }
 }
 

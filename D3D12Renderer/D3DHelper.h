@@ -35,9 +35,12 @@ namespace D3DHelper
     void CreateUploadBuffer(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadBuffer);
     void CreateDefaultBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultBuffer);
     void CreateDefaultTexture(ID3D12Device10* pDevice, UINT64 width, UINT height, ComPtr<ID3D12Resource>& defaultTexture);
-    void CreateRenderTarget(ID3D12Device10* pDevice, UINT64 width, UINT height, DXGI_FORMAT format, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& renderTarget, D3D12_CLEAR_VALUE* pClearValue = nullptr);
+    void CreateRenderTarget(ID3D12Device10* pDevice, UINT64 width, UINT height, DXGI_FORMAT format, DXGI_FORMAT rtvFormat, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& renderTarget, D3D12_CLEAR_VALUE* pClearValue = nullptr);
+    void CreateDepthStencilBuffer(ID3D12Device10* pDevice, UINT64 width, UINT height, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& depthStencilBuffer, D3D12_CLEAR_VALUE* pClearValue = nullptr);
 
-    void CreateRTV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
+    void CreateRTV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, bool isArray = false, UINT firstArraySlice = 0);
+    void CreateDSV(ID3D12Device10* pDevice, ID3D12Resource* pResource, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, bool isArray = false, UINT firstArraySlice = 0);
+    void CreateSRV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
 
     void UpdateSubresources(
         ID3D12Device* pDevice,
@@ -106,14 +109,6 @@ namespace D3DHelper
         ComPtr<ID3D12Resource>& indexBuffer,
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
         const std::vector<UINT32>& indices);
-
-    void CreateDepthStencilBuffer(
-        ID3D12Device10* pDevice,
-        UINT64 width,
-        UINT height,
-        ComPtr<ID3D12Resource>& depthStencilBuffer,
-        DescriptorAllocation& dsvAllocation,
-        UINT16 arraySize = 1);
 
     void CreateSRVForShadow(
         ID3D12Device10* pDevice,

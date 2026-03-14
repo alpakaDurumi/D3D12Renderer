@@ -335,6 +335,7 @@ void Renderer::OnResize(UINT width, UINT height)
 
         m_frameResources[i]->SetFenceValue(m_frameResources[m_frameIndex]->GetFenceValue());
     }
+    m_layoutTracker->UnregisterResource(m_depthStencilBuffer.Get());
     m_depthStencilBuffer.Reset();
 
     // Preserve existing format
@@ -354,8 +355,12 @@ void Renderer::OnResize(UINT width, UINT height)
         CreateRTV(m_device.Get(), m_frameResources[i]->GetRenderTarget(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_frameResources[i]->GetRTVHandle());
     }
 
-    // Recreate DSV
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation);
+    // Recreate depth-stencil buffer, DSV, and SRV
+    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer);
+    m_layoutTracker->RegisterResource(m_depthStencilBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, 1, 1, DXGI_FORMAT_R32_TYPELESS);
+
+    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle());
+    CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R32_FLOAT, m_depthSRVAllocation.GetDescriptorHandle());
 }
 
 void Renderer::OnDpiChanged()
@@ -664,9 +669,15 @@ void Renderer::LoadAssets()
         { "INSTANCE_MATERIAL_INDEX", 0, DXGI_FORMAT_R32_UINT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
     };
 
-    // Create the depth stencil view
+    // Create depth-stencil buffer, DSV, and SRV
     m_dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation);
+    m_depthSRVAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
+
+    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer);
+    m_layoutTracker->RegisterResource(m_depthStencilBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, 1, 1, DXGI_FORMAT_R32_TYPELESS);
+
+    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle());
+    CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R32_FLOAT, m_depthSRVAllocation.GetDescriptorHandle());
 
     // Set viewport and scissorRect for shadow mapping
     m_shadowMapViewport = { 0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f };

@@ -30,7 +30,11 @@ void Light::Init(
 
     UINT16 arraySize = GetRequiredArraySize(m_type);
 
-    CreateDepthStencilBuffer(pDevice, shadowMapResolution, shadowMapResolution, m_depthBuffer, m_dsvAllocation, arraySize);
+    CreateDepthStencilBuffer(pDevice, shadowMapResolution, shadowMapResolution, arraySize, m_depthBuffer);
+    for (UINT i = 0; i < arraySize; ++i)
+    {
+        CreateDSV(pDevice, m_depthBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(i), true, i);
+    }
     layoutTracker.RegisterResource(m_depthBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, arraySize, 1, DXGI_FORMAT_R32_TYPELESS);
 
     auto cbvAllocations = cbvAllocation.Split();
@@ -218,20 +222,13 @@ PointLight::PointLight(
     clearValue.Color[2] = 1.0f;
     clearValue.Color[3] = 1.0f;
 
-    CreateRenderTarget(pDevice, shadowMapResolution, shadowMapResolution, DXGI_FORMAT_R32_TYPELESS, POINT_LIGHT_ARRAY_SIZE, m_renderTarget, &clearValue);
+    CreateRenderTarget(pDevice, shadowMapResolution, shadowMapResolution, DXGI_FORMAT_R32_TYPELESS, DXGI_FORMAT_R32_FLOAT, POINT_LIGHT_ARRAY_SIZE, m_renderTarget, &clearValue);
     layoutTracker.RegisterResource(m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_RENDER_TARGET, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS);
 
     // Create RTVs.
-    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-    rtvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
-    rtvDesc.Texture2DArray.MipSlice = 0;
-    rtvDesc.Texture2DArray.ArraySize = 1;
-    rtvDesc.Texture2DArray.PlaneSlice = 0;
     for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
     {
-        rtvDesc.Texture2DArray.FirstArraySlice = i;
-        pDevice->CreateRenderTargetView(m_renderTarget.Get(), &rtvDesc, m_rtvAllocation.GetDescriptorHandle(i));
+        CreateRTV(pDevice, m_renderTarget.Get(), DXGI_FORMAT_R32_FLOAT, m_rtvAllocation.GetDescriptorHandle(i), true, i);
     }
 
     // Create SRV for render target we've created just before. NOT for depth buffer!

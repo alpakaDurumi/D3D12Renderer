@@ -109,6 +109,7 @@ private:
 
     ComPtr<ID3D12Resource> m_depthStencilBuffer;
     DescriptorAllocation m_dsvAllocation;
+    DescriptorAllocation m_depthSRVAllocation;
 
     // App resources
     // 
