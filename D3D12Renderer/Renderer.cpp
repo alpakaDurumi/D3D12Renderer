@@ -21,8 +21,6 @@ using namespace D3DHelper;
 // Definition for static member
 Renderer* Renderer::sm_instance = nullptr;
 
-constexpr float DefaultDPI = 96.0f;
-
 // Generate a simple black and white checkerboard texture.
 std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UINT texturePixelSize)
 {
@@ -177,13 +175,13 @@ void Renderer::SetFullScreen(bool fullScreen)
     }
 }
 
-void Renderer::OnInit()
+void Renderer::OnInit(UINT dpi)
 {
     ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED));   // For initializing DirectXTex
     LoadPipeline();
     LoadAssets();
 
-    m_dpiScale = static_cast<float>(GetDpiForWindow(Win32Application::GetHwnd())) / DefaultDPI;
+    m_dpiScale = static_cast<float>(dpi) / USER_DEFAULT_SCREEN_DPI;
 
     InitImGui();
     m_prevTime = m_clock.now();
@@ -363,9 +361,9 @@ void Renderer::OnResize(UINT width, UINT height)
     CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R32_FLOAT, m_depthSRVAllocation.GetDescriptorHandle());
 }
 
-void Renderer::OnDpiChanged()
+void Renderer::OnDpiChanged(UINT dpi)
 {
-    m_dpiScale = static_cast<float>(GetDpiForWindow(Win32Application::GetHwnd())) / DefaultDPI;
+    m_dpiScale = static_cast<float>(dpi) / USER_DEFAULT_SCREEN_DPI;
     ImGui::GetStyle().FontScaleMain = m_dpiScale;
 }
 

@@ -53,7 +53,7 @@ public:
     void ToggleFullScreen();
     void SetFullScreen(bool fullScreen);
 
-    void OnInit();
+    void OnInit(UINT dpi);
     void OnUpdate();
     void OnRender();
     void OnDestroy();
@@ -61,7 +61,7 @@ public:
     void OnKeyUp(WPARAM key);
     void OnMouseMove(int xPos, int yPos);
     void OnResize(UINT width, UINT height);
-    void OnDpiChanged();
+    void OnDpiChanged(UINT dpi);
 
     static void ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle);
     static void ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle);
