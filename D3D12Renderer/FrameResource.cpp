@@ -219,6 +219,10 @@ DXGI_FORMAT FrameResource::GetGBufferFormat(GBufferSlot slot)
         return DXGI_FORMAT_R8G8B8A8_UNORM;
     case GBufferSlot::NORMAL:
         return DXGI_FORMAT_R16G16B16A16_FLOAT;
+    case GBufferSlot::MATERIAL_AMBIENT:
+        return DXGI_FORMAT_R8G8B8A8_UNORM;
+    case GBufferSlot::MATERIAL_SPECULAR:
+        return DXGI_FORMAT_R8G8B8A8_UNORM;
     default:
         assert(false);
         return DXGI_FORMAT_UNKNOWN;

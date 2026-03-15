@@ -21,6 +21,8 @@ enum class GBufferSlot
 {
     ALBEDO,
     NORMAL,
+    MATERIAL_AMBIENT,
+    MATERIAL_SPECULAR,
     NUM_GBUFFER_SLOTS
 };
 

@@ -76,5 +76,23 @@
       </Outputs>
       <AdditionalInputs>SharedConfig.h</AdditionalInputs>
     </CustomBuild>
+
+    <CustomBuild Include="GBufferPS.hlsl">
+      <Message>DXC: GBufferPS.hlsl</Message>
+
+      <PdbFlag Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)GBufferPS.pdb"</PdbFlag>
+      <PdbFlag Condition="'$(Configuration)'=='Release'"></PdbFlag>
+
+      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)GBufferPS.cso"</Command>
+
+      <Outputs Condition="'$(Configuration)'!='Release'">
+        $(ShaderOutDir)GBufferPS.cso;
+        $(ShaderPdbDir)GBufferPS.pdb;
+      </Outputs>
+      <Outputs Condition="'$(Configuration)'=='Release'">
+        $(ShaderOutDir)GBufferPS.cso;
+      </Outputs>
+      <FileType>Document</FileType>
+    </CustomBuild>
   </ItemGroup>
 </Project>
