@@ -17,7 +17,6 @@ struct PSInput
     float3 tangentWorld : TANGENT;
     float3 normalWorld : NORMAL;
     nointerpolation float tangentW : TEXCOORD1;     // Do not interpolate w component of tangent vector.
-    float distView : TEXCOORD2;                     // Distance in view space for determining CSM index.
     nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
 };
 
@@ -34,12 +33,8 @@ PSInput main(VSInput input)
 {
     PSInput output;
     
-    // Calculate position in world space
     output.posWorld = mul(float4(input.pos, 1.0f), input.instanceWorld).xyz;
-    
-    float3 posView = mul(float4(output.posWorld, 1.0f), view).xyz;
-    output.distView = posView.z;
-    output.pos = mul(float4(posView, 1.0f), projection);
+    output.pos = mul(float4(output.posWorld, 1.0f), mul(view, projection));
     output.texCoord = input.texCoord;
     
 #ifndef DEPTH_ONLY

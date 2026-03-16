@@ -11,7 +11,6 @@ struct PSInput
     float3 tangentWorld : TANGENT;
     float3 normalWorld : NORMAL;
     nointerpolation float tangentW : TEXCOORD1; // Do not interpolate w component of tangent vector.
-    float distView : TEXCOORD2; // Distance in view space for determining CSM index.
     nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
 };
 
@@ -28,6 +27,8 @@ cbuffer CameraConstantBuffer : register(b0, space0)
     float3 cameraPos;
     float4x4 view;
     float4x4 projection;
+    float4x4 invView;
+    float4x4 invProj;
 }
 
 struct MaterialConstants

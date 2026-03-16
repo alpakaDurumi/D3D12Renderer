@@ -202,7 +202,7 @@ float4 main(PSInput input) : SV_TARGET
     float3 materialAmbient = g_materialAmbient.Load(int3(texCoord, 0)).rgb;
     float3 materialSpecular = g_materialSpecular.Load(int3(texCoord, 0)).rgb;
     
-    // reconstruct world coordinate
+    // reconstruct world position
     float depth = g_depthBuffer.Load(int3(texCoord, 0)).r;
     float4 ndc = float4(input.texCoord.x * 2.0f - 1.0f, 1.0f - input.texCoord.y * 2.0f, depth, 1.0f);
     float4 posView = mul(ndc, invProj);

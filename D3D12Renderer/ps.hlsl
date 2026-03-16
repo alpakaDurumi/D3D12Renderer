@@ -30,7 +30,6 @@ struct PSInput
     float3 tangentWorld : TANGENT;
     float3 normalWorld : NORMAL;
     nointerpolation float tangentW : TEXCOORD1;     // Do not interpolate w component of tangent vector.
-    float distView : TEXCOORD2;                     // Distance in view space for determining CSM index.
     nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
 };
 
@@ -309,7 +308,7 @@ float4 main(PSInput input) : SV_TARGET
 
     uint csmIdx;
     float alpha;
-    CalcCSMIndex(input.distView, csmIdx, alpha);
+    CalcCSMIndex(input.pos.w, csmIdx, alpha);   // SV_POSITION.w means view space distance.
     
     // Check CSM boundaries
     //if (csmIdx == 0)
