@@ -249,6 +249,8 @@
     <CustomBuild Include="ps.hlsl" />
     <CustomBuild Include="PointLightShadowPS.hlsl" />
     <CustomBuild Include="GBufferPS.hlsl" />
+    <CustomBuild Include="DeferredLightingVS.hlsl" />
+    <CustomBuild Include="DeferredLightingPS.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="ShaderCompile.targets" Condition="Exists('ShaderCompile.targets')" />

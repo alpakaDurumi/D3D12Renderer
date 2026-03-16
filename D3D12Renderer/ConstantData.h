@@ -24,7 +24,9 @@ struct CameraConstantData : public ConstantData<CameraConstantData>
     float padding0;
     XMFLOAT4X4 view;
     XMFLOAT4X4 projection;
-    float padding1[28];
+    XMFLOAT4X4 invView;
+    XMFLOAT4X4 invProj;
+    float padding1[60];
 
     void SetPos(XMVECTOR pos)
     {
@@ -34,11 +36,13 @@ struct CameraConstantData : public ConstantData<CameraConstantData>
     void SetView(XMMATRIX view)
     {
         XMStoreFloat4x4(&this->view, XMMatrixTranspose(view));
+        XMStoreFloat4x4(&this->invView, XMMatrixTranspose(XMMatrixInverse(nullptr, view)));
     }
 
     void SetProjection(XMMATRIX projection)
     {
         XMStoreFloat4x4(&this->projection, XMMatrixTranspose(projection));
+        XMStoreFloat4x4(&this->invProj, XMMatrixTranspose(XMMatrixInverse(nullptr, projection)));
     }
 };
 
