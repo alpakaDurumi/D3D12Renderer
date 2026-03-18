@@ -92,12 +92,10 @@ void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 o
         m_currentOffset = static_cast<UINT32>(descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get()) + descriptorTableCache.NumDescriptors;
     }
 
-    D3D12_CPU_DESCRIPTOR_HANDLE srcStart = allocation.GetDescriptorHandle(offsetInAllocation);
-
     // Copy descriptor handles
-    for (UINT32 i = 0; i < numDescriptors; ++i)
+    for (UINT i = 0; i < numDescriptors; ++i)
     {
-        start[i] = GetCPUDescriptorHandle(srcStart, i, m_descriptorHandleIncrementSize);
+        start[i] = allocation.GetDescriptorHandle(offsetInAllocation + i);
     }
 
     // Set the root parameter index bit as 1 to make sure the descriptor table 
