@@ -12,6 +12,7 @@
 #include <memory>
 #include <array>
 #include <chrono>
+#include <unordered_map>
 
 #include "Camera.h"
 #include "InputManager.h"
@@ -31,6 +32,7 @@
 #include "Light.h"
 #include "Material.h"
 #include "RenderObject.h"
+#include "SharedConfig.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;

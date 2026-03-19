@@ -3,7 +3,6 @@
 
 #include "D3DHelper.h"
 #include "Utility.h"
-#include "SharedConfig.h"
 
 FrameResource::FrameResource(
     ID3D12Device10* pDevice,
@@ -103,6 +102,16 @@ D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetRTVHandle() const
 D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetGBufferRTVHandle(GBufferSlot slot) const
 {
     return m_gBufferRTVAllocation.GetDescriptorHandle(static_cast<UINT>(slot));
+}
+
+std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> FrameResource::GetGBufferRTVHandles() const
+{
+    std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> ret(static_cast<std::size_t>(GBufferSlot::NUM_GBUFFER_SLOTS));
+    for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
+    {
+        ret[i] = m_gBufferRTVAllocation.GetDescriptorHandle(i);
+    }
+    return ret;
 }
 
 DescriptorAllocation& FrameResource::GetGBufferSRVAllocationRef()

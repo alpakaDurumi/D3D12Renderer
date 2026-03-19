@@ -14,17 +14,9 @@
 #include "ConstantData.h"
 #include "ConstantBuffer.h"
 #include "DescriptorAllocation.h"
+#include "SharedConfig.h"
 
 using Microsoft::WRL::ComPtr;
-
-enum class GBufferSlot
-{
-    ALBEDO,
-    NORMAL,
-    MATERIAL_AMBIENT,
-    MATERIAL_SPECULAR,
-    NUM_GBUFFER_SLOTS
-};
 
 // aliasing
 using MaterialCB = ConstantBuffer<MaterialConstantData>;
@@ -56,6 +48,7 @@ public:
     ID3D12Resource* GetGBuffer(GBufferSlot slot) const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetRTVHandle() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferRTVHandle(GBufferSlot slot) const;
+    std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> GetGBufferRTVHandles() const;
     DescriptorAllocation& GetGBufferSRVAllocationRef();
     UINT64 GetFenceValue() const;
 
