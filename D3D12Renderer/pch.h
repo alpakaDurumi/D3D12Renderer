@@ -28,6 +28,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 
 // PIX Event
 #ifdef USE_PIX
