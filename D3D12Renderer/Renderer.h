@@ -122,8 +122,17 @@ private:
 
     InputManager m_inputManager;
 
+    struct InstanceRange
+    {
+        UINT offset;            // offset in instance buffer
+        UINT forwardCount;
+        UINT deferredCount;
+    };
+
     std::vector<std::unique_ptr<Mesh>> m_meshes;
-    std::unordered_map<Mesh*, std::vector<RenderObject>> m_renderObjects;
+    std::unordered_map<Mesh*, InstanceRange> m_instanceRanges;
+    std::unordered_map<Mesh*, std::vector<RenderObject>> m_forwardRenderObjects;
+    std::unordered_map<Mesh*, std::vector<RenderObject>> m_deferredRenderObjects;
 
     std::vector<RenderObject*> m_previewRotations;
 
@@ -166,6 +175,8 @@ private:
 
     Material* CreateMaterial();
     Material* CloneMaterial(const Material& material);
+
+    RenderObject* CreateRenderObject(Mesh* pMesh, Material* mat);
 
     template <typename T>
     T* CreateLight();

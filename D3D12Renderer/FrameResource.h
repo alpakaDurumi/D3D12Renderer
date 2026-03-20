@@ -77,9 +77,9 @@ public:
     void ResetRenderTarget();
     void ResetGBuffer(GBufferSlot slot);
 
-private:
-    DXGI_FORMAT GetGBufferFormat(GBufferSlot slot);
+    static DXGI_FORMAT GetGBufferFormat(GBufferSlot slot);
 
+private:
     ComPtr<ID3D12Resource> m_renderTarget;
     DescriptorAllocation m_rtvAllocation;
 

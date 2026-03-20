@@ -612,27 +612,16 @@ void Renderer::LoadAssets()
 {
     // Read shaders
     {
-        std::wstring vsName = L"vs.hlsl";
-        std::wstring psName0 = L"ps.hlsl";
-        std::wstring psName1 = L"PointLightShadowPS.hlsl";
+        std::vector<std::wstring> shaderNames;
+        shaderNames.push_back(L"vs.cso");
+        shaderNames.push_back(L"vs_depth_only.cso");
+        shaderNames.push_back(L"ps.cso");
+        shaderNames.push_back(L"PointLightShadowPS.cso");
+        shaderNames.push_back(L"GBufferPS.cso");
+        shaderNames.push_back(L"DeferredLightingVS.cso");
+        shaderNames.push_back(L"DeferredLightingPS.cso");
 
-        std::vector<std::wstring> csoNames;
-
-        // VS
-        for (UINT i = 0; i < static_cast<UINT>(PassType::NUM_PASS_TYPES); ++i)
-        {
-            std::wstring temp = Utility::RemoveFileExtension(vsName);
-            if (i == 1) temp += L"_depth_only";
-            temp += L".cso";
-
-            csoNames.push_back(temp);
-        }
-
-        // PS
-        csoNames.push_back(Utility::RemoveFileExtension(psName0) + L".cso");
-        csoNames.push_back(Utility::RemoveFileExtension(psName1) + L".cso");
-
-        for (const auto& name : csoNames)
+        for (const auto& name : shaderNames)
         {
             std::ifstream file(std::filesystem::path(L"shaders") / name, std::ios::binary);
             if (!file)
@@ -750,41 +739,40 @@ void Renderer::LoadAssets()
     pBaseMat->SetTextureIndices(0, 1, 2);
     pBaseMat->SetTextureAddressingModes(TextureAddressingMode::WRAP, TextureAddressingMode::WRAP, TextureAddressingMode::WRAP);
     pBaseMat->BuildSamplerIndices(m_currentTextureFiltering);
+    pBaseMat->SetRenderingPath(RenderingPath::DEFERRED);
 
     auto* pPlaneMat = CloneMaterial(*pBaseMat);
     pPlaneMat->SetTextureTileScales(50.0f, 50.0f, 50.0f);
 
     // Add meshes
-    m_meshes.push_back(std::make_unique<Mesh>(m_device.Get(), commandList, *m_uploadBuffer, GeometryGenerator::GenerateCube()));
-    m_meshes.push_back(std::make_unique<Mesh>(m_device.Get(), commandList, *m_uploadBuffer, GeometryGenerator::GenerateSphere()));
+    auto cubeMesh = std::make_unique<Mesh>(m_device.Get(), commandList, *m_uploadBuffer, GeometryGenerator::GenerateCube());
+    auto sphereMesh = std::make_unique<Mesh>(m_device.Get(), commandList, *m_uploadBuffer, GeometryGenerator::GenerateSphere());
+
+    auto* pCubeMesh = cubeMesh.get();
+    auto* pSphereMesh = sphereMesh.get();
+
+    m_meshes.push_back(std::move(cubeMesh));
+    m_meshes.push_back(std::move(sphereMesh));
 
     // Add RenderObjects
-    auto& cubes = m_renderObjects[m_meshes[0].get()];
+    auto* pPlane = CreateRenderObject(pCubeMesh, pPlaneMat);
+    pPlane->SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
 
-    cubes.emplace_back(m_meshes[0].get());
-    cubes.back().SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
-    cubes.back().SetMaterial(pPlaneMat);
+    m_forwardRenderObjects[pCubeMesh].reserve(10001);
+    m_deferredRenderObjects[pCubeMesh].reserve(10001);
 
     for (UINT i = 0; i < 100; i++)
     {
         for (UINT j = 0; j < 100; j++)
         {
-            cubes.emplace_back(m_meshes[0].get());
-            cubes.back().SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, 10.0f));
-            cubes.back().SetMaterial(pBaseMat);
+            auto* pCube = CreateRenderObject(pCubeMesh, pBaseMat);
+            pCube->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, 10.0f));
+            m_previewRotations.push_back(pCube);
         }
     }
 
-    for (UINT i = 1; i < cubes.size(); ++i)
-    {
-        m_previewRotations.push_back(&cubes[i]);
-    }
-
-    auto& spheres = m_renderObjects[m_meshes[1].get()];
-
-    spheres.emplace_back(m_meshes[1].get());
-    spheres.back().SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
-    spheres.back().SetMaterial(pBaseMat);
+    auto* pSphere = CreateRenderObject(pSphereMesh, pBaseMat);
+    pSphere->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
 
     // Set up lights
     auto* pDirectionalLight = CreateLight<DirectionalLight>();
@@ -844,27 +832,37 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7 + static_cast<UINT>(type), idxInArray, 1, light->GetSRVAllocationRef());
     }
 
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, 0, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), frameResource.GetGBufferSRVAllocationRef());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), 1, m_depthSRVAllocation);
+
     BindDescriptorTables(cmdList.Get());
 
-    UINT requiredCount = 0;
-    for (auto& [pMesh, objects] : m_renderObjects)
+    static const UINT instanceDataSize = static_cast<UINT>(sizeof(InstanceData));
+
+    std::vector<InstanceData> temp;
+    UINT curOffset = 0;
+    for (auto& mesh : m_meshes)
     {
-        requiredCount += static_cast<UINT>(objects.size());
+        auto* pMesh = mesh.get();
+
+        for (auto& object : m_forwardRenderObjects[pMesh])
+            temp.push_back(object.BuildInstanceData());
+        for (auto& object : m_deferredRenderObjects[pMesh])
+            temp.push_back(object.BuildInstanceData());
+
+        m_instanceRanges[pMesh].offset = curOffset;
+        m_instanceRanges[pMesh].forwardCount = static_cast<UINT>(m_forwardRenderObjects[pMesh].size());
+        m_instanceRanges[pMesh].deferredCount = static_cast<UINT>(m_deferredRenderObjects[pMesh].size());
+        curOffset += m_instanceRanges[pMesh].forwardCount + m_instanceRanges[pMesh].deferredCount;
     }
-    frameResource.EnsureInstanceCapacity(requiredCount);
 
-    static const UINT instantDataSize = static_cast<UINT>(sizeof(InstanceData));
-
-    for (auto& [pMesh, objects] : m_renderObjects)
-    {
-        std::vector<InstanceData> temp(objects.size());
-        for (UINT i = 0; i < objects.size(); ++i)
-            temp[i] = objects[i].BuildInstanceData();
+    frameResource.EnsureInstanceCapacity(static_cast<UINT>(temp.size()));
         frameResource.PushInstanceData(temp);
-    }
 
     // Depth-only pass for shadow mapping
     {
+        PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"Depth-only pass");
+
         cmdList->RSSetViewports(1, &m_shadowMapViewport);
         cmdList->RSSetScissorRects(1, &m_shadowMapScissorRect);
 
@@ -932,24 +930,23 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
                 cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(light->GetCameraConstantBufferBaseIndex() + j));
 
-                UINT offset = 0;
-                for (auto& [pMesh, objects] : m_renderObjects)
+                for (auto& mesh : m_meshes)
                 {
-                    const UINT objectCount = static_cast<UINT>(objects.size());
+                    auto* pMesh = mesh.get();
+                    const auto& instanceRange = m_instanceRanges[pMesh];
 
                     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
                     D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
-                    instanceBufferView.BufferLocation = frameResource.GetInstanceBufferVirtualAddress() + offset;
-                    instanceBufferView.StrideInBytes = instantDataSize;
-                    instanceBufferView.SizeInBytes = instantDataSize * objectCount;
-                    offset += instantDataSize * objectCount;
+                    instanceBufferView.BufferLocation = frameResource.GetInstanceBufferVirtualAddress() + instanceRange.offset * instanceDataSize;
+                    instanceBufferView.StrideInBytes = instanceDataSize;
+                    instanceBufferView.SizeInBytes = instanceDataSize * (instanceRange.forwardCount + instanceRange.deferredCount);
 
                     D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->m_vertexBufferView, instanceBufferView };
                     cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
                     cmdList->IASetIndexBuffer(&pMesh->m_indexBufferView);
 
-                    cmdList->DrawIndexedInstanced(pMesh->m_numIndices, objectCount, 0, 0, 0);
+                    cmdList->DrawIndexedInstanced(pMesh->m_numIndices, instanceRange.forwardCount + instanceRange.deferredCount, 0, 0, 0);
                 }
             }
 
@@ -977,8 +974,139 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         }
     }
 
-    // Color pass
+    // temp
+    commandList.Barrier(
+        m_depthStencilBuffer.Get(),
+        D3D12_BARRIER_SYNC_NONE,
+        D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+        D3D12_BARRIER_ACCESS_NO_ACCESS,
+        D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
+
+    // GBuffer pass
     {
+        PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"GBuffer pass");
+
+        cmdList->RSSetViewports(1, &m_viewport);
+        cmdList->RSSetScissorRects(1, &m_scissorRect);
+
+        // Pre-query PSOs
+        m_currentPSOKey.passType = PassType::GBUFFER;
+        m_currentPSOKey.vsName = L"vs.hlsl";
+        m_currentPSOKey.psName = L"GBufferPS.hlsl";
+        auto* pso = GetPipelineState(m_currentPSOKey);
+
+        for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
+        {
+            commandList.Barrier(
+                frameResource.GetGBuffer(static_cast<GBufferSlot>(i)),
+                D3D12_BARRIER_SYNC_NONE,
+                D3D12_BARRIER_SYNC_RENDER_TARGET,
+                D3D12_BARRIER_ACCESS_NO_ACCESS,
+                D3D12_BARRIER_ACCESS_RENDER_TARGET,
+                D3D12_BARRIER_LAYOUT_RENDER_TARGET);
+        }
+
+        auto rtvHandles = frameResource.GetGBufferRTVHandles();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
+        cmdList->OMSetRenderTargets(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), rtvHandles.data(), FALSE, &dsvHandle);
+
+        XMVECTORF32 clearColor;
+        clearColor.v = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+        for (auto& rtvHandle : rtvHandles)
+            cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
+
+        cmdList->SetPipelineState(pso);
+
+        cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
+
+        for (auto& mesh : m_meshes)
+    {
+            auto* pMesh = mesh.get();
+            const auto& instanceRange = m_instanceRanges[pMesh];
+
+            if (instanceRange.deferredCount == 0) continue;
+
+            cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+            D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
+            instanceBufferView.BufferLocation = frameResource.GetInstanceBufferVirtualAddress() + (instanceRange.offset + instanceRange.forwardCount) * instanceDataSize;
+            instanceBufferView.StrideInBytes = instanceDataSize;
+            instanceBufferView.SizeInBytes = instanceDataSize * instanceRange.deferredCount;
+
+            D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->m_vertexBufferView, instanceBufferView };
+            cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
+            cmdList->IASetIndexBuffer(&pMesh->m_indexBufferView);
+
+            cmdList->DrawIndexedInstanced(pMesh->m_numIndices, instanceRange.deferredCount, 0, 0, 0);
+        }
+
+        for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
+        {
+            commandList.Barrier(
+                frameResource.GetGBuffer(static_cast<GBufferSlot>(i)),
+                D3D12_BARRIER_SYNC_RENDER_TARGET,
+                D3D12_BARRIER_SYNC_PIXEL_SHADING,
+                D3D12_BARRIER_ACCESS_RENDER_TARGET,
+                D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+                D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
+        }
+    }
+
+    // To use depth-stencill buffer as a SRV in Deferred Lighting pass
+    // Needs to reconstruct world pos
+    commandList.Barrier(
+        m_depthStencilBuffer.Get(),
+        D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+        D3D12_BARRIER_SYNC_PIXEL_SHADING,
+        D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+        D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+        D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
+
+    // Deferred Lighting pass
+    {
+        PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"Deferred Lighting pass");
+
+        cmdList->RSSetViewports(1, &m_viewport);
+        cmdList->RSSetScissorRects(1, &m_scissorRect);
+
+        // Pre-query PSOs
+        m_currentPSOKey.passType = PassType::DEFERRED_LIGHTING;
+        m_currentPSOKey.vsName = L"DeferredLightingVS.hlsl";
+        m_currentPSOKey.psName = L"DeferredLightingPS.hlsl";
+        auto* pso = GetPipelineState(m_currentPSOKey);
+
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetRTVHandle();
+        cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+        // Use linear color for gamma-correct rendering
+        XMVECTORF32 clearColor;
+        clearColor.v = XMColorSRGBToRGB(XMVectorSet(0.5f, 0.5f, 0.5f, 1.0f));
+        cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+
+        cmdList->SetPipelineState(pso);
+
+        cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
+        cmdList->SetGraphicsRootConstantBufferView(1, frameResource.GetShadowCBVirtualAddress());
+
+        cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        cmdList->DrawInstanced(3, 1, 0, 0);
+    }
+
+    // restore
+    commandList.Barrier(
+        m_depthStencilBuffer.Get(),
+        D3D12_BARRIER_SYNC_PIXEL_SHADING,
+        D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+        D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+        D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
+
+    // Forward Color pass
+    {
+        PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"Forward color pass");
+
         cmdList->RSSetViewports(1, &m_viewport);
         cmdList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -1000,35 +1128,30 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
         cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
-        // Use linear color for gamma-correct rendering
-        XMVECTORF32 clearColor;
-        clearColor.v = XMColorSRGBToRGB(XMVectorSet(0.5f, 0.5f, 0.5f, 1.0f));
-        cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-        cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
-
         cmdList->SetPipelineState(pso);
 
         cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
         cmdList->SetGraphicsRootConstantBufferView(1, frameResource.GetShadowCBVirtualAddress());
 
-        UINT offset = 0;
-        for (auto& [pMesh, objects] : m_renderObjects)
+        for (auto& mesh : m_meshes)
         {
-            const UINT objectCount = static_cast<UINT>(objects.size());
+            auto* pMesh = mesh.get();
+            const auto& instanceRange = m_instanceRanges[pMesh];
+
+            if (instanceRange.forwardCount == 0) continue;
 
             cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
             D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
-            instanceBufferView.BufferLocation = frameResource.GetInstanceBufferVirtualAddress() + offset;
-            instanceBufferView.StrideInBytes = instantDataSize;
-            instanceBufferView.SizeInBytes = instantDataSize * objectCount;
-            offset += instantDataSize * objectCount;
+            instanceBufferView.BufferLocation = frameResource.GetInstanceBufferVirtualAddress() + instanceRange.offset * instanceDataSize;
+            instanceBufferView.StrideInBytes = instanceDataSize;
+            instanceBufferView.SizeInBytes = instanceDataSize * instanceRange.forwardCount;
 
             D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->m_vertexBufferView, instanceBufferView };
             cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
             cmdList->IASetIndexBuffer(&pMesh->m_indexBufferView);
 
-            cmdList->DrawIndexedInstanced(pMesh->m_numIndices, objectCount, 0, 0, 0);
+            cmdList->DrawIndexedInstanced(pMesh->m_numIndices, instanceRange.forwardCount, 0, 0, 0);
         }
     }
 }
@@ -1095,6 +1218,27 @@ Material* Renderer::CloneMaterial(const Material& src)
     return pMat;
 }
 
+RenderObject* Renderer::CreateRenderObject(Mesh* pMesh, Material* mat)
+{
+    RenderingPath path = mat->GetRenderingPath();
+    RenderObject* ret = nullptr;
+    if (path == RenderingPath::FORWARD)
+    {
+        m_forwardRenderObjects[pMesh].emplace_back(pMesh);
+        ret = &m_forwardRenderObjects[pMesh].back();
+    }
+    else if (path == RenderingPath::DEFERRED)
+    {
+        m_deferredRenderObjects[pMesh].emplace_back(pMesh);
+        ret = &m_deferredRenderObjects[pMesh].back();
+    }
+
+    if (!ret) throw std::runtime_error("Unsupported Rendering Path.");
+
+    ret->SetMaterial(mat);
+    return ret;
+}
+
 Texture* Renderer::CreateTexture(
     CommandList& commandList,
     DescriptorAllocation&& allocation,
@@ -1146,12 +1290,12 @@ void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList)
     }
 
     m_dynamicDescriptorHeapForCBVSRVUAV->CommitStagedDescriptorsForDraw(pCommandList);
-    pCommandList->SetGraphicsRootDescriptorTable(10, m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart());    // Root parameter 10
+    pCommandList->SetGraphicsRootDescriptorTable(11, m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart());    // Root parameter 11
 }
 
 void Renderer::CreateRootSignature()
 {
-    m_rootSignature = std::make_unique<RootSignature>(11, 2);
+    m_rootSignature = std::make_unique<RootSignature>(12, 2);
     auto& rootSignature = *m_rootSignature;
 
     // Root descriptor for CameraCB and ShadowCB
@@ -1189,9 +1333,14 @@ void Renderer::CreateRootSignature()
     rootSignature[9].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
     rootSignature[9].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
+    // Descriptor table for GBuffers and SRV for depth stencil buffer
+    rootSignature[10].InitAsTable(2, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[10].InitAsRange(0, 0, 4, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    rootSignature[10].InitAsRange(1, 0, 5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+
     // Descriptor table for samplers
-    rootSignature[10].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[10].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
+    rootSignature[11].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[11].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
         static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS) * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES),
         D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
 
@@ -1250,6 +1399,13 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
 
         // Depth-stencil
         D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
+        if (psoKey.passType == PassType::DEFERRED_LIGHTING)
+        {
+            depthStencilDesc.DepthEnable = FALSE;
+            depthStencilDesc.StencilEnable = FALSE;
+        }
+        else
+        {
         depthStencilDesc.DepthEnable = TRUE;
         depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
         depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
@@ -1260,9 +1416,13 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
         depthStencilDesc.FrontFace = defaultStencilOp;
         depthStencilDesc.BackFace = defaultStencilOp;
+        }
 
         // Describe and create the graphics pipeline state object (PSO).
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+        if (psoKey.passType == PassType::DEFERRED_LIGHTING)
+            psoDesc.InputLayout = { nullptr, 0 };
+        else
         psoDesc.InputLayout = { m_inputLayout.data(), static_cast<UINT>(m_inputLayout.size()) };
         psoDesc.pRootSignature = m_rootSignature->GetRootSignature().Get();
 
@@ -1294,8 +1454,13 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         psoDesc.SampleMask = UINT_MAX;
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
-        if (psoKey.passType == PassType::DEPTH_ONLY)
+        switch (psoKey.passType)
         {
+        case PassType::DEFAULT:
+            psoDesc.NumRenderTargets = 1;
+            psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+            break;
+        case PassType::DEPTH_ONLY:
             if (psoKey.psName == L"PointLightShadowPS.hlsl")
             {
                 psoDesc.NumRenderTargets = 1;
@@ -1305,13 +1470,24 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
             {
                 psoDesc.NumRenderTargets = 0;
             }
-        }
-        else
+            break;
+        case PassType::GBUFFER:
         {
+            UINT numSlots = static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS);
+            psoDesc.NumRenderTargets = numSlots;
+            for (UINT i = 0; i < numSlots; ++i)
+            {
+                psoDesc.RTVFormats[i] = FrameResource::GetGBufferFormat(static_cast<GBufferSlot>(i));
+            }
+            break;
+        }
+        case PassType::DEFERRED_LIGHTING:
             psoDesc.NumRenderTargets = 1;
             psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+            break;
         }
-        psoDesc.SampleDesc.Count = 1;
+
+        psoDesc.SampleDesc = { 1, 0 };
         ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&it->second)));
     }
 
@@ -1377,7 +1553,14 @@ void Renderer::FixedUpdate(double fixedDtMs)
     // RenderObjects
     static float rotationSpeed = 1.0f;  // unit : rad/s
 
-    for (auto& [pMesh, objects] : m_renderObjects)
+    for (auto& [pMesh, objects] : m_forwardRenderObjects)
+    {
+        for (auto& ob : objects)
+        {
+            ob.SnapshotState();
+        }
+    }
+    for (auto& [pMesh, objects] : m_deferredRenderObjects)
     {
         for (auto& ob : objects)
         {
@@ -1394,7 +1577,14 @@ void Renderer::FixedUpdate(double fixedDtMs)
 void Renderer::PrepareConstantData(float alpha)
 {
     // RenderObjects
-    for (auto& [pMesh, objects] : m_renderObjects)
+    for (auto& [pMesh, objects] : m_forwardRenderObjects)
+    {
+        for (auto& ob : objects)
+        {
+            ob.UpdateRenderState(alpha);
+        }
+    }
+    for (auto& [pMesh, objects] : m_deferredRenderObjects)
     {
         for (auto& ob : objects)
         {

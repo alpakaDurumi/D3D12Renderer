@@ -6,11 +6,8 @@ TextureCube<float> g_PointShadowMaps[] : register(t0, space2);
 Texture2D<float> g_SpotShadowMaps[] : register(t0, space3);
 
 // GBuffers & depth buffer
-Texture2D g_albedo : register(t0, space4);
-Texture2D g_normal : register(t1, space4);
-Texture2D g_materialAmbient : register(t2, space4);
-Texture2D g_materialSpecular : register(t3, space4);
-Texture2D g_depthBuffer : register(t4, space4);
+Texture2D g_gBuffers[NUM_GBUFFER_SLOTS] : register(t0, space4);
+Texture2D g_depthBuffer : register(t0, space5);
 
 // Static comparison samplers for shadow mapping
 SamplerComparisonState g_comparisonSampler0 : register(s0, space1);
@@ -195,12 +192,12 @@ float4 main(PSInput input) : SV_TARGET
     // Sample GBuffers
     int2 texCoord = int2(input.pos.xy);
     
-    float3 texColor = g_albedo.Load(int3(texCoord, 0)).rgb;
-    float4 temp = g_normal.Load(int3(texCoord, 0));
+    float3 texColor = g_gBuffers[GBUFFER_SLOT_ALBEDO].Load(int3(texCoord, 0)).rgb;
+    float4 temp = g_gBuffers[GBUFFER_SLOT_NORMAL].Load(int3(texCoord, 0));
     float3 normalWorld = temp.xyz;
     float shininess = temp.w;
-    float3 materialAmbient = g_materialAmbient.Load(int3(texCoord, 0)).rgb;
-    float3 materialSpecular = g_materialSpecular.Load(int3(texCoord, 0)).rgb;
+    float3 materialAmbient = g_gBuffers[GBUFFER_SLOT_MAT_AMBIENT].Load(int3(texCoord, 0)).rgb;
+    float3 materialSpecular = g_gBuffers[GBUFFER_SLOT_MAT_SPECULAR].Load(int3(texCoord, 0)).rgb;
     
     // reconstruct world position
     float depth = g_depthBuffer.Load(int3(texCoord, 0)).r;
