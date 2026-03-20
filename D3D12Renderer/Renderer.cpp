@@ -857,7 +857,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     }
 
     frameResource.EnsureInstanceCapacity(static_cast<UINT>(temp.size()));
-        frameResource.PushInstanceData(temp);
+    frameResource.PushInstanceData(temp);
 
     // Depth-only pass for shadow mapping
     {
@@ -1022,7 +1022,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
 
         for (auto& mesh : m_meshes)
-    {
+        {
             auto* pMesh = mesh.get();
             const auto& instanceRange = m_instanceRanges[pMesh];
 
@@ -1310,28 +1310,26 @@ void Renderer::CreateRootSignature()
 
     // Descriptor table for MaterialConstantBuffers[]
     rootSignature[4].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[4].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[4].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for LightConstantBuffers[]
     rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[5].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[5].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for textures (albedo, normal map, height map)
-    // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
-    // GPU jobs (UpdateSubresources) are already finished when recording command list. I don't know why DATA_STATIC flag fails.
     rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[6].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[6].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for shadowMaps[]
     // Directional
     rootSignature[7].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[7].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[7].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
     // Point
     rootSignature[8].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[8].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[8].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
     // Spot
     rootSignature[9].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[9].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[9].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
 
     // Descriptor table for GBuffers and SRV for depth stencil buffer
     rootSignature[10].InitAsTable(2, D3D12_SHADER_VISIBILITY_PIXEL);
@@ -1406,16 +1404,16 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         }
         else
         {
-        depthStencilDesc.DepthEnable = TRUE;
-        depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-        depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
-        depthStencilDesc.StencilEnable = FALSE;
-        depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
-        depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-        const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =
-        { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
-        depthStencilDesc.FrontFace = defaultStencilOp;
-        depthStencilDesc.BackFace = defaultStencilOp;
+            depthStencilDesc.DepthEnable = TRUE;
+            depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+            depthStencilDesc.StencilEnable = FALSE;
+            depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+            depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+            const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =
+            { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+            depthStencilDesc.FrontFace = defaultStencilOp;
+            depthStencilDesc.BackFace = defaultStencilOp;
         }
 
         // Describe and create the graphics pipeline state object (PSO).
@@ -1423,7 +1421,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         if (psoKey.passType == PassType::DEFERRED_LIGHTING)
             psoDesc.InputLayout = { nullptr, 0 };
         else
-        psoDesc.InputLayout = { m_inputLayout.data(), static_cast<UINT>(m_inputLayout.size()) };
+            psoDesc.InputLayout = { m_inputLayout.data(), static_cast<UINT>(m_inputLayout.size()) };
         psoDesc.pRootSignature = m_rootSignature->GetRootSignature().Get();
 
         // Shader stages are selected by demand.
