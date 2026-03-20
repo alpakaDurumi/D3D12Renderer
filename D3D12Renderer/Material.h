@@ -20,6 +20,13 @@ enum class TextureSlot
     NUM_TEXTURE_SLOTS
 };
 
+enum class RenderingPath
+{
+    FORWARD,
+    DEFERRED,
+    NUM_RENDERING_PATHS
+};
+
 class Material
 {
 public:
@@ -117,6 +124,17 @@ public:
     {
         m_constantData = src.m_constantData;
         m_textureAddressingModes = src.m_textureAddressingModes;
+        m_renderingPath = src.m_renderingPath;
+    }
+
+    RenderingPath GetRenderingPath() const
+    {
+        return m_renderingPath;
+    }
+
+    void SetRenderingPath(RenderingPath path)
+    {
+        m_renderingPath = path;
     }
 
 private:
@@ -129,4 +147,6 @@ private:
     UINT m_constantBufferIndex;
 
     std::array<TextureAddressingMode, static_cast<UINT>(TextureSlot::NUM_TEXTURE_SLOTS)> m_textureAddressingModes;
+
+    RenderingPath m_renderingPath;
 };
