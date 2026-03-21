@@ -354,11 +354,12 @@ void Renderer::OnResize(UINT width, UINT height)
     }
 
     // Recreate depth-stencil buffer, DSV, and SRV
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer);
-    m_layoutTracker->RegisterResource(m_depthStencilBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, 1, 1, DXGI_FORMAT_R32_TYPELESS);
+    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer, true);
+    m_layoutTracker->RegisterResource(m_depthStencilBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, 1, 1, DXGI_FORMAT_R24G8_TYPELESS);
 
-    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle());
-    CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R32_FLOAT, m_depthSRVAllocation.GetDescriptorHandle());
+    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(), true, false);
+    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_readOnlyDSVAllocation.GetDescriptorHandle(), true, true);
+    CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R24_UNORM_X8_TYPELESS, m_depthSRVAllocation.GetDescriptorHandle());
 }
 
 void Renderer::OnDpiChanged(UINT dpi)
@@ -658,13 +659,15 @@ void Renderer::LoadAssets()
 
     // Create depth-stencil buffer, DSV, and SRV
     m_dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
+    m_readOnlyDSVAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
     m_depthSRVAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
 
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer);
-    m_layoutTracker->RegisterResource(m_depthStencilBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, 1, 1, DXGI_FORMAT_R32_TYPELESS);
+    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer, true);
+    m_layoutTracker->RegisterResource(m_depthStencilBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, 1, 1, DXGI_FORMAT_R24G8_TYPELESS);
 
-    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle());
-    CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R32_FLOAT, m_depthSRVAllocation.GetDescriptorHandle());
+    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(), true, false);
+    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_readOnlyDSVAllocation.GetDescriptorHandle(), true, true);
+    CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R24_UNORM_X8_TYPELESS, m_depthSRVAllocation.GetDescriptorHandle());
 
     // Set viewport and scissorRect for shadow mapping
     m_shadowMapViewport = { 0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f };
@@ -860,6 +863,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     frameResource.PushInstanceData(temp);
 
     // Depth-only pass for shadow mapping
+    // Also work as z-prepass
     {
         PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"Depth-only pass");
 
@@ -1015,7 +1019,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         clearColor.v = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
         for (auto& rtvHandle : rtvHandles)
             cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-        cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
+        cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 0.0f, 0, 0, nullptr);
+        cmdList->OMSetStencilRef(1);
 
         cmdList->SetPipelineState(pso);
 
@@ -1054,15 +1059,16 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         }
     }
 
-    // To use depth-stencill buffer as a SRV in Deferred Lighting pass
-    // Needs to reconstruct world pos
+    // To use depth-stencil buffer as both SRV and DSV simultaneously
+    // SRV: to reconstruct world pos
+    // DSV: for stencil test
     commandList.Barrier(
         m_depthStencilBuffer.Get(),
         D3D12_BARRIER_SYNC_DEPTH_STENCIL,
         D3D12_BARRIER_SYNC_PIXEL_SHADING,
         D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
-        D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-        D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
+        D3D12_BARRIER_ACCESS_SHADER_RESOURCE | D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ,
+        D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_GENERIC_READ);
 
     // Deferred Lighting pass
     {
@@ -1078,7 +1084,9 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetRTVHandle();
-        cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_readOnlyDSVAllocation.GetDescriptorHandle();
+        cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+        cmdList->OMSetStencilRef(1);
 
         // Use linear color for gamma-correct rendering
         XMVECTORF32 clearColor;
@@ -1099,7 +1107,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         m_depthStencilBuffer.Get(),
         D3D12_BARRIER_SYNC_PIXEL_SHADING,
         D3D12_BARRIER_SYNC_DEPTH_STENCIL,
-        D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+        D3D12_BARRIER_ACCESS_SHADER_RESOURCE | D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ,
         D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
         D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
 
@@ -1400,20 +1408,35 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         if (psoKey.passType == PassType::DEFERRED_LIGHTING)
         {
             depthStencilDesc.DepthEnable = FALSE;
-            depthStencilDesc.StencilEnable = FALSE;
+
+            depthStencilDesc.StencilEnable = TRUE;
+            depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+            depthStencilDesc.StencilWriteMask = 0;
+            const D3D12_DEPTH_STENCILOP_DESC stencilOp =
+            { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_EQUAL };
+            depthStencilDesc.FrontFace = stencilOp;
+            depthStencilDesc.BackFace = stencilOp;
         }
         else
         {
             depthStencilDesc.DepthEnable = TRUE;
             depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
             depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
-            depthStencilDesc.StencilEnable = FALSE;
-            depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
-            depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-            const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =
-            { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
-            depthStencilDesc.FrontFace = defaultStencilOp;
-            depthStencilDesc.BackFace = defaultStencilOp;
+
+            if (psoKey.passType == PassType::GBUFFER)
+            {
+                depthStencilDesc.StencilEnable = TRUE;
+                depthStencilDesc.StencilReadMask = 0;
+                depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+                const D3D12_DEPTH_STENCILOP_DESC stencilOp =
+                { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_REPLACE, D3D12_COMPARISON_FUNC_ALWAYS };
+                depthStencilDesc.FrontFace = stencilOp;
+                depthStencilDesc.BackFace = stencilOp;
+            }
+            else
+            {
+                depthStencilDesc.StencilEnable = FALSE;
+            }
         }
 
         // Describe and create the graphics pipeline state object (PSO).
@@ -1448,7 +1471,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         psoDesc.RasterizerState = rasterizerDesc;
         psoDesc.BlendState = blendDesc;
         psoDesc.DepthStencilState = depthStencilDesc;
-        psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+        psoDesc.DSVFormat = psoKey.passType == PassType::DEPTH_ONLY ? DXGI_FORMAT_D32_FLOAT : DXGI_FORMAT_D24_UNORM_S8_UINT;
         psoDesc.SampleMask = UINT_MAX;
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 

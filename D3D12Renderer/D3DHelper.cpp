@@ -311,10 +311,10 @@ namespace D3DHelper
             IID_PPV_ARGS(&renderTarget)));
     }
 
-    void CreateDepthStencilBuffer(ID3D12Device10* pDevice, UINT64 width, UINT height, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& depthStencilBuffer, D3D12_CLEAR_VALUE* pClearValue)
+    void CreateDepthStencilBuffer(ID3D12Device10* pDevice, UINT64 width, UINT height, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& depthStencilBuffer, bool useStencil, D3D12_CLEAR_VALUE* pClearValue)
     {
         D3D12_CLEAR_VALUE defaultClearValue = {};
-        defaultClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+        defaultClearValue.Format = useStencil ? DXGI_FORMAT_D24_UNORM_S8_UINT : DXGI_FORMAT_D32_FLOAT;
         defaultClearValue.DepthStencil.Depth = 0.0f;    // reverse-z
         defaultClearValue.DepthStencil.Stencil = 0;
 
@@ -332,7 +332,7 @@ namespace D3DHelper
         resourceDesc.Height = height;
         resourceDesc.DepthOrArraySize = depthOrArraySize;
         resourceDesc.MipLevels = 1;
-        resourceDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+        resourceDesc.Format = useStencil ? DXGI_FORMAT_R24G8_TYPELESS : DXGI_FORMAT_R32_TYPELESS;
         resourceDesc.SampleDesc = { 1, 0 };
         resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
         resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
@@ -373,11 +373,11 @@ namespace D3DHelper
         pDevice->CreateRenderTargetView(pResource, &rtvDesc, cpuHandle);
     }
 
-    void CreateDSV(ID3D12Device10* pDevice, ID3D12Resource* pResource, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, bool isArray, UINT firstArraySlice)
+    void CreateDSV(ID3D12Device10* pDevice, ID3D12Resource* pResource, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, bool useStencil, bool isReadOnly, bool isArray, UINT firstArraySlice)
     {
         D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-        dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
-        dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+        dsvDesc.Format = useStencil ? DXGI_FORMAT_D24_UNORM_S8_UINT : DXGI_FORMAT_D32_FLOAT;
+        dsvDesc.Flags = isReadOnly ? D3D12_DSV_FLAG_READ_ONLY_DEPTH | D3D12_DSV_FLAG_READ_ONLY_STENCIL : D3D12_DSV_FLAG_NONE;
 
         if (isArray)
         {
