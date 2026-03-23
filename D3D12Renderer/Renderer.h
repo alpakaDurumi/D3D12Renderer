@@ -13,6 +13,7 @@
 #include <array>
 #include <chrono>
 #include <unordered_map>
+#include <cstddef>
 
 #include "Camera.h"
 #include "InputManager.h"
@@ -142,7 +143,7 @@ private:
     std::vector<std::unique_ptr<Texture>> m_textures;
 
     // Lights, Shadows
-    std::vector<std::unique_ptr<Light>> m_lights;
+    std::array<std::vector<std::unique_ptr<Light>>, static_cast<std::size_t>(LightType::NUM_LIGHT_TYPES)> m_lights;
     D3D12_VIEWPORT m_shadowMapViewport;
     D3D12_RECT m_shadowMapScissorRect;
     UINT m_shadowMapResolution = 2048;

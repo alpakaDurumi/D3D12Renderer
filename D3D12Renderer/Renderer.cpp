@@ -810,7 +810,8 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     // Set root signature
     cmdList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature().Get());
 
-    UINT numLights = static_cast<UINT>(m_lights.size());
+    UINT numLights = 0;
+    for (const auto& vec : m_lights) numLights += static_cast<UINT>(vec.size());
     cmdList->SetGraphicsRoot32BitConstant(2, numLights, 0);
 
     // Stage material CBVs
@@ -828,11 +829,13 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, i, 1, m_textures[i]->GetAllocationRef());
 
     // Stage shadow SRVs
-    for (const auto& light : m_lights)
+    for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
     {
-        LightType type = light->GetType();
+        for (auto& light : m_lights[type])
+        {
         UINT idxInArray = light->GetIdxInArray();
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7 + static_cast<UINT>(type), idxInArray, 1, light->GetSRVAllocationRef());
+            m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7 + type, idxInArray, 1, light->GetSRVAllocationRef());
+    }
     }
 
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, 0, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), frameResource.GetGBufferSRVAllocationRef());
@@ -879,11 +882,13 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         m_currentPSOKey.psName = L"PointLightShadowPS.hlsl";
         auto* pointShadowPSO = GetPipelineState(m_currentPSOKey);
 
-        for (UINT i = 0; i < m_lights.size(); ++i)
+        UINT lightIdx = 0;
+        for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
         {
-            auto& light = m_lights[i];
-            bool isPointLight = light->GetType() == LightType::POINT;
+            bool isPointLight = static_cast<LightType>(type) == LightType::POINT;
 
+            for (auto& light : m_lights[type])
+            {
             if (isPointLight)
             {
                 commandList.Barrier(
@@ -894,7 +899,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                     D3D12_BARRIER_ACCESS_RENDER_TARGET,
                     D3D12_BARRIER_LAYOUT_RENDER_TARGET);
 
-                cmdList->SetGraphicsRoot32BitConstant(3, i, 0);
+                    cmdList->SetGraphicsRoot32BitConstant(3, lightIdx, 0);
             }
             else
             {
@@ -975,7 +980,9 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                     D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
                     D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
             }
+                ++lightIdx;
         }
+    }
     }
 
     // temp
@@ -1629,41 +1636,21 @@ void Renderer::PrepareConstantData(float alpha)
     // Pre-calculate common data for CSM.
     std::vector<BoundingSphere> cascadeSpheres = CalcCascadeSpheres();
 
-    UINT numDirectionalLight = 0;
-    UINT numPointLight = 0;
-    UINT numSpotLight = 0;
-    for (auto& light : m_lights)
-    {
-        LightType type = light->GetType();
+    UINT lightIndices[3] = { 0, 0, 0 };
 
-        switch (type)
-        {
-        case LightType::DIRECTIONAL:
-        {
-            // Since light type is guaranteed by m_type variable,
-            // Use static_cast for downcasting instead of dynamic_cast.
-            PrepareDirectionalLight(static_cast<DirectionalLight&>(*light), cascadeSpheres);
+    // Wrap prepare... functions by lambda
+    std::function<void(Light&)> prepareFuncs[3];
+    prepareFuncs[0] = [&](Light& l) { PrepareDirectionalLight(static_cast<DirectionalLight&>(l), cascadeSpheres); };
+    prepareFuncs[1] = [&](Light& l) { PreparePointLight(static_cast<PointLight&>(l)); };
+    prepareFuncs[2] = [&](Light& l) { PrepareSpotLight(static_cast<SpotLight&>(l)); };
 
-            light->SetIdxInArray(numDirectionalLight);
-            ++numDirectionalLight;
-            break;
-        }
-        case LightType::POINT:
+    for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
         {
-            PreparePointLight(static_cast<PointLight&>(*light));
-
-            light->SetIdxInArray(numPointLight);
-            ++numPointLight;
-            break;
-        }
-        case LightType::SPOT:
+        for (auto& light : m_lights[type])
         {
-            PrepareSpotLight(static_cast<SpotLight&>(*light));
-
-            light->SetIdxInArray(numSpotLight);
-            ++numSpotLight;
-            break;
-        }
+            prepareFuncs[type](*light);
+            light->SetIdxInArray(lightIndices[type]);
+            ++lightIndices[type];
         }
     }
 }
@@ -1828,15 +1815,19 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
         frameResource.UpdateMaterialConstantBuffer(i, m_materials[i]->GetConstantDataPtr());
     }
 
-    for (UINT i = 0; i < m_lights.size(); ++i)
+    UINT lightIdx = 0;
+    for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
     {
-        auto& light = m_lights[i];
-        UINT16 arraySize = light->GetArraySize();
-        for (UINT j = 0; j < arraySize; ++j)
+        UINT16 arraySize = GetRequiredArraySize(static_cast<LightType>(type));
+        for (auto& light : m_lights[type])
         {
-            frameResource.UpdateCameraConstantBuffer(light->GetCameraConstantBufferBaseIndex() + j, light->GetCameraConstantDataPtr(j));
+            for (UINT i = 0; i < arraySize; ++i)
+        {
+                frameResource.UpdateCameraConstantBuffer(light->GetCameraConstantBufferBaseIndex() + i, light->GetCameraConstantDataPtr(i));
+            }
+            frameResource.UpdateLightConstantBuffer(lightIdx, light->GetLightConstantDataPtr());
+            ++lightIdx;
         }
-        frameResource.UpdateLightConstantBuffer(i, light->GetLightConstantDataPtr());
     }
 }
 
@@ -1857,7 +1848,7 @@ DirectionalLight* Renderer::CreateLight<DirectionalLight>()
         std::move(cbvAllocation));
 
     auto* pLight = light.get();
-    m_lights.push_back(std::move(light));
+    m_lights[static_cast<UINT>(LightType::DIRECTIONAL)].push_back(std::move(light));
 
     return pLight;
 }
@@ -1880,7 +1871,7 @@ PointLight* Renderer::CreateLight<PointLight>()
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(POINT_LIGHT_ARRAY_SIZE));
 
     auto* pLight = light.get();
-    m_lights.push_back(std::move(light));
+    m_lights[static_cast<UINT>(LightType::POINT)].push_back(std::move(light));
 
     return pLight;
 }
@@ -1902,7 +1893,7 @@ SpotLight* Renderer::CreateLight<SpotLight>()
         std::move(cbvAllocation));
 
     auto* pLight = light.get();
-    m_lights.push_back(std::move(light));
+    m_lights[static_cast<UINT>(LightType::SPOT)].push_back(std::move(light));
 
     return pLight;
 }
