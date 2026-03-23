@@ -123,7 +123,7 @@ void Light::SetPosition(XMVECTOR pos)
 
 void Light::SetDirection(XMFLOAT3 dir)
 {
-    m_lightConstantData.lightDir = dir;
+    SetDirection(XMVectorSet(dir.x, dir.y, dir.z, 0.0f));
 }
 
 void Light::SetDirection(XMVECTOR dir)
@@ -273,6 +273,7 @@ SpotLight::SpotLight(
 {
     Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation));
     CreateSRVForShadow(pDevice, m_depthBuffer.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
+    SetAngles(45.0f, 20.0f);    // Set default angle
 }
 
 float SpotLight::GetOuterAngle() const
@@ -289,4 +290,9 @@ void SpotLight::SetAngles(float outerAngleDegree, float innerAngleDegree)
     // We need cosine value that calculated from half angle.
     m_lightConstantData.cosOuterAngle = std::cos(m_outerAngle * 0.5f);
     m_lightConstantData.cosInnerAngle = std::cos(m_innerAngle * 0.5f);
+    
+    const float minDiff = 0.01f;
+
+    if ((m_lightConstantData.cosInnerAngle - m_lightConstantData.cosOuterAngle) < minDiff)
+        m_lightConstantData.cosOuterAngle = m_lightConstantData.cosInnerAngle - minDiff;
 }

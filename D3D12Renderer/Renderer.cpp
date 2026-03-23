@@ -779,15 +779,15 @@ void Renderer::LoadAssets()
 
     // Set up lights
     auto* pDirectionalLight = CreateLight<DirectionalLight>();
-    pDirectionalLight->SetDirection(XMVectorSet(-1.0f, -1.0f, 1.0f, 0.0f));
+    pDirectionalLight->SetDirection(XMFLOAT3(-1.0f, -1.0f, 1.0f));
 
     auto* pPointLight = CreateLight<PointLight>();
-    pPointLight->SetPosition(XMVectorSet(0.0f, 4.0f, 3.0f, 1.0f));
+    pPointLight->SetPosition(XMFLOAT3(0.0f, 4.0f, 3.0f));
     pPointLight->SetRange(30.0f);
 
     auto* pSpotLight = CreateLight<SpotLight>();
-    pSpotLight->SetPosition(XMVectorSet(0.0f, 10.0f, -5.0f, 1.0f));
-    pSpotLight->SetDirection(XMVectorSet(0.0f, -1.0f, 1.0f, 0.0f));
+    pSpotLight->SetPosition(XMFLOAT3(0.0f, 10.0f, -5.0f));
+    pSpotLight->SetDirection(XMFLOAT3(0.0f, -1.0f, 1.0f));
     pSpotLight->SetRange(50.0f);
     pSpotLight->SetAngles(50.0f, 10.0f);
 

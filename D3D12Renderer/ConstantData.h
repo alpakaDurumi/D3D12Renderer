@@ -48,9 +48,9 @@ struct CameraConstantData : public ConstantData<CameraConstantData>
 
 struct LightConstantData : public ConstantData<LightConstantData>
 {
-    XMFLOAT3 lightPos;
-    float range;
-    XMFLOAT3 lightDir;
+    XMFLOAT3 lightPos = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    float range = 50.0f;
+    XMFLOAT3 lightDir = XMFLOAT3(0.0f, 0.0f, 1.0f);
     float cosOuterAngle;
     XMFLOAT3 lightColor = XMFLOAT3(1.0f, 1.0f, 1.0f);
     float cosInnerAngle;
