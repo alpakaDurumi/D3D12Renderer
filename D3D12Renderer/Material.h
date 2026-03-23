@@ -6,6 +6,7 @@
 #include <memory>
 #include <utility>
 #include <array>
+#include <cstddef>
 
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
@@ -146,7 +147,7 @@ private:
     MaterialConstantData m_constantData;
     UINT m_constantBufferIndex;
 
-    std::array<TextureAddressingMode, static_cast<UINT>(TextureSlot::NUM_TEXTURE_SLOTS)> m_textureAddressingModes;
+    std::array<TextureAddressingMode, static_cast<std::size_t>(TextureSlot::NUM_TEXTURE_SLOTS)> m_textureAddressingModes;
 
     RenderingPath m_renderingPath;
 };

@@ -2,6 +2,7 @@
 
 #include <functional>   // for std::hash
 #include <string>
+#include <cstddef>
 
 #include "Utility.h"
 
