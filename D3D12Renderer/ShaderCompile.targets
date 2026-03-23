@@ -40,6 +40,23 @@
       <AdditionalInputs>SharedConfig.h</AdditionalInputs>
     </CustomBuild>
 
+    <CustomBuild Update="DeferredLightingVS.hlsl">
+      <Message>DXC: DeferredLightingVS.hlsl (all variants)</Message>
+
+      <PdbFlag Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)DeferredLightingVS.pdb"</PdbFlag>
+      <PdbFlag Condition="'$(Configuration)'=='Release'"></PdbFlag>
+
+      <Command>"$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)DeferredLightingVS.cso"</Command>
+
+      <Outputs Condition="'$(Configuration)'!='Release'">
+        $(ShaderOutDir)DeferredLightingVS.cso;
+        $(ShaderPdbDir)DeferredLightingVS.pdb;
+      </Outputs>
+      <Outputs Condition="'$(Configuration)'=='Release'">
+        $(ShaderOutDir)DeferredLightingVS.cso;
+      </Outputs>
+    </CustomBuild>
+
     <!-- PS -->
     <CustomBuild Update="ps.hlsl">
       <Message>DXC: ps.hlsl</Message>
@@ -73,6 +90,41 @@
       </Outputs>
       <Outputs Condition="'$(Configuration)'=='Release'">
         $(ShaderOutDir)PointLightShadowPS.cso;
+      </Outputs>
+      <AdditionalInputs>SharedConfig.h</AdditionalInputs>
+    </CustomBuild>
+
+    <CustomBuild Update="GBufferPS.hlsl">
+      <Message>DXC: GBufferPS.hlsl</Message>
+
+      <PdbFlag Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)GBufferPS.pdb"</PdbFlag>
+      <PdbFlag Condition="'$(Configuration)'=='Release'"></PdbFlag>
+
+      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)GBufferPS.cso"</Command>
+
+      <Outputs Condition="'$(Configuration)'!='Release'">
+        $(ShaderOutDir)GBufferPS.cso;
+        $(ShaderPdbDir)GBufferPS.pdb;
+      </Outputs>
+      <Outputs Condition="'$(Configuration)'=='Release'">
+        $(ShaderOutDir)GBufferPS.cso;
+      </Outputs>
+    </CustomBuild>
+
+    <CustomBuild Update="DeferredLightingPS.hlsl">
+      <Message>DXC: DeferredLightingPS.hlsl</Message>
+
+      <PdbFlag Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)DeferredLightingPS.pdb"</PdbFlag>
+      <PdbFlag Condition="'$(Configuration)'=='Release'"></PdbFlag>
+
+      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)DeferredLightingPS.cso"</Command>
+
+      <Outputs Condition="'$(Configuration)'!='Release'">
+        $(ShaderOutDir)DeferredLightingPS.cso;
+        $(ShaderPdbDir)DeferredLightingPS.pdb;
+      </Outputs>
+      <Outputs Condition="'$(Configuration)'=='Release'">
+        $(ShaderOutDir)DeferredLightingPS.cso;
       </Outputs>
       <AdditionalInputs>SharedConfig.h</AdditionalInputs>
     </CustomBuild>

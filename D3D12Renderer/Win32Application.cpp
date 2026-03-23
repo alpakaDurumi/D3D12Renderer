@@ -37,14 +37,15 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
         return 1;
     }
 
-    RECT windowRect = { 0, 0, static_cast<LONG>(pRenderer->GetWidth()), static_cast<LONG>(pRenderer->GetHeight()) };
-    AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
-
-    // Make application DPI-aware before window creation
+    // Make application DPI-aware before adjusting window.
     SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
+    RECT windowRect = { 0, 0, static_cast<LONG>(pRenderer->GetWidth()), static_cast<LONG>(pRenderer->GetHeight()) };
+    UINT dpi = GetDpiForSystem();
+    AdjustWindowRectExForDpi(&windowRect, WS_OVERLAPPEDWINDOW, FALSE, 0, dpi);
+
     // Create the window and store a handle to it.
-    m_hwnd = CreateWindowExW(
+    sm_hwnd = CreateWindowExW(
         NULL,
         windowClass.lpszClassName,
         pRenderer->GetTitle(),
@@ -57,15 +58,15 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
         nullptr,        // We aren't using menus.
         hInstance,
         pRenderer);
-    if (m_hwnd == 0)
+    if (sm_hwnd == 0)
     {
         MessageBoxW(nullptr, L"Window Creation Failed!", L"Error", MB_OK | MB_ICONERROR);
         return 1;
     }
 
-    pRenderer->OnInit();
+    pRenderer->OnInit(dpi);
 
-    ShowWindow(m_hwnd, nCmdShow);
+    ShowWindow(sm_hwnd, nCmdShow);
 
     // Set periodic timer resolution.
     MMRESULT mm = timeBeginPeriod(1);
@@ -173,7 +174,15 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
     case WM_DPICHANGED:
         if (renderer)
         {
-            renderer->OnDpiChanged();
+            UINT dpi = LOWORD(wParam);
+            RECT* const newRect = (RECT*)lParam;
+            SetWindowPos(sm_hwnd, HWND_TOP,
+                newRect->left,
+                newRect->top,
+                newRect->right - newRect->left,
+                newRect->bottom - newRect->top,
+                SWP_NOZORDER | SWP_NOACTIVATE);
+            renderer->OnDpiChanged(dpi);
         }
         return 0;
     case WM_DESTROY:

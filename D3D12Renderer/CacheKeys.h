@@ -9,6 +9,8 @@ enum class PassType
 {
     DEFAULT,
     DEPTH_ONLY,
+    GBUFFER,
+    DEFERRED_LIGHTING,
     NUM_PASS_TYPES
 };
 

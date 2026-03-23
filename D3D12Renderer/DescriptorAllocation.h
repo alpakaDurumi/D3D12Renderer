@@ -4,6 +4,9 @@
 
 #include <d3d12.h>
 
+#include <vector>
+#include <cassert>
+
 class DescriptorAllocatorPage;
 
 // move-only self-freeing type that is used as a wrapper for a D3D12_CPU_DESCRIPTOR_HANDLE

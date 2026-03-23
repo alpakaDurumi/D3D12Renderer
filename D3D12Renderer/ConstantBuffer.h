@@ -22,7 +22,7 @@ public:
     ConstantBuffer(ID3D12Device10* pDevice)
         : m_allocation(std::nullopt)
     {
-        CreateUploadHeap(pDevice, sizeof(T), m_buffer);
+        CreateUploadBuffer(pDevice, sizeof(T), m_buffer);
 
         D3D12_RANGE readRange = { 0, 0 };
         ThrowIfFailed(m_buffer->Map(0, &readRange, reinterpret_cast<void**>(&m_pBufferBegin)));
@@ -34,7 +34,7 @@ public:
     {
         assert(!m_allocation->IsNull());
 
-        CreateUploadHeap(pDevice, sizeof(T), m_buffer);
+        CreateUploadBuffer(pDevice, sizeof(T), m_buffer);
 
         // Create constant buffer view
         D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};

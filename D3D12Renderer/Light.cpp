@@ -30,7 +30,11 @@ void Light::Init(
 
     UINT16 arraySize = GetRequiredArraySize(m_type);
 
-    CreateDepthStencilBuffer(pDevice, shadowMapResolution, shadowMapResolution, m_depthBuffer, m_dsvAllocation, arraySize);
+    CreateDepthStencilBuffer(pDevice, shadowMapResolution, shadowMapResolution, arraySize, m_depthBuffer, false);
+    for (UINT i = 0; i < arraySize; ++i)
+    {
+        CreateDSV(pDevice, m_depthBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(i), false, false, true, i);
+    }
     layoutTracker.RegisterResource(m_depthBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, arraySize, 1, DXGI_FORMAT_R32_TYPELESS);
 
     auto cbvAllocations = cbvAllocation.Split();
@@ -40,12 +44,12 @@ void Light::Init(
     {
         FrameResource& frameResource = *frameResources[i];
 
-        frameResource.m_lightConstantBuffers.push_back(std::make_unique<LightCB>(pDevice, std::move(cbvAllocations[i])));
-        if (i == 0) m_cameraConstantBufferBaseIndex = UINT(frameResource.m_cameraConstantBuffers.size());
+        frameResource.AddLightConstantBuffer(std::move(cbvAllocations[i]));
+        if (i == 0) m_cameraConstantBufferBaseIndex = frameResource.GetCameraConstantBufferCount();
 
         for (UINT j = 0; j < arraySize; ++j)
         {
-            frameResource.m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(pDevice));
+            frameResource.AddCameraConstantBuffer();
         }
     }
 }
@@ -144,18 +148,14 @@ void Light::SetIdxInArray(UINT idxInArray)
     m_lightConstantData.idxInArray = idxInArray;
 }
 
-void Light::UpdateCameraConstantBuffer(FrameResource& frameResource)
+CameraConstantData* Light::GetCameraConstantDataPtr(UINT idx)
 {
-    UINT16 arraySize = GetArraySize();
-    for (UINT i = 0; i < arraySize; ++i)
-    {
-        frameResource.m_cameraConstantBuffers[m_cameraConstantBufferBaseIndex + i]->Update(&m_cameraConstantData[i]);
-    }
+    return &m_cameraConstantData[idx];
 }
 
-void Light::UpdateLightConstantBuffer(FrameResource& frameResource, UINT lightIndex)
+LightConstantData* Light::GetLightConstantDataPtr()
 {
-    frameResource.m_lightConstantBuffers[lightIndex]->Update(&m_lightConstantData);
+    return &m_lightConstantData;
 }
 
 DirectionalLight::DirectionalLight(
@@ -215,27 +215,6 @@ PointLight::PointLight(
 
     Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation));
 
-    // Create render target.
-    D3D12_HEAP_PROPERTIES heapProperties = {};
-    heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-    heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProperties.CreationNodeMask = 1;
-    heapProperties.VisibleNodeMask = 1;
-
-    D3D12_RESOURCE_DESC1 resourceDesc = {};
-    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    resourceDesc.Alignment = 0;
-    resourceDesc.Width = shadowMapResolution;
-    resourceDesc.Height = shadowMapResolution;
-    resourceDesc.DepthOrArraySize = POINT_LIGHT_ARRAY_SIZE;
-    resourceDesc.MipLevels = 1;
-    resourceDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-    resourceDesc.SampleDesc = { 1, 0 };
-    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-    resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
-
     D3D12_CLEAR_VALUE clearValue = {};
     clearValue.Format = DXGI_FORMAT_R32_FLOAT;
     clearValue.Color[0] = 1.0f;
@@ -243,31 +222,14 @@ PointLight::PointLight(
     clearValue.Color[2] = 1.0f;
     clearValue.Color[3] = 1.0f;
 
-    ThrowIfFailed(pDevice->CreateCommittedResource3(
-        &heapProperties,
-        D3D12_HEAP_FLAG_NONE,
-        &resourceDesc,
-        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-        &clearValue,
-        nullptr,
-        0,
-        nullptr,
-        IID_PPV_ARGS(&m_renderTarget)));
+    CreateRenderTarget(pDevice, shadowMapResolution, shadowMapResolution, DXGI_FORMAT_R32_TYPELESS, DXGI_FORMAT_R32_FLOAT, POINT_LIGHT_ARRAY_SIZE, m_renderTarget, &clearValue);
+    layoutTracker.RegisterResource(m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_RENDER_TARGET, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS);
 
     // Create RTVs.
-    D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-    rtvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-    rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
-    rtvDesc.Texture2DArray.MipSlice = 0;
-    rtvDesc.Texture2DArray.ArraySize = 1;
-    rtvDesc.Texture2DArray.PlaneSlice = 0;
     for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
     {
-        rtvDesc.Texture2DArray.FirstArraySlice = i;
-        pDevice->CreateRenderTargetView(m_renderTarget.Get(), &rtvDesc, m_rtvAllocation.GetDescriptorHandle(i));
+        CreateRTV(pDevice, m_renderTarget.Get(), DXGI_FORMAT_R32_FLOAT, m_rtvAllocation.GetDescriptorHandle(i), true, i);
     }
-
-    layoutTracker.RegisterResource(m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_RENDER_TARGET, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS);
 
     // Create SRV for render target we've created just before. NOT for depth buffer!
     CreateSRVForShadow(pDevice, m_renderTarget.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);

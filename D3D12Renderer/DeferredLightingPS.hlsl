@@ -1,14 +1,13 @@
 #include "SharedConfig.h"
 
-Texture2D g_textures[] : register(t0, space0);
-
 // SRV for lights
 Texture2DArray<float> g_directionalShadowMaps[] : register(t0, space1);
 TextureCube<float> g_PointShadowMaps[] : register(t0, space2);
 Texture2D<float> g_SpotShadowMaps[] : register(t0, space3);
 
-// Dynamic samplers for ordinary texture sampling
-SamplerState g_samplers[] : register(s0, space0);
+// GBuffers & depth buffer
+Texture2D g_gBuffers[NUM_GBUFFER_SLOTS] : register(t0, space4);
+Texture2D g_depthBuffer : register(t0, space5);
 
 // Static comparison samplers for shadow mapping
 SamplerComparisonState g_comparisonSampler0 : register(s0, space1);
@@ -25,12 +24,7 @@ static const float2 vogelDisk[16] =
 struct PSInput
 {
     float4 pos : SV_POSITION;
-    float3 posWorld : POSITION;
-    float2 texCoord : TEXCOORD0;
-    float3 tangentWorld : TANGENT;
-    float3 normalWorld : NORMAL;
-    nointerpolation float tangentW : TEXCOORD1;     // Do not interpolate w component of tangent vector.
-    nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
+    float2 texCoord : TEXCOORD;
 };
 
 cbuffer CameraConstantBuffer : register(b0, space0)
@@ -52,17 +46,6 @@ cbuffer GlobalConstants : register(b2, space0)
     uint numLights;
 };
 
-struct MaterialConstants
-{
-    float3 materialAmbient;
-    float3 materialSpecular;
-    float shininess;
-    uint4 textureIndices;
-    uint4 samplerIndices;
-    float4 textureTileScales;
-};
-ConstantBuffer<MaterialConstants> MaterialConstantBuffers[] : register(b0, space1);
-
 struct LightConstants
 {
     float3 lightPos;
@@ -77,56 +60,6 @@ struct LightConstants
     float lightIntensity;
 };
 ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space2);
-
-// Parallax Occlusion Mapping
-float2 ParallaxMapping(float2 texCoord, float3 toCamera, uint heightMapIdx, uint heightMapSamplerIdx)
-{
-    static const float heightScale = 0.02f;
-    
-    // Set numLayers based on view direction
-    static const float minLayers = 8.0f;
-    static const float maxLayers = 32.0f;
-    const float numLayers = lerp(maxLayers, minLayers, abs(dot(float3(0.0f, 0.0f, 1.0f), toCamera)));
-    
-    float layerStep = 1.0f / numLayers;
-    
-    // Texture coord offset per layer
-    // xy / z = offset / (1.0 * heightScale)
-    float2 deltaTexCoord = toCamera.xy / max(toCamera.z, 0.001f) * heightScale / numLayers;
-    
-    float2 currentTexCoord = texCoord;
-    float2 dx = ddx(currentTexCoord);
-    float2 dy = ddy(currentTexCoord);
-    
-    float currentHeightMapValue = 1.0f - g_textures[heightMapIdx].SampleGrad(g_samplers[heightMapSamplerIdx], currentTexCoord, dx, dy).r;
-    float currentLayerHeight = 0.0f;
-    
-    float2 prevTexCoord = currentTexCoord;
-    float prevHeightMapValue = currentHeightMapValue;
-    float prevLayerHeight = currentLayerHeight;
-    
-    [loop]
-    while (currentLayerHeight < 1.0f && currentLayerHeight < currentHeightMapValue)
-    {
-        prevTexCoord = currentTexCoord;
-        prevHeightMapValue = currentHeightMapValue;
-        prevLayerHeight = currentLayerHeight;
-        
-        currentTexCoord -= deltaTexCoord;
-        currentHeightMapValue = 1.0f - g_textures[heightMapIdx].SampleGrad(g_samplers[heightMapSamplerIdx], currentTexCoord, dx, dy).r;
-        currentLayerHeight += layerStep;
-    }
-    
-    // Interpolate
-    float diffAfter = currentLayerHeight - currentHeightMapValue;
-    float diffBefore = prevHeightMapValue - prevLayerHeight;
-    
-    // Eliminate divide by zero
-    float weight = saturate(diffBefore / max(diffAfter + diffBefore, 0.00001f));
-    float2 interpolatedTexCoord = lerp(prevTexCoord, currentTexCoord, weight);
-    
-    return interpolatedTexCoord;
-}
 
 // Determine which index to use and alpha for interpolation.
 void CalcCSMIndex(float distView, out uint index, out float alpha)
@@ -256,81 +189,28 @@ float CalcAngularAttenuation(LightConstants light, float3 lightToPixel)
 
 float4 main(PSInput input) : SV_TARGET
 {
-    uint materialIdx = input.materialIndex;
+    // Sample GBuffers
+    int2 texCoord = int2(input.pos.xy);
     
-    uint4 textureIndices = MaterialConstantBuffers[materialIdx].textureIndices;
-    uint albedoIdx = textureIndices[0];
-    uint normalMapIdx = textureIndices[1];
-    uint heightMapIdx = textureIndices[2];
+    float3 texColor = g_gBuffers[GBUFFER_SLOT_ALBEDO].Load(int3(texCoord, 0)).rgb;
+    float4 temp = g_gBuffers[GBUFFER_SLOT_NORMAL].Load(int3(texCoord, 0));
+    float3 normalWorld = temp.xyz;
+    float shininess = temp.w;
+    float3 materialAmbient = g_gBuffers[GBUFFER_SLOT_MAT_AMBIENT].Load(int3(texCoord, 0)).rgb;
+    float3 materialSpecular = g_gBuffers[GBUFFER_SLOT_MAT_SPECULAR].Load(int3(texCoord, 0)).rgb;
     
-    uint4 samplerIndices = MaterialConstantBuffers[materialIdx].samplerIndices;
-    uint albedoSamplerIdx = samplerIndices[0];
-    uint normalMapSamplerIdx = samplerIndices[1];
-    uint heightMapSamplerIdx = samplerIndices[2];
+    // reconstruct world position
+    float depth = g_depthBuffer.Load(int3(texCoord, 0)).r;
+    float4 ndc = float4(input.texCoord.x * 2.0f - 1.0f, 1.0f - input.texCoord.y * 2.0f, depth, 1.0f);
+    float4 posView = mul(ndc, invProj);
+    posView /= posView.w;       // perspective division
+    float3 posWorld = mul(posView, invView).xyz;
     
-    float4 textureTileScales = MaterialConstantBuffers[materialIdx].textureTileScales;
-    float albedoScale = textureTileScales[0];
-    float normalMapScale = textureTileScales[1];
-    float heightMapScale = textureTileScales[2];
+    float3 toCameraWorld = normalize(cameraPos - posWorld);
     
-    float3 materialAmbient = MaterialConstantBuffers[materialIdx].materialAmbient;
-    float3 materialSpecular = MaterialConstantBuffers[materialIdx].materialSpecular;
-    float shininess = MaterialConstantBuffers[materialIdx].shininess;
-    
-    // For POM, use inaccurate inverse-TBN
-    float3 iT = normalize(input.tangentWorld);
-    float3 iN = normalize(input.normalWorld);
-    iT = normalize(iT - dot(iT, iN) * iN);              // Gram-Schmidt process
-    float3 iB = input.tangentW * cross(iN, iT);         // W represents handedness
-    float3x3 iiTBN = transpose(float3x3(iT, iB, iN));   // Inverse of orthogonal matrix is same as transpose.
-    
-    float3 toCameraWorld = normalize(cameraPos - input.posWorld);
-    float3 toCameraTangent = normalize(mul(toCameraWorld, iiTBN));
-    
-    float2 texCoord = ParallaxMapping(input.texCoord * heightMapScale, toCameraTangent, heightMapIdx, heightMapSamplerIdx);
-    float2 albedoTexCoord = texCoord * albedoScale / heightMapScale;
-    float2 normalMapTexCoord = texCoord * normalMapScale / heightMapScale;
-    
-    //// Clip if texCoord exceeds boundary
-    //if (texCoord.x < 0.0 || texCoord.x > 1.0 * textureTileScale || texCoord.y < 0.0 || texCoord.y > 1.0 * textureTileScale)
-    //{
-    //    clip(-1);
-    //}
-    
-    // Set up TBN matrix
-    float3 B = input.tangentW * cross(input.normalWorld, input.tangentWorld);
-    float3x3 TBN = float3x3(input.tangentWorld, B, input.normalWorld);
-    
-    // Sample textures
-    float3 texColor = g_textures[albedoIdx].Sample(g_samplers[albedoSamplerIdx], albedoTexCoord).rgb;
-    float3 normal = g_textures[normalMapIdx].Sample(g_samplers[normalMapSamplerIdx], normalMapTexCoord).rgb * 2.0f - 1.0f;
-    float3 normalWorld = normalize(mul(normal, TBN));
-
     uint csmIdx;
     float alpha;
-    CalcCSMIndex(input.pos.w, csmIdx, alpha);   // SV_POSITION.w means view space distance.
-    
-    // Check CSM boundaries
-    //if (csmIdx == 0)
-    //{
-    //    return lerp(float4(1.0f, 0.0f, 0.0f, 1.0f), float4(0.0f, 1.0f, 0.0f, 1.0f), alpha);
-    //}
-    //else if (csmIdx == 1)
-    //{
-    //    return lerp(float4(0.0f, 1.0f, 0.0f, 1.0f), float4(0.0f, 0.0f, 1.0f, 1.0f), alpha);
-    //}
-    //else if (csmIdx == 2)
-    //{
-    //    return lerp(float4(0.0f, 0.0f, 1.0f, 1.0f), float4(1.0f, 0.0f, 1.0f, 1.0f), alpha);
-    //}
-    //else if (csmIdx == 3)
-    //{
-    //    return lerp(float4(1.0f, 0.0f, 1.0f, 1.0f), float4(0.0f, 0.0f, 0.0f, 1.0f), alpha);
-    //}
-    //else
-    //{
-    //    return float4(0.0f, 0.0f, 0.0f, 1.0f);
-    //}
+    CalcCSMIndex(posView.z, csmIdx, alpha);
     
     // Pass random rotation to PCF based on IGN
     float noise = InterleavedGradientNoise(input.pos.xy);
@@ -353,7 +233,7 @@ float4 main(PSInput input) : SV_TARGET
         {
             // First cascade
             {
-                float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[csmIdx]);
+                float4 lightScreen = mul(float4(posWorld, 1.0f), light.viewProjection[csmIdx]);
                 lightScreen.xyz /= lightScreen.w;
                 float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
         
@@ -363,7 +243,7 @@ float4 main(PSInput input) : SV_TARGET
             // Second cascade. Only apply when overlapping can occur.
             if (csmIdx < MAX_CASCADES - 1)
             {
-                float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[csmIdx + 1]);
+                float4 lightScreen = mul(float4(posWorld, 1.0f), light.viewProjection[csmIdx + 1]);
                 lightScreen.xyz /= lightScreen.w;
                 float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
         
@@ -378,10 +258,10 @@ float4 main(PSInput input) : SV_TARGET
         // Point
         else if (light.type == LIGHT_TYPE_POINT)
         {
-            float dist = distance(light.lightPos, input.posWorld);
+            float dist = distance(light.lightPos, posWorld);
             float normalizedDist = dist / light.range;
             
-            float3 toLightWorld = normalize(light.lightPos - input.posWorld);
+            float3 toLightWorld = normalize(light.lightPos - posWorld);
             
             float factor = CalcAttenuation(dist, light.range) *
                 PCFPoint(light.idxInArray, filterSize, -toLightWorld, normalizedDist, rot);
@@ -391,13 +271,13 @@ float4 main(PSInput input) : SV_TARGET
         // Spot
         else if (light.type == LIGHT_TYPE_SPOT)
         {
-            float3 toLightWorld = normalize(light.lightPos - input.posWorld);
-            float dist = distance(light.lightPos, input.posWorld);
+            float3 toLightWorld = normalize(light.lightPos - posWorld);
+            float dist = distance(light.lightPos, posWorld);
 
             float distAtt = CalcAttenuation(dist, light.range);
             float angularAtt = CalcAngularAttenuation(light, -toLightWorld);
             
-            float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[0]);
+            float4 lightScreen = mul(float4(posWorld, 1.0f), light.viewProjection[0]);
             lightScreen.xyz /= lightScreen.w;
             float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
             

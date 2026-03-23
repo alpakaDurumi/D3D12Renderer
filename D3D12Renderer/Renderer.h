@@ -12,6 +12,7 @@
 #include <memory>
 #include <array>
 #include <chrono>
+#include <unordered_map>
 
 #include "Camera.h"
 #include "InputManager.h"
@@ -31,6 +32,7 @@
 #include "Light.h"
 #include "Material.h"
 #include "RenderObject.h"
+#include "SharedConfig.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -53,7 +55,7 @@ public:
     void ToggleFullScreen();
     void SetFullScreen(bool fullScreen);
 
-    void OnInit();
+    void OnInit(UINT dpi);
     void OnUpdate();
     void OnRender();
     void OnDestroy();
@@ -61,7 +63,7 @@ public:
     void OnKeyUp(WPARAM key);
     void OnMouseMove(int xPos, int yPos);
     void OnResize(UINT width, UINT height);
-    void OnDpiChanged();
+    void OnDpiChanged(UINT dpi);
 
     static void ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle);
     static void ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle);
@@ -109,6 +111,8 @@ private:
 
     ComPtr<ID3D12Resource> m_depthStencilBuffer;
     DescriptorAllocation m_dsvAllocation;
+    DescriptorAllocation m_readOnlyDSVAllocation;
+    DescriptorAllocation m_depthSRVAllocation;
 
     // App resources
     // 
@@ -119,8 +123,17 @@ private:
 
     InputManager m_inputManager;
 
+    struct InstanceRange
+    {
+        UINT offset;            // offset in instance buffer
+        UINT forwardCount;
+        UINT deferredCount;
+    };
+
     std::vector<std::unique_ptr<Mesh>> m_meshes;
-    std::unordered_map<Mesh*, std::vector<RenderObject>> m_renderObjects;
+    std::unordered_map<Mesh*, InstanceRange> m_instanceRanges;
+    std::unordered_map<Mesh*, std::vector<RenderObject>> m_forwardRenderObjects;
+    std::unordered_map<Mesh*, std::vector<RenderObject>> m_deferredRenderObjects;
 
     std::vector<RenderObject*> m_previewRotations;
 
@@ -164,6 +177,8 @@ private:
     Material* CreateMaterial();
     Material* CloneMaterial(const Material& material);
 
+    RenderObject* CreateRenderObject(Mesh* pMesh, Material* mat);
+
     template <typename T>
     T* CreateLight();
 
@@ -193,9 +208,6 @@ private:
     void PrepareSpotLight(SpotLight& light);
 
     void UpdateConstantBuffers(FrameResource& frameResource);
-
-    void UpdateCameraConstantBuffer(FrameResource& frameResource);
-    void UpdateShadowConstantBuffer(FrameResource& frameResource);
 };
 
 template <>

@@ -105,11 +105,6 @@ private:
 
     bool m_visible;
 
-    bool m_materialOverride = false;
-    UINT m_materialConstantBufferOverrideIndex;
-
-    TextureAddressingMode m_textureAddressingMode;
-
     // TODO:
     // material override
     Material* m_pMaterial = nullptr;

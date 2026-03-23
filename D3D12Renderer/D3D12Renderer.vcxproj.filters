@@ -213,6 +213,9 @@
     <ClInclude Include="Material.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="RenderObject.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="vs.hlsl">
@@ -222,6 +225,15 @@
       <Filter>Shaders</Filter>
     </CustomBuild>
     <CustomBuild Include="PointLightShadowPS.hlsl">
+      <Filter>Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="GBufferPS.hlsl">
+      <Filter>Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="DeferredLightingPS.hlsl">
+      <Filter>Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="DeferredLightingVS.hlsl">
       <Filter>Shaders</Filter>
     </CustomBuild>
   </ItemGroup>

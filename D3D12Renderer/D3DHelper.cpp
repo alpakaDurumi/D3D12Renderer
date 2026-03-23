@@ -166,7 +166,7 @@ namespace D3DHelper
         }
     }
 
-    void CreateUploadHeap(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadHeap)
+    void CreateUploadBuffer(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadBuffer)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -197,11 +197,11 @@ namespace D3DHelper
             nullptr,
             0,
             nullptr,
-            IID_PPV_ARGS(&uploadHeap)));
+            IID_PPV_ARGS(&uploadBuffer)));
     }
 
     // For vertex buffer and index buffer
-    void CreateDefaultHeapForBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultHeap)
+    void CreateDefaultBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultBuffer)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -232,10 +232,10 @@ namespace D3DHelper
             nullptr,
             0,
             nullptr,
-            IID_PPV_ARGS(&defaultHeap)));
+            IID_PPV_ARGS(&defaultBuffer)));
     }
 
-    void CreateDefaultHeapForTexture(ID3D12Device10* pDevice, UINT width, UINT height, ComPtr<ID3D12Resource>& defaultHeap)
+    void CreateDefaultTexture(ID3D12Device10* pDevice, UINT64 width, UINT height, ComPtr<ID3D12Resource>& defaultTexture)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -266,7 +266,147 @@ namespace D3DHelper
             nullptr,
             0,
             nullptr,
-            IID_PPV_ARGS(&defaultHeap)));
+            IID_PPV_ARGS(&defaultTexture)));
+    }
+
+    // If pClearValue is provided, rtvFormat parameter will be ignored.
+    void CreateRenderTarget(ID3D12Device10* pDevice, UINT64 width, UINT height, DXGI_FORMAT format, DXGI_FORMAT rtvFormat, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& renderTarget, D3D12_CLEAR_VALUE* pClearValue)
+    {
+        D3D12_CLEAR_VALUE defaultClearValue = {};
+        defaultClearValue.Format = rtvFormat;
+        defaultClearValue.Color[0] = 0.0f;
+        defaultClearValue.Color[1] = 0.0f;
+        defaultClearValue.Color[2] = 0.0f;
+        defaultClearValue.Color[3] = 0.0f;
+
+        D3D12_HEAP_PROPERTIES heapProperties = {};
+        heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProperties.CreationNodeMask = 1;
+        heapProperties.VisibleNodeMask = 1;
+
+        D3D12_RESOURCE_DESC1 resourceDesc = {};
+        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        resourceDesc.Alignment = 0;
+        resourceDesc.Width = width;
+        resourceDesc.Height = height;
+        resourceDesc.DepthOrArraySize = depthOrArraySize;
+        resourceDesc.MipLevels = 1;
+        resourceDesc.Format = format;
+        resourceDesc.SampleDesc = { 1, 0 };
+        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
+
+        ThrowIfFailed(pDevice->CreateCommittedResource3(
+            &heapProperties,
+            D3D12_HEAP_FLAG_NONE,
+            &resourceDesc,
+            D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+            pClearValue == nullptr ? &defaultClearValue : pClearValue,
+            nullptr,
+            0,
+            nullptr,
+            IID_PPV_ARGS(&renderTarget)));
+    }
+
+    void CreateDepthStencilBuffer(ID3D12Device10* pDevice, UINT64 width, UINT height, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& depthStencilBuffer, bool useStencil, D3D12_CLEAR_VALUE* pClearValue)
+    {
+        D3D12_CLEAR_VALUE defaultClearValue = {};
+        defaultClearValue.Format = useStencil ? DXGI_FORMAT_D24_UNORM_S8_UINT : DXGI_FORMAT_D32_FLOAT;
+        defaultClearValue.DepthStencil.Depth = 0.0f;    // reverse-z
+        defaultClearValue.DepthStencil.Stencil = 0;
+
+        D3D12_HEAP_PROPERTIES heapProperties = {};
+        heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProperties.CreationNodeMask = 1;
+        heapProperties.VisibleNodeMask = 1;
+
+        D3D12_RESOURCE_DESC1 resourceDesc = {};
+        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        resourceDesc.Alignment = 0;
+        resourceDesc.Width = width;
+        resourceDesc.Height = height;
+        resourceDesc.DepthOrArraySize = depthOrArraySize;
+        resourceDesc.MipLevels = 1;
+        resourceDesc.Format = useStencil ? DXGI_FORMAT_R24G8_TYPELESS : DXGI_FORMAT_R32_TYPELESS;
+        resourceDesc.SampleDesc = { 1, 0 };
+        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
+
+        ThrowIfFailed(pDevice->CreateCommittedResource3(
+            &heapProperties,
+            D3D12_HEAP_FLAG_NONE,
+            &resourceDesc,
+            D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
+            pClearValue == nullptr ? &defaultClearValue : pClearValue,
+            nullptr,
+            0,
+            nullptr,
+            IID_PPV_ARGS(&depthStencilBuffer)));
+    }
+
+    void CreateRTV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, bool isArray, UINT firstArraySlice)
+    {
+        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+        rtvDesc.Format = format;
+
+        if (isArray)
+        {
+            rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+            rtvDesc.Texture2DArray.MipSlice = 0;
+            rtvDesc.Texture2DArray.FirstArraySlice = firstArraySlice;
+            rtvDesc.Texture2DArray.ArraySize = 1;
+            rtvDesc.Texture2DArray.PlaneSlice = 0;
+        }
+        else
+        {
+            rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+            rtvDesc.Texture2D.MipSlice = 0;
+            rtvDesc.Texture2D.PlaneSlice = 0;
+        }
+
+        pDevice->CreateRenderTargetView(pResource, &rtvDesc, cpuHandle);
+    }
+
+    void CreateDSV(ID3D12Device10* pDevice, ID3D12Resource* pResource, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, bool useStencil, bool isReadOnly, bool isArray, UINT firstArraySlice)
+    {
+        D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+        dsvDesc.Format = useStencil ? DXGI_FORMAT_D24_UNORM_S8_UINT : DXGI_FORMAT_D32_FLOAT;
+        dsvDesc.Flags = isReadOnly ? D3D12_DSV_FLAG_READ_ONLY_DEPTH | D3D12_DSV_FLAG_READ_ONLY_STENCIL : D3D12_DSV_FLAG_NONE;
+
+        if (isArray)
+        {
+            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+            dsvDesc.Texture2DArray.MipSlice = 0;
+            dsvDesc.Texture2DArray.ArraySize = 1;
+            dsvDesc.Texture2DArray.FirstArraySlice = firstArraySlice;
+        }
+        else
+        {
+            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+            dsvDesc.Texture2D.MipSlice = 0;
+        }
+
+        pDevice->CreateDepthStencilView(pResource, &dsvDesc, cpuHandle);
+    }
+
+    void CreateSRV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
+    {
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = format;
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MostDetailedMip = 0;
+        srvDesc.Texture2D.MipLevels = 1;
+        srvDesc.Texture2D.PlaneSlice = 0;
+        srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+        pDevice->CreateShaderResourceView(pResource, &srvDesc, cpuHandle);
     }
 
     void UpdateSubresources(
@@ -483,7 +623,7 @@ namespace D3DHelper
     {
         const UINT indexBufferSize = UINT(indices.size()) * UINT(sizeof(UINT32));
 
-        CreateDefaultHeapForBuffer(pDevice, indexBufferSize, indexBuffer);
+        CreateDefaultBuffer(pDevice, indexBufferSize, indexBuffer);
 
         auto uploadAllocation = uploadBuffer.Allocate(indexBufferSize, sizeof(UINT32));
 
@@ -505,76 +645,6 @@ namespace D3DHelper
         pindexBufferView->BufferLocation = indexBuffer->GetGPUVirtualAddress();
         pindexBufferView->SizeInBytes = indexBufferSize;
         pindexBufferView->Format = DXGI_FORMAT_R32_UINT;
-    }
-
-    void CreateDepthStencilBuffer(
-        ID3D12Device10* pDevice,
-        UINT width,
-        UINT height,
-        ComPtr<ID3D12Resource>& depthStencilBuffer,
-        DescriptorAllocation& dsvAllocation,
-        UINT16 arraySize)
-    {
-        assert(arraySize == dsvAllocation.GetNumHandles());
-
-        // Create resource.
-        D3D12_HEAP_PROPERTIES heapProperties = {};
-        heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProperties.CreationNodeMask = 1;
-        heapProperties.VisibleNodeMask = 1;
-
-        D3D12_RESOURCE_DESC1 resourceDesc = {};
-        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        resourceDesc.Alignment = 0;
-        resourceDesc.Width = width;
-        resourceDesc.Height = height;
-        resourceDesc.DepthOrArraySize = arraySize;
-        resourceDesc.MipLevels = 1;
-        resourceDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-        resourceDesc.SampleDesc = { 1, 0 };
-        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
-
-        D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
-        depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-        depthOptimizedClearValue.DepthStencil.Depth = 0.0f;
-        depthOptimizedClearValue.DepthStencil.Stencil = 0;
-
-        ThrowIfFailed(pDevice->CreateCommittedResource3(
-            &heapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &resourceDesc,
-            D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
-            &depthOptimizedClearValue,
-            nullptr,
-            0,
-            nullptr,
-            IID_PPV_ARGS(&depthStencilBuffer)));
-
-        // Create DSV for each slice. Branch based on array size.
-        D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-        dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
-        dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
-        if (arraySize == 1)
-        {
-            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-            dsvDesc.Texture2D.MipSlice = 0;
-            pDevice->CreateDepthStencilView(depthStencilBuffer.Get(), &dsvDesc, dsvAllocation.GetDescriptorHandle());
-        }
-        else
-        {
-            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
-            dsvDesc.Texture2DArray.MipSlice = 0;
-            dsvDesc.Texture2DArray.ArraySize = 1;
-            for (UINT i = 0; i < arraySize; ++i)
-            {
-                dsvDesc.Texture2DArray.FirstArraySlice = i;
-                pDevice->CreateDepthStencilView(depthStencilBuffer.Get(), &dsvDesc, dsvAllocation.GetDescriptorHandle(i));
-            }
-        }
     }
 
     void CreateSRVForShadow(

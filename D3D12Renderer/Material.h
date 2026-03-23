@@ -20,6 +20,13 @@ enum class TextureSlot
     NUM_TEXTURE_SLOTS
 };
 
+enum class RenderingPath
+{
+    FORWARD,
+    DEFERRED,
+    NUM_RENDERING_PATHS
+};
+
 class Material
 {
 public:
@@ -37,8 +44,8 @@ public:
         {
             FrameResource& frameResource = *frameResources[i];
 
-            if (i == 0) m_constantBufferIndex = UINT(frameResource.m_materialConstantBuffers.size());
-            frameResource.m_materialConstantBuffers.push_back(std::make_unique<MaterialCB>(pDevice, std::move(allocations[i])));
+            if (i == 0) m_constantBufferIndex = frameResource.GetMaterialConstantBufferCount();
+            frameResource.AddMaterialConstantBuffer(std::move(allocations[i]));
         }
 
         m_textureAddressingModes.fill(TextureAddressingMode::WRAP);
@@ -108,15 +115,26 @@ public:
         SetTextureTileScale(TextureSlot::HEIGHTMAP, height);
     }
 
-    void UpdateMaterialConstantBuffer(FrameResource& frameResource)
+    MaterialConstantData* GetConstantDataPtr()
     {
-        frameResource.m_materialConstantBuffers[m_constantBufferIndex]->Update(&m_constantData);
+        return &m_constantData;
     }
 
     void CopyDataFrom(const Material& src)
     {
         m_constantData = src.m_constantData;
         m_textureAddressingModes = src.m_textureAddressingModes;
+        m_renderingPath = src.m_renderingPath;
+    }
+
+    RenderingPath GetRenderingPath() const
+    {
+        return m_renderingPath;
+    }
+
+    void SetRenderingPath(RenderingPath path)
+    {
+        m_renderingPath = path;
     }
 
 private:
@@ -129,4 +147,6 @@ private:
     UINT m_constantBufferIndex;
 
     std::array<TextureAddressingMode, static_cast<UINT>(TextureSlot::NUM_TEXTURE_SLOTS)> m_textureAddressingModes;
+
+    RenderingPath m_renderingPath;
 };

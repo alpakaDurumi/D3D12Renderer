@@ -21,8 +21,6 @@ using namespace D3DHelper;
 // Definition for static member
 Renderer* Renderer::sm_instance = nullptr;
 
-constexpr float DefaultDPI = 96.0f;
-
 // Generate a simple black and white checkerboard texture.
 std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UINT texturePixelSize)
 {
@@ -177,13 +175,13 @@ void Renderer::SetFullScreen(bool fullScreen)
     }
 }
 
-void Renderer::OnInit()
+void Renderer::OnInit(UINT dpi)
 {
     ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED));   // For initializing DirectXTex
     LoadPipeline();
     LoadAssets();
 
-    m_dpiScale = static_cast<float>(GetDpiForWindow(Win32Application::GetHwnd())) / DefaultDPI;
+    m_dpiScale = static_cast<float>(dpi) / USER_DEFAULT_SCREEN_DPI;
 
     InitImGui();
     m_prevTime = m_clock.now();
@@ -257,7 +255,7 @@ void Renderer::OnRender()
     // and presentation requires the back buffer is using D3D12_BARRIER_LAYOUT_COMMON.
     // LAYOUT_PRESENT is alias for LAYOUT_COMMON.
     commandList.Barrier(
-        m_frameResources[m_frameIndex]->m_renderTarget.Get(),
+        m_frameResources[m_frameIndex]->GetRenderTarget(),
         D3D12_BARRIER_SYNC_RENDER_TARGET,
         D3D12_BARRIER_SYNC_NONE,
         D3D12_BARRIER_ACCESS_RENDER_TARGET,
@@ -267,7 +265,7 @@ void Renderer::OnRender()
     // Execute the command lists and store the fence value
     // And notify fenceValue to UploadBuffer
     UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
-    m_frameResources[m_frameIndex]->m_fenceValue = fenceValue;
+    m_frameResources[m_frameIndex]->SetFenceValue(fenceValue);
     m_uploadBuffer->QueueRetiredPages(fenceValue);
     m_dynamicDescriptorHeapForCBVSRVUAV->QueueRetiredHeaps(fenceValue);
 
@@ -321,10 +319,21 @@ void Renderer::OnResize(UINT width, UINT height)
     // Unregister and release current render target, set frame fence values to the current fence value
     for (UINT i = 0; i < FrameCount; i++)
     {
-        m_layoutTracker->UnregisterResource(m_frameResources[i]->m_renderTarget.Get());
-        m_frameResources[i]->m_renderTarget.Reset();
-        m_frameResources[i]->m_fenceValue = m_frameResources[m_frameIndex]->m_fenceValue;
+        m_layoutTracker->UnregisterResource(m_frameResources[i]->GetRenderTarget());
+        m_frameResources[i]->ResetRenderTarget();
+
+        // Release previous gbuffers and create new ones
+        for (UINT j = 0; j < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++j)
+        {
+            auto slot = static_cast<GBufferSlot>(j);
+            m_layoutTracker->UnregisterResource(m_frameResources[i]->GetGBuffer(slot));
+            m_frameResources[i]->ResetGBuffer(slot);
+        }
+        m_frameResources[i]->CreateGBuffers(width, height, *m_layoutTracker);
+
+        m_frameResources[i]->SetFenceValue(m_frameResources[m_frameIndex]->GetFenceValue());
     }
+    m_layoutTracker->UnregisterResource(m_depthStencilBuffer.Get());
     m_depthStencilBuffer.Reset();
 
     // Preserve existing format
@@ -335,26 +344,27 @@ void Renderer::OnResize(UINT width, UINT height)
     // Recreate RTVs
     for (UINT i = 0; i < FrameCount; i++)
     {
-        ThrowIfFailed(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_frameResources[i]->m_renderTarget)));
-
-        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-        rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-        rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-        m_device->CreateRenderTargetView(m_frameResources[i]->m_renderTarget.Get(), &rtvDesc, m_frameResources[i]->m_rtvAllocation.GetDescriptorHandle());
+        m_frameResources[i]->AcquireBackBuffer(m_swapChain.Get(), i);
 
         // Assume that ResizeBuffers do not preserve previous layout.
         // For now, just use D3D12_BARRIER_LAYOUT_COMMON.
-        auto desc = m_frameResources[i]->m_renderTarget->GetDesc();
-        m_layoutTracker->RegisterResource(m_frameResources[i]->m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_COMMON, desc.DepthOrArraySize, desc.MipLevels, DXGI_FORMAT_R8G8B8A8_UNORM);
+        m_layoutTracker->RegisterResource(m_frameResources[i]->GetRenderTarget(), D3D12_BARRIER_LAYOUT_COMMON, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
+
+        CreateRTV(m_device.Get(), m_frameResources[i]->GetRenderTarget(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_frameResources[i]->GetRTVHandle());
     }
 
-    // Recreate DSV
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation);
+    // Recreate depth-stencil buffer, DSV, and SRV
+    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer, true);
+    m_layoutTracker->RegisterResource(m_depthStencilBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, 1, 1, DXGI_FORMAT_R24G8_TYPELESS);
+
+    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(), true, false);
+    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_readOnlyDSVAllocation.GetDescriptorHandle(), true, true);
+    CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R24_UNORM_X8_TYPELESS, m_depthSRVAllocation.GetDescriptorHandle());
 }
 
-void Renderer::OnDpiChanged()
+void Renderer::OnDpiChanged(UINT dpi)
 {
-    m_dpiScale = static_cast<float>(GetDpiForWindow(Win32Application::GetHwnd())) / DefaultDPI;
+    m_dpiScale = static_cast<float>(dpi) / USER_DEFAULT_SCREEN_DPI;
     ImGui::GetStyle().FontScaleMain = m_dpiScale;
 }
 
@@ -585,14 +595,11 @@ void Renderer::LoadPipeline()
     auto rtvAllocations = alloc.Split();
     for (UINT i = 0; i < FrameCount; i++)
     {
-        auto frameResource = std::make_unique<FrameResource>(m_device.Get(), m_swapChain.Get(), i, std::move(rtvAllocations[i]));
-
-        // Register backbuffer to tracker
-        // Initial layout of backbuffer is D3D12_BARRIER_LAYOUT_COMMON : https://microsoft.github.io/DirectX-Specs/d3d/D3D12EnhancedBarriers.html#initial-resource-state
-        // depthOrArraySize and mipLevels for backbuffers are 1
-        ID3D12Resource* pBackBuffer = frameResource->m_renderTarget.Get();
-        auto desc = pBackBuffer->GetDesc();
-        m_layoutTracker->RegisterResource(pBackBuffer, D3D12_BARRIER_LAYOUT_COMMON, desc.DepthOrArraySize, desc.MipLevels, DXGI_FORMAT_R8G8B8A8_UNORM);
+        auto frameResource = std::make_unique<FrameResource>(m_device.Get(), m_swapChain.Get(), i,
+            *m_layoutTracker,
+            std::move(rtvAllocations[i]),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)));
 
         m_frameResources.push_back(std::move(frameResource));
     }
@@ -606,27 +613,16 @@ void Renderer::LoadAssets()
 {
     // Read shaders
     {
-        std::wstring vsName = L"vs.hlsl";
-        std::wstring psName0 = L"ps.hlsl";
-        std::wstring psName1 = L"PointLightShadowPS.hlsl";
+        std::vector<std::wstring> shaderNames;
+        shaderNames.push_back(L"vs.cso");
+        shaderNames.push_back(L"vs_depth_only.cso");
+        shaderNames.push_back(L"ps.cso");
+        shaderNames.push_back(L"PointLightShadowPS.cso");
+        shaderNames.push_back(L"GBufferPS.cso");
+        shaderNames.push_back(L"DeferredLightingVS.cso");
+        shaderNames.push_back(L"DeferredLightingPS.cso");
 
-        std::vector<std::wstring> csoNames;
-
-        // VS
-        for (UINT i = 0; i < static_cast<UINT>(PassType::NUM_PASS_TYPES); ++i)
-        {
-            std::wstring temp = Utility::RemoveFileExtension(vsName);
-            if (i == 1) temp += L"_depth_only";
-            temp += L".cso";
-
-            csoNames.push_back(temp);
-        }
-
-        // PS
-        csoNames.push_back(Utility::RemoveFileExtension(psName0) + L".cso");
-        csoNames.push_back(Utility::RemoveFileExtension(psName1) + L".cso");
-
-        for (const auto& name : csoNames)
+        for (const auto& name : shaderNames)
         {
             std::ifstream file(std::filesystem::path(L"shaders") / name, std::ios::binary);
             if (!file)
@@ -661,9 +657,17 @@ void Renderer::LoadAssets()
         { "INSTANCE_MATERIAL_INDEX", 0, DXGI_FORMAT_R32_UINT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 },
     };
 
-    // Create the depth stencil view
+    // Create depth-stencil buffer, DSV, and SRV
     m_dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, m_depthStencilBuffer, m_dsvAllocation);
+    m_readOnlyDSVAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
+    m_depthSRVAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
+
+    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer, true);
+    m_layoutTracker->RegisterResource(m_depthStencilBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, 1, 1, DXGI_FORMAT_R24G8_TYPELESS);
+
+    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(), true, false);
+    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_readOnlyDSVAllocation.GetDescriptorHandle(), true, true);
+    CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R24_UNORM_X8_TYPELESS, m_depthSRVAllocation.GetDescriptorHandle());
 
     // Set viewport and scissorRect for shadow mapping
     m_shadowMapViewport = { 0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f };
@@ -678,11 +682,11 @@ void Renderer::LoadAssets()
         FrameResource& frameResource = *m_frameResources[i];
 
         // Main Camera
-        if (i == 0) m_mainCameraIndex = UINT(frameResource.m_cameraConstantBuffers.size());
-        frameResource.m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_device.Get()));
+        if (i == 0) m_mainCameraIndex = frameResource.GetCameraConstantBufferCount();
+        frameResource.AddCameraConstantBuffer();
 
         // Shadow
-        frameResource.m_shadowConstantBuffer = std::make_unique<ShadowCB>(m_device.Get());
+        frameResource.CreateShadowConstantBuffer();
     }
 
     // Add samplers
@@ -738,41 +742,40 @@ void Renderer::LoadAssets()
     pBaseMat->SetTextureIndices(0, 1, 2);
     pBaseMat->SetTextureAddressingModes(TextureAddressingMode::WRAP, TextureAddressingMode::WRAP, TextureAddressingMode::WRAP);
     pBaseMat->BuildSamplerIndices(m_currentTextureFiltering);
+    pBaseMat->SetRenderingPath(RenderingPath::DEFERRED);
 
     auto* pPlaneMat = CloneMaterial(*pBaseMat);
     pPlaneMat->SetTextureTileScales(50.0f, 50.0f, 50.0f);
 
     // Add meshes
-    m_meshes.push_back(std::make_unique<Mesh>(m_device.Get(), commandList, *m_uploadBuffer, GeometryGenerator::GenerateCube()));
-    m_meshes.push_back(std::make_unique<Mesh>(m_device.Get(), commandList, *m_uploadBuffer, GeometryGenerator::GenerateSphere()));
+    auto cubeMesh = std::make_unique<Mesh>(m_device.Get(), commandList, *m_uploadBuffer, GeometryGenerator::GenerateCube());
+    auto sphereMesh = std::make_unique<Mesh>(m_device.Get(), commandList, *m_uploadBuffer, GeometryGenerator::GenerateSphere());
+
+    auto* pCubeMesh = cubeMesh.get();
+    auto* pSphereMesh = sphereMesh.get();
+
+    m_meshes.push_back(std::move(cubeMesh));
+    m_meshes.push_back(std::move(sphereMesh));
 
     // Add RenderObjects
-    auto& cubes = m_renderObjects[m_meshes[0].get()];
+    auto* pPlane = CreateRenderObject(pCubeMesh, pPlaneMat);
+    pPlane->SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
 
-    cubes.emplace_back(m_meshes[0].get());
-    cubes.back().SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
-    cubes.back().SetMaterial(pPlaneMat);
+    m_forwardRenderObjects[pCubeMesh].reserve(10001);
+    m_deferredRenderObjects[pCubeMesh].reserve(10001);
 
     for (UINT i = 0; i < 100; i++)
     {
         for (UINT j = 0; j < 100; j++)
         {
-            cubes.emplace_back(m_meshes[0].get());
-            cubes.back().SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, 10.0f));
-            cubes.back().SetMaterial(pBaseMat);
+            auto* pCube = CreateRenderObject(pCubeMesh, pBaseMat);
+            pCube->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, 10.0f));
+            m_previewRotations.push_back(pCube);
         }
     }
 
-    for (UINT i = 1; i < cubes.size(); ++i)
-    {
-        m_previewRotations.push_back(&cubes[i]);
-    }
-
-    auto& spheres = m_renderObjects[m_meshes[1].get()];
-
-    spheres.emplace_back(m_meshes[1].get());
-    spheres.back().SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
-    spheres.back().SetMaterial(pBaseMat);
+    auto* pSphere = CreateRenderObject(pSphereMesh, pBaseMat);
+    pSphere->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
 
     // Set up lights
     auto* pDirectionalLight = CreateLight<DirectionalLight>();
@@ -789,7 +792,7 @@ void Renderer::LoadAssets()
     pSpotLight->SetAngles(50.0f, 10.0f);
 
     // Execute commands for loading assets and store fence value
-    m_frameResources[m_frameIndex]->m_fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
+    m_frameResources[m_frameIndex]->SetFenceValue(m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker));
 
     // Wait until assets have been uploaded to the GPU
     WaitForGPU();
@@ -813,11 +816,11 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     // Stage material CBVs
     UINT numMaterials = static_cast<UINT>(m_materials.size());
     for (UINT i = 0; i < numMaterials; ++i)
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, i, 1, frameResource.m_materialConstantBuffers[i]->GetAllocationRef());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, i, 1, frameResource.GetMaterialCBVAllocationRef(i));
 
     // Stage light CBVs
     for (UINT i = 0; i < numLights; ++i)
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, i, 1, frameResource.m_lightConstantBuffers[i]->GetAllocationRef());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, i, 1, frameResource.GetLightCBVAllocationRef(i));
 
     // Stage textures
     UINT numTextures = static_cast<UINT>(m_textures.size());
@@ -832,31 +835,38 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7 + static_cast<UINT>(type), idxInArray, 1, light->GetSRVAllocationRef());
     }
 
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, 0, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), frameResource.GetGBufferSRVAllocationRef());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), 1, m_depthSRVAllocation);
+
     BindDescriptorTables(cmdList.Get());
 
-    UINT requiredCount = 0;
-    for (auto& [pMesh, objects] : m_renderObjects)
+    static const UINT instanceDataSize = static_cast<UINT>(sizeof(InstanceData));
+
+    std::vector<InstanceData> temp;
+    UINT curOffset = 0;
+    for (auto& mesh : m_meshes)
     {
-        requiredCount += static_cast<UINT>(objects.size());
+        auto* pMesh = mesh.get();
+
+        for (auto& object : m_forwardRenderObjects[pMesh])
+            temp.push_back(object.BuildInstanceData());
+        for (auto& object : m_deferredRenderObjects[pMesh])
+            temp.push_back(object.BuildInstanceData());
+
+        m_instanceRanges[pMesh].offset = curOffset;
+        m_instanceRanges[pMesh].forwardCount = static_cast<UINT>(m_forwardRenderObjects[pMesh].size());
+        m_instanceRanges[pMesh].deferredCount = static_cast<UINT>(m_deferredRenderObjects[pMesh].size());
+        curOffset += m_instanceRanges[pMesh].forwardCount + m_instanceRanges[pMesh].deferredCount;
     }
-    frameResource.EnsureInstanceCapacity(requiredCount);
 
-    static const UINT instantDataSize = static_cast<UINT>(sizeof(InstanceData));
-
-    for (auto& [pMesh, objects] : m_renderObjects)
-    {
-        std::vector<InstanceData> temp(objects.size());
-        for (UINT i = 0; i < objects.size(); ++i)
-        {
-            temp[i] = objects[i].BuildInstanceData();
-        }
-        memcpy(frameResource.m_instanceBufferBegin + frameResource.m_instanceOffsetByte, temp.data(), instantDataSize * objects.size());
-
-        frameResource.m_instanceOffsetByte += instantDataSize * static_cast<UINT>(objects.size());
-    }
+    frameResource.EnsureInstanceCapacity(static_cast<UINT>(temp.size()));
+    frameResource.PushInstanceData(temp);
 
     // Depth-only pass for shadow mapping
+    // Also work as z-prepass
     {
+        PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"Depth-only pass");
+
         cmdList->RSSetViewports(1, &m_shadowMapViewport);
         cmdList->RSSetScissorRects(1, &m_shadowMapScissorRect);
 
@@ -922,26 +932,25 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
                 cmdList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
 
-                cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_cameraConstantBuffers[light->GetCameraConstantBufferBaseIndex() + j]->GetGPUVirtualAddress());
+                cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(light->GetCameraConstantBufferBaseIndex() + j));
 
-                UINT offset = 0;
-                for (auto& [pMesh, objects] : m_renderObjects)
+                for (auto& mesh : m_meshes)
                 {
-                    const UINT objectCount = static_cast<UINT>(objects.size());
+                    auto* pMesh = mesh.get();
+                    const auto& instanceRange = m_instanceRanges[pMesh];
 
                     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
                     D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
-                    instanceBufferView.BufferLocation = frameResource.m_instanceUploadBuffer->GetGPUVirtualAddress() + offset;
-                    instanceBufferView.StrideInBytes = instantDataSize;
-                    instanceBufferView.SizeInBytes = instantDataSize * objectCount;
-                    offset += instantDataSize * objectCount;
+                    instanceBufferView.BufferLocation = frameResource.GetInstanceBufferVirtualAddress() + instanceRange.offset * instanceDataSize;
+                    instanceBufferView.StrideInBytes = instanceDataSize;
+                    instanceBufferView.SizeInBytes = instanceDataSize * (instanceRange.forwardCount + instanceRange.deferredCount);
 
                     D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->m_vertexBufferView, instanceBufferView };
                     cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
                     cmdList->IASetIndexBuffer(&pMesh->m_indexBufferView);
 
-                    cmdList->DrawIndexedInstanced(pMesh->m_numIndices, objectCount, 0, 0, 0);
+                    cmdList->DrawIndexedInstanced(pMesh->m_numIndices, instanceRange.forwardCount + instanceRange.deferredCount, 0, 0, 0);
                 }
             }
 
@@ -969,8 +978,143 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         }
     }
 
-    // Color pass
+    // temp
+    commandList.Barrier(
+        m_depthStencilBuffer.Get(),
+        D3D12_BARRIER_SYNC_NONE,
+        D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+        D3D12_BARRIER_ACCESS_NO_ACCESS,
+        D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
+
+    // GBuffer pass
     {
+        PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"GBuffer pass");
+
+        cmdList->RSSetViewports(1, &m_viewport);
+        cmdList->RSSetScissorRects(1, &m_scissorRect);
+
+        // Pre-query PSOs
+        m_currentPSOKey.passType = PassType::GBUFFER;
+        m_currentPSOKey.vsName = L"vs.hlsl";
+        m_currentPSOKey.psName = L"GBufferPS.hlsl";
+        auto* pso = GetPipelineState(m_currentPSOKey);
+
+        for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
+        {
+            commandList.Barrier(
+                frameResource.GetGBuffer(static_cast<GBufferSlot>(i)),
+                D3D12_BARRIER_SYNC_NONE,
+                D3D12_BARRIER_SYNC_RENDER_TARGET,
+                D3D12_BARRIER_ACCESS_NO_ACCESS,
+                D3D12_BARRIER_ACCESS_RENDER_TARGET,
+                D3D12_BARRIER_LAYOUT_RENDER_TARGET);
+        }
+
+        auto rtvHandles = frameResource.GetGBufferRTVHandles();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
+        cmdList->OMSetRenderTargets(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), rtvHandles.data(), FALSE, &dsvHandle);
+
+        XMVECTORF32 clearColor;
+        clearColor.v = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+        for (auto& rtvHandle : rtvHandles)
+            cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 0.0f, 0, 0, nullptr);
+        cmdList->OMSetStencilRef(1);
+
+        cmdList->SetPipelineState(pso);
+
+        cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
+
+        for (auto& mesh : m_meshes)
+        {
+            auto* pMesh = mesh.get();
+            const auto& instanceRange = m_instanceRanges[pMesh];
+
+            if (instanceRange.deferredCount == 0) continue;
+
+            cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+            D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
+            instanceBufferView.BufferLocation = frameResource.GetInstanceBufferVirtualAddress() + (instanceRange.offset + instanceRange.forwardCount) * instanceDataSize;
+            instanceBufferView.StrideInBytes = instanceDataSize;
+            instanceBufferView.SizeInBytes = instanceDataSize * instanceRange.deferredCount;
+
+            D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->m_vertexBufferView, instanceBufferView };
+            cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
+            cmdList->IASetIndexBuffer(&pMesh->m_indexBufferView);
+
+            cmdList->DrawIndexedInstanced(pMesh->m_numIndices, instanceRange.deferredCount, 0, 0, 0);
+        }
+
+        for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
+        {
+            commandList.Barrier(
+                frameResource.GetGBuffer(static_cast<GBufferSlot>(i)),
+                D3D12_BARRIER_SYNC_RENDER_TARGET,
+                D3D12_BARRIER_SYNC_PIXEL_SHADING,
+                D3D12_BARRIER_ACCESS_RENDER_TARGET,
+                D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+                D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
+        }
+    }
+
+    // To use depth-stencil buffer as both SRV and DSV simultaneously
+    // SRV: to reconstruct world pos
+    // DSV: for stencil test
+    commandList.Barrier(
+        m_depthStencilBuffer.Get(),
+        D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+        D3D12_BARRIER_SYNC_PIXEL_SHADING,
+        D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+        D3D12_BARRIER_ACCESS_SHADER_RESOURCE | D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ,
+        D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_GENERIC_READ);
+
+    // Deferred Lighting pass
+    {
+        PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"Deferred Lighting pass");
+
+        cmdList->RSSetViewports(1, &m_viewport);
+        cmdList->RSSetScissorRects(1, &m_scissorRect);
+
+        // Pre-query PSOs
+        m_currentPSOKey.passType = PassType::DEFERRED_LIGHTING;
+        m_currentPSOKey.vsName = L"DeferredLightingVS.hlsl";
+        m_currentPSOKey.psName = L"DeferredLightingPS.hlsl";
+        auto* pso = GetPipelineState(m_currentPSOKey);
+
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetRTVHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_readOnlyDSVAllocation.GetDescriptorHandle();
+        cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+        cmdList->OMSetStencilRef(1);
+
+        // Use linear color for gamma-correct rendering
+        XMVECTORF32 clearColor;
+        clearColor.v = XMColorSRGBToRGB(XMVectorSet(0.5f, 0.5f, 0.5f, 1.0f));
+        cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+
+        cmdList->SetPipelineState(pso);
+
+        cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
+        cmdList->SetGraphicsRootConstantBufferView(1, frameResource.GetShadowCBVirtualAddress());
+
+        cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        cmdList->DrawInstanced(3, 1, 0, 0);
+    }
+
+    // restore
+    commandList.Barrier(
+        m_depthStencilBuffer.Get(),
+        D3D12_BARRIER_SYNC_PIXEL_SHADING,
+        D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+        D3D12_BARRIER_ACCESS_SHADER_RESOURCE | D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ,
+        D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
+
+    // Forward Color pass
+    {
+        PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"Forward color pass");
+
         cmdList->RSSetViewports(1, &m_viewport);
         cmdList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -981,46 +1125,41 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
 
         commandList.Barrier(
-            frameResource.m_renderTarget.Get(),
+            frameResource.GetRenderTarget(),
             D3D12_BARRIER_SYNC_NONE,
             D3D12_BARRIER_SYNC_RENDER_TARGET,
             D3D12_BARRIER_ACCESS_NO_ACCESS,
             D3D12_BARRIER_ACCESS_RENDER_TARGET,
             D3D12_BARRIER_LAYOUT_RENDER_TARGET);
 
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.m_rtvAllocation.GetDescriptorHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetRTVHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
         cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
-        // Use linear color for gamma-correct rendering
-        XMVECTORF32 clearColor;
-        clearColor.v = XMColorSRGBToRGB(XMVectorSet(0.5f, 0.5f, 0.5f, 1.0f));
-        cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-        cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
-
         cmdList->SetPipelineState(pso);
 
-        cmdList->SetGraphicsRootConstantBufferView(0, frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->GetGPUVirtualAddress());
-        cmdList->SetGraphicsRootConstantBufferView(1, frameResource.m_shadowConstantBuffer->GetGPUVirtualAddress());
+        cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
+        cmdList->SetGraphicsRootConstantBufferView(1, frameResource.GetShadowCBVirtualAddress());
 
-        UINT offset = 0;
-        for (auto& [pMesh, objects] : m_renderObjects)
+        for (auto& mesh : m_meshes)
         {
-            const UINT objectCount = static_cast<UINT>(objects.size());
+            auto* pMesh = mesh.get();
+            const auto& instanceRange = m_instanceRanges[pMesh];
+
+            if (instanceRange.forwardCount == 0) continue;
 
             cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
             D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
-            instanceBufferView.BufferLocation = frameResource.m_instanceUploadBuffer->GetGPUVirtualAddress() + offset;
-            instanceBufferView.StrideInBytes = instantDataSize;
-            instanceBufferView.SizeInBytes = instantDataSize * objectCount;
-            offset += instantDataSize * objectCount;
+            instanceBufferView.BufferLocation = frameResource.GetInstanceBufferVirtualAddress() + instanceRange.offset * instanceDataSize;
+            instanceBufferView.StrideInBytes = instanceDataSize;
+            instanceBufferView.SizeInBytes = instanceDataSize * instanceRange.forwardCount;
 
             D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->m_vertexBufferView, instanceBufferView };
             cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
             cmdList->IASetIndexBuffer(&pMesh->m_indexBufferView);
 
-            cmdList->DrawIndexedInstanced(pMesh->m_numIndices, objectCount, 0, 0, 0);
+            cmdList->DrawIndexedInstanced(pMesh->m_numIndices, instanceRange.forwardCount, 0, 0, 0);
         }
     }
 }
@@ -1035,7 +1174,7 @@ void Renderer::MoveToNextFrame()
 {
     // Update frame index and wait for fence value
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-    m_commandQueue->WaitForFenceValue(m_frameResources[m_frameIndex]->m_fenceValue);
+    m_commandQueue->WaitForFenceValue(m_frameResources[m_frameIndex]->GetFenceValue());
 }
 
 // Setup Dear ImGui context
@@ -1085,6 +1224,27 @@ Material* Renderer::CloneMaterial(const Material& src)
     auto pMat = CreateMaterial();
     pMat->CopyDataFrom(src);
     return pMat;
+}
+
+RenderObject* Renderer::CreateRenderObject(Mesh* pMesh, Material* mat)
+{
+    RenderingPath path = mat->GetRenderingPath();
+    RenderObject* ret = nullptr;
+    if (path == RenderingPath::FORWARD)
+    {
+        m_forwardRenderObjects[pMesh].emplace_back(pMesh);
+        ret = &m_forwardRenderObjects[pMesh].back();
+    }
+    else if (path == RenderingPath::DEFERRED)
+    {
+        m_deferredRenderObjects[pMesh].emplace_back(pMesh);
+        ret = &m_deferredRenderObjects[pMesh].back();
+    }
+
+    if (!ret) throw std::runtime_error("Unsupported Rendering Path.");
+
+    ret->SetMaterial(mat);
+    return ret;
 }
 
 Texture* Renderer::CreateTexture(
@@ -1138,12 +1298,12 @@ void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList)
     }
 
     m_dynamicDescriptorHeapForCBVSRVUAV->CommitStagedDescriptorsForDraw(pCommandList);
-    pCommandList->SetGraphicsRootDescriptorTable(10, m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart());    // Root parameter 10
+    pCommandList->SetGraphicsRootDescriptorTable(11, m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart());    // Root parameter 11
 }
 
 void Renderer::CreateRootSignature()
 {
-    m_rootSignature = std::make_unique<RootSignature>(11, 2);
+    m_rootSignature = std::make_unique<RootSignature>(12, 2);
     auto& rootSignature = *m_rootSignature;
 
     // Root descriptor for CameraCB and ShadowCB
@@ -1158,32 +1318,35 @@ void Renderer::CreateRootSignature()
 
     // Descriptor table for MaterialConstantBuffers[]
     rootSignature[4].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[4].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[4].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for LightConstantBuffers[]
     rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[5].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[5].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for textures (albedo, normal map, height map)
-    // When capture in PIX, app crashes if flag set by D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC. Very weird... should I report this to Microsoft?
-    // GPU jobs (UpdateSubresources) are already finished when recording command list. I don't know why DATA_STATIC flag fails.
     rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[6].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[6].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for shadowMaps[]
     // Directional
     rootSignature[7].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[7].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[7].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
     // Point
     rootSignature[8].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[8].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[8].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
     // Spot
     rootSignature[9].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[9].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+    rootSignature[9].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+
+    // Descriptor table for GBuffers and SRV for depth stencil buffer
+    rootSignature[10].InitAsTable(2, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[10].InitAsRange(0, 0, 4, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    rootSignature[10].InitAsRange(1, 0, 5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
 
     // Descriptor table for samplers
-    rootSignature[10].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[10].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
+    rootSignature[11].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[11].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
         static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS) * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES),
         D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
 
@@ -1242,20 +1405,46 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
 
         // Depth-stencil
         D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
-        depthStencilDesc.DepthEnable = TRUE;
-        depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-        depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
-        depthStencilDesc.StencilEnable = FALSE;
-        depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
-        depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-        const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =
-        { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
-        depthStencilDesc.FrontFace = defaultStencilOp;
-        depthStencilDesc.BackFace = defaultStencilOp;
+        if (psoKey.passType == PassType::DEFERRED_LIGHTING)
+        {
+            depthStencilDesc.DepthEnable = FALSE;
+
+            depthStencilDesc.StencilEnable = TRUE;
+            depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+            depthStencilDesc.StencilWriteMask = 0;
+            const D3D12_DEPTH_STENCILOP_DESC stencilOp =
+            { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_EQUAL };
+            depthStencilDesc.FrontFace = stencilOp;
+            depthStencilDesc.BackFace = stencilOp;
+        }
+        else
+        {
+            depthStencilDesc.DepthEnable = TRUE;
+            depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+
+            if (psoKey.passType == PassType::GBUFFER)
+            {
+                depthStencilDesc.StencilEnable = TRUE;
+                depthStencilDesc.StencilReadMask = 0;
+                depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+                const D3D12_DEPTH_STENCILOP_DESC stencilOp =
+                { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_REPLACE, D3D12_COMPARISON_FUNC_ALWAYS };
+                depthStencilDesc.FrontFace = stencilOp;
+                depthStencilDesc.BackFace = stencilOp;
+            }
+            else
+            {
+                depthStencilDesc.StencilEnable = FALSE;
+            }
+        }
 
         // Describe and create the graphics pipeline state object (PSO).
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-        psoDesc.InputLayout = { m_inputLayout.data(), static_cast<UINT>(m_inputLayout.size()) };
+        if (psoKey.passType == PassType::DEFERRED_LIGHTING)
+            psoDesc.InputLayout = { nullptr, 0 };
+        else
+            psoDesc.InputLayout = { m_inputLayout.data(), static_cast<UINT>(m_inputLayout.size()) };
         psoDesc.pRootSignature = m_rootSignature->GetRootSignature().Get();
 
         // Shader stages are selected by demand.
@@ -1282,12 +1471,17 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         psoDesc.RasterizerState = rasterizerDesc;
         psoDesc.BlendState = blendDesc;
         psoDesc.DepthStencilState = depthStencilDesc;
-        psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+        psoDesc.DSVFormat = psoKey.passType == PassType::DEPTH_ONLY ? DXGI_FORMAT_D32_FLOAT : DXGI_FORMAT_D24_UNORM_S8_UINT;
         psoDesc.SampleMask = UINT_MAX;
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
-        if (psoKey.passType == PassType::DEPTH_ONLY)
+        switch (psoKey.passType)
         {
+        case PassType::DEFAULT:
+            psoDesc.NumRenderTargets = 1;
+            psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+            break;
+        case PassType::DEPTH_ONLY:
             if (psoKey.psName == L"PointLightShadowPS.hlsl")
             {
                 psoDesc.NumRenderTargets = 1;
@@ -1297,13 +1491,24 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
             {
                 psoDesc.NumRenderTargets = 0;
             }
-        }
-        else
+            break;
+        case PassType::GBUFFER:
         {
+            UINT numSlots = static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS);
+            psoDesc.NumRenderTargets = numSlots;
+            for (UINT i = 0; i < numSlots; ++i)
+            {
+                psoDesc.RTVFormats[i] = FrameResource::GetGBufferFormat(static_cast<GBufferSlot>(i));
+            }
+            break;
+        }
+        case PassType::DEFERRED_LIGHTING:
             psoDesc.NumRenderTargets = 1;
             psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+            break;
         }
-        psoDesc.SampleDesc.Count = 1;
+
+        psoDesc.SampleDesc = { 1, 0 };
         ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&it->second)));
     }
 
@@ -1369,7 +1574,14 @@ void Renderer::FixedUpdate(double fixedDtMs)
     // RenderObjects
     static float rotationSpeed = 1.0f;  // unit : rad/s
 
-    for (auto& [pMesh, objects] : m_renderObjects)
+    for (auto& [pMesh, objects] : m_forwardRenderObjects)
+    {
+        for (auto& ob : objects)
+        {
+            ob.SnapshotState();
+        }
+    }
+    for (auto& [pMesh, objects] : m_deferredRenderObjects)
     {
         for (auto& ob : objects)
         {
@@ -1386,7 +1598,14 @@ void Renderer::FixedUpdate(double fixedDtMs)
 void Renderer::PrepareConstantData(float alpha)
 {
     // RenderObjects
-    for (auto& [pMesh, objects] : m_renderObjects)
+    for (auto& [pMesh, objects] : m_forwardRenderObjects)
+    {
+        for (auto& ob : objects)
+        {
+            ob.UpdateRenderState(alpha);
+        }
+    }
+    for (auto& [pMesh, objects] : m_deferredRenderObjects)
     {
         for (auto& ob : objects)
         {
@@ -1601,31 +1820,24 @@ void Renderer::PrepareSpotLight(SpotLight& light)
 
 void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
 {
-    UpdateCameraConstantBuffer(frameResource);
+    frameResource.UpdateCameraConstantBuffer(m_mainCameraIndex, &m_cameraConstantData);
+    frameResource.UpdateShadowConstantBuffer(&m_shadowConstantData);
 
-    for (auto& material : m_materials)
+    for (UINT i = 0; i < m_materials.size(); ++i)
     {
-        material->UpdateMaterialConstantBuffer(frameResource);
+        frameResource.UpdateMaterialConstantBuffer(i, m_materials[i]->GetConstantDataPtr());
     }
 
     for (UINT i = 0; i < m_lights.size(); ++i)
     {
         auto& light = m_lights[i];
-        light->UpdateCameraConstantBuffer(frameResource);
-        light->UpdateLightConstantBuffer(frameResource, i);
+        UINT16 arraySize = light->GetArraySize();
+        for (UINT j = 0; j < arraySize; ++j)
+        {
+            frameResource.UpdateCameraConstantBuffer(light->GetCameraConstantBufferBaseIndex() + j, light->GetCameraConstantDataPtr(j));
+        }
+        frameResource.UpdateLightConstantBuffer(i, light->GetLightConstantDataPtr());
     }
-
-    UpdateShadowConstantBuffer(frameResource);
-}
-
-void Renderer::UpdateCameraConstantBuffer(FrameResource& frameResource)
-{
-    frameResource.m_cameraConstantBuffers[m_mainCameraIndex]->Update(&m_cameraConstantData);
-}
-
-void Renderer::UpdateShadowConstantBuffer(FrameResource& frameResource)
-{
-    frameResource.m_shadowConstantBuffer->Update(&m_shadowConstantData);
 }
 
 template <>

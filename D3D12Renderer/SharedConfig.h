@@ -41,6 +41,15 @@ enum class TextureAddressingMode
     NUM_TEXTURE_ADDRESSING_MODES
 };
 
+enum class GBufferSlot
+{
+    ALBEDO,
+    NORMAL,
+    MATERIAL_AMBIENT,
+    MATERIAL_SPECULAR,
+    NUM_GBUFFER_SLOTS
+};
+
 struct InstanceData
 {
     DirectX::XMFLOAT4X4 world;
@@ -56,6 +65,12 @@ static const uint SPOT_LIGHT_ARRAY_SIZE = 1;
 static const uint LIGHT_TYPE_DIRECTIONAL = 0;
 static const uint LIGHT_TYPE_POINT = 1;
 static const uint LIGHT_TYPE_SPOT = 2;
+
+static const uint GBUFFER_SLOT_ALBEDO = 0;
+static const uint GBUFFER_SLOT_NORMAL = 1;
+static const uint GBUFFER_SLOT_MAT_AMBIENT = 2;
+static const uint GBUFFER_SLOT_MAT_SPECULAR = 3;
+static const uint NUM_GBUFFER_SLOTS = 4;
 #endif  // __cplusplus
 
 #endif  // SHARED_CONFIG
