@@ -105,7 +105,7 @@ private:
     std::unique_ptr<RootSignature> m_rootSignature;
     std::unordered_map<PSOKey, ComPtr<ID3D12PipelineState>> m_pipelineStates;
 
-    PSOKey m_currentPSOKey = { PassType::DEFAULT };
+    PSOKey m_currentPSOKey = { PassType::FORWARD_COLORING };
 
     std::vector<D3D12_INPUT_ELEMENT_DESC> m_inputLayout;
     std::unordered_map<ShaderKey, std::vector<char>> m_shaderBlobs;

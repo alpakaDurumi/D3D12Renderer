@@ -1094,7 +1094,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         cmdList->RSSetScissorRects(1, &m_scissorRect);
 
         // Pre-query PSOs
-        m_currentPSOKey.passType = PassType::DEFAULT;
+        m_currentPSOKey.passType = PassType::FORWARD_COLORING;
         m_currentPSOKey.vsName = L"vs.hlsl";
         m_currentPSOKey.psName = L"ps.hlsl";
         auto* pso = GetPipelineState(m_currentPSOKey);
@@ -1118,7 +1118,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
         for (auto& mesh : m_meshes)
         {
-            DrawMesh(cmdList.Get(), *mesh, PassType::DEFAULT, frameResource.GetInstanceBufferVirtualAddress());
+            DrawMesh(cmdList.Get(), *mesh, PassType::FORWARD_COLORING, frameResource.GetInstanceBufferVirtualAddress());
         }
     }
 }
@@ -1436,7 +1436,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
 
         switch (psoKey.passType)
         {
-        case PassType::DEFAULT:
+        case PassType::FORWARD_COLORING:
             psoDesc.NumRenderTargets = 1;
             psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
             break;
@@ -1789,7 +1789,7 @@ void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, Mesh& mesh, Pa
 
     const auto& instanceRange = m_instanceRanges[&mesh];
 
-    if ((passType == PassType::DEFAULT && instanceRange.forwardCount == 0) ||
+    if ((passType == PassType::FORWARD_COLORING && instanceRange.forwardCount == 0) ||
         (passType == PassType::DEPTH_ONLY && (instanceRange.forwardCount + instanceRange.deferredCount) == 0) ||
         (passType == PassType::GBUFFER && instanceRange.deferredCount == 0) ||
         (passType == PassType::DEFERRED_LIGHTING))
@@ -1800,7 +1800,7 @@ void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, Mesh& mesh, Pa
     UINT instanceCount;
     switch (passType)
     {
-    case PassType::DEFAULT:
+    case PassType::FORWARD_COLORING:
         instanceCount = instanceRange.forwardCount;
         break;
     case PassType::DEPTH_ONLY:
