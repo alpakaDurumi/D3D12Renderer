@@ -209,6 +209,8 @@ private:
     void PrepareSpotLight(SpotLight& light);
 
     void UpdateConstantBuffers(FrameResource& frameResource);
+
+    void DrawMesh(ID3D12GraphicsCommandList7* pCommandList, Mesh& mesh, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
 };
 
 template <>

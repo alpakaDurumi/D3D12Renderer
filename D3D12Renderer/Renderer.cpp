@@ -833,17 +833,15 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     {
         for (auto& light : m_lights[type])
         {
-        UINT idxInArray = light->GetIdxInArray();
+            UINT idxInArray = light->GetIdxInArray();
             m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7 + type, idxInArray, 1, light->GetSRVAllocationRef());
-    }
+        }
     }
 
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, 0, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), frameResource.GetGBufferSRVAllocationRef());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), 1, m_depthSRVAllocation);
 
     BindDescriptorTables(cmdList.Get());
-
-    static const UINT instanceDataSize = static_cast<UINT>(sizeof(InstanceData));
 
     std::vector<InstanceData> temp;
     UINT curOffset = 0;
@@ -889,100 +887,86 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
             for (auto& light : m_lights[type])
             {
-            if (isPointLight)
-            {
-                commandList.Barrier(
-                    static_cast<PointLight*>(light.get())->GetRenderTarget(),
-                    D3D12_BARRIER_SYNC_NONE,
-                    D3D12_BARRIER_SYNC_RENDER_TARGET,
-                    D3D12_BARRIER_ACCESS_NO_ACCESS,
-                    D3D12_BARRIER_ACCESS_RENDER_TARGET,
-                    D3D12_BARRIER_LAYOUT_RENDER_TARGET);
-
-                    cmdList->SetGraphicsRoot32BitConstant(3, lightIdx, 0);
-            }
-            else
-            {
-                // Barrier to change layout of shadowMap to depth write
-                commandList.Barrier(
-                    light->GetDepthBuffer(),
-                    D3D12_BARRIER_SYNC_NONE,
-                    D3D12_BARRIER_SYNC_DEPTH_STENCIL,
-                    D3D12_BARRIER_ACCESS_NO_ACCESS,
-                    D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
-                    D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
-            }
-
-            // Render each entry of shadow map.
-            UINT16 arraySize = light->GetArraySize();
-            for (UINT j = 0; j < arraySize; ++j)
-            {
-                auto shadowMapDsvHandle = light->GetDSVDescriptorHandle(j);
-
                 if (isPointLight)
                 {
-                    auto rtvHandle = static_cast<PointLight*>(light.get())->GetRTVDescriptorHandle(j);
-                    cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &shadowMapDsvHandle);
+                    commandList.Barrier(
+                        static_cast<PointLight*>(light.get())->GetRenderTarget(),
+                        D3D12_BARRIER_SYNC_NONE,
+                        D3D12_BARRIER_SYNC_RENDER_TARGET,
+                        D3D12_BARRIER_ACCESS_NO_ACCESS,
+                        D3D12_BARRIER_ACCESS_RENDER_TARGET,
+                        D3D12_BARRIER_LAYOUT_RENDER_TARGET);
 
-                    XMVECTORF32 clearColor;
-                    clearColor.v = XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f);
-                    cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+                    cmdList->SetGraphicsRoot32BitConstant(3, lightIdx, 0);
                 }
                 else
                 {
-                    cmdList->OMSetRenderTargets(0, nullptr, FALSE, &shadowMapDsvHandle);
+                    // Barrier to change layout of shadowMap to depth write
+                    commandList.Barrier(
+                        light->GetDepthBuffer(),
+                        D3D12_BARRIER_SYNC_NONE,
+                        D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+                        D3D12_BARRIER_ACCESS_NO_ACCESS,
+                        D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+                        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
                 }
 
-                cmdList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
-
-                cmdList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
-
-                cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(light->GetCameraConstantBufferBaseIndex() + j));
-
-                for (auto& mesh : m_meshes)
+                // Render each entry of shadow map.
+                UINT16 arraySize = light->GetArraySize();
+                for (UINT j = 0; j < arraySize; ++j)
                 {
-                    auto* pMesh = mesh.get();
-                    const auto& instanceRange = m_instanceRanges[pMesh];
+                    auto shadowMapDsvHandle = light->GetDSVDescriptorHandle(j);
 
-                    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+                    if (isPointLight)
+                    {
+                        auto rtvHandle = static_cast<PointLight*>(light.get())->GetRTVDescriptorHandle(j);
+                        cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &shadowMapDsvHandle);
 
-                    D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
-                    instanceBufferView.BufferLocation = frameResource.GetInstanceBufferVirtualAddress() + instanceRange.offset * instanceDataSize;
-                    instanceBufferView.StrideInBytes = instanceDataSize;
-                    instanceBufferView.SizeInBytes = instanceDataSize * (instanceRange.forwardCount + instanceRange.deferredCount);
+                        XMVECTORF32 clearColor;
+                        clearColor.v = XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f);
+                        cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+                    }
+                    else
+                    {
+                        cmdList->OMSetRenderTargets(0, nullptr, FALSE, &shadowMapDsvHandle);
+                    }
 
-                        D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->GetVBV(), instanceBufferView };
-                    cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
-                        cmdList->IASetIndexBuffer(&pMesh->GetIBV());
+                    cmdList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
-                        cmdList->DrawIndexedInstanced(pMesh->GetNumIndices(), instanceRange.forwardCount + instanceRange.deferredCount, 0, 0, 0);
+                    cmdList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
+
+                    cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(light->GetCameraConstantBufferBaseIndex() + j));
+
+                    for (auto& mesh : m_meshes)
+                    {
+                        DrawMesh(cmdList.Get(), *mesh, PassType::DEPTH_ONLY, frameResource.GetInstanceBufferVirtualAddress());
+                    }
                 }
-            }
 
-            if (isPointLight)
-            {
-                commandList.Barrier(
-                    static_cast<PointLight*>(light.get())->GetRenderTarget(),
-                    D3D12_BARRIER_SYNC_RENDER_TARGET,
-                    D3D12_BARRIER_SYNC_PIXEL_SHADING,
-                    D3D12_BARRIER_ACCESS_RENDER_TARGET,
-                    D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-                    D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
-            }
-            else
-            {
-                // Barrier to change layout of shadowMap to SRV
-                commandList.Barrier(
-                    light->GetDepthBuffer(),
-                    D3D12_BARRIER_SYNC_DEPTH_STENCIL,
-                    D3D12_BARRIER_SYNC_PIXEL_SHADING,
-                    D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
-                    D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-                    D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
-            }
+                if (isPointLight)
+                {
+                    commandList.Barrier(
+                        static_cast<PointLight*>(light.get())->GetRenderTarget(),
+                        D3D12_BARRIER_SYNC_RENDER_TARGET,
+                        D3D12_BARRIER_SYNC_PIXEL_SHADING,
+                        D3D12_BARRIER_ACCESS_RENDER_TARGET,
+                        D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+                        D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
+                }
+                else
+                {
+                    // Barrier to change layout of shadowMap to SRV
+                    commandList.Barrier(
+                        light->GetDepthBuffer(),
+                        D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+                        D3D12_BARRIER_SYNC_PIXEL_SHADING,
+                        D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+                        D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+                        D3D12_BARRIER_LAYOUT_SHADER_RESOURCE);
+                }
                 ++lightIdx;
+            }
         }
-    }
     }
 
     // temp
@@ -1035,23 +1019,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
         for (auto& mesh : m_meshes)
         {
-            auto* pMesh = mesh.get();
-            const auto& instanceRange = m_instanceRanges[pMesh];
-
-            if (instanceRange.deferredCount == 0) continue;
-
-            cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-            D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
-            instanceBufferView.BufferLocation = frameResource.GetInstanceBufferVirtualAddress() + (instanceRange.offset + instanceRange.forwardCount) * instanceDataSize;
-            instanceBufferView.StrideInBytes = instanceDataSize;
-            instanceBufferView.SizeInBytes = instanceDataSize * instanceRange.deferredCount;
-
-            D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->GetVBV(), instanceBufferView };
-            cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
-            cmdList->IASetIndexBuffer(&pMesh->GetIBV());
-
-            cmdList->DrawIndexedInstanced(pMesh->GetNumIndices(), instanceRange.forwardCount + instanceRange.deferredCount, 0, 0, 0);
+            DrawMesh(cmdList.Get(), *mesh, PassType::GBUFFER, frameResource.GetInstanceBufferVirtualAddress());
         }
 
         for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
@@ -1150,23 +1118,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
         for (auto& mesh : m_meshes)
         {
-            auto* pMesh = mesh.get();
-            const auto& instanceRange = m_instanceRanges[pMesh];
-
-            if (instanceRange.forwardCount == 0) continue;
-
-            cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-            D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
-            instanceBufferView.BufferLocation = frameResource.GetInstanceBufferVirtualAddress() + instanceRange.offset * instanceDataSize;
-            instanceBufferView.StrideInBytes = instanceDataSize;
-            instanceBufferView.SizeInBytes = instanceDataSize * instanceRange.forwardCount;
-
-            D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->GetVBV(), instanceBufferView };
-            cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
-            cmdList->IASetIndexBuffer(&pMesh->GetIBV());
-
-            cmdList->DrawIndexedInstanced(pMesh->GetNumIndices(), instanceRange.forwardCount + instanceRange.deferredCount, 0, 0, 0);
+            DrawMesh(cmdList.Get(), *mesh, PassType::DEFAULT, frameResource.GetInstanceBufferVirtualAddress());
         }
     }
 }
@@ -1645,7 +1597,7 @@ void Renderer::PrepareConstantData(float alpha)
     prepareFuncs[2] = [&](Light& l) { PrepareSpotLight(static_cast<SpotLight&>(l)); };
 
     for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
-        {
+    {
         for (auto& light : m_lights[type])
         {
             prepareFuncs[type](*light);
@@ -1822,13 +1774,53 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
         for (auto& light : m_lights[type])
         {
             for (UINT i = 0; i < arraySize; ++i)
-        {
+            {
                 frameResource.UpdateCameraConstantBuffer(light->GetCameraConstantBufferBaseIndex() + i, light->GetCameraConstantDataPtr(i));
             }
             frameResource.UpdateLightConstantBuffer(lightIdx, light->GetLightConstantDataPtr());
             ++lightIdx;
         }
     }
+}
+
+void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, Mesh& mesh, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)
+{
+    static const UINT instanceDataSize = static_cast<UINT>(sizeof(InstanceData));
+
+    const auto& instanceRange = m_instanceRanges[&mesh];
+
+    if ((passType == PassType::DEFAULT && instanceRange.forwardCount == 0) ||
+        (passType == PassType::DEPTH_ONLY && (instanceRange.forwardCount + instanceRange.deferredCount) == 0) ||
+        (passType == PassType::GBUFFER && instanceRange.deferredCount == 0) ||
+        (passType == PassType::DEFERRED_LIGHTING))
+        return;
+
+    pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    UINT instanceCount;
+    switch (passType)
+    {
+    case PassType::DEFAULT:
+        instanceCount = instanceRange.forwardCount;
+        break;
+    case PassType::DEPTH_ONLY:
+        instanceCount = instanceRange.forwardCount + instanceRange.deferredCount;
+        break;
+    case PassType::GBUFFER:
+        instanceCount = instanceRange.deferredCount;
+        break;
+    }
+
+    D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
+    instanceBufferView.BufferLocation = instanceBufferBase + instanceRange.offset * instanceDataSize;
+    instanceBufferView.StrideInBytes = instanceDataSize;
+    instanceBufferView.SizeInBytes = instanceDataSize * instanceCount;
+
+    D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { mesh.GetVBV(), instanceBufferView };
+    pCommandList->IASetVertexBuffers(0, 2, pVertexBufferViews);
+    pCommandList->IASetIndexBuffer(&mesh.GetIBV());
+
+    pCommandList->DrawIndexedInstanced(mesh.GetNumIndices(), instanceCount, 0, 0, 0);
 }
 
 template <>
