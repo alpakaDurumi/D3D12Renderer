@@ -951,11 +951,11 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                     instanceBufferView.StrideInBytes = instanceDataSize;
                     instanceBufferView.SizeInBytes = instanceDataSize * (instanceRange.forwardCount + instanceRange.deferredCount);
 
-                    D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->m_vertexBufferView, instanceBufferView };
+                        D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->GetVBV(), instanceBufferView };
                     cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
-                    cmdList->IASetIndexBuffer(&pMesh->m_indexBufferView);
+                        cmdList->IASetIndexBuffer(&pMesh->GetIBV());
 
-                    cmdList->DrawIndexedInstanced(pMesh->m_numIndices, instanceRange.forwardCount + instanceRange.deferredCount, 0, 0, 0);
+                        cmdList->DrawIndexedInstanced(pMesh->GetNumIndices(), instanceRange.forwardCount + instanceRange.deferredCount, 0, 0, 0);
                 }
             }
 
@@ -1047,11 +1047,11 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             instanceBufferView.StrideInBytes = instanceDataSize;
             instanceBufferView.SizeInBytes = instanceDataSize * instanceRange.deferredCount;
 
-            D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->m_vertexBufferView, instanceBufferView };
+            D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->GetVBV(), instanceBufferView };
             cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
-            cmdList->IASetIndexBuffer(&pMesh->m_indexBufferView);
+            cmdList->IASetIndexBuffer(&pMesh->GetIBV());
 
-            cmdList->DrawIndexedInstanced(pMesh->m_numIndices, instanceRange.deferredCount, 0, 0, 0);
+            cmdList->DrawIndexedInstanced(pMesh->GetNumIndices(), instanceRange.forwardCount + instanceRange.deferredCount, 0, 0, 0);
         }
 
         for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
@@ -1162,11 +1162,11 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             instanceBufferView.StrideInBytes = instanceDataSize;
             instanceBufferView.SizeInBytes = instanceDataSize * instanceRange.forwardCount;
 
-            D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->m_vertexBufferView, instanceBufferView };
+            D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->GetVBV(), instanceBufferView };
             cmdList->IASetVertexBuffers(0, 2, pVertexBufferViews);
-            cmdList->IASetIndexBuffer(&pMesh->m_indexBufferView);
+            cmdList->IASetIndexBuffer(&pMesh->GetIBV());
 
-            cmdList->DrawIndexedInstanced(pMesh->m_numIndices, instanceRange.forwardCount, 0, 0, 0);
+            cmdList->DrawIndexedInstanced(pMesh->GetNumIndices(), instanceRange.forwardCount + instanceRange.deferredCount, 0, 0, 0);
         }
     }
 }

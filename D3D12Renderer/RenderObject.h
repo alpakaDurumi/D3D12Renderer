@@ -9,7 +9,7 @@ public:
     RenderObject(Mesh* pMesh)
         : m_pMesh(pMesh)
     {
-        m_pMaterial = pMesh->m_pDefaultMaterial;
+        m_pMaterial = pMesh->GetMaterial();
 
         m_prevS = XMFLOAT3(1.0f, 1.0f, 1.0f);
         m_currS = XMFLOAT3(1.0f, 1.0f, 1.0f);

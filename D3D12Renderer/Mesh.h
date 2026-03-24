@@ -33,6 +33,27 @@ public:
         m_pDefaultMaterial = mat;
     }
 
+    const D3D12_VERTEX_BUFFER_VIEW& GetVBV() const
+    {
+        return m_vertexBufferView;
+    }
+
+    const D3D12_INDEX_BUFFER_VIEW& GetIBV() const
+    {
+        return m_indexBufferView;
+    }
+
+    UINT GetNumIndices() const
+    {
+        return m_numIndices;
+    }
+
+    Material* GetMaterial() const
+    {
+        return m_pDefaultMaterial;
+    }
+
+private:
     ComPtr<ID3D12Resource> m_vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 
