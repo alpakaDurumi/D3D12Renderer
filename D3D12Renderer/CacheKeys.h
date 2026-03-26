@@ -31,7 +31,7 @@ struct std::hash<ShaderKey>
     {
         std::hash<std::wstring> hasher;
         return hasher(key.fileName);
-        }
+    }
 };
 
 // Key that identify unique PSO.

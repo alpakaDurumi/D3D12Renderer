@@ -206,6 +206,7 @@
     <None Include="ShaderCompile.targets" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Aliases.h" />
     <ClInclude Include="CacheKeys.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CommandList.h" />
@@ -235,8 +236,10 @@
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="RenderGraphNode.h" />
     <ClInclude Include="RenderObject.h" />
     <ClInclude Include="ResourceLayoutTracker.h" />
+    <ClInclude Include="ResourceRegistry.h" />
     <ClInclude Include="RootSignature.h" />
     <ClInclude Include="SharedConfig.h" />
     <ClInclude Include="Texture.h" />
