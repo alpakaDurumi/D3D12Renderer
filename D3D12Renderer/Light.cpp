@@ -158,6 +158,16 @@ LightConstantData* Light::GetLightConstantDataPtr()
     return &m_lightConstantData;
 }
 
+UINT Light::GetDepthBufferHandle() const
+{
+    return m_hDepthBuffer;
+}
+
+void Light::SetDepthBufferHandle(UINT handle)
+{
+    m_hDepthBuffer = handle;
+}
+
 DirectionalLight::DirectionalLight(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,
@@ -261,6 +271,16 @@ D3D12_CPU_DESCRIPTOR_HANDLE PointLight::GetRTVDescriptorHandle(UINT idx) const
     return m_rtvAllocation.GetDescriptorHandle(idx);
 }
 
+UINT PointLight::GetRenderTargetHandle() const
+{
+    return m_hRenderTarget;
+}
+
+void PointLight::SetRenderTargetHandle(UINT handle)
+{
+    m_hRenderTarget = handle;
+}
+
 SpotLight::SpotLight(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,
@@ -290,7 +310,7 @@ void SpotLight::SetAngles(float outerAngleDegree, float innerAngleDegree)
     // We need cosine value that calculated from half angle.
     m_lightConstantData.cosOuterAngle = std::cos(m_outerAngle * 0.5f);
     m_lightConstantData.cosInnerAngle = std::cos(m_innerAngle * 0.5f);
-    
+
     const float minDiff = 0.01f;
 
     if ((m_lightConstantData.cosInnerAngle - m_lightConstantData.cosOuterAngle) < minDiff)

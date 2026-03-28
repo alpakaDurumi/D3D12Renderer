@@ -34,6 +34,8 @@
 #include "Material.h"
 #include "RenderObject.h"
 #include "SharedConfig.h"
+#include "ResourceRegistry.h"
+#include "RenderGraphNode.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -123,6 +125,15 @@ private:
     CameraConstantData m_cameraConstantData;
 
     InputManager m_inputManager;
+
+    std::vector<RenderGraphNode> m_renderGraph;
+    std::vector<std::vector<ResourceUsage>> m_frameEndUsage;
+
+    // Resource handles
+    ResourceRegistry m_resourceRegistry;
+    ResourceHandle m_hBackBuffer;
+    ResourceHandle m_hDepthStencilBuffer;
+    ResourceHandle m_hGBuffers[static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)];
 
     struct InstanceRange
     {

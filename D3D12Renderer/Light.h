@@ -55,6 +55,9 @@ public:
     CameraConstantData* GetCameraConstantDataPtr(UINT idx);
     LightConstantData* GetLightConstantDataPtr();
 
+    UINT GetDepthBufferHandle() const;
+    void SetDepthBufferHandle(UINT handle);
+
 protected:
     std::vector<CameraConstantData> m_cameraConstantData;
     UINT m_cameraConstantBufferBaseIndex;
@@ -66,6 +69,8 @@ protected:
     ComPtr<ID3D12Resource> m_depthBuffer;
     DescriptorAllocation m_dsvAllocation;
     DescriptorAllocation m_srvAllocation;
+
+    UINT m_hDepthBuffer;
 };
 
 class DirectionalLight : public Light
@@ -110,9 +115,14 @@ public:
     ID3D12Resource* GetRenderTarget() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetRTVDescriptorHandle(UINT idx) const;
 
+    UINT GetRenderTargetHandle() const;
+    void SetRenderTargetHandle(UINT handle);
+
 private:
     ComPtr<ID3D12Resource> m_renderTarget;
     DescriptorAllocation m_rtvAllocation;
+
+    UINT m_hRenderTarget;
 };
 
 class SpotLight : public Light
