@@ -832,7 +832,7 @@ void Renderer::LoadAssets()
     }
 
     // Set up render graph
-    m_renderGraph.resize(4);
+    m_renderGraph.resize(static_cast<std::size_t>(PassType::NUM_PASS_TYPES));
     auto& depthOnly = m_renderGraph[0];
     auto& gBuffer = m_renderGraph[1];
     auto& deferredLighting = m_renderGraph[2];
@@ -847,16 +847,16 @@ void Renderer::LoadAssets()
             if (isPointLight)
             {
                 ResourceHandle handle = static_cast<PointLight&>(*light).GetRenderTargetHandle();
-                D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 };
                 ResourceUsage usage = { D3D12_BARRIER_SYNC_RENDER_TARGET ,D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET };
-                depthOnly.inputs.emplace_back(handle, range, usage);
+                depthOnly.AddInput(handle, usage);
+                depthOnly.AddOutput(handle, usage);
             }
             else
             {
                 ResourceHandle handle = light->GetDepthBufferHandle();
-                D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 };
                 ResourceUsage usage = { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE };
-                depthOnly.inputs.emplace_back(handle, range, usage);
+                depthOnly.AddInput(handle, usage);
+                depthOnly.AddOutput(handle, usage);
             }
         }
     }
@@ -865,19 +865,20 @@ void Renderer::LoadAssets()
     for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
     {
         ResourceHandle handle = m_hGBuffers[slot];
-        D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 };
         ResourceUsage usage = { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET };
-        gBuffer.inputs.emplace_back(handle, range, usage);
+        gBuffer.AddInput(handle, usage);
+        gBuffer.AddOutput(handle, usage);
     }
-    gBuffer.inputs.emplace_back(m_hDepthStencilBuffer, D3D12_BARRIER_SUBRESOURCE_RANGE{ 0xffff'ffff, 0, 0, 0, 0, 0 }, ResourceUsage{ D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    gBuffer.AddInput(m_hDepthStencilBuffer, ResourceUsage{ D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    gBuffer.AddOutput(m_hDepthStencilBuffer, ResourceUsage{ D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
 
     // Deferred lighting pass
     for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
     {
         ResourceHandle handle = m_hGBuffers[slot];
-        D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 };
         ResourceUsage usage = { D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE };
-        deferredLighting.inputs.emplace_back(handle, range, usage);
+        deferredLighting.AddInput(handle, usage);
+        deferredLighting.AddOutput(handle, usage);
     }
     for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
     {
@@ -887,21 +888,23 @@ void Renderer::LoadAssets()
             if (isPointLight)
             {
                 ResourceHandle handle = static_cast<PointLight&>(*light).GetRenderTargetHandle();
-                D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 };
                 ResourceUsage usage = { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE };
-                deferredLighting.inputs.emplace_back(handle, range, usage);
+                deferredLighting.AddInput(handle, usage);
+                deferredLighting.AddOutput(handle, usage);
             }
             else
             {
                 ResourceHandle handle = light->GetDepthBufferHandle();
-                D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 };
                 ResourceUsage usage = { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE };
-                deferredLighting.inputs.emplace_back(handle, range, usage);
+                deferredLighting.AddInput(handle, usage);
+                deferredLighting.AddOutput(handle, usage);
             }
         }
     }
-    deferredLighting.inputs.emplace_back(m_hDepthStencilBuffer, D3D12_BARRIER_SUBRESOURCE_RANGE{ 0xffff'ffff, 0, 0, 0, 0, 0 }, ResourceUsage{ D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE | D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ, D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_GENERIC_READ });
-    deferredLighting.inputs.emplace_back(m_hBackBuffer, D3D12_BARRIER_SUBRESOURCE_RANGE{ 0xffff'ffff, 0, 0, 0, 0, 0 }, ResourceUsage{ D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    deferredLighting.AddInput(m_hDepthStencilBuffer, ResourceUsage{ D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE | D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ, D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_GENERIC_READ });
+    deferredLighting.AddOutput(m_hDepthStencilBuffer, ResourceUsage{ D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE | D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ, D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_GENERIC_READ });
+    deferredLighting.AddInput(m_hBackBuffer, ResourceUsage{ D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    deferredLighting.AddOutput(m_hBackBuffer, ResourceUsage{ D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
 
     // Forward coloring pass
     for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
@@ -911,22 +914,24 @@ void Renderer::LoadAssets()
         {
             if (isPointLight)
             {
-                ResourceHandle handle = { static_cast<PointLight&>(*light).GetRenderTargetHandle() };
-                D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 };
+                ResourceHandle handle = static_cast<PointLight&>(*light).GetRenderTargetHandle();
                 ResourceUsage usage = { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE };
-                forwardColoring.inputs.emplace_back(handle, range, usage);
+                forwardColoring.AddInput(handle, usage);
+                forwardColoring.AddOutput(handle, usage);
             }
             else
             {
-                ResourceHandle handle = { light->GetDepthBufferHandle() };
-                D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 };
+                ResourceHandle handle = light->GetDepthBufferHandle();
                 ResourceUsage usage = { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE };
-                forwardColoring.inputs.emplace_back(handle, range, usage);
+                forwardColoring.AddInput(handle, usage);
+                forwardColoring.AddOutput(handle, usage);
             }
         }
     }
-    forwardColoring.inputs.emplace_back(m_hDepthStencilBuffer, D3D12_BARRIER_SUBRESOURCE_RANGE{ 0xffff'ffff, 0, 0, 0, 0, 0 }, ResourceUsage{ D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    forwardColoring.inputs.emplace_back(m_hBackBuffer, D3D12_BARRIER_SUBRESOURCE_RANGE{ 0xffff'ffff, 0, 0, 0, 0, 0 }, ResourceUsage{ D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    forwardColoring.AddInput(m_hDepthStencilBuffer, ResourceUsage{ D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    forwardColoring.AddOutput(m_hDepthStencilBuffer, ResourceUsage{ D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    forwardColoring.AddInput(m_hBackBuffer, ResourceUsage{ D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    forwardColoring.AddOutput(m_hBackBuffer, ResourceUsage{ D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
 
     // Use initialLayout when using newly created resources.
     // For existing resources, use values queried from m_frameEndUsage.
@@ -963,7 +968,8 @@ void Renderer::LoadAssets()
     {
         auto& node = m_renderGraph[passIdx];
 
-        for (auto& [handle, range, usage] : node.inputs)
+        // Process inputs
+        for (auto& [handle, usage, range] : node.inputs)
         {
             auto& latestUsages = currentUsages[handle];
 
@@ -973,13 +979,12 @@ void Renderer::LoadAssets()
             {
                 UINT subresourceCount = m_resourceRegistry.GetSubresourceCount(handle);
 
-                for (UINT i = 0; i < subresourceCount; i++)
+                for (UINT i = 0; i < subresourceCount; ++i)
                 {
                     if (latestUsages[i] != usage)
                     {
-                        CompiledBarrier barrier = { handle, {i, 0, 0, 0, 0, 0}, latestUsages[i], usage };
+                        CompiledBarrier barrier = { handle, latestUsages[i], usage, {i, 0, 0, 0, 0, 0} };
                         node.barriers.push_back(barrier);
-                        latestUsages[i] = usage;
                     }
                 }
             }
@@ -997,8 +1002,47 @@ void Renderer::LoadAssets()
 
                             if (latestUsages[subresourceIndex] != usage)
                             {
-                                CompiledBarrier barrier = { handle, {subresourceIndex, 0, 0, 0, 0, 0}, latestUsages[subresourceIndex], usage };
+                                CompiledBarrier barrier = { handle, latestUsages[subresourceIndex], usage, {subresourceIndex, 0, 0, 0, 0, 0} };
                                 node.barriers.push_back(barrier);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Process outputs
+        for (auto& [handle, usage, range] : node.outputs)
+        {
+            auto& latestUsages = currentUsages[handle];
+
+            const auto& [IndexOrFirstMipLevel, NumMipLevels, FirstArraySlice, NumArraySlices, FirstPlane, NumPlanes] = range;
+
+            UINT subresourceCount = m_resourceRegistry.GetSubresourceCount(handle);
+
+            if (IndexOrFirstMipLevel == 0xffff'ffff && NumMipLevels == 0)
+            {
+                UINT subresourceCount = m_resourceRegistry.GetSubresourceCount(handle);
+
+                for (UINT i = 0; i < subresourceCount; ++i)
+                {
+                    latestUsages[i] = usage;
+                }
+            }
+            else
+            {
+                const auto [mipLevels, depthOrArraySize, planeCount] = m_resourceRegistry.GetResourceDimension(handle);
+
+                for (UINT plane = FirstPlane; plane < FirstPlane + NumPlanes; ++plane)
+                {
+                    for (UINT array = FirstArraySlice; array < FirstArraySlice + NumArraySlices; ++array)
+                    {
+                        for (UINT mip = IndexOrFirstMipLevel; mip < IndexOrFirstMipLevel + NumMipLevels; ++mip)
+                        {
+                            UINT subresourceIndex = CalcSubresourceIndex(mip, array, plane, mipLevels, depthOrArraySize);
+
+                            if (latestUsages[subresourceIndex] != usage)
+                            {
                                 latestUsages[subresourceIndex] = usage;
                             }
                         }

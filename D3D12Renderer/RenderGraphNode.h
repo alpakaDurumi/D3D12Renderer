@@ -29,16 +29,26 @@ struct ResourceUsage
 struct CompiledBarrier
 {
     ResourceHandle handle;
-    D3D12_BARRIER_SUBRESOURCE_RANGE subresourceRange;
     ResourceUsage before;
     ResourceUsage after;
+    D3D12_BARRIER_SUBRESOURCE_RANGE subresourceRange;
 };
 
 struct RenderGraphNode
 {
 public:
-    std::vector<std::tuple<ResourceHandle, D3D12_BARRIER_SUBRESOURCE_RANGE, ResourceUsage>> inputs;
-    //std::vector<std::tuple<ResourceHandle, D3D12_BARRIER_SUBRESOURCE_RANGE, ResourceUsage>> outputs;
+    void AddInput(ResourceHandle handle, ResourceUsage usage, D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 })
+    {
+        inputs.emplace_back(handle, usage, range);
+    }
+
+    void AddOutput(ResourceHandle handle, ResourceUsage usage, D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 })
+    {
+        outputs.emplace_back(handle, usage, range);
+    }
+
+    std::vector<std::tuple<ResourceHandle, ResourceUsage, D3D12_BARRIER_SUBRESOURCE_RANGE>> inputs;
+    std::vector<std::tuple<ResourceHandle, ResourceUsage, D3D12_BARRIER_SUBRESOURCE_RANGE>> outputs;
 
     std::vector<CompiledBarrier> barriers;
 };
