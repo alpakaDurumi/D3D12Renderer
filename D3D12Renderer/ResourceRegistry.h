@@ -40,6 +40,16 @@ public:
         return static_cast<ResourceHandle>(m_entries.size()) - 1;
     }
 
+    void UpdateStatic(ResourceHandle handle, ID3D12Resource* pResource)
+    {
+        m_entries[handle].pResources[0] = pResource;
+    }
+
+    void UpdatePerFrame(ResourceHandle handle, std::vector<ID3D12Resource*> pResources)
+    {
+        m_entries[handle].pResources = pResources;
+    }
+
     ID3D12Resource* Resolve(ResourceHandle handle, UINT frameIndex) const
     {
         bool isStatic = m_entries[handle].pResources.size() == 1;

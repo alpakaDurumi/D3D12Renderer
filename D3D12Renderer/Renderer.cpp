@@ -336,7 +336,7 @@ void Renderer::OnResize(UINT width, UINT height)
             m_layoutTracker->UnregisterResource(m_frameResources[i]->GetGBuffer(slot));
             m_frameResources[i]->ResetGBuffer(slot);
         }
-        m_frameResources[i]->CreateGBuffers(width, height, *m_layoutTracker);
+        m_frameResources[i]->CreateGBuffers(m_width, m_height, *m_layoutTracker);
 
         m_frameResources[i]->SetFenceValue(m_frameResources[m_frameIndex]->GetFenceValue());
     }
@@ -360,9 +360,23 @@ void Renderer::OnResize(UINT width, UINT height)
         CreateRTV(m_device.Get(), m_frameResources[i]->GetRenderTarget(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_frameResources[i]->GetRTVHandle());
     }
 
+    // Update registered info of backbuffers
+    std::vector<ID3D12Resource*> pBackBuffers = { m_frameResources[0]->GetRenderTarget(),m_frameResources[1]->GetRenderTarget() };
+    m_resourceRegistry.UpdatePerFrame(m_hBackBuffer, pBackBuffers);
+
+    // Update registered info of GBuffers
+    for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
+    {
+        std::vector<ID3D12Resource*> pGBuffers = { m_frameResources[0]->GetGBuffer(static_cast<GBufferSlot>(slot)), m_frameResources[1]->GetGBuffer(static_cast<GBufferSlot>(slot)) };
+        m_resourceRegistry.UpdatePerFrame(m_hGBuffers[slot], pGBuffers);
+    }
+
     // Recreate depth-stencil buffer, DSV, and SRV
     CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer, true);
     m_layoutTracker->RegisterResource(m_depthStencilBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, 1, 1, DXGI_FORMAT_R24G8_TYPELESS);
+
+    // Update registered info of depth-stencil buffer
+    m_resourceRegistry.UpdateStatic(m_hDepthStencilBuffer, m_depthStencilBuffer.Get());
 
     CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(), true, false);
     CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_readOnlyDSVAllocation.GetDescriptorHandle(), true, true);
