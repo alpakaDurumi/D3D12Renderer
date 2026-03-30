@@ -13,14 +13,14 @@ struct ResourceUsage
     D3D12_BARRIER_ACCESS access;
     D3D12_BARRIER_LAYOUT layout;
 
-    bool operator==(const ResourceUsage& other)
+    bool operator==(const ResourceUsage& other) const
     {
         return this->sync == other.sync &&
             this->access == other.access &&
             this->layout == other.layout;
     }
 
-    bool operator!=(const ResourceUsage& other)
+    bool operator!=(const ResourceUsage& other) const
     {
         return !(*this == other);
     }
