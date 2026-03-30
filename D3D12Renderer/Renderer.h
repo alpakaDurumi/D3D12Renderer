@@ -126,7 +126,7 @@ private:
 
     InputManager m_inputManager;
 
-    std::vector<RenderGraphNode> m_renderGraph;
+    std::array<RenderGraphNode, static_cast<std::size_t>(PassType::NUM_PASS_TYPES)> m_renderGraph;
     std::vector<std::vector<ResourceUsage>> m_frameEndUsage;
 
     // Resource handles

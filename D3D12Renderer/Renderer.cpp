@@ -839,11 +839,10 @@ void Renderer::LoadAssets()
     }
 
     // Set up render graph
-    m_renderGraph.resize(static_cast<std::size_t>(PassType::NUM_PASS_TYPES));
-    auto& depthOnly = m_renderGraph[0];
-    auto& gBuffer = m_renderGraph[1];
-    auto& deferredLighting = m_renderGraph[2];
-    auto& forwardColoring = m_renderGraph[3];
+    auto& depthOnly = m_renderGraph[static_cast<UINT>(PassType::DEPTH_ONLY)];
+    auto& gBuffer = m_renderGraph[static_cast<UINT>(PassType::GBUFFER)];
+    auto& deferredLighting = m_renderGraph[static_cast<UINT>(PassType::DEFERRED_LIGHTING)];
+    auto& forwardColoring = m_renderGraph[static_cast<UINT>(PassType::FORWARD_COLORING)];
 
     // Depth-only pass
     for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
@@ -979,10 +978,16 @@ void Renderer::LoadAssets()
         }
     }
 
+    PassType defaultOrder[static_cast<std::size_t>(PassType::NUM_PASS_TYPES)] = {
+        PassType::DEPTH_ONLY,
+        PassType::GBUFFER,
+        PassType::DEFERRED_LIGHTING,
+        PassType::FORWARD_COLORING };
+
     // Compile graph
-    for (UINT passIdx = 0; passIdx < static_cast<UINT>(PassType::NUM_PASS_TYPES); ++passIdx)
+    for (const PassType& passType : defaultOrder)
     {
-        auto& node = m_renderGraph[passIdx];
+        auto& node = m_renderGraph[static_cast<UINT>(passType)];
 
         // Process inputs
         for (auto& [handle, usage, range] : node.inputs)
@@ -1134,10 +1139,10 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     frameResource.EnsureInstanceCapacity(static_cast<UINT>(temp.size()));
     frameResource.PushInstanceData(temp);
 
-    auto& depthOnly = m_renderGraph[0];
-    auto& gBuffer = m_renderGraph[1];
-    auto& deferredLighting = m_renderGraph[2];
-    auto& forwardColoring = m_renderGraph[3];
+    auto& depthOnly = m_renderGraph[static_cast<UINT>(PassType::DEPTH_ONLY)];
+    auto& gBuffer = m_renderGraph[static_cast<UINT>(PassType::GBUFFER)];
+    auto& deferredLighting = m_renderGraph[static_cast<UINT>(PassType::DEFERRED_LIGHTING)];
+    auto& forwardColoring = m_renderGraph[static_cast<UINT>(PassType::FORWARD_COLORING)];
 
     // Barrier for depth-only pass
     {
