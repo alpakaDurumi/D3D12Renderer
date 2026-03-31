@@ -30,7 +30,7 @@ public:
         m_pSamplerDescriptorHeap = pHeapForSampler;
     }
 
-    ComPtr<ID3D12CommandQueue> GetCommandQueue() const { return m_commandQueue; }
+    ID3D12CommandQueue* GetCommandQueue() const { return m_commandQueue.Get(); }
 
     ID3D12CommandAllocator* CreateCommandAllocator();
     ID3D12GraphicsCommandList7* CreateCommandList(ID3D12CommandAllocator* pCommandAllocator);

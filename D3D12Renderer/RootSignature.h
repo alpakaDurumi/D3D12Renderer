@@ -121,7 +121,7 @@ public:
             m_staticSamplers = nullptr;
     }
 
-    ComPtr<ID3D12RootSignature> GetRootSignature() const { return m_rootSignature; }
+    ID3D12RootSignature* GetRootSignature() const { return m_rootSignature.Get(); }
     UINT GetNumParameters() const { return m_numParameters; }
     UINT GetNumStaticSamplers() const { return m_numStaticSamplers; }
     UINT32 GetDescriptorTableBitMask(D3D12_DESCRIPTOR_HEAP_TYPE heapType) const

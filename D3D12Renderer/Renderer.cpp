@@ -586,7 +586,7 @@ void Renderer::LoadPipeline()
 
     ComPtr<IDXGISwapChain1> swapChain;
     ThrowIfFailed(factory->CreateSwapChainForHwnd(
-        m_commandQueue->GetCommandQueue().Get(),
+        m_commandQueue->GetCommandQueue(),
         Win32Application::GetHwnd(),
         &swapChainDesc,
         nullptr,
@@ -1084,7 +1084,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     frameResource.ResetInstanceOffsetByte();
 
     // Set root signature
-    pCommandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature().Get());
+    pCommandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
 
     UINT numLights = 0;
     for (const auto& vec : m_lights) numLights += static_cast<UINT>(vec.size());
@@ -1490,7 +1490,7 @@ void Renderer::InitImGui()
     // Setup Platform/Renderer backends
     ImGui_ImplDX12_InitInfo init_info = {};
     init_info.Device = m_device.Get();
-    init_info.CommandQueue = m_commandQueue->GetCommandQueue().Get();
+    init_info.CommandQueue = m_commandQueue->GetCommandQueue();
     init_info.NumFramesInFlight = FrameCount;
     init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
     init_info.DSVFormat = DXGI_FORMAT_D32_FLOAT;
@@ -1744,7 +1744,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
             psoDesc.InputLayout = { nullptr, 0 };
         else
             psoDesc.InputLayout = { m_inputLayout.data(), static_cast<UINT>(m_inputLayout.size()) };
-        psoDesc.pRootSignature = m_rootSignature->GetRootSignature().Get();
+        psoDesc.pRootSignature = m_rootSignature->GetRootSignature();
 
         // Shader stages are selected by demand.
         // VS is essential for rasterization.
