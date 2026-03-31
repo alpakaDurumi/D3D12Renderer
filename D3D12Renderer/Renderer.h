@@ -19,7 +19,6 @@
 #include "InputManager.h"
 #include "ConstantData.h"
 #include "CommandQueue.h"
-#include "CommandList.h"
 #include "FrameResource.h"
 #include "UploadBuffer.h"
 #include "Mesh.h"
@@ -175,7 +174,7 @@ private:
 
     void LoadPipeline();
     void LoadAssets();
-    void PopulateCommandList(CommandList& commandList);
+    void PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList);
     void BuildImGuiFrame();
     void WaitForGPU();
     void MoveToNextFrame();
@@ -192,7 +191,7 @@ private:
     T* CreateLight();
 
     Texture* CreateTexture(
-        CommandList& commandList,
+        ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& allocation,
         const std::wstring& filePath,
         bool isSRGB,

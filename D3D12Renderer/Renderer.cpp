@@ -236,10 +236,10 @@ void Renderer::OnUpdate()
 // Render the scene.
 void Renderer::OnRender()
 {
-    auto [commandAllocator, commandList] = m_commandQueue->GetAvailableCommandList();
+    auto [pCommandAllocator, pCommandList] = m_commandQueue->GetAvailableCommandList();
 
     BuildImGuiFrame();
-    PopulateCommandList(commandList);
+    PopulateCommandList(pCommandList);
 
     m_dynamicDescriptorHeapForCBVSRVUAV->Reset();
 
@@ -247,8 +247,8 @@ void Renderer::OnRender()
     // Is it OK to call SetDescriptorHeaps? (Does it affect performance?)
     ImGui::Render();
     ID3D12DescriptorHeap* ppHeaps[] = { m_imguiDescriptorAllocator->GetDescriptorHeap() };
-    commandList.GetCommandList()->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.GetCommandList().Get());
+    pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), pCommandList);
 
     // Barrier for RTV should be called after ImGui Render.
     // Swap Chain textures initially created in D3D12_BARRIER_LAYOUT_COMMON.
@@ -267,11 +267,11 @@ void Renderer::OnRender()
     };
 
     D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(1, &barrier) };
-    commandList.GetCommandList()->Barrier(1, barrierGroups);
+    pCommandList->Barrier(1, barrierGroups);
 
     // Execute the command lists and store the fence value
     // And notify fenceValue to UploadBuffer
-    UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList);
+    UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(pCommandAllocator, pCommandList);
     m_frameResources[m_frameIndex]->SetFenceValue(fenceValue);
     m_uploadBuffer->QueueRetiredPages(fenceValue);
     m_dynamicDescriptorHeapForCBVSRVUAV->QueueRetiredHeaps(fenceValue);
@@ -1076,21 +1076,19 @@ void Renderer::LoadAssets()
     }
 }
 
-void Renderer::PopulateCommandList(CommandList& commandList)
+void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 {
-    PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"PopulateCommandList");
+    PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"PopulateCommandList");
 
     FrameResource& frameResource = *m_frameResources[m_frameIndex];
     frameResource.ResetInstanceOffsetByte();
 
-    auto cmdList = commandList.GetCommandList();
-
     // Set root signature
-    cmdList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature().Get());
+    pCommandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature().Get());
 
     UINT numLights = 0;
     for (const auto& vec : m_lights) numLights += static_cast<UINT>(vec.size());
-    cmdList->SetGraphicsRoot32BitConstant(2, numLights, 0);
+    pCommandList->SetGraphicsRoot32BitConstant(2, numLights, 0);
 
     // Stage material CBVs
     UINT numMaterials = static_cast<UINT>(m_materials.size());
@@ -1119,7 +1117,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, 0, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), frameResource.GetGBufferSRVAllocationRef());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), 1, m_depthSRVAllocation);
 
-    BindDescriptorTables(cmdList.Get());
+    BindDescriptorTables(pCommandList);
 
     std::vector<InstanceData> temp;
     UINT curOffset = 0;
@@ -1168,16 +1166,16 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         }
 
         D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(UINT32(barriers.size()), barriers.data()) };
-        cmdList->Barrier(1, barrierGroups);
+        pCommandList->Barrier(1, barrierGroups);
     }
 
     // Depth-only pass for shadow mapping
     // Also work as z-prepass
     {
-        PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"Depth-only pass");
+        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Depth-only pass");
 
-        cmdList->RSSetViewports(1, &m_shadowMapViewport);
-        cmdList->RSSetScissorRects(1, &m_shadowMapScissorRect);
+        pCommandList->RSSetViewports(1, &m_shadowMapViewport);
+        pCommandList->RSSetScissorRects(1, &m_shadowMapScissorRect);
 
         // Pre-query PSOs
         m_currentPSOKey.passType = PassType::DEPTH_ONLY;
@@ -1195,7 +1193,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
             for (auto& light : m_lights[type])
             {
-                if (isPointLight) cmdList->SetGraphicsRoot32BitConstant(3, lightIdx, 0);
+                if (isPointLight) pCommandList->SetGraphicsRoot32BitConstant(3, lightIdx, 0);
 
                 // Render each entry of shadow map.
                 UINT16 arraySize = light->GetArraySize();
@@ -1206,26 +1204,26 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                     if (isPointLight)
                     {
                         auto rtvHandle = static_cast<PointLight*>(light.get())->GetRTVDescriptorHandle(j);
-                        cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &shadowMapDsvHandle);
+                        pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &shadowMapDsvHandle);
 
                         XMVECTORF32 clearColor;
                         clearColor.v = XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f);
-                        cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+                        pCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
                     }
                     else
                     {
-                        cmdList->OMSetRenderTargets(0, nullptr, FALSE, &shadowMapDsvHandle);
+                        pCommandList->OMSetRenderTargets(0, nullptr, FALSE, &shadowMapDsvHandle);
                     }
 
-                    cmdList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
+                    pCommandList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
-                    cmdList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
+                    pCommandList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
 
-                    cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(light->GetCameraConstantBufferBaseIndex() + j));
+                    pCommandList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(light->GetCameraConstantBufferBaseIndex() + j));
 
                     for (auto& mesh : m_meshes)
                     {
-                        DrawMesh(cmdList.Get(), *mesh, PassType::DEPTH_ONLY, frameResource.GetInstanceBufferVirtualAddress());
+                        DrawMesh(pCommandList, *mesh, PassType::DEPTH_ONLY, frameResource.GetInstanceBufferVirtualAddress());
                     }
                 }
 
@@ -1256,15 +1254,15 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         }
 
         D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(UINT32(barriers.size()), barriers.data()) };
-        cmdList->Barrier(1, barrierGroups);
+        pCommandList->Barrier(1, barrierGroups);
     }
 
     // GBuffer pass
     {
-        PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"GBuffer pass");
+        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"GBuffer pass");
 
-        cmdList->RSSetViewports(1, &m_viewport);
-        cmdList->RSSetScissorRects(1, &m_scissorRect);
+        pCommandList->RSSetViewports(1, &m_viewport);
+        pCommandList->RSSetScissorRects(1, &m_scissorRect);
 
         // Pre-query PSOs
         m_currentPSOKey.passType = PassType::GBUFFER;
@@ -1274,22 +1272,22 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
         auto rtvHandles = frameResource.GetGBufferRTVHandles();
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
-        cmdList->OMSetRenderTargets(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), rtvHandles.data(), FALSE, &dsvHandle);
+        pCommandList->OMSetRenderTargets(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), rtvHandles.data(), FALSE, &dsvHandle);
 
         XMVECTORF32 clearColor;
         clearColor.v = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
         for (auto& rtvHandle : rtvHandles)
-            cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-        cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 0.0f, 0, 0, nullptr);
-        cmdList->OMSetStencilRef(1);
+            pCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        pCommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 0.0f, 0, 0, nullptr);
+        pCommandList->OMSetStencilRef(1);
 
-        cmdList->SetPipelineState(pso);
+        pCommandList->SetPipelineState(pso);
 
-        cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
+        pCommandList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
 
         for (auto& mesh : m_meshes)
         {
-            DrawMesh(cmdList.Get(), *mesh, PassType::GBUFFER, frameResource.GetInstanceBufferVirtualAddress());
+            DrawMesh(pCommandList, *mesh, PassType::GBUFFER, frameResource.GetInstanceBufferVirtualAddress());
         }
     }
 
@@ -1315,15 +1313,15 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         }
 
         D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(UINT32(barriers.size()), barriers.data()) };
-        cmdList->Barrier(1, barrierGroups);
+        pCommandList->Barrier(1, barrierGroups);
     }
 
     // Deferred Lighting pass
     {
-        PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"Deferred Lighting pass");
+        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Deferred Lighting pass");
 
-        cmdList->RSSetViewports(1, &m_viewport);
-        cmdList->RSSetScissorRects(1, &m_scissorRect);
+        pCommandList->RSSetViewports(1, &m_viewport);
+        pCommandList->RSSetScissorRects(1, &m_scissorRect);
 
         // Pre-query PSOs
         m_currentPSOKey.passType = PassType::DEFERRED_LIGHTING;
@@ -1333,21 +1331,21 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetRTVHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_readOnlyDSVAllocation.GetDescriptorHandle();
-        cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
-        cmdList->OMSetStencilRef(1);
+        pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+        pCommandList->OMSetStencilRef(1);
 
         // Use linear color for gamma-correct rendering
         XMVECTORF32 clearColor;
         clearColor.v = XMColorSRGBToRGB(XMVectorSet(0.5f, 0.5f, 0.5f, 1.0f));
-        cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        pCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-        cmdList->SetPipelineState(pso);
+        pCommandList->SetPipelineState(pso);
 
-        cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
-        cmdList->SetGraphicsRootConstantBufferView(1, frameResource.GetShadowCBVirtualAddress());
+        pCommandList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
+        pCommandList->SetGraphicsRootConstantBufferView(1, frameResource.GetShadowCBVirtualAddress());
 
-        cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        cmdList->DrawInstanced(3, 1, 0, 0);
+        pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        pCommandList->DrawInstanced(3, 1, 0, 0);
 
         for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
         {
@@ -1364,7 +1362,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             };
 
             D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(1, &b) };
-            commandList.GetCommandList()->Barrier(1, barrierGroups);
+            pCommandList->Barrier(1, barrierGroups);
         }
     }
 
@@ -1390,15 +1388,15 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         }
 
         D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(UINT32(barriers.size()), barriers.data()) };
-        cmdList->Barrier(1, barrierGroups);
+        pCommandList->Barrier(1, barrierGroups);
     }
 
     // Forward Coloring pass
     {
-        PIX_SCOPED_EVENT(commandList.GetCommandList().Get(), PIX_COLOR_DEFAULT, L"Forward color pass");
+        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Forward color pass");
 
-        cmdList->RSSetViewports(1, &m_viewport);
-        cmdList->RSSetScissorRects(1, &m_scissorRect);
+        pCommandList->RSSetViewports(1, &m_viewport);
+        pCommandList->RSSetScissorRects(1, &m_scissorRect);
 
         // Pre-query PSOs
         m_currentPSOKey.passType = PassType::FORWARD_COLORING;
@@ -1408,16 +1406,16 @@ void Renderer::PopulateCommandList(CommandList& commandList)
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetRTVHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
-        cmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+        pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
-        cmdList->SetPipelineState(pso);
+        pCommandList->SetPipelineState(pso);
 
-        cmdList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
-        cmdList->SetGraphicsRootConstantBufferView(1, frameResource.GetShadowCBVirtualAddress());
+        pCommandList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
+        pCommandList->SetGraphicsRootConstantBufferView(1, frameResource.GetShadowCBVirtualAddress());
 
         for (auto& mesh : m_meshes)
         {
-            DrawMesh(cmdList.Get(), *mesh, PassType::FORWARD_COLORING, frameResource.GetInstanceBufferVirtualAddress());
+            DrawMesh(pCommandList, *mesh, PassType::FORWARD_COLORING, frameResource.GetInstanceBufferVirtualAddress());
         }
 
         UINT lightIdx = 0;
@@ -1442,7 +1440,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                     };
 
                     D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(1, &b) };
-                    commandList.GetCommandList()->Barrier(1, barrierGroups);
+                    pCommandList->Barrier(1, barrierGroups);
                 }
                 else
                 {
@@ -1459,7 +1457,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                     };
 
                     D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(1, &b) };
-                    commandList.GetCommandList()->Barrier(1, barrierGroups);
+                    pCommandList->Barrier(1, barrierGroups);
                 }
             }
         }
@@ -1550,7 +1548,7 @@ RenderObject* Renderer::CreateRenderObject(Mesh* pMesh, Material* mat)
 }
 
 Texture* Renderer::CreateTexture(
-    CommandList& commandList,
+    ID3D12GraphicsCommandList7* pCommandList,
     DescriptorAllocation&& allocation,
     const std::wstring& filePath,
     bool isSRGB,
@@ -1560,7 +1558,7 @@ Texture* Renderer::CreateTexture(
 {
     auto texture = std::make_unique<Texture>(
         m_device.Get(),
-        commandList,
+        pCommandList,
         std::move(allocation),
         *m_uploadBuffer,
         filePath,

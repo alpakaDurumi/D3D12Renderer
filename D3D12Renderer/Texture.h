@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "D3DHelper.h"
-#include "CommandList.h"
 #include "UploadBuffer.h"
 #include "DescriptorAllocation.h"
 #include "Utility.h"
@@ -22,7 +21,7 @@ class Texture
 public:
     Texture(
         ID3D12Device10* pDevice,
-        CommandList& commandList,
+        ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& allocation,
         UploadBuffer& uploadBuffer,
         const std::vector<UINT8>& textureSrc,
@@ -47,7 +46,7 @@ public:
         };
 
         D3D12_BARRIER_GROUP barrierGroups0[] = { TextureBarrierGroup(1, &barrier0) };
-        commandList.GetCommandList()->Barrier(1, barrierGroups0);
+        pCommandList->Barrier(1, barrierGroups0);
 
         // Calculate required size for data upload
         D3D12_RESOURCE_DESC desc = m_texture->GetDesc();
@@ -61,7 +60,7 @@ public:
         textureData.RowPitch = width * 4;   // 4 bytes per pixel (RGBA)
         textureData.SlicePitch = textureData.RowPitch * height;
 
-        UpdateSubresources(pDevice, commandList, m_texture.Get(), uploadAllocation, 0, 1, &textureData);
+        UpdateSubresources(pDevice, pCommandList, m_texture.Get(), uploadAllocation, 0, 1, &textureData);
 
         D3D12_TEXTURE_BARRIER barrier1 = {
             D3D12_BARRIER_SYNC_COPY,
@@ -76,7 +75,7 @@ public:
         };
 
         D3D12_BARRIER_GROUP barrierGroups1[] = { TextureBarrierGroup(1, &barrier1) };
-        commandList.GetCommandList()->Barrier(1, barrierGroups1);
+        pCommandList->Barrier(1, barrierGroups1);
 
         // Describe and create a SRV for the texture.
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -90,7 +89,7 @@ public:
 
     Texture(
         ID3D12Device10* pDevice,
-        CommandList& commandList,
+        ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& allocation,
         UploadBuffer& uploadBuffer,
         const std::wstring& filePath,
@@ -147,7 +146,7 @@ public:
         };
 
         D3D12_BARRIER_GROUP barrierGroups0[] = { TextureBarrierGroup(1, &barrier0) };
-        commandList.GetCommandList()->Barrier(1, barrierGroups0);
+        pCommandList->Barrier(1, barrierGroups0);
 
         // Calculate required size for data upload
         UINT64 requiredSize = 0;
@@ -155,7 +154,7 @@ public:
 
         auto uploadAllocation = uploadBuffer.Allocate(requiredSize, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
 
-        UpdateSubresources(pDevice, commandList, m_texture.Get(), uploadAllocation, 0, numSubresources, subresources.data());
+        UpdateSubresources(pDevice, pCommandList, m_texture.Get(), uploadAllocation, 0, numSubresources, subresources.data());
 
         D3D12_TEXTURE_BARRIER barrier1 = {
             D3D12_BARRIER_SYNC_COPY,
@@ -170,7 +169,7 @@ public:
         };
 
         D3D12_BARRIER_GROUP barrierGroups1[] = { TextureBarrierGroup(1, &barrier1) };
-        commandList.GetCommandList()->Barrier(1, barrierGroups1);
+        pCommandList->Barrier(1, barrierGroups1);
 
         // Describe and create a SRV for the texture.
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};

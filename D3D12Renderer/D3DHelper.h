@@ -8,7 +8,6 @@
 
 #include <vector>
 
-#include "CommandList.h"
 #include "UploadBuffer.h"
 #include "SharedConfig.h"
 
@@ -41,7 +40,7 @@ namespace D3DHelper
 
     void UpdateSubresources(
         ID3D12Device* pDevice,
-        CommandList& commandList,
+        ID3D12GraphicsCommandList7* pCommandList,
         ID3D12Resource* pDest,
         ID3D12Resource* pIntermediate,
         UINT64 intermediateOffset,
@@ -51,7 +50,7 @@ namespace D3DHelper
 
     void UpdateSubresources(
         ID3D12Device* pDevice,
-        CommandList& commandList,
+        ID3D12GraphicsCommandList7* pCommandList,
         ID3D12Resource* pDest,
         UploadBuffer::Allocation& uploadAllocation,
         UINT firstSubresource,
@@ -67,7 +66,7 @@ namespace D3DHelper
     template<typename T>
     void CreateVertexBuffer(
         ID3D12Device10* pDevice,
-        CommandList& commandList,
+        ID3D12GraphicsCommandList7* pCommandList,
         UploadBuffer& uploadBuffer,
         ComPtr<ID3D12Resource>& vertexBuffer,
         D3D12_VERTEX_BUFFER_VIEW* pVertexBufferView,
@@ -84,7 +83,7 @@ namespace D3DHelper
         vertexData.RowPitch = vertexBufferSize;
         vertexData.SlicePitch = vertexData.RowPitch;
 
-        UpdateSubresources(pDevice, commandList, vertexBuffer.Get(), uploadAllocation, 0, 1, &vertexData);
+        UpdateSubresources(pDevice, pCommandList, vertexBuffer.Get(), uploadAllocation, 0, 1, &vertexData);
 
         D3D12_BUFFER_BARRIER b = {
             D3D12_BARRIER_SYNC_COPY,
@@ -97,7 +96,7 @@ namespace D3DHelper
         };
 
         D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(1, &b) };
-        commandList.GetCommandList()->Barrier(1, barrierGroups);
+        pCommandList->Barrier(1, barrierGroups);
 
         // Initialize the vertex buffer view
         pVertexBufferView->BufferLocation = vertexBuffer->GetGPUVirtualAddress();
@@ -107,7 +106,7 @@ namespace D3DHelper
 
     void CreateIndexBuffer(
         ID3D12Device10* pDevice,
-        CommandList& commandList,
+        ID3D12GraphicsCommandList7* pCommandList,
         UploadBuffer& uploadBuffer,
         ComPtr<ID3D12Resource>& indexBuffer,
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,

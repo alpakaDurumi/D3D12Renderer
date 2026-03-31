@@ -8,8 +8,6 @@
 #include <queue>
 #include <utility>  // for std::pair
 
-#include "CommandList.h"
-
 class DynamicDescriptorHeap;
 
 using Microsoft::WRL::ComPtr;
@@ -34,12 +32,12 @@ public:
 
     ComPtr<ID3D12CommandQueue> GetCommandQueue() const { return m_commandQueue; }
 
-    ComPtr<ID3D12CommandAllocator> CreateCommandAllocator();
-    ComPtr<ID3D12GraphicsCommandList7> CreateCommandList(ID3D12CommandAllocator* pCommandAllocator);
+    ID3D12CommandAllocator* CreateCommandAllocator();
+    ID3D12GraphicsCommandList7* CreateCommandList(ID3D12CommandAllocator* pCommandAllocator);
 
-    std::pair<ComPtr<ID3D12CommandAllocator>, CommandList> GetAvailableCommandList();
+    std::pair<ID3D12CommandAllocator*, ID3D12GraphicsCommandList7*> GetAvailableCommandList();
 
-    UINT64 ExecuteCommandLists(const ComPtr<ID3D12CommandAllocator>& commandAllocator, const CommandList& commandList);
+    UINT64 ExecuteCommandLists(ID3D12CommandAllocator* pCommandAllocator, ID3D12GraphicsCommandList7* pCommandList);
 
     UINT64 Signal();
     UINT64 GetCompletedFenceValue() const;
@@ -53,12 +51,16 @@ private:
     struct CommandAllocatorEntry
     {
         UINT64 fenceValue;
-        ComPtr<ID3D12CommandAllocator> commandAllocator;
+        ID3D12CommandAllocator* pCommandAllocator;
     };
+
+    // Pools
+    std::vector<ComPtr<ID3D12CommandAllocator>> m_commandAllocatorPool;
+    std::vector<ComPtr<ID3D12GraphicsCommandList7>> m_commandListPool;
 
     // Queue containing command allocators and lists currently being used by GPU
     std::queue<CommandAllocatorEntry> m_commandAllocatorQueue;
-    std::queue<ComPtr<ID3D12GraphicsCommandList7>> m_commandListQueue;
+    std::queue<ID3D12GraphicsCommandList7*> m_commandListQueue;
 
     ComPtr<ID3D12CommandQueue> m_commandQueue;
 

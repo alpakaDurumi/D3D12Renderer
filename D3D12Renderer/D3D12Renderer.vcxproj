@@ -136,7 +136,6 @@
   <ItemGroup>
     <ClCompile Include="CacheKeys.cpp" />
     <ClCompile Include="Camera.cpp" />
-    <ClCompile Include="CommandList.cpp" />
     <ClCompile Include="CommandQueue.cpp" />
     <ClCompile Include="D3DHelper.cpp" />
     <ClCompile Include="DDSTextureLoader12.cpp">
@@ -208,7 +207,6 @@
     <ClInclude Include="Aliases.h" />
     <ClInclude Include="CacheKeys.h" />
     <ClInclude Include="Camera.h" />
-    <ClInclude Include="CommandList.h" />
     <ClInclude Include="CommandQueue.h" />
     <ClInclude Include="ConstantBuffer.h" />
     <ClInclude Include="ConstantData.h" />
