@@ -86,12 +86,18 @@ namespace D3DHelper
 
         UpdateSubresources(pDevice, commandList, vertexBuffer.Get(), uploadAllocation, 0, 1, &vertexData);
 
-        commandList.Barrier(
-            vertexBuffer.Get(),
+        D3D12_BUFFER_BARRIER b = {
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_SYNC_VERTEX_SHADING,
             D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_ACCESS_VERTEX_BUFFER);
+            D3D12_BARRIER_ACCESS_VERTEX_BUFFER,
+            vertexBuffer.Get(),
+            0,
+            UINT64_MAX
+        };
+
+        D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(1, &b) };
+        commandList.GetCommandList()->Barrier(1, barrierGroups);
 
         // Initialize the vertex buffer view
         pVertexBufferView->BufferLocation = vertexBuffer->GetGPUVirtualAddress();

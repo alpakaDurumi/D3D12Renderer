@@ -634,12 +634,18 @@ namespace D3DHelper
 
         UpdateSubresources(pDevice, commandList, indexBuffer.Get(), uploadAllocation, 0, 1, &indexData);
 
-        commandList.Barrier(
-            indexBuffer.Get(),
+        D3D12_BUFFER_BARRIER b = {
             D3D12_BARRIER_SYNC_COPY,
             D3D12_BARRIER_SYNC_INDEX_INPUT,
             D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_ACCESS_INDEX_BUFFER);
+            D3D12_BARRIER_ACCESS_INDEX_BUFFER,
+            indexBuffer.Get(),
+            0,
+            UINT64_MAX
+        };
+
+        D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(1, &b) };
+        commandList.GetCommandList()->Barrier(1, barrierGroups);
 
         // Initialize the index buffer view
         pindexBufferView->BufferLocation = indexBuffer->GetGPUVirtualAddress();
