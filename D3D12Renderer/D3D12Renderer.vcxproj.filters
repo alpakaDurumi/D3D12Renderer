@@ -72,9 +72,6 @@
     <ClCompile Include="D3DHelper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ResourceLayoutTracker.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="CommandList.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -175,9 +172,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="RootSignature.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ResourceLayoutTracker.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CommandList.h">

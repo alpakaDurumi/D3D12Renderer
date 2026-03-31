@@ -21,7 +21,6 @@
 #include "CommandQueue.h"
 #include "CommandList.h"
 #include "FrameResource.h"
-#include "ResourceLayoutTracker.h"
 #include "UploadBuffer.h"
 #include "Mesh.h"
 #include "DescriptorAllocator.h"
@@ -99,7 +98,6 @@ private:
     std::unique_ptr<DynamicDescriptorHeap> m_dynamicDescriptorHeapForCBVSRVUAV;
     ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
     std::unique_ptr<CommandQueue> m_commandQueue;
-    std::unique_ptr<ResourceLayoutTracker> m_layoutTracker;
     std::unique_ptr<UploadBuffer> m_uploadBuffer;
     std::array<std::unique_ptr<DescriptorAllocator>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
     std::vector<std::unique_ptr<FrameResource>> m_frameResources;
@@ -127,7 +125,6 @@ private:
     InputManager m_inputManager;
 
     std::array<RenderGraphNode, static_cast<std::size_t>(PassType::NUM_PASS_TYPES)> m_renderGraph;
-    std::vector<std::vector<ResourceUsage>> m_frameEndUsage;
 
     // Resource handles
     ResourceRegistry m_resourceRegistry;

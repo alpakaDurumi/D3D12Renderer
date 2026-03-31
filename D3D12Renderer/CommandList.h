@@ -1,14 +1,8 @@
 #pragma once
 
-#include <Windows.h>
 #include <wrl/client.h>
 
 #include "d3d12.h"
-
-#include <unordered_map>
-#include <vector>
-
-#include "ResourceLayoutTracker.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -27,17 +21,6 @@ public:
     {
     }
 
-    struct LatestLayout
-    {
-        LatestLayout(UINT mipLevels, UINT depthOrArraySize, UINT8 planeCount, D3D12_BARRIER_LAYOUT initialLayout)
-            : LayoutInfo(mipLevels, depthOrArraySize, planeCount, initialLayout), IsNotUsed(mipLevels * depthOrArraySize * planeCount, true)
-        {
-        }
-
-        ResourceLayoutInfo LayoutInfo;
-        std::vector<bool> IsNotUsed;
-    };
-
     ComPtr<ID3D12GraphicsCommandList7> GetCommandList() const { return m_commandList; }
 
     void Barrier(
@@ -47,22 +30,7 @@ public:
         D3D12_BARRIER_ACCESS accessBefore,
         D3D12_BARRIER_ACCESS accessAfter);
 
-    void Barrier(
-        ID3D12Resource* pResource,
-        D3D12_BARRIER_SYNC syncBefore,
-        D3D12_BARRIER_SYNC syncAfter,
-        D3D12_BARRIER_ACCESS accessBefore,
-        D3D12_BARRIER_ACCESS accessAfter,
-        D3D12_BARRIER_LAYOUT layoutAfter,
-        D3D12_BARRIER_SUBRESOURCE_RANGE subresourceRange = { 0xffffffff, 0, 0, 0, 0, 0 });
-
-    std::vector<D3D12_TEXTURE_BARRIER> GetPendingBarriers() const { return m_pendingBarriers; }
-
-    std::unordered_map<ID3D12Resource*, LatestLayout> GetLatestLayouts() const { return m_latestLayouts; }
 private:
     ComPtr<ID3D12Device10> m_device;
-
     ComPtr<ID3D12GraphicsCommandList7> m_commandList;
-    std::unordered_map<ID3D12Resource*, LatestLayout> m_latestLayouts;  // Latest layout for each resource during a single command list recording.
-    std::vector<D3D12_TEXTURE_BARRIER> m_pendingBarriers;
 };

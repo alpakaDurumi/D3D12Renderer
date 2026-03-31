@@ -196,7 +196,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_PIX|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Renderer.cpp" />
-    <ClCompile Include="ResourceLayoutTracker.cpp" />
     <ClCompile Include="UploadBuffer.cpp" />
     <ClCompile Include="Utility.cpp" />
     <ClCompile Include="Win32Application.cpp" />
@@ -238,7 +237,6 @@
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RenderGraphNode.h" />
     <ClInclude Include="RenderObject.h" />
-    <ClInclude Include="ResourceLayoutTracker.h" />
     <ClInclude Include="ResourceRegistry.h" />
     <ClInclude Include="RootSignature.h" />
     <ClInclude Include="SharedConfig.h" />

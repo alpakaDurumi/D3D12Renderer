@@ -22,7 +22,6 @@ Light::Light(DescriptorAllocation&& dsvAllocation, DescriptorAllocation&& srvAll
 void Light::Init(
     ID3D12Device10* pDevice,
     UINT shadowMapResolution,
-    ResourceLayoutTracker& layoutTracker,
     const std::vector<std::unique_ptr<FrameResource>>& frameResources,
     DescriptorAllocation&& cbvAllocation)
 {
@@ -35,7 +34,6 @@ void Light::Init(
     {
         CreateDSV(pDevice, m_depthBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(i), false, false, true, i);
     }
-    layoutTracker.RegisterResource(m_depthBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, arraySize, 1, DXGI_FORMAT_R32_TYPELESS);
 
     auto cbvAllocations = cbvAllocation.Split();
 
@@ -173,12 +171,11 @@ DirectionalLight::DirectionalLight(
     DescriptorAllocation&& dsvAllocation,
     DescriptorAllocation&& srvAllocation,
     UINT shadowMapResolution,
-    ResourceLayoutTracker& layoutTracker,
     const std::vector<std::unique_ptr<FrameResource>>& frameResources,
     DescriptorAllocation&& cbvAllocation)
     : Light(std::move(dsvAllocation), std::move(srvAllocation), LightType::DIRECTIONAL)
 {
-    Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation));
+    Init(pDevice, shadowMapResolution, frameResources, std::move(cbvAllocation));
     CreateSRVForShadow(pDevice, m_depthBuffer.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
 }
 
@@ -214,7 +211,6 @@ PointLight::PointLight(
     DescriptorAllocation&& dsvAllocation,
     DescriptorAllocation&& srvAllocation,
     UINT shadowMapResolution,
-    ResourceLayoutTracker& layoutTracker,
     const std::vector<std::unique_ptr<FrameResource>>& frameResources,
     DescriptorAllocation&& cbvAllocation,
     DescriptorAllocation&& rtvAllocation)
@@ -223,7 +219,7 @@ PointLight::PointLight(
 {
     assert(POINT_LIGHT_ARRAY_SIZE == m_rtvAllocation.GetNumHandles());
 
-    Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation));
+    Init(pDevice, shadowMapResolution, frameResources, std::move(cbvAllocation));
 
     D3D12_CLEAR_VALUE clearValue = {};
     clearValue.Format = DXGI_FORMAT_R32_FLOAT;
@@ -233,7 +229,6 @@ PointLight::PointLight(
     clearValue.Color[3] = 1.0f;
 
     CreateRenderTarget(pDevice, shadowMapResolution, shadowMapResolution, DXGI_FORMAT_R32_TYPELESS, DXGI_FORMAT_R32_FLOAT, POINT_LIGHT_ARRAY_SIZE, m_renderTarget, &clearValue);
-    layoutTracker.RegisterResource(m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_RENDER_TARGET, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS);
 
     // Create RTVs.
     for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
@@ -286,12 +281,11 @@ SpotLight::SpotLight(
     DescriptorAllocation&& dsvAllocation,
     DescriptorAllocation&& srvAllocation,
     UINT shadowMapResolution,
-    ResourceLayoutTracker& layoutTracker,
     const std::vector<std::unique_ptr<FrameResource>>& frameResources,
     DescriptorAllocation&& cbvAllocation)
     : Light(std::move(dsvAllocation), std::move(srvAllocation), LightType::SPOT)
 {
-    Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation));
+    Init(pDevice, shadowMapResolution, frameResources, std::move(cbvAllocation));
     CreateSRVForShadow(pDevice, m_depthBuffer.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
     SetAngles(45.0f, 20.0f);    // Set default angle
 }

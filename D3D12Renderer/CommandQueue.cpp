@@ -2,7 +2,6 @@
 #include "CommandQueue.h"
 
 #include "D3DHelper.h"
-#include "ResourceLayoutTracker.h"
 #include "DynamicDescriptorHeap.h"
 
 using namespace D3DHelper;
@@ -92,66 +91,17 @@ std::pair<ComPtr<ID3D12CommandAllocator>, CommandList> CommandQueue::GetAvailabl
         std::forward_as_tuple(m_device, commandList));
 }
 
-UINT64 CommandQueue::ExecuteCommandLists(const ComPtr<ID3D12CommandAllocator>& commandAllocator, const CommandList& commandList, ResourceLayoutTracker& layoutTracker)
+UINT64 CommandQueue::ExecuteCommandLists(const ComPtr<ID3D12CommandAllocator>& commandAllocator, const CommandList& commandList)
 {
-    // Get pending barriers and prepare the sub command list for sync
-    auto [subCommandAllocator, subCommandList] = GetAvailableCommandList();
-    ComPtr<ID3D12GraphicsCommandList7> sub = subCommandList.GetCommandList();
+    auto cmdList = commandList.GetCommandList();
+    cmdList->Close();
 
-    auto pendingBarriers = commandList.GetPendingBarriers();
+    ID3D12CommandList* ppCommandLists[] = { cmdList.Get() };
+    m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-    if (!pendingBarriers.empty())
-    {
-        for (auto& barrier : pendingBarriers)
-        {
-            UINT subresourceIndex = barrier.Subresources.IndexOrFirstMipLevel;
-            barrier.LayoutBefore = layoutTracker.GetLayout(barrier.pResource, subresourceIndex);
-        }
-
-        D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(UINT32(pendingBarriers.size()), pendingBarriers.data()) };
-        sub->Barrier(1, barrierGroups);
-        sub->Close();
-    }
-    else
-    {
-        sub->Close();
-    }
-
-    // Prepare main command list
-    auto main = commandList.GetCommandList();
-    main->Close();
-
-    // Execute command lists
-    if (!pendingBarriers.empty())
-    {
-        ID3D12CommandList* ppCommandLists[] = { sub.Get(), main.Get() };
-        m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-    }
-    else
-    {
-        ID3D12CommandList* ppCommandLists[] = { main.Get() };
-        m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-    }
-
-    // Update ResourceLayoutTracker
-    auto latestLayouts = commandList.GetLatestLayouts();
-    for (const auto& [pResource, p] : latestLayouts)
-    {
-        const auto& [layoutInfo, isNotUsed] = p;
-        UINT subresourceCount = layoutInfo.MipLevels * layoutInfo.DepthOrArraySize * layoutInfo.PlaneCount;
-        for (UINT i = 0; i < subresourceCount; i++)
-        {
-            if (isNotUsed[i]) continue;     // 커맨드 리스트 내에서 사용한 적이 없는 서브리소스는 그대로 유지
-            layoutTracker.SetLayout(pResource, i, layoutInfo.GetLayout(i));
-        }
-    }
-
-    // Set sub and main with same fenceValue for now
     UINT64 fenceValue = Signal();
     m_commandAllocatorQueue.push({ fenceValue, commandAllocator });
-    m_commandListQueue.push(main);
-    m_commandAllocatorQueue.push({ fenceValue, subCommandAllocator });
-    m_commandListQueue.push(sub);
+    m_commandListQueue.push(cmdList);
 
     return fenceValue;
 }

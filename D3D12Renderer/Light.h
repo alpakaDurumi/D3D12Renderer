@@ -7,7 +7,6 @@
 
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
-#include "ResourceLayoutTracker.h"
 #include "FrameResource.h"
 #include "SharedConfig.h"
 
@@ -22,7 +21,6 @@ protected:
     void Init(
         ID3D12Device10* pDevice,
         UINT shadowMapResolution,
-        ResourceLayoutTracker& layoutTracker,
         const std::vector<std::unique_ptr<FrameResource>>& frameResources,
         DescriptorAllocation&& cbvAllocation);
 
@@ -81,7 +79,6 @@ public:
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
         UINT shadowMapResolution,
-        ResourceLayoutTracker& layoutTracker,
         const std::vector<std::unique_ptr<FrameResource>>& frameResources,
         DescriptorAllocation&& cbvAllocation);
 
@@ -102,7 +99,6 @@ public:
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
         UINT shadowMapResolution,
-        ResourceLayoutTracker& layoutTracker,
         const std::vector<std::unique_ptr<FrameResource>>& frameResources,
         DescriptorAllocation&& cbvAllocation,
         DescriptorAllocation&& rtvAllocation);
@@ -133,7 +129,6 @@ public:
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
         UINT shadowMapResolution,
-        ResourceLayoutTracker& layoutTracker,
         const std::vector<std::unique_ptr<FrameResource>>& frameResources,
         DescriptorAllocation&& cbvAllocation);
 

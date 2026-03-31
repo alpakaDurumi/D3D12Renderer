@@ -32,7 +32,6 @@ public:
         ID3D12Device10* pDevice,
         IDXGISwapChain* pSwapChain,
         UINT frameIndex,
-        ResourceLayoutTracker& layoutTracker,
         DescriptorAllocation&& rtvAllocation,
         DescriptorAllocation&& gBufferRTVAllocation,
         DescriptorAllocation&& gBufferSRVAllocation);
@@ -40,7 +39,7 @@ public:
 
     void ResetInstanceOffsetByte();
     void EnsureInstanceCapacity(UINT requiredSize);
-    void CreateGBuffers(UINT64 width, UINT height, ResourceLayoutTracker& layoutTracker);
+    void CreateGBuffers(UINT64 width, UINT height);
     void AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameIndex);
 
     // back buffers

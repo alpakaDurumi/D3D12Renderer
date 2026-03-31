@@ -10,12 +10,9 @@
 
 #include "CommandList.h"
 #include "UploadBuffer.h"
-#include "DescriptorAllocation.h"
 #include "SharedConfig.h"
 
 using Microsoft::WRL::ComPtr;
-
-class ResourceLayoutTracker;
 
 namespace D3DHelper
 {

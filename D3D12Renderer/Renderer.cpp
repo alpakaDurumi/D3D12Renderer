@@ -271,7 +271,7 @@ void Renderer::OnRender()
 
     // Execute the command lists and store the fence value
     // And notify fenceValue to UploadBuffer
-    UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker);
+    UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(commandAllocator, commandList);
     m_frameResources[m_frameIndex]->SetFenceValue(fenceValue);
     m_uploadBuffer->QueueRetiredPages(fenceValue);
     m_dynamicDescriptorHeapForCBVSRVUAV->QueueRetiredHeaps(fenceValue);
@@ -326,21 +326,18 @@ void Renderer::OnResize(UINT width, UINT height)
     // Unregister and release current render target, set frame fence values to the current fence value
     for (UINT i = 0; i < FrameCount; i++)
     {
-        m_layoutTracker->UnregisterResource(m_frameResources[i]->GetRenderTarget());
         m_frameResources[i]->ResetRenderTarget();
 
         // Release previous gbuffers and create new ones
         for (UINT j = 0; j < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++j)
         {
             auto slot = static_cast<GBufferSlot>(j);
-            m_layoutTracker->UnregisterResource(m_frameResources[i]->GetGBuffer(slot));
             m_frameResources[i]->ResetGBuffer(slot);
         }
-        m_frameResources[i]->CreateGBuffers(m_width, m_height, *m_layoutTracker);
+        m_frameResources[i]->CreateGBuffers(m_width, m_height);
 
         m_frameResources[i]->SetFenceValue(m_frameResources[m_frameIndex]->GetFenceValue());
     }
-    m_layoutTracker->UnregisterResource(m_depthStencilBuffer.Get());
     m_depthStencilBuffer.Reset();
 
     // Preserve existing format
@@ -352,11 +349,6 @@ void Renderer::OnResize(UINT width, UINT height)
     for (UINT i = 0; i < FrameCount; i++)
     {
         m_frameResources[i]->AcquireBackBuffer(m_swapChain.Get(), i);
-
-        // Assume that ResizeBuffers do not preserve previous layout.
-        // For now, just use D3D12_BARRIER_LAYOUT_COMMON.
-        m_layoutTracker->RegisterResource(m_frameResources[i]->GetRenderTarget(), D3D12_BARRIER_LAYOUT_COMMON, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
-
         CreateRTV(m_device.Get(), m_frameResources[i]->GetRenderTarget(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_frameResources[i]->GetRTVHandle());
     }
 
@@ -373,7 +365,6 @@ void Renderer::OnResize(UINT width, UINT height)
 
     // Recreate depth-stencil buffer, DSV, and SRV
     CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer, true);
-    m_layoutTracker->RegisterResource(m_depthStencilBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, 1, 1, DXGI_FORMAT_R24G8_TYPELESS);
 
     // Update registered info of depth-stencil buffer
     m_resourceRegistry.UpdateStatic(m_hDepthStencilBuffer, m_depthStencilBuffer.Get());
@@ -551,7 +542,6 @@ void Renderer::LoadPipeline()
     m_commandQueue = std::make_unique<CommandQueue>(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
     m_dynamicDescriptorHeapForCBVSRVUAV = std::make_unique<DynamicDescriptorHeap>(m_device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     m_uploadBuffer = std::make_unique<UploadBuffer>(m_device, 16 * 1024 * 1024);    // 16MB
-    m_layoutTracker = std::make_unique<ResourceLayoutTracker>(m_device);
     for (UINT i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
     {
         D3D12_DESCRIPTOR_HEAP_TYPE type = static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(i);
@@ -617,7 +607,6 @@ void Renderer::LoadPipeline()
     for (UINT i = 0; i < FrameCount; i++)
     {
         auto frameResource = std::make_unique<FrameResource>(m_device.Get(), m_swapChain.Get(), i,
-            *m_layoutTracker,
             std::move(rtvAllocations[i]),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)));
@@ -684,7 +673,6 @@ void Renderer::LoadAssets()
     m_depthSRVAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
 
     CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer, true);
-    m_layoutTracker->RegisterResource(m_depthStencilBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, 1, 1, DXGI_FORMAT_R24G8_TYPELESS);
 
     CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(), true, false);
     CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_readOnlyDSVAllocation.GetDescriptorHandle(), true, true);
@@ -813,7 +801,7 @@ void Renderer::LoadAssets()
     pSpotLight->SetAngles(50.0f, 10.0f);
 
     // Execute commands for loading assets and store fence value
-    m_frameResources[m_frameIndex]->SetFenceValue(m_commandQueue->ExecuteCommandLists(commandAllocator, commandList, *m_layoutTracker));
+    m_frameResources[m_frameIndex]->SetFenceValue(m_commandQueue->ExecuteCommandLists(commandAllocator, commandList));
 
     // Wait until assets have been uploaded to the GPU
     WaitForGPU();
@@ -1242,9 +1230,9 @@ void Renderer::PopulateCommandList(CommandList& commandList)
                 }
 
                 ++lightIdx;
-                }
-                }
             }
+        }
+    }
 
     // Barrier for gBuffer pass
     {
@@ -1306,7 +1294,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
     }
 
     // Barrier for deferred lighting pass
-        {
+    {
         std::vector<D3D12_TEXTURE_BARRIER> barriers;
 
         for (const auto& barrier : deferredLighting.barriers)
@@ -1324,7 +1312,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
             };
 
             barriers.push_back(b);
-    }
+        }
 
         D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(UINT32(barriers.size()), barriers.data()) };
         cmdList->Barrier(1, barrierGroups);
@@ -1364,7 +1352,7 @@ void Renderer::PopulateCommandList(CommandList& commandList)
         for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
         {
             D3D12_TEXTURE_BARRIER b = {
-        D3D12_BARRIER_SYNC_PIXEL_SHADING,
+                D3D12_BARRIER_SYNC_PIXEL_SHADING,
                 D3D12_BARRIER_SYNC_NONE,
                 D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
                 D3D12_BARRIER_ACCESS_NO_ACCESS,
@@ -1575,7 +1563,6 @@ Texture* Renderer::CreateTexture(
         commandList,
         std::move(allocation),
         *m_uploadBuffer,
-        *m_layoutTracker,
         filePath,
         isSRGB,
         useBlockCompress,
@@ -2190,7 +2177,6 @@ DirectionalLight* Renderer::CreateLight<DirectionalLight>()
         std::move(dsvAllocation),
         std::move(srvAllocation),
         m_shadowMapResolution,
-        *m_layoutTracker,
         m_frameResources,
         std::move(cbvAllocation));
 
@@ -2212,7 +2198,6 @@ PointLight* Renderer::CreateLight<PointLight>()
         std::move(dsvAllocation),
         std::move(srvAllocation),
         m_shadowMapResolution,
-        *m_layoutTracker,
         m_frameResources,
         std::move(cbvAllocation),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(POINT_LIGHT_ARRAY_SIZE));
@@ -2235,7 +2220,6 @@ SpotLight* Renderer::CreateLight<SpotLight>()
         std::move(dsvAllocation),
         std::move(srvAllocation),
         m_shadowMapResolution,
-        *m_layoutTracker,
         m_frameResources,
         std::move(cbvAllocation));
 
