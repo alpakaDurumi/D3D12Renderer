@@ -129,7 +129,10 @@ private:
     ResourceRegistry m_resourceRegistry;
     ResourceHandle m_hBackBuffer;
     ResourceHandle m_hDepthStencilBuffer;
-    ResourceHandle m_hGBuffers[static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)];
+    ResourceHandle m_hGBuffer;
+    ResourceHandle m_hDirectionalLightDepthBuffer;
+    ResourceHandle m_hPointLightRenderTarget;
+    ResourceHandle m_hSpotLightDepthBuffer;
 
     struct InstanceRange
     {
