@@ -183,6 +183,8 @@ private:
     void MoveToNextFrame();
     void InitImGui();
 
+    void ApplyPassBarriers(PassType passType, ID3D12GraphicsCommandList7* pCommandList);
+
     void SetTextureFiltering(TextureFiltering filtering);
 
     Material* CreateMaterial();

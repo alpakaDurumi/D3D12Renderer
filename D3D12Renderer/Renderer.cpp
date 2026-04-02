@@ -1102,44 +1102,12 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     frameResource.EnsureInstanceCapacity(static_cast<UINT>(temp.size()));
     frameResource.PushInstanceData(temp);
 
-    auto& depthOnly = m_renderGraph[static_cast<UINT>(PassType::DEPTH_ONLY)];
-    auto& gBuffer = m_renderGraph[static_cast<UINT>(PassType::GBUFFER)];
-    auto& deferredLighting = m_renderGraph[static_cast<UINT>(PassType::DEFERRED_LIGHTING)];
-    auto& forwardColoring = m_renderGraph[static_cast<UINT>(PassType::FORWARD_COLORING)];
-
-    // Barrier for depth-only pass
-    {
-        std::vector<D3D12_TEXTURE_BARRIER> barriers;
-
-        for (const auto& barrier : depthOnly.barriers)
-        {
-            UINT elementCount = m_resourceRegistry.GetElementCount(barrier.handle);
-            for (UINT i = 0; i < elementCount; ++i)
-            {
-                D3D12_TEXTURE_BARRIER b = {
-                    barrier.before.sync,
-                    barrier.after.sync,
-                    barrier.before.access,
-                    barrier.after.access,
-                    barrier.before.layout,
-                    barrier.after.layout,
-                    m_resourceRegistry.Resolve(barrier.handle, i, m_frameIndex),
-                    barrier.subresourceRange,
-                    D3D12_TEXTURE_BARRIER_FLAG_NONE
-                };
-
-                barriers.push_back(b);
-            }
-        }
-
-        D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(UINT32(barriers.size()), barriers.data()) };
-        pCommandList->Barrier(1, barrierGroups);
-    }
-
     // Depth-only pass for shadow mapping
     // Also work as z-prepass
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Depth-only pass");
+
+        ApplyPassBarriers(PassType::DEPTH_ONLY, pCommandList);
 
         pCommandList->RSSetViewports(1, &m_shadowMapViewport);
         pCommandList->RSSetScissorRects(1, &m_shadowMapScissorRect);
@@ -1199,38 +1167,11 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         }
     }
 
-    // Barrier for gBuffer pass
-    {
-        std::vector<D3D12_TEXTURE_BARRIER> barriers;
-
-        for (const auto& barrier : gBuffer.barriers)
-        {
-            UINT elementCount = m_resourceRegistry.GetElementCount(barrier.handle);
-            for (UINT i = 0; i < elementCount; ++i)
-            {
-                D3D12_TEXTURE_BARRIER b = {
-                    barrier.before.sync,
-                    barrier.after.sync,
-                    barrier.before.access,
-                    barrier.after.access,
-                    barrier.before.layout,
-                    barrier.after.layout,
-                    m_resourceRegistry.Resolve(barrier.handle, i, m_frameIndex),
-                    barrier.subresourceRange,
-                    D3D12_TEXTURE_BARRIER_FLAG_NONE
-                };
-
-                barriers.push_back(b);
-            }
-        }
-
-        D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(UINT32(barriers.size()), barriers.data()) };
-        pCommandList->Barrier(1, barrierGroups);
-    }
-
     // GBuffer pass
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"GBuffer pass");
+
+        ApplyPassBarriers(PassType::GBUFFER, pCommandList);
 
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
@@ -1262,38 +1203,11 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         }
     }
 
-    // Barrier for deferred lighting pass
-    {
-        std::vector<D3D12_TEXTURE_BARRIER> barriers;
-
-        for (const auto& barrier : deferredLighting.barriers)
-        {
-            UINT elementCount = m_resourceRegistry.GetElementCount(barrier.handle);
-            for (UINT i = 0; i < elementCount; ++i)
-            {
-                D3D12_TEXTURE_BARRIER b = {
-                    barrier.before.sync,
-                    barrier.after.sync,
-                    barrier.before.access,
-                    barrier.after.access,
-                    barrier.before.layout,
-                    barrier.after.layout,
-                    m_resourceRegistry.Resolve(barrier.handle, i, m_frameIndex),
-                    barrier.subresourceRange,
-                    D3D12_TEXTURE_BARRIER_FLAG_NONE
-                };
-
-                barriers.push_back(b);
-            }
-        }
-
-        D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(UINT32(barriers.size()), barriers.data()) };
-        pCommandList->Barrier(1, barrierGroups);
-    }
-
     // Deferred Lighting pass
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Deferred Lighting pass");
+
+        ApplyPassBarriers(PassType::DEFERRED_LIGHTING, pCommandList);
 
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
@@ -1341,38 +1255,11 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         }
     }
 
-    // Barrier for forward coloring pass
-    {
-        std::vector<D3D12_TEXTURE_BARRIER> barriers;
-
-        for (const auto& barrier : forwardColoring.barriers)
-        {
-            UINT elementCount = m_resourceRegistry.GetElementCount(barrier.handle);
-            for (UINT i = 0; i < elementCount; ++i)
-            {
-                D3D12_TEXTURE_BARRIER b = {
-                    barrier.before.sync,
-                    barrier.after.sync,
-                    barrier.before.access,
-                    barrier.after.access,
-                    barrier.before.layout,
-                    barrier.after.layout,
-                    m_resourceRegistry.Resolve(barrier.handle, i, m_frameIndex),
-                    barrier.subresourceRange,
-                    D3D12_TEXTURE_BARRIER_FLAG_NONE
-                };
-
-                barriers.push_back(b);
-            }
-        }
-
-        D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(UINT32(barriers.size()), barriers.data()) };
-        pCommandList->Barrier(1, barrierGroups);
-    }
-
     // Forward Coloring pass
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Forward color pass");
+
+        ApplyPassBarriers(PassType::FORWARD_COLORING, pCommandList);
 
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
@@ -1479,6 +1366,37 @@ void Renderer::InitImGui()
     ImGui_ImplDX12_Init(&init_info);
 
     ImGui::GetStyle().FontScaleMain = m_dpiScale;
+}
+
+void Renderer::ApplyPassBarriers(PassType passType, ID3D12GraphicsCommandList7* pCommandList)
+{
+    std::vector<D3D12_TEXTURE_BARRIER> barriers;
+
+    for (const auto& barrier : m_renderGraph[static_cast<UINT>(passType)].barriers)
+    {
+        UINT elementCount = m_resourceRegistry.GetElementCount(barrier.handle);
+        for (UINT i = 0; i < elementCount; ++i)
+        {
+            D3D12_TEXTURE_BARRIER b = {
+                barrier.before.sync,
+                barrier.after.sync,
+                barrier.before.access,
+                barrier.after.access,
+                barrier.before.layout,
+                barrier.after.layout,
+                m_resourceRegistry.Resolve(barrier.handle, i, m_frameIndex),
+                barrier.subresourceRange,
+                D3D12_TEXTURE_BARRIER_FLAG_NONE
+            };
+
+            barriers.push_back(b);
+        }
+    }
+
+    if (barriers.empty()) return;
+
+    D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(UINT32(barriers.size()), barriers.data()) };
+    pCommandList->Barrier(1, barrierGroups);
 }
 
 void Renderer::SetTextureFiltering(TextureFiltering filtering)
