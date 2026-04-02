@@ -1079,6 +1079,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         pCommandList->DrawInstanced(3, 1, 0, 0);
 
+        std::vector<D3D12_TEXTURE_BARRIER> barriers;
         for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
         {
             D3D12_TEXTURE_BARRIER b = {
@@ -1092,10 +1093,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
                 {0xffff'ffff, 0, 0, 0, 0, 0},
                 D3D12_TEXTURE_BARRIER_FLAG_NONE
             };
-
-            D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(1, &b) };
-            pCommandList->Barrier(1, barrierGroups);
+            barriers.push_back(b);
         }
+        D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(static_cast<UINT32>(barriers.size()), barriers.data()) };
+        pCommandList->Barrier(1, barrierGroups);
     }
 
     // Forward Coloring pass
@@ -1127,6 +1128,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             DrawMesh(pCommandList, *mesh, PassType::FORWARD_COLORING, frameResource.GetInstanceBufferVirtualAddress());
         }
 
+        std::vector<D3D12_TEXTURE_BARRIER> barriers;
         UINT lightIdx = 0;
         for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
         {
@@ -1147,9 +1149,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
                         {0xffff'ffff, 0, 0, 0, 0, 0},
                         D3D12_TEXTURE_BARRIER_FLAG_NONE
                     };
-
-                    D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(1, &b) };
-                    pCommandList->Barrier(1, barrierGroups);
+                    barriers.push_back(b);
                 }
                 else
                 {
@@ -1164,12 +1164,12 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
                         {0xffff'ffff, 0, 0, 0, 0, 0},
                         D3D12_TEXTURE_BARRIER_FLAG_NONE
                     };
-
-                    D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(1, &b) };
-                    pCommandList->Barrier(1, barrierGroups);
+                    barriers.push_back(b);
                 }
             }
         }
+        D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(static_cast<UINT32>(barriers.size()), barriers.data()) };
+        pCommandList->Barrier(1, barrierGroups);
     }
 }
 
