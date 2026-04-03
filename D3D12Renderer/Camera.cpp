@@ -12,7 +12,7 @@ Camera::Camera(XMFLOAT3 initialPosition)
     m_pitch = 0.0f;
 
     m_aspectRatio = 16.0f / 9.0f;
-    SetHorizontalFOV(90.0f);
+    SetHorizontalFOV(XMConvertToRadians(90.0f));
     m_nearPlane = 0.1f;
     m_farPlane = 1000.0f;
 }
@@ -119,5 +119,5 @@ float Camera::CalcVerticalFOV(float horizontalFOV)
 {
     assert(m_aspectRatio > 0.0f);
 
-    return 2.0f * std::atan2(std::tan(XMConvertToRadians(horizontalFOV * 0.5f)), m_aspectRatio);
+    return 2.0f * std::atan2(std::tan(horizontalFOV * 0.5f), m_aspectRatio);
 }
