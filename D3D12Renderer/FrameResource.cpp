@@ -8,7 +8,6 @@ FrameResource::FrameResource(
     ID3D12Device10* pDevice,
     IDXGISwapChain* pSwapChain,
     UINT frameIndex,
-    ResourceLayoutTracker& layoutTracker,
     DescriptorAllocation&& rtvAllocation,
     DescriptorAllocation&& gBufferRTVAllocation,
     DescriptorAllocation&& gBufferSRVAllocation)
@@ -23,10 +22,6 @@ FrameResource::FrameResource(
 
     AcquireBackBuffer(pSwapChain, frameIndex);
 
-    // Register backbuffer to tracker
-    // Initial layout of backbuffer is D3D12_BARRIER_LAYOUT_COMMON : https://microsoft.github.io/DirectX-Specs/d3d/D3D12EnhancedBarriers.html#initial-resource-state
-    layoutTracker.RegisterResource(m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_COMMON, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
-
     CreateRTV(m_pDevice, m_renderTarget.Get(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_rtvAllocation.GetDescriptorHandle());
 
     CreateUploadBuffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, m_instanceUploadBuffer);
@@ -38,7 +33,7 @@ FrameResource::FrameResource(
     const UINT64 width = rtDesc.Width;
     const UINT height = rtDesc.Height;
 
-    CreateGBuffers(width, height, layoutTracker);
+    CreateGBuffers(width, height);
 }
 
 FrameResource::~FrameResource()
@@ -65,14 +60,13 @@ void FrameResource::EnsureInstanceCapacity(UINT requiredSize)
     }
 }
 
-void FrameResource::CreateGBuffers(UINT64 width, UINT height, ResourceLayoutTracker& layoutTracker)
+void FrameResource::CreateGBuffers(UINT64 width, UINT height)
 {
     for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
     {
         auto format = GetGBufferFormat(static_cast<GBufferSlot>(i));
 
         CreateRenderTarget(m_pDevice, width, height, format, format, 1, m_gBuffers[i]);
-        layoutTracker.RegisterResource(m_gBuffers[i].Get(), D3D12_BARRIER_LAYOUT_RENDER_TARGET, 1, 1, format);
 
         CreateRTV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferRTVAllocation.GetDescriptorHandle(i));
         CreateSRV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferSRVAllocation.GetDescriptorHandle(i));

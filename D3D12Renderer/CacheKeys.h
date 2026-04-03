@@ -8,7 +8,7 @@
 
 enum class PassType
 {
-    DEFAULT,
+    FORWARD_COLORING,
     DEPTH_ONLY,
     GBUFFER,
     DEFERRED_LIGHTING,
@@ -31,7 +31,7 @@ struct std::hash<ShaderKey>
     {
         std::hash<std::wstring> hasher;
         return hasher(key.fileName);
-        }
+    }
 };
 
 // Key that identify unique PSO.

@@ -19,9 +19,7 @@
 #include "InputManager.h"
 #include "ConstantData.h"
 #include "CommandQueue.h"
-#include "CommandList.h"
 #include "FrameResource.h"
-#include "ResourceLayoutTracker.h"
 #include "UploadBuffer.h"
 #include "Mesh.h"
 #include "DescriptorAllocator.h"
@@ -34,6 +32,8 @@
 #include "Material.h"
 #include "RenderObject.h"
 #include "SharedConfig.h"
+#include "ResourceRegistry.h"
+#include "RenderGraphNode.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -97,7 +97,6 @@ private:
     std::unique_ptr<DynamicDescriptorHeap> m_dynamicDescriptorHeapForCBVSRVUAV;
     ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
     std::unique_ptr<CommandQueue> m_commandQueue;
-    std::unique_ptr<ResourceLayoutTracker> m_layoutTracker;
     std::unique_ptr<UploadBuffer> m_uploadBuffer;
     std::array<std::unique_ptr<DescriptorAllocator>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
     std::vector<std::unique_ptr<FrameResource>> m_frameResources;
@@ -105,7 +104,7 @@ private:
     std::unique_ptr<RootSignature> m_rootSignature;
     std::unordered_map<PSOKey, ComPtr<ID3D12PipelineState>> m_pipelineStates;
 
-    PSOKey m_currentPSOKey = { PassType::DEFAULT };
+    PSOKey m_currentPSOKey = { PassType::FORWARD_COLORING };
 
     std::vector<D3D12_INPUT_ELEMENT_DESC> m_inputLayout;
     std::unordered_map<ShaderKey, std::vector<char>> m_shaderBlobs;
@@ -123,6 +122,17 @@ private:
     CameraConstantData m_cameraConstantData;
 
     InputManager m_inputManager;
+
+    std::array<RenderGraphNode, static_cast<std::size_t>(PassType::NUM_PASS_TYPES)> m_renderGraph;
+
+    // Resource handles
+    ResourceRegistry m_resourceRegistry;
+    ResourceHandle m_hBackBuffer;
+    ResourceHandle m_hDepthStencilBuffer;
+    ResourceHandle m_hGBuffer;
+    ResourceHandle m_hDirectionalLightDepthBuffer;
+    ResourceHandle m_hPointLightRenderTarget;
+    ResourceHandle m_hSpotLightDepthBuffer;
 
     struct InstanceRange
     {
@@ -167,11 +177,15 @@ private:
 
     void LoadPipeline();
     void LoadAssets();
-    void PopulateCommandList(CommandList& commandList);
+    void PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList);
     void BuildImGuiFrame();
     void WaitForGPU();
     void MoveToNextFrame();
     void InitImGui();
+
+    void PrepareRenderGraph();
+    void CompileRenderGraph();
+    void ApplyPassBarriers(PassType passType, ID3D12GraphicsCommandList7* pCommandList);
 
     void SetTextureFiltering(TextureFiltering filtering);
 
@@ -184,7 +198,7 @@ private:
     T* CreateLight();
 
     Texture* CreateTexture(
-        CommandList& commandList,
+        ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& allocation,
         const std::wstring& filePath,
         bool isSRGB,

@@ -6,7 +6,6 @@
 #include <d3d12.h>
 
 #include "D3DHelper.h"
-#include "CommandList.h"
 #include "GeometryGenerator.h"
 
 using Microsoft::WRL::ComPtr;
@@ -19,12 +18,12 @@ class Mesh
 public:
     Mesh(
         ID3D12Device10* pDevice,
-        CommandList& commandList,
+        ID3D12GraphicsCommandList7* pCommandList,
         UploadBuffer& uploadBuffer,
         const GeometryData& geometryData)
     {
-        CreateVertexBuffer(pDevice, commandList, uploadBuffer, m_vertexBuffer, &m_vertexBufferView, geometryData.vertices);
-        CreateIndexBuffer(pDevice, commandList, uploadBuffer, m_indexBuffer, &m_indexBufferView, geometryData.indices);
+        CreateVertexBuffer(pDevice, pCommandList, uploadBuffer, m_vertexBuffer, &m_vertexBufferView, geometryData.vertices);
+        CreateIndexBuffer(pDevice, pCommandList, uploadBuffer, m_indexBuffer, &m_indexBufferView, geometryData.indices);
         m_numIndices = UINT(geometryData.indices.size());
     }
 

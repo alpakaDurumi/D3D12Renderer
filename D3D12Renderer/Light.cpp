@@ -22,7 +22,6 @@ Light::Light(DescriptorAllocation&& dsvAllocation, DescriptorAllocation&& srvAll
 void Light::Init(
     ID3D12Device10* pDevice,
     UINT shadowMapResolution,
-    ResourceLayoutTracker& layoutTracker,
     const std::vector<std::unique_ptr<FrameResource>>& frameResources,
     DescriptorAllocation&& cbvAllocation)
 {
@@ -35,7 +34,6 @@ void Light::Init(
     {
         CreateDSV(pDevice, m_depthBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(i), false, false, true, i);
     }
-    layoutTracker.RegisterResource(m_depthBuffer.Get(), D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE, arraySize, 1, DXGI_FORMAT_R32_TYPELESS);
 
     auto cbvAllocations = cbvAllocation.Split();
 
@@ -158,17 +156,26 @@ LightConstantData* Light::GetLightConstantDataPtr()
     return &m_lightConstantData;
 }
 
+UINT Light::GetDepthBufferHandle() const
+{
+    return m_hDepthBuffer;
+}
+
+void Light::SetDepthBufferHandle(UINT handle)
+{
+    m_hDepthBuffer = handle;
+}
+
 DirectionalLight::DirectionalLight(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,
     DescriptorAllocation&& srvAllocation,
     UINT shadowMapResolution,
-    ResourceLayoutTracker& layoutTracker,
     const std::vector<std::unique_ptr<FrameResource>>& frameResources,
     DescriptorAllocation&& cbvAllocation)
     : Light(std::move(dsvAllocation), std::move(srvAllocation), LightType::DIRECTIONAL)
 {
-    Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation));
+    Init(pDevice, shadowMapResolution, frameResources, std::move(cbvAllocation));
     CreateSRVForShadow(pDevice, m_depthBuffer.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
 }
 
@@ -204,7 +211,6 @@ PointLight::PointLight(
     DescriptorAllocation&& dsvAllocation,
     DescriptorAllocation&& srvAllocation,
     UINT shadowMapResolution,
-    ResourceLayoutTracker& layoutTracker,
     const std::vector<std::unique_ptr<FrameResource>>& frameResources,
     DescriptorAllocation&& cbvAllocation,
     DescriptorAllocation&& rtvAllocation)
@@ -213,7 +219,7 @@ PointLight::PointLight(
 {
     assert(POINT_LIGHT_ARRAY_SIZE == m_rtvAllocation.GetNumHandles());
 
-    Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation));
+    Init(pDevice, shadowMapResolution, frameResources, std::move(cbvAllocation));
 
     D3D12_CLEAR_VALUE clearValue = {};
     clearValue.Format = DXGI_FORMAT_R32_FLOAT;
@@ -223,7 +229,6 @@ PointLight::PointLight(
     clearValue.Color[3] = 1.0f;
 
     CreateRenderTarget(pDevice, shadowMapResolution, shadowMapResolution, DXGI_FORMAT_R32_TYPELESS, DXGI_FORMAT_R32_FLOAT, POINT_LIGHT_ARRAY_SIZE, m_renderTarget, &clearValue);
-    layoutTracker.RegisterResource(m_renderTarget.Get(), D3D12_BARRIER_LAYOUT_RENDER_TARGET, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS);
 
     // Create RTVs.
     for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
@@ -261,17 +266,26 @@ D3D12_CPU_DESCRIPTOR_HANDLE PointLight::GetRTVDescriptorHandle(UINT idx) const
     return m_rtvAllocation.GetDescriptorHandle(idx);
 }
 
+UINT PointLight::GetRenderTargetHandle() const
+{
+    return m_hRenderTarget;
+}
+
+void PointLight::SetRenderTargetHandle(UINT handle)
+{
+    m_hRenderTarget = handle;
+}
+
 SpotLight::SpotLight(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,
     DescriptorAllocation&& srvAllocation,
     UINT shadowMapResolution,
-    ResourceLayoutTracker& layoutTracker,
     const std::vector<std::unique_ptr<FrameResource>>& frameResources,
     DescriptorAllocation&& cbvAllocation)
     : Light(std::move(dsvAllocation), std::move(srvAllocation), LightType::SPOT)
 {
-    Init(pDevice, shadowMapResolution, layoutTracker, frameResources, std::move(cbvAllocation));
+    Init(pDevice, shadowMapResolution, frameResources, std::move(cbvAllocation));
     CreateSRVForShadow(pDevice, m_depthBuffer.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
     SetAngles(45.0f, 20.0f);    // Set default angle
 }
@@ -290,7 +304,7 @@ void SpotLight::SetAngles(float outerAngleDegree, float innerAngleDegree)
     // We need cosine value that calculated from half angle.
     m_lightConstantData.cosOuterAngle = std::cos(m_outerAngle * 0.5f);
     m_lightConstantData.cosInnerAngle = std::cos(m_innerAngle * 0.5f);
-    
+
     const float minDiff = 0.01f;
 
     if ((m_lightConstantData.cosInnerAngle - m_lightConstantData.cosOuterAngle) < minDiff)
