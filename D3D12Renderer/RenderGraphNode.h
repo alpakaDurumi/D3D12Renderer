@@ -3,52 +3,91 @@
 #include <d3d12.h>
 
 #include <vector>
+#include <utility>
 #include <tuple>
 
 #include "Aliases.h"
 
-struct ResourceUsage
+struct BufferResourceUsage
+{
+    D3D12_BARRIER_SYNC sync;
+    D3D12_BARRIER_ACCESS access;
+
+    bool operator==(const BufferResourceUsage& other) const
+    {
+        return this->sync == other.sync &&
+            this->access == other.access;
+    }
+
+    bool operator!=(const BufferResourceUsage& other) const
+    {
+        return !(*this == other);
+    }
+};
+
+struct TextureResourceUsage
 {
     D3D12_BARRIER_SYNC sync;
     D3D12_BARRIER_ACCESS access;
     D3D12_BARRIER_LAYOUT layout;
 
-    bool operator==(const ResourceUsage& other) const
+    bool operator==(const TextureResourceUsage& other) const
     {
         return this->sync == other.sync &&
             this->access == other.access &&
             this->layout == other.layout;
     }
 
-    bool operator!=(const ResourceUsage& other) const
+    bool operator!=(const TextureResourceUsage& other) const
     {
         return !(*this == other);
     }
 };
 
-struct CompiledBarrier
+struct CompiledBufferBarrier
 {
     ResourceHandle handle;
-    ResourceUsage before;
-    ResourceUsage after;
+    BufferResourceUsage before;
+    BufferResourceUsage after;
+};
+
+struct CompiledTextureBarrier
+{
+    ResourceHandle handle;
+    TextureResourceUsage before;
+    TextureResourceUsage after;
     D3D12_BARRIER_SUBRESOURCE_RANGE subresourceRange;
 };
 
 struct RenderGraphNode
 {
 public:
-    void AddInput(ResourceHandle handle, ResourceUsage usage, D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 })
+    void AddBufferInput(ResourceHandle handle, BufferResourceUsage usage)
     {
-        inputs.emplace_back(handle, usage, range);
+        bufferInputs.emplace_back(handle, usage);
     }
 
-    void AddOutput(ResourceHandle handle, ResourceUsage usage, D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 })
+    void AddBufferOutput(ResourceHandle handle, BufferResourceUsage usage)
     {
-        outputs.emplace_back(handle, usage, range);
+        bufferOutputs.emplace_back(handle, usage);
     }
 
-    std::vector<std::tuple<ResourceHandle, ResourceUsage, D3D12_BARRIER_SUBRESOURCE_RANGE>> inputs;
-    std::vector<std::tuple<ResourceHandle, ResourceUsage, D3D12_BARRIER_SUBRESOURCE_RANGE>> outputs;
+    void AddTextureInput(ResourceHandle handle, TextureResourceUsage usage, D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 })
+    {
+        textureInputs.emplace_back(handle, usage, range);
+    }
 
-    std::vector<CompiledBarrier> barriers;
+    void AddTextureOutput(ResourceHandle handle, TextureResourceUsage usage, D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 })
+    {
+        textureOutputs.emplace_back(handle, usage, range);
+    }
+
+    std::vector<std::pair<ResourceHandle, BufferResourceUsage>> bufferInputs;
+    std::vector<std::pair<ResourceHandle, BufferResourceUsage>> bufferOutputs;
+
+    std::vector<std::tuple<ResourceHandle, TextureResourceUsage, D3D12_BARRIER_SUBRESOURCE_RANGE>> textureInputs;
+    std::vector<std::tuple<ResourceHandle, TextureResourceUsage, D3D12_BARRIER_SUBRESOURCE_RANGE>> textureOutputs;
+
+    std::vector<CompiledBufferBarrier> bufferBarriers;
+    std::vector<CompiledTextureBarrier> textureBarriers;
 };
