@@ -42,13 +42,11 @@ ID3D12CommandAllocator* CommandQueue::CreateCommandAllocator()
 
 ID3D12GraphicsCommandList7* CommandQueue::CreateCommandList(ID3D12CommandAllocator* pCommandAllocator)
 {
-    ComPtr<ID3D12GraphicsCommandList> commandList;
-    ComPtr<ID3D12GraphicsCommandList7> commandList7;
+    ComPtr<ID3D12GraphicsCommandList7> commandList;
     ThrowIfFailed(m_device->CreateCommandList(0, m_type, pCommandAllocator, nullptr, IID_PPV_ARGS(&commandList)));
-    ThrowIfFailed(commandList.As(&commandList7));
-    m_commandListPool.push_back(commandList7);
+    m_commandListPool.push_back(commandList);
 
-    return commandList7.Get();
+    return commandList.Get();
 }
 
 std::pair<ID3D12CommandAllocator*, ID3D12GraphicsCommandList7*> CommandQueue::GetAvailableCommandList()

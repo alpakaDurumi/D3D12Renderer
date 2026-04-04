@@ -468,15 +468,11 @@ void Renderer::LoadPipeline()
 #if defined(_DEBUG)
     // Enable the D3D12 debug layer and GBV
     {
-        ComPtr<ID3D12Debug> debugController0;
-        ComPtr<ID3D12Debug1> debugController1;
-        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController0))))
+        ComPtr<ID3D12Debug1> debugController;
+        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
         {
-            debugController0->EnableDebugLayer();
-            if (SUCCEEDED(debugController0.As(&debugController1)))
-            {
-                debugController1->SetEnableGPUBasedValidation(TRUE);
-            }
+            debugController->EnableDebugLayer();
+            debugController->SetEnableGPUBasedValidation(TRUE);
         }
     }
 
@@ -498,7 +494,6 @@ void Renderer::LoadPipeline()
     ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
 
     // Create device using appropriate adapter
-    ComPtr<ID3D12Device> device;
     if (m_useWarpDevice)
     {
         ComPtr<IDXGIAdapter> warpAdapter;
@@ -507,7 +502,7 @@ void Renderer::LoadPipeline()
         ThrowIfFailed(D3D12CreateDevice(
             warpAdapter.Get(),
             D3D_FEATURE_LEVEL_11_0,
-            IID_PPV_ARGS(&device)));
+            IID_PPV_ARGS(&m_device)));
     }
     else
     {
@@ -517,10 +512,9 @@ void Renderer::LoadPipeline()
         ThrowIfFailed(D3D12CreateDevice(
             hardwareAdapter.Get(),
             D3D_FEATURE_LEVEL_11_0,
-            IID_PPV_ARGS(&device)
+            IID_PPV_ARGS(&m_device)
         ));
     }
-    ThrowIfFailed(device.As(&m_device));
 
 #if defined(_DEBUG)
     // Use ID3D12InfoQueue

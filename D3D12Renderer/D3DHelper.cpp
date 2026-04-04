@@ -25,6 +25,8 @@ namespace D3DHelper
     {
         *ppAdapter = nullptr;
 
+        bool found = false;
+
         ComPtr<IDXGIAdapter1> adapter;
 
         ComPtr<IDXGIFactory6> factory6;
@@ -52,13 +54,12 @@ namespace D3DHelper
                 // actual device yet.
                 if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
                 {
+                    found = true;
                     break;
                 }
             }
         }
-
-        // For backward compatibility
-        if (adapter.Get() == nullptr)
+        else
         {
             for (UINT adapterIndex = 0; SUCCEEDED(pFactory->EnumAdapters1(adapterIndex, &adapter)); ++adapterIndex)
             {
@@ -72,12 +73,13 @@ namespace D3DHelper
 
                 if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, _uuidof(ID3D12Device), nullptr)))
                 {
+                    found = true;
                     break;
                 }
             }
         }
 
-        *ppAdapter = adapter.Detach();
+        *ppAdapter = found ? adapter.Detach() : nullptr;
     }
 
     bool CheckTearingSupport()
