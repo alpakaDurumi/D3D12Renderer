@@ -771,9 +771,6 @@ void Renderer::LoadAssets()
     auto* pPlane = CreateRenderObject(pCubeMesh, pPlaneMat);
     pPlane->SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
 
-    m_forwardRenderObjects[pCubeMesh].reserve(10001);
-    m_deferredRenderObjects[pCubeMesh].reserve(10001);
-
     for (UINT i = 0; i < 100; i++)
     {
         for (UINT j = 0; j < 100; j++)
@@ -926,9 +923,9 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pMesh = mesh.get();
 
         for (auto& object : m_forwardRenderObjects[pMesh])
-            temp.push_back(object.BuildInstanceData());
+            temp.push_back(object->BuildInstanceData());
         for (auto& object : m_deferredRenderObjects[pMesh])
-            temp.push_back(object.BuildInstanceData());
+            temp.push_back(object->BuildInstanceData());
 
         m_instanceRanges[pMesh].offset = curOffset;
         m_instanceRanges[pMesh].forwardCount = static_cast<UINT>(m_forwardRenderObjects[pMesh].size());
@@ -1460,20 +1457,22 @@ Material* Renderer::CloneMaterial(const Material& src)
 
 RenderObject* Renderer::CreateRenderObject(Mesh* pMesh, Material* mat)
 {
+    auto renderObject = std::make_unique<RenderObject>(pMesh);
+    RenderObject* ret = renderObject.get();
+
     RenderingPath path = mat->GetRenderingPath();
-    RenderObject* ret = nullptr;
     if (path == RenderingPath::FORWARD)
     {
-        m_forwardRenderObjects[pMesh].emplace_back(pMesh);
-        ret = &m_forwardRenderObjects[pMesh].back();
+        m_forwardRenderObjects[pMesh].push_back(std::move(renderObject));
     }
     else if (path == RenderingPath::DEFERRED)
     {
-        m_deferredRenderObjects[pMesh].emplace_back(pMesh);
-        ret = &m_deferredRenderObjects[pMesh].back();
+        m_deferredRenderObjects[pMesh].push_back(std::move(renderObject));
     }
-
-    if (!ret) throw std::runtime_error("Unsupported Rendering Path.");
+    else
+    {
+        assert(false);
+    }
 
     ret->SetMaterial(mat);
     return ret;
@@ -1809,14 +1808,14 @@ void Renderer::FixedUpdate(double fixedDtMs)
     {
         for (auto& ob : objects)
         {
-            ob.SnapshotState();
+            ob->SnapshotState();
         }
     }
     for (auto& [pMesh, objects] : m_deferredRenderObjects)
     {
         for (auto& ob : objects)
         {
-            ob.SnapshotState();
+            ob->SnapshotState();
         }
     }
 
@@ -1833,14 +1832,14 @@ void Renderer::PrepareConstantData(float alpha)
     {
         for (auto& ob : objects)
         {
-            ob.UpdateRenderState(alpha);
+            ob->UpdateRenderState(alpha);
         }
     }
     for (auto& [pMesh, objects] : m_deferredRenderObjects)
     {
         for (auto& ob : objects)
         {
-            ob.UpdateRenderState(alpha);
+            ob->UpdateRenderState(alpha);
         }
     }
 

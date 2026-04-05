@@ -143,8 +143,8 @@ private:
 
     std::vector<std::unique_ptr<Mesh>> m_meshes;
     std::unordered_map<Mesh*, InstanceRange> m_instanceRanges;
-    std::unordered_map<Mesh*, std::vector<RenderObject>> m_forwardRenderObjects;
-    std::unordered_map<Mesh*, std::vector<RenderObject>> m_deferredRenderObjects;
+    std::unordered_map<Mesh*, std::vector<std::unique_ptr<RenderObject>>> m_forwardRenderObjects;
+    std::unordered_map<Mesh*, std::vector<std::unique_ptr<RenderObject>>> m_deferredRenderObjects;
 
     std::vector<RenderObject*> m_previewRotations;
 
