@@ -5,6 +5,7 @@
 #include <DirectXMath.h>
 
 #include <vector>
+#include <string>
 
 using namespace DirectX;
 
@@ -18,6 +19,7 @@ struct Vertex
 
 struct GeometryData
 {
+    std::wstring name;
     std::vector<Vertex> vertices;
     std::vector<UINT32> indices;
 };
@@ -76,7 +78,7 @@ public:
             20, 21, 22, 20, 22, 23
         };
 
-        return { vertices, indices };
+        return { L"builtin://cube", vertices, indices};
     }
 
     static GeometryData GenerateSphere()
@@ -137,6 +139,6 @@ public:
             }
         }
 
-        return { vertices, indices };
+        return { L"builtin://sphere", vertices, indices};
     }
 };

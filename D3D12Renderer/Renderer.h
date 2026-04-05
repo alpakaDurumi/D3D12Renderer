@@ -34,6 +34,8 @@
 #include "SharedConfig.h"
 #include "ResourceRegistry.h"
 #include "RenderGraphNode.h"
+#include "MeshRegistry.h"
+#include "MaterialRegistry.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -141,14 +143,18 @@ private:
         UINT deferredCount;
     };
 
+    // Mesh, RenderObject
     std::vector<std::unique_ptr<Mesh>> m_meshes;
+    MeshRegistry m_meshRegistry;
     std::unordered_map<Mesh*, InstanceRange> m_instanceRanges;
     std::unordered_map<Mesh*, std::vector<std::unique_ptr<RenderObject>>> m_forwardRenderObjects;
     std::unordered_map<Mesh*, std::vector<std::unique_ptr<RenderObject>>> m_deferredRenderObjects;
 
     std::vector<RenderObject*> m_previewRotations;
 
+    // Material
     std::vector<std::unique_ptr<Material>> m_materials;
+    MaterialRegistry m_materialRegistry;
 
     std::vector<std::unique_ptr<Texture>> m_textures;
 
@@ -190,8 +196,10 @@ private:
     void SetTextureFiltering(TextureFiltering filtering);
 
     Material* CreateMaterial();
+    Material* CreateMaterial(const MaterialHandle& name);
     Material* CloneMaterial(const Material& material);
 
+    Mesh* CreateMesh(ID3D12GraphicsCommandList7* pCommandList, const GeometryData& data);
     RenderObject* CreateRenderObject(Mesh* pMesh, Material* mat);
 
     template <typename T>

@@ -213,6 +213,12 @@
     <ClInclude Include="Aliases.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MeshRegistry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialRegistry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="vs.hlsl">

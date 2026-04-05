@@ -458,6 +458,15 @@ void Renderer::BuildImGuiFrame()
         ImGui::EndCombo();
     }
 
+    if (ImGui::Button("Add Cube"))
+    {
+        auto* pMesh = m_meshRegistry.Resolve(L"builtin://cube");
+        auto* pTemplateMat = m_materialRegistry.Resolve(L"PavingStones150");
+        auto* pMat = CloneMaterial(*pTemplateMat);
+        auto* pCube = CreateRenderObject(pMesh, pMat);
+        pCube->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3());
+    }
+
     ImGui::End();
 }
 
@@ -745,7 +754,7 @@ void Renderer::LoadAssets()
         false);
 
     // Add materials
-    auto* pBaseMat = CreateMaterial();
+    auto* pBaseMat = CreateMaterial(L"PavingStones150");
     pBaseMat->SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
     pBaseMat->SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
     pBaseMat->SetShininess(10.0f);
@@ -758,14 +767,8 @@ void Renderer::LoadAssets()
     pPlaneMat->SetTextureTileScales(50.0f, 50.0f, 50.0f);
 
     // Add meshes
-    auto cubeMesh = std::make_unique<Mesh>(m_device.Get(), commandList, *m_uploadBuffer, GeometryGenerator::GenerateCube());
-    auto sphereMesh = std::make_unique<Mesh>(m_device.Get(), commandList, *m_uploadBuffer, GeometryGenerator::GenerateSphere());
-
-    auto* pCubeMesh = cubeMesh.get();
-    auto* pSphereMesh = sphereMesh.get();
-
-    m_meshes.push_back(std::move(cubeMesh));
-    m_meshes.push_back(std::move(sphereMesh));
+    auto* pCubeMesh = CreateMesh(commandList, GeometryGenerator::GenerateCube());
+    auto* pSphereMesh = CreateMesh(commandList, GeometryGenerator::GenerateSphere());
 
     // Add RenderObjects
     auto* pPlane = CreateRenderObject(pCubeMesh, pPlaneMat);
@@ -1440,6 +1443,7 @@ void Renderer::SetTextureFiltering(TextureFiltering filtering)
     }
 }
 
+// Allocate Material
 Material* Renderer::CreateMaterial()
 {
     auto material = std::make_unique<Material>(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount), m_frameResources);
@@ -1448,11 +1452,29 @@ Material* Renderer::CreateMaterial()
     return pMat;
 }
 
+// Allocate & register Material
+Material* Renderer::CreateMaterial(const MaterialHandle& name)
+{
+    auto* pMat = CreateMaterial();
+    m_materialRegistry.Register(name, pMat);
+    return pMat;
+}
+
 Material* Renderer::CloneMaterial(const Material& src)
 {
     auto pMat = CreateMaterial();
     pMat->CopyDataFrom(src);
     return pMat;
+}
+
+Mesh* Renderer::CreateMesh(ID3D12GraphicsCommandList7* pCommandList, const GeometryData& data)
+{
+    auto mesh = std::make_unique<Mesh>(m_device.Get(), pCommandList, *m_uploadBuffer, data);
+    Mesh* pMesh = mesh.get();
+    m_meshRegistry.Register(data.name, pMesh);
+    m_meshes.push_back(std::move(mesh));
+
+    return pMesh;
 }
 
 RenderObject* Renderer::CreateRenderObject(Mesh* pMesh, Material* mat)
