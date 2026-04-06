@@ -219,6 +219,9 @@
     <ClInclude Include="MaterialRegistry.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SlotMap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="vs.hlsl">
