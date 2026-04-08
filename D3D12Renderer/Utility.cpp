@@ -34,7 +34,7 @@ namespace Utility
 
         return hash;
     }
-    
+
     std::wstring MultiByteToWideChar(const std::string& str)
     {
         std::wstring converted;
@@ -43,7 +43,7 @@ namespace Utility
         size_t requiredSize;
         mbstowcs_s(&requiredSize, nullptr, 0, str.data(), 0);
         converted.resize(requiredSize);
-        
+
         // Convert
         mbstowcs_s(nullptr, converted.data(), requiredSize, str.data(), requiredSize - 1);
 
@@ -64,5 +64,10 @@ namespace Utility
         x |= x >> 16;
 
         return x + 1;
+    }
+
+    std::size_t Align(std::size_t value, std::size_t alignment)
+    {
+        return (value + (alignment - 1)) & ~(alignment - 1);
     }
 }

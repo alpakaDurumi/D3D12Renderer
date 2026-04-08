@@ -22,4 +22,5 @@ namespace Utility
     }
 
     UINT CeilPowerOfTwo(UINT x);
+    std::size_t Align(std::size_t value, std::size_t alignment);
 }

@@ -10,14 +10,24 @@
 #include <cstddef>
 
 #include "D3DHelper.h"
+#include "Utility.h"
 
 using Microsoft::WRL::ComPtr;
 
-// Linear allocator using upload heap for per-frame resource
-class FrameUploadHeap
+// Linear allocator using upload heap for transient usage.
+// Fence of CommandQueue ensures the safety of transient allocations,
+// So no per-allocation tracking is required.
+// Do not use this for cross-frame allocation.
+class TransientUploadAllocator
 {
 public:
-    FrameUploadHeap(ID3D12Device10* pDevice)
+    // Disable copy and move
+    TransientUploadAllocator(const TransientUploadAllocator&) = delete;
+    TransientUploadAllocator& operator=(const TransientUploadAllocator&) = delete;
+    TransientUploadAllocator(TransientUploadAllocator&&) = delete;
+    TransientUploadAllocator& operator=(TransientUploadAllocator&&) = delete;
+
+    TransientUploadAllocator(ID3D12Device10* pDevice)
         : m_pDevice(pDevice)
     {
         AllocatePage();
@@ -32,8 +42,10 @@ public:
     };
 
     // Copy data from src to currentOffset, returns Allocation
-    Allocation Push(void* src, std::size_t size)
+    Allocation Push(void* src, std::size_t size, std::size_t alignment)
     {
+        m_currentOffset = Utility::Align(m_currentOffset, alignment);
+
         // If current page has not enough space
         if (m_currentOffset + size > PAGE_SIZE)
         {
@@ -52,10 +64,10 @@ public:
             currentPage->GPUBasePtr + m_currentOffset
         };
 
-        memcpy(alloc.CPUPtr, src, size);
+        if (src) memcpy(alloc.CPUPtr, src, size);
 
         m_currentOffset += size;
-        
+
         return alloc;
     }
 
