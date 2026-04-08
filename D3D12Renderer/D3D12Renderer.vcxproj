@@ -217,6 +217,7 @@
     <ClInclude Include="DescriptorAllocatorPage.h" />
     <ClInclude Include="DynamicDescriptorHeap.h" />
     <ClInclude Include="FrameResource.h" />
+    <ClInclude Include="FrameUploadHeap.h" />
     <ClInclude Include="GeometryGenerator.h" />
     <ClInclude Include="SlotMap.h" />
     <ClInclude Include="ImGuiDescriptorAllocator.h" />
