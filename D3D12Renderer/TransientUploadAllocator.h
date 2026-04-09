@@ -37,12 +37,14 @@ public:
 
     struct Allocation
     {
+        ID3D12Resource* pResource;
+        UINT64 Offset;
         void* CPUPtr;
         D3D12_GPU_VIRTUAL_ADDRESS GPUPtr;
     };
 
-    // Copy data from src to currentOffset, returns Allocation
-    Allocation Push(void* src, std::size_t size, std::size_t alignment)
+    // Only allocate space
+    Allocation Allocate(std::size_t size, std::size_t alignment)
     {
         m_currentOffset = Utility::Align(m_currentOffset, alignment);
 
@@ -60,14 +62,22 @@ public:
         auto& currentPage = m_pages[m_currentPageIndex];
 
         Allocation alloc = {
+            currentPage->Resource.Get(),
+            m_currentOffset,
             static_cast<UINT8*>(currentPage->CPUBasePtr) + m_currentOffset,
             currentPage->GPUBasePtr + m_currentOffset
         };
 
-        if (src) memcpy(alloc.CPUPtr, src, size);
-
         m_currentOffset += size;
 
+        return alloc;
+    }
+
+    // Allocate and copy data from src to currentOffset, returns Allocation
+    Allocation Push(void* src, std::size_t size, std::size_t alignment)
+    {
+        auto alloc = Allocate(size, alignment);
+        if (src) memcpy(alloc.CPUPtr, src, size);
         return alloc;
     }
 
@@ -98,6 +108,11 @@ private:
             GPUBasePtr = Resource->GetGPUVirtualAddress();
         }
 
+        ~Page()
+        {
+            Resource->Unmap(0, nullptr);
+        }
+
         ComPtr<ID3D12Resource> Resource;
         void* CPUBasePtr;
         D3D12_GPU_VIRTUAL_ADDRESS GPUBasePtr;
@@ -106,5 +121,5 @@ private:
     ID3D12Device10* m_pDevice;
     std::vector<std::unique_ptr<Page>> m_pages;
     UINT m_currentPageIndex;
-    UINT m_currentOffset;
+    UINT64 m_currentOffset;
 };
