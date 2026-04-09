@@ -11,6 +11,7 @@
 
 #include "D3DHelper.h"
 #include "Utility.h"
+#include "UploadAllocation.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -35,16 +36,8 @@ public:
         m_currentOffset = 0;
     }
 
-    struct Allocation
-    {
-        ID3D12Resource* pResource;
-        UINT64 Offset;
-        void* CPUPtr;
-        D3D12_GPU_VIRTUAL_ADDRESS GPUPtr;
-    };
-
     // Only allocate space
-    Allocation Allocate(std::size_t size, std::size_t alignment)
+    UploadAllocation Allocate(std::size_t size, std::size_t alignment)
     {
         m_currentOffset = Utility::Align(m_currentOffset, alignment);
 
@@ -61,7 +54,7 @@ public:
 
         auto& currentPage = m_pages[m_currentPageIndex];
 
-        Allocation alloc = {
+        UploadAllocation alloc = {
             currentPage->Resource.Get(),
             m_currentOffset,
             static_cast<UINT8*>(currentPage->CPUBasePtr) + m_currentOffset,
@@ -74,7 +67,7 @@ public:
     }
 
     // Allocate and copy data from src to currentOffset, returns Allocation
-    Allocation Push(void* src, std::size_t size, std::size_t alignment)
+    UploadAllocation Push(void* src, std::size_t size, std::size_t alignment)
     {
         auto alloc = Allocate(size, alignment);
         if (src) memcpy(alloc.CPUPtr, src, size);

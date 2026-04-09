@@ -411,12 +411,12 @@ namespace D3DHelper
         pDevice->CreateShaderResourceView(pResource, &srvDesc, cpuHandle);
     }
 
+    // Assume that intermediate resource is already mapped
     void UpdateSubresources(
         ID3D12Device* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         ID3D12Resource* pDest,
-        ID3D12Resource* pIntermediate,
-        UINT64 intermediateOffset,
+        UploadAllocation intermediate,
         UINT firstSubresource,
         UINT numSubresources,
         D3D12_SUBRESOURCE_DATA* pSrcData)
@@ -437,98 +437,14 @@ namespace D3DHelper
         UINT64* pRowSizeInBytes = reinterpret_cast<UINT64*>(pNumRows + numSubresources);
         UINT64 requiredSize = 0;
         // 네 번째 인자인 BaseOffset은 출력되는 pLayouts[i].Offset들에 더해지는 값이다
-        pDevice->GetCopyableFootprints(&desc, firstSubresource, numSubresources, intermediateOffset, pLayouts, pNumRows, pRowSizeInBytes, &requiredSize);
-
-        // Map intermediate resource (upload heap)
-        D3D12_RANGE readRange = { 0, 0 };   // do not read from CPU. only write
-        UINT8* pData;
-        ThrowIfFailed(pIntermediate->Map(0, &readRange, reinterpret_cast<void**>(&pData)));
-
-        // dest의 레이아웃에 맞춰서 intermediate로 데이터를 복사
-        // Each subresource
-        for (UINT i = 0; i < numSubresources; i++)
-        {
-            //D3D12_MEMCPY_DEST DestData = { pData + pLayouts[i].Offset, pLayouts[i].Footprint.RowPitch, SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]) };
-            auto pIntermediateStart = pData + pLayouts[i].Offset;
-            auto rowPitch = pLayouts[i].Footprint.RowPitch;
-            auto slicePitch = SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]);
-            // Each depth (slice)
-            for (UINT z = 0; z < pLayouts[i].Footprint.Depth; ++z)
-            {
-                auto pIntermediateSlice = static_cast<UINT8*>(pIntermediateStart) + slicePitch * z;
-                auto pSrcSlice = static_cast<const UINT8*>(pSrcData[i].pData) + pSrcData[i].SlicePitch * LONG_PTR(z);
-                // Each Row
-                for (UINT y = 0; y < pNumRows[i]; ++y)
-                {
-                    memcpy(pIntermediateSlice + rowPitch * y,
-                        pSrcSlice + pSrcData[i].RowPitch * LONG_PTR(y),
-                        pRowSizeInBytes[i]);
-                }
-            }
-        }
-
-        // Unmap
-        pIntermediate->Unmap(0, nullptr);
-
-        // Copy from upload heap to default heap
-        // Buffer has only one subresource
-        if (desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
-        {
-            pCommandList->CopyBufferRegion(pDest, 0, pIntermediate, pLayouts[0].Offset, pLayouts[0].Footprint.Width);
-        }
-        // Texture has one or more subresources
-        else
-        {
-            for (UINT i = 0; i < numSubresources; i++)
-            {
-                D3D12_TEXTURE_COPY_LOCATION dst = {};
-                dst.pResource = pDest;
-                dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-                dst.SubresourceIndex = i + firstSubresource;
-
-                D3D12_TEXTURE_COPY_LOCATION src = {};
-                src.pResource = pIntermediate;
-                src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                src.PlacedFootprint = pLayouts[i];
-
-                pCommandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-            }
-        }
-
-        HeapFree(GetProcessHeap(), 0, pMem);
-    }
-
-    void UpdateSubresources(
-        ID3D12Device* pDevice,
-        ID3D12GraphicsCommandList7* pCommandList,
-        ID3D12Resource* pDest,
-        UploadBuffer::Allocation& uploadAllocation,
-        UINT firstSubresource,
-        UINT numSubresources,
-        D3D12_SUBRESOURCE_DATA* pSrcData)
-    {
-        // Calculate required size for data upload and allocate heap memory for footprints
-        // Structure of Arrays
-        UINT64 memToAlloc = static_cast<UINT64>(sizeof(D3D12_PLACED_SUBRESOURCE_FOOTPRINT) + sizeof(UINT) + sizeof(UINT64)) * numSubresources;
-        void* pMem = HeapAlloc(GetProcessHeap(), 0, static_cast<SIZE_T>(memToAlloc));
-        if (pMem == nullptr)
-        {
-            return;
-        }
-
-        // Acquire footprint of each subresource
-        D3D12_RESOURCE_DESC desc = pDest->GetDesc();
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT* pLayouts = static_cast<D3D12_PLACED_SUBRESOURCE_FOOTPRINT*>(pMem);
-        UINT* pNumRows = reinterpret_cast<UINT*>(pLayouts + numSubresources);
-        UINT64* pRowSizeInBytes = reinterpret_cast<UINT64*>(pNumRows + numSubresources);
-        UINT64 requiredSize = 0;
         pDevice->GetCopyableFootprints(&desc, firstSubresource, numSubresources, 0, pLayouts, pNumRows, pRowSizeInBytes, &requiredSize);
 
         // dest의 레이아웃에 맞춰서 intermediate로 데이터를 복사
         // Each subresource
         for (UINT i = 0; i < numSubresources; i++)
         {
-            auto pIntermediateStart = static_cast<UINT8*>(uploadAllocation.CPUPtr) + pLayouts[i].Offset;
+            //D3D12_MEMCPY_DEST DestData = { pData + pLayouts[i].Offset, pLayouts[i].Footprint.RowPitch, SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]) };
+            auto pIntermediateStart = static_cast<UINT8*>(intermediate.CPUPtr) + pLayouts[i].Offset;
             auto rowPitch = pLayouts[i].Footprint.RowPitch;
             auto slicePitch = SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]);
             // Each depth (slice)
@@ -550,7 +466,7 @@ namespace D3DHelper
         // Buffer has only one subresource
         if (desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
         {
-            pCommandList->CopyBufferRegion(pDest, 0, uploadAllocation.pResource, uploadAllocation.Offset + pLayouts[0].Offset, pLayouts[0].Footprint.Width);
+            pCommandList->CopyBufferRegion(pDest, 0, intermediate.pResource, intermediate.Offset + pLayouts[0].Offset, pLayouts[0].Footprint.Width);
         }
         // Texture has one or more subresources
         else
@@ -563,10 +479,10 @@ namespace D3DHelper
                 dst.SubresourceIndex = i + firstSubresource;
 
                 D3D12_TEXTURE_COPY_LOCATION src = {};
-                src.pResource = uploadAllocation.pResource;
+                src.pResource = intermediate.pResource;
                 src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
                 src.PlacedFootprint = pLayouts[i];
-                src.PlacedFootprint.Offset += uploadAllocation.Offset;
+                src.PlacedFootprint.Offset += intermediate.Offset;
 
                 pCommandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
             }
@@ -618,7 +534,7 @@ namespace D3DHelper
     void CreateIndexBuffer(
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
-        UploadBuffer& uploadBuffer,
+        UploadAllocation intermediate,
         ComPtr<ID3D12Resource>& indexBuffer,
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
         const std::vector<UINT32>& indices)
@@ -627,14 +543,12 @@ namespace D3DHelper
 
         CreateDefaultBuffer(pDevice, indexBufferSize, indexBuffer);
 
-        auto uploadAllocation = uploadBuffer.Allocate(indexBufferSize, sizeof(UINT32));
-
         D3D12_SUBRESOURCE_DATA indexData = {};
         indexData.pData = indices.data();
         indexData.RowPitch = indexBufferSize;
         indexData.SlicePitch = indexData.RowPitch;
 
-        UpdateSubresources(pDevice, pCommandList, indexBuffer.Get(), uploadAllocation, 0, 1, &indexData);
+        UpdateSubresources(pDevice, pCommandList, indexBuffer.Get(), intermediate, 0, 1, &indexData);
 
         D3D12_BUFFER_BARRIER b = {
             D3D12_BARRIER_SYNC_COPY,

@@ -7,9 +7,10 @@
 #include <dxgi1_6.h>    // DXGI 1.6
 
 #include <vector>
+#include <string>
 
-#include "UploadBuffer.h"
 #include "SharedConfig.h"
+#include "UploadAllocation.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -42,17 +43,7 @@ namespace D3DHelper
         ID3D12Device* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         ID3D12Resource* pDest,
-        ID3D12Resource* pIntermediate,
-        UINT64 intermediateOffset,
-        UINT firstSubresource,
-        UINT numSubresources,
-        D3D12_SUBRESOURCE_DATA* pSrcData);
-
-    void UpdateSubresources(
-        ID3D12Device* pDevice,
-        ID3D12GraphicsCommandList7* pCommandList,
-        ID3D12Resource* pDest,
-        UploadBuffer::Allocation& uploadAllocation,
+        UploadAllocation intermediate,
         UINT firstSubresource,
         UINT numSubresources,
         D3D12_SUBRESOURCE_DATA* pSrcData);
@@ -67,7 +58,7 @@ namespace D3DHelper
     void CreateVertexBuffer(
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
-        UploadBuffer& uploadBuffer,
+        UploadAllocation intermediate,
         ComPtr<ID3D12Resource>& vertexBuffer,
         D3D12_VERTEX_BUFFER_VIEW* pVertexBufferView,
         const std::vector<T>& vertices)
@@ -76,14 +67,12 @@ namespace D3DHelper
 
         CreateDefaultBuffer(pDevice, vertexBufferSize, vertexBuffer);
 
-        auto uploadAllocation = uploadBuffer.Allocate(vertexBufferSize, sizeof(T));
-
         D3D12_SUBRESOURCE_DATA vertexData = {};
         vertexData.pData = vertices.data();
         vertexData.RowPitch = vertexBufferSize;
         vertexData.SlicePitch = vertexData.RowPitch;
 
-        UpdateSubresources(pDevice, pCommandList, vertexBuffer.Get(), uploadAllocation, 0, 1, &vertexData);
+        UpdateSubresources(pDevice, pCommandList, vertexBuffer.Get(), intermediate, 0, 1, &vertexData);
 
         D3D12_BUFFER_BARRIER b = {
             D3D12_BARRIER_SYNC_COPY,
@@ -107,7 +96,7 @@ namespace D3DHelper
     void CreateIndexBuffer(
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
-        UploadBuffer& uploadBuffer,
+        UploadAllocation intermediate,
         ComPtr<ID3D12Resource>& indexBuffer,
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
         const std::vector<UINT32>& indices);

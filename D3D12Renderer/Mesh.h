@@ -7,9 +7,9 @@
 
 #include "D3DHelper.h"
 #include "GeometryGenerator.h"
+#include "TransientUploadAllocator.h"
 
 using Microsoft::WRL::ComPtr;
-using namespace D3DHelper;
 
 class Material;
 
@@ -19,12 +19,17 @@ public:
     Mesh(
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
-        UploadBuffer& uploadBuffer,
+        TransientUploadAllocator& allocator,
         const GeometryData& geometryData)
     {
-        CreateVertexBuffer(pDevice, pCommandList, uploadBuffer, m_vertexBuffer, &m_vertexBufferView, geometryData.vertices);
-        CreateIndexBuffer(pDevice, pCommandList, uploadBuffer, m_indexBuffer, &m_indexBufferView, geometryData.indices);
+        const UINT64 vbSize = static_cast<UINT64>(geometryData.vertices.size()) * sizeof(Vertex);
+        auto vbAlloc = allocator.Allocate(vbSize, sizeof(Vertex));
+        D3DHelper::CreateVertexBuffer(pDevice, pCommandList, vbAlloc, m_vertexBuffer, &m_vertexBufferView, geometryData.vertices);
+
         m_numIndices = UINT(geometryData.indices.size());
+        const UINT64 ibSize = static_cast<UINT64>(m_numIndices) * sizeof(UINT32);
+        auto ibAlloc = allocator.Allocate(ibSize, sizeof(UINT32));
+        D3DHelper::CreateIndexBuffer(pDevice, pCommandList, ibAlloc, m_indexBuffer, &m_indexBufferView, geometryData.indices);
     }
 
     void SetMaterial(Material* mat)

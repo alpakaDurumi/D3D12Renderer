@@ -273,7 +273,6 @@ void Renderer::OnRender()
     // And notify fenceValue to UploadBuffer
     UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(pCommandAllocator, pCommandList);
     m_frameResources[m_frameIndex]->SetFenceValue(fenceValue);
-    m_uploadBuffer->QueueRetiredPages(fenceValue);
     m_dynamicDescriptorHeapForCBVSRVUAV->QueueRetiredHeaps(fenceValue);
 
     // Present the frame.
@@ -551,7 +550,6 @@ void Renderer::LoadPipeline()
     // Instead, pass the constructor arguments directly to std::make_unique<T>()
     m_commandQueue = std::make_unique<CommandQueue>(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
     m_dynamicDescriptorHeapForCBVSRVUAV = std::make_unique<DynamicDescriptorHeap>(m_device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_uploadBuffer = std::make_unique<UploadBuffer>(m_device, 16 * 1024 * 1024);    // 16MB
     for (UINT i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
     {
         D3D12_DESCRIPTOR_HEAP_TYPE type = static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(i);
@@ -572,7 +570,6 @@ void Renderer::LoadPipeline()
     // Dependency injections
     m_commandQueue->SetDescriptorHeaps(m_dynamicDescriptorHeapForCBVSRVUAV.get(), m_samplerDescriptorHeap.Get());
     m_dynamicDescriptorHeapForCBVSRVUAV->SetCommandQueue(m_commandQueue.get());
-    m_uploadBuffer->SetCommandQueue(m_commandQueue.get());
 
     // For ImGui
     m_imguiDescriptorAllocator = std::make_unique<ImGuiDescriptorAllocator>(m_device.Get());
@@ -631,6 +628,8 @@ void Renderer::LoadPipeline()
 // Load the sample assets.
 void Renderer::LoadAssets()
 {
+    TransientUploadAllocator uploadAllocator(m_device.Get());
+
     // Read shaders
     {
         std::vector<std::wstring> shaderNames;
@@ -729,6 +728,7 @@ void Renderer::LoadAssets()
     CreateTexture(
         commandList,
         std::move(textureAllocations[0]),
+        uploadAllocator,
         L"assets/textures/PavingStones150_4K-PNG_Color.png",
         true,
         true,
@@ -738,6 +738,7 @@ void Renderer::LoadAssets()
     CreateTexture(
         commandList,
         std::move(textureAllocations[1]),
+        uploadAllocator,
         L"assets/textures/PavingStones150_4K-PNG_NormalDX.png",
         false,
         true,
@@ -747,6 +748,7 @@ void Renderer::LoadAssets()
     CreateTexture(
         commandList,
         std::move(textureAllocations[2]),
+        uploadAllocator,
         L"assets/textures/PavingStones150_4K-PNG_Displacement.png",
         false,
         true,
@@ -767,8 +769,8 @@ void Renderer::LoadAssets()
     pPlaneMat->SetTextureTileScales(50.0f, 50.0f, 50.0f);
 
     // Add meshes
-    auto* pCubeMesh = CreateMesh(commandList, GeometryGenerator::GenerateCube());
-    auto* pSphereMesh = CreateMesh(commandList, GeometryGenerator::GenerateSphere());
+    auto* pCubeMesh = CreateMesh(commandList, uploadAllocator, GeometryGenerator::GenerateCube());
+    auto* pSphereMesh = CreateMesh(commandList, uploadAllocator, GeometryGenerator::GenerateSphere());
 
     // Add RenderObjects
     auto* pPlane = CreateRenderObject(pCubeMesh, pPlaneMat);
@@ -1467,9 +1469,9 @@ Material* Renderer::CloneMaterial(const Material& src)
     return pMat;
 }
 
-Mesh* Renderer::CreateMesh(ID3D12GraphicsCommandList7* pCommandList, const GeometryData& data)
+Mesh* Renderer::CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data)
 {
-    auto mesh = std::make_unique<Mesh>(m_device.Get(), pCommandList, *m_uploadBuffer, data);
+    auto mesh = std::make_unique<Mesh>(m_device.Get(), pCommandList, allocator, data);
     Mesh* pMesh = mesh.get();
     m_meshRegistry.Register(data.name, pMesh);
     m_meshes.push_back(std::move(mesh));
@@ -1503,6 +1505,7 @@ RenderObject* Renderer::CreateRenderObject(Mesh* pMesh, Material* mat)
 Texture* Renderer::CreateTexture(
     ID3D12GraphicsCommandList7* pCommandList,
     DescriptorAllocation&& allocation,
+    TransientUploadAllocator& uploadAllocator,
     const std::wstring& filePath,
     bool isSRGB,
     bool useBlockCompress,
@@ -1513,7 +1516,7 @@ Texture* Renderer::CreateTexture(
         m_device.Get(),
         pCommandList,
         std::move(allocation),
-        *m_uploadBuffer,
+        uploadAllocator,
         filePath,
         isSRGB,
         useBlockCompress,

@@ -9,9 +9,9 @@
 #include <vector>
 
 #include "D3DHelper.h"
-#include "UploadBuffer.h"
 #include "DescriptorAllocation.h"
 #include "Utility.h"
+#include "TransientUploadAllocator.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
@@ -23,7 +23,7 @@ public:
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& allocation,
-        UploadBuffer& uploadBuffer,
+        TransientUploadAllocator& uploadAllocator,
         const std::vector<UINT8>& textureSrc,
         UINT width,
         UINT height)
@@ -53,7 +53,7 @@ public:
         UINT64 requiredSize = 0;
         pDevice->GetCopyableFootprints(&desc, 0, 1, 0, nullptr, nullptr, nullptr, &requiredSize);
 
-        auto uploadAllocation = uploadBuffer.Allocate(requiredSize, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+        auto uploadAllocation = uploadAllocator.Allocate(requiredSize, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
 
         D3D12_SUBRESOURCE_DATA textureData = {};
         textureData.pData = textureSrc.data();
@@ -91,7 +91,7 @@ public:
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& allocation,
-        UploadBuffer& uploadBuffer,
+        TransientUploadAllocator& uploadAllocator,
         const std::wstring& filePath,
         bool isSRGB,
         bool useBlockCompress,
@@ -152,7 +152,7 @@ public:
         UINT64 requiredSize = 0;
         pDevice->GetCopyableFootprints(&desc, 0, numSubresources, 0, nullptr, nullptr, nullptr, &requiredSize);
 
-        auto uploadAllocation = uploadBuffer.Allocate(requiredSize, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+        auto uploadAllocation = uploadAllocator.Allocate(requiredSize, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
 
         UpdateSubresources(pDevice, pCommandList, m_texture.Get(), uploadAllocation, 0, numSubresources, subresources.data());
 

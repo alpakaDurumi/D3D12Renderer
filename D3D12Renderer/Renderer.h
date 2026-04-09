@@ -20,7 +20,6 @@
 #include "ConstantData.h"
 #include "CommandQueue.h"
 #include "FrameResource.h"
-#include "UploadBuffer.h"
 #include "Mesh.h"
 #include "DescriptorAllocator.h"
 #include "Texture.h"
@@ -36,6 +35,7 @@
 #include "RenderGraphNode.h"
 #include "MeshRegistry.h"
 #include "MaterialRegistry.h"
+#include "TransientUploadAllocator.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -99,7 +99,6 @@ private:
     std::unique_ptr<DynamicDescriptorHeap> m_dynamicDescriptorHeapForCBVSRVUAV;
     ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
     std::unique_ptr<CommandQueue> m_commandQueue;
-    std::unique_ptr<UploadBuffer> m_uploadBuffer;
     std::array<std::unique_ptr<DescriptorAllocator>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
     std::vector<std::unique_ptr<FrameResource>> m_frameResources;
 
@@ -199,7 +198,7 @@ private:
     Material* CreateMaterial(const MaterialHandle& name);
     Material* CloneMaterial(const Material& material);
 
-    Mesh* CreateMesh(ID3D12GraphicsCommandList7* pCommandList, const GeometryData& data);
+    Mesh* CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data);
     RenderObject* CreateRenderObject(Mesh* pMesh, Material* mat);
 
     template <typename T>
@@ -208,6 +207,7 @@ private:
     Texture* CreateTexture(
         ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& allocation,
+        TransientUploadAllocator& uploadAllocator,
         const std::wstring& filePath,
         bool isSRGB,
         bool useBlockCompress,
