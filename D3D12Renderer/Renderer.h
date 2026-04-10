@@ -119,8 +119,8 @@ private:
     // 
     // Main Camera
     Camera m_camera;
-    UINT m_mainCameraIndex = 0;
     CameraConstantData m_cameraConstantData;
+    UploadAllocation m_cameraUploadAllocation;
 
     InputManager m_inputManager;
 
@@ -163,6 +163,7 @@ private:
     D3D12_RECT m_shadowMapScissorRect;
     UINT m_shadowMapResolution = 2048;
     ShadowConstantData m_shadowConstantData;
+    UploadAllocation m_shadowUploadAllocation;
 
     TextureFiltering m_currentTextureFiltering = TextureFiltering::ANISOTROPIC_X16;
 

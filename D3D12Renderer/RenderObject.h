@@ -84,7 +84,8 @@ public:
         world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
         XMStoreFloat4x4(&ret.inverseTranspose, XMMatrixInverse(nullptr, world));
 
-        ret.materialIndex = m_pMaterial->GetMaterialConstantBufferIndex();
+        // TODO: use appropriate material index. use 0 for now.
+        ret.materialIndex = 0;
 
         return ret;
     }

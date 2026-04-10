@@ -17,16 +17,14 @@ Light::Light(DescriptorAllocation&& dsvAllocation, DescriptorAllocation&& srvAll
 
     m_lightConstantData.type = static_cast<UINT32>(m_type);
     m_cameraConstantData.resize(arraySize);
+    m_cameraUploadAllocations.resize(arraySize);
 }
 
 void Light::Init(
     ID3D12Device10* pDevice,
     UINT shadowMapResolution,
-    const std::vector<std::unique_ptr<FrameResource>>& frameResources,
     DescriptorAllocation&& cbvAllocation)
 {
-    assert(cbvAllocation.GetNumHandles() == frameResources.size());
-
     UINT16 arraySize = GetRequiredArraySize(m_type);
 
     CreateDepthStencilBuffer(pDevice, shadowMapResolution, shadowMapResolution, arraySize, m_depthBuffer, false);
@@ -35,21 +33,7 @@ void Light::Init(
         CreateDSV(pDevice, m_depthBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(i), false, false, true, i);
     }
 
-    auto cbvAllocations = cbvAllocation.Split();
-
-    // Create constant buffers
-    for (UINT i = 0; i < frameResources.size(); ++i)
-    {
-        FrameResource& frameResource = *frameResources[i];
-
-        frameResource.AddLightConstantBuffer(std::move(cbvAllocations[i]));
-        if (i == 0) m_cameraConstantBufferBaseIndex = frameResource.GetCameraConstantBufferCount();
-
-        for (UINT j = 0; j < arraySize; ++j)
-        {
-            frameResource.AddCameraConstantBuffer();
-        }
-    }
+    m_lightCBVAllocations = cbvAllocation.Split();
 }
 
 LightType Light::GetType() const
@@ -71,16 +55,6 @@ D3D12_CPU_DESCRIPTOR_HANDLE Light::GetDSVDescriptorHandle(UINT idx) const
 {
     return m_dsvAllocation.GetDescriptorHandle(idx);
 }
-
-UINT Light::GetCameraConstantBufferBaseIndex() const
-{
-    return m_cameraConstantBufferBaseIndex;
-}
-//
-//UINT Light::GetLightConstantBufferIndex() const
-//{
-//    return m_lightConstantBufferIndex;
-//}
 
 DescriptorAllocation& Light::GetSRVAllocationRef()
 {
@@ -146,14 +120,34 @@ void Light::SetIdxInArray(UINT idxInArray)
     m_lightConstantData.idxInArray = idxInArray;
 }
 
-CameraConstantData* Light::GetCameraConstantDataPtr(UINT idx)
+CameraConstantData* Light::GetCameraConstantDataPtr(UINT arrayIndex)
 {
-    return &m_cameraConstantData[idx];
+    return &m_cameraConstantData[arrayIndex];
+}
+
+void Light::SetCameraUploadAllocation(UINT arrayIndex, UploadAllocation alloc)
+{
+    m_cameraUploadAllocations[arrayIndex] = alloc;
+}
+
+UploadAllocation Light::GetCameraUploadAllocation(UINT arrayIndex)
+{
+    return m_cameraUploadAllocations[arrayIndex];
 }
 
 LightConstantData* Light::GetLightConstantDataPtr()
 {
     return &m_lightConstantData;
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE Light::GetLightCBVHandle(UINT frameIndex)
+{
+    return m_lightCBVAllocations[frameIndex].GetDescriptorHandle();
+}
+
+DescriptorAllocation& Light::GetLightCBVAllocationRef(UINT frameIndex)
+{
+    return m_lightCBVAllocations[frameIndex];
 }
 
 UINT Light::GetDepthBufferHandle() const
@@ -171,11 +165,10 @@ DirectionalLight::DirectionalLight(
     DescriptorAllocation&& dsvAllocation,
     DescriptorAllocation&& srvAllocation,
     UINT shadowMapResolution,
-    const std::vector<std::unique_ptr<FrameResource>>& frameResources,
     DescriptorAllocation&& cbvAllocation)
     : Light(std::move(dsvAllocation), std::move(srvAllocation), LightType::DIRECTIONAL)
 {
-    Init(pDevice, shadowMapResolution, frameResources, std::move(cbvAllocation));
+    Init(pDevice, shadowMapResolution, std::move(cbvAllocation));
     CreateSRVForShadow(pDevice, m_depthBuffer.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
 }
 
@@ -211,7 +204,6 @@ PointLight::PointLight(
     DescriptorAllocation&& dsvAllocation,
     DescriptorAllocation&& srvAllocation,
     UINT shadowMapResolution,
-    const std::vector<std::unique_ptr<FrameResource>>& frameResources,
     DescriptorAllocation&& cbvAllocation,
     DescriptorAllocation&& rtvAllocation)
     : Light(std::move(dsvAllocation), std::move(srvAllocation), LightType::POINT)
@@ -219,7 +211,7 @@ PointLight::PointLight(
 {
     assert(POINT_LIGHT_ARRAY_SIZE == m_rtvAllocation.GetNumHandles());
 
-    Init(pDevice, shadowMapResolution, frameResources, std::move(cbvAllocation));
+    Init(pDevice, shadowMapResolution, std::move(cbvAllocation));
 
     D3D12_CLEAR_VALUE clearValue = {};
     clearValue.Format = DXGI_FORMAT_R32_FLOAT;
@@ -281,11 +273,10 @@ SpotLight::SpotLight(
     DescriptorAllocation&& dsvAllocation,
     DescriptorAllocation&& srvAllocation,
     UINT shadowMapResolution,
-    const std::vector<std::unique_ptr<FrameResource>>& frameResources,
     DescriptorAllocation&& cbvAllocation)
     : Light(std::move(dsvAllocation), std::move(srvAllocation), LightType::SPOT)
 {
-    Init(pDevice, shadowMapResolution, frameResources, std::move(cbvAllocation));
+    Init(pDevice, shadowMapResolution, std::move(cbvAllocation));
     CreateSRVForShadow(pDevice, m_depthBuffer.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
     SetAngles(45.0f, 20.0f);    // Set default angle
 }

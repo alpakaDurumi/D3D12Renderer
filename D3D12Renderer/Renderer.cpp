@@ -270,7 +270,6 @@ void Renderer::OnRender()
     pCommandList->Barrier(1, barrierGroups);
 
     // Execute the command lists and store the fence value
-    // And notify fenceValue to UploadBuffer
     UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(pCommandAllocator, pCommandList);
     m_frameResources[m_frameIndex]->SetFenceValue(fenceValue);
     m_dynamicDescriptorHeapForCBVSRVUAV->QueueRetiredHeaps(fenceValue);
@@ -694,19 +693,6 @@ void Renderer::LoadAssets()
     // Get command allocator and list for loading assets
     auto [commandAllocator, commandList] = m_commandQueue->GetAvailableCommandList();
 
-    // Create constant buffers for each frame
-    for (UINT i = 0; i < FrameCount; i++)
-    {
-        FrameResource& frameResource = *m_frameResources[i];
-
-        // Main Camera
-        if (i == 0) m_mainCameraIndex = frameResource.GetCameraConstantBufferCount();
-        frameResource.AddCameraConstantBuffer();
-
-        // Shadow
-        frameResource.CreateShadowConstantBuffer();
-    }
-
     // Add samplers
     auto baseCPUHandle = m_samplerDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
     auto incrementSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
@@ -895,11 +881,18 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     // Stage material CBVs
     UINT numMaterials = static_cast<UINT>(m_materials.size());
     for (UINT i = 0; i < numMaterials; ++i)
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, i, 1, frameResource.GetMaterialCBVAllocationRef(i));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, i, 1, m_materials[i]->GetCBVAllocationRef(m_frameIndex));
 
     // Stage light CBVs
-    for (UINT i = 0; i < numLights; ++i)
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, i, 1, frameResource.GetLightCBVAllocationRef(i));
+    UINT lightIdx = 0;
+    for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
+    {
+        for (auto& light : m_lights[type])
+        {
+            m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, lightIdx, 1, light->GetLightCBVAllocationRef(m_frameIndex));
+            ++lightIdx;
+        }
+    }
 
     // Stage textures
     UINT numTextures = static_cast<UINT>(m_textures.size());
@@ -993,7 +986,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
                     pCommandList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
 
-                    pCommandList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(light->GetCameraConstantBufferBaseIndex() + j));
+                    pCommandList->SetGraphicsRootConstantBufferView(0, light->GetCameraUploadAllocation(j).GPUPtr);
 
                     for (auto& mesh : m_meshes)
                     {
@@ -1034,7 +1027,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         pCommandList->SetPipelineState(pso);
 
-        pCommandList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
+        pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.GPUPtr);
 
         for (auto& mesh : m_meshes)
         {
@@ -1069,8 +1062,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         pCommandList->SetPipelineState(pso);
 
-        pCommandList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
-        pCommandList->SetGraphicsRootConstantBufferView(1, frameResource.GetShadowCBVirtualAddress());
+        pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.GPUPtr);
+        pCommandList->SetGraphicsRootConstantBufferView(1, m_shadowUploadAllocation.GPUPtr);
 
         pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         pCommandList->DrawInstanced(3, 1, 0, 0);
@@ -1116,8 +1109,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         pCommandList->SetPipelineState(pso);
 
-        pCommandList->SetGraphicsRootConstantBufferView(0, frameResource.GetCameraCBVirtualAddress(m_mainCameraIndex));
-        pCommandList->SetGraphicsRootConstantBufferView(1, frameResource.GetShadowCBVirtualAddress());
+        pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.GPUPtr);
+        pCommandList->SetGraphicsRootConstantBufferView(1, m_shadowUploadAllocation.GPUPtr);
 
         for (auto& mesh : m_meshes)
         {
@@ -1448,7 +1441,7 @@ void Renderer::SetTextureFiltering(TextureFiltering filtering)
 // Allocate Material
 Material* Renderer::CreateMaterial()
 {
-    auto material = std::make_unique<Material>(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount), m_frameResources);
+    auto material = std::make_unique<Material>(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
     auto* pMat = material.get();
     m_materials.push_back(std::move(material));
     return pMat;
@@ -2055,15 +2048,15 @@ void Renderer::PrepareSpotLight(SpotLight& light)
 
 void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
 {
-    frameResource.UpdateCameraConstantBuffer(m_mainCameraIndex, &m_cameraConstantData);
-    frameResource.UpdateShadowConstantBuffer(&m_shadowConstantData);
+    m_cameraUploadAllocation = frameResource.PushConstantData(&m_cameraConstantData, sizeof(CameraConstantData));
+    m_shadowUploadAllocation = frameResource.PushConstantData(&m_shadowConstantData, sizeof(ShadowConstantData));
 
     for (UINT i = 0; i < m_materials.size(); ++i)
     {
-        frameResource.UpdateMaterialConstantBuffer(i, m_materials[i]->GetConstantDataPtr());
+        auto alloc = frameResource.PushConstantData(m_materials[i]->GetConstantDataPtr(), sizeof(MaterialConstantData));
+        CreateCBV(m_device.Get(), alloc.GPUPtr, sizeof(MaterialConstantData), m_materials[i]->GetCBVHandle(m_frameIndex));
     }
 
-    UINT lightIdx = 0;
     for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
     {
         UINT16 arraySize = GetRequiredArraySize(static_cast<LightType>(type));
@@ -2071,10 +2064,11 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
         {
             for (UINT i = 0; i < arraySize; ++i)
             {
-                frameResource.UpdateCameraConstantBuffer(light->GetCameraConstantBufferBaseIndex() + i, light->GetCameraConstantDataPtr(i));
+                auto alloc = frameResource.PushConstantData(light->GetCameraConstantDataPtr(i), sizeof(CameraConstantData));
+                light->SetCameraUploadAllocation(i, alloc);
             }
-            frameResource.UpdateLightConstantBuffer(lightIdx, light->GetLightConstantDataPtr());
-            ++lightIdx;
+            auto alloc = frameResource.PushConstantData(light->GetLightConstantDataPtr(), sizeof(LightConstantData));
+            CreateCBV(m_device.Get(), alloc.GPUPtr, sizeof(LightConstantData), light->GetLightCBVHandle(m_frameIndex));
         }
     }
 }
@@ -2131,7 +2125,6 @@ DirectionalLight* Renderer::CreateLight<DirectionalLight>()
         std::move(dsvAllocation),
         std::move(srvAllocation),
         m_shadowMapResolution,
-        m_frameResources,
         std::move(cbvAllocation));
 
     auto* pLight = light.get();
@@ -2152,7 +2145,6 @@ PointLight* Renderer::CreateLight<PointLight>()
         std::move(dsvAllocation),
         std::move(srvAllocation),
         m_shadowMapResolution,
-        m_frameResources,
         std::move(cbvAllocation),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(POINT_LIGHT_ARRAY_SIZE));
 
@@ -2174,7 +2166,6 @@ SpotLight* Renderer::CreateLight<SpotLight>()
         std::move(dsvAllocation),
         std::move(srvAllocation),
         m_shadowMapResolution,
-        m_frameResources,
         std::move(cbvAllocation));
 
     auto* pLight = light.get();

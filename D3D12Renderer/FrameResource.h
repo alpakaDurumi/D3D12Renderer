@@ -7,22 +7,14 @@
 #include <dxgi1_6.h>    // DXGI 1.6
 
 #include <vector>
-#include <memory>
 #include <array>
 #include <cstddef>
 
-#include "ConstantData.h"
-#include "ConstantBuffer.h"
 #include "DescriptorAllocation.h"
 #include "SharedConfig.h"
+#include "TransientUploadAllocator.h"
 
 using Microsoft::WRL::ComPtr;
-
-// aliasing
-using MaterialCB = ConstantBuffer<MaterialConstantData>;
-using LightCB = ConstantBuffer<LightConstantData>;
-using CameraCB = ConstantBuffer<CameraConstantData>;
-using ShadowCB = ConstantBuffer<ShadowConstantData>;
 
 // Dynamic Data for each frame
 class FrameResource
@@ -52,20 +44,7 @@ public:
     UINT64 GetFenceValue() const;
 
     // CB
-    UINT GetCameraConstantBufferCount() const;
-    UINT GetMaterialConstantBufferCount() const;
-    void AddCameraConstantBuffer();
-    void CreateShadowConstantBuffer();
-    void AddMaterialConstantBuffer(DescriptorAllocation&& allocation);
-    void AddLightConstantBuffer(DescriptorAllocation&& allocation);
-    D3D12_GPU_VIRTUAL_ADDRESS GetCameraCBVirtualAddress(UINT idx) const;
-    D3D12_GPU_VIRTUAL_ADDRESS GetShadowCBVirtualAddress() const;
-    DescriptorAllocation& GetMaterialCBVAllocationRef(UINT idx);
-    DescriptorAllocation& GetLightCBVAllocationRef(UINT idx);
-    void UpdateCameraConstantBuffer(UINT idx, CameraConstantData* pData);
-    void UpdateShadowConstantBuffer(ShadowConstantData* pData);
-    void UpdateMaterialConstantBuffer(UINT idx, MaterialConstantData* pData);
-    void UpdateLightConstantBuffer(UINT idx, LightConstantData* pData);
+    UploadAllocation PushConstantData(void* src, std::size_t size);
 
     // instance data
     void PushInstanceData(std::vector<InstanceData>& data);
@@ -86,10 +65,7 @@ private:
     DescriptorAllocation m_gBufferRTVAllocation;
     DescriptorAllocation m_gBufferSRVAllocation;
 
-    std::vector<std::unique_ptr<CameraCB>> m_cameraConstantBuffers;
-    std::vector<std::unique_ptr<MaterialCB>> m_materialConstantBuffers;
-    std::vector<std::unique_ptr<LightCB>> m_lightConstantBuffers;
-    std::unique_ptr<ShadowCB> m_shadowConstantBuffer;
+    TransientUploadAllocator m_uploadAllocator;
 
     ComPtr<ID3D12Resource> m_instanceUploadBuffer;
     UINT8* m_instanceBufferBegin = nullptr;

@@ -4,11 +4,14 @@
 #include <wrl/client.h>
 
 #include <d3d12.h>
+#include <DirectXMath.h>
+
+#include <vector>
 
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
-#include "FrameResource.h"
 #include "SharedConfig.h"
+#include "UploadAllocation.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -21,7 +24,6 @@ protected:
     void Init(
         ID3D12Device10* pDevice,
         UINT shadowMapResolution,
-        const std::vector<std::unique_ptr<FrameResource>>& frameResources,
         DescriptorAllocation&& cbvAllocation);
 
 public:
@@ -29,8 +31,6 @@ public:
     ID3D12Resource* GetDepthBuffer() const;
     UINT16 GetArraySize() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetDSVDescriptorHandle(UINT idx) const;
-
-    UINT GetCameraConstantBufferBaseIndex() const;
 
     DescriptorAllocation& GetSRVAllocationRef();
 
@@ -50,17 +50,23 @@ public:
 
     void SetIdxInArray(UINT idxInArray);
 
-    CameraConstantData* GetCameraConstantDataPtr(UINT idx);
+    CameraConstantData* GetCameraConstantDataPtr(UINT arrayIndex);
+    void SetCameraUploadAllocation(UINT arrayIndex, UploadAllocation alloc);
+    UploadAllocation GetCameraUploadAllocation(UINT arrayIndex);
+
     LightConstantData* GetLightConstantDataPtr();
+    D3D12_CPU_DESCRIPTOR_HANDLE GetLightCBVHandle(UINT frameIndex);
+    DescriptorAllocation& GetLightCBVAllocationRef(UINT frameIndex);
 
     UINT GetDepthBufferHandle() const;
     void SetDepthBufferHandle(UINT handle);
 
 protected:
     std::vector<CameraConstantData> m_cameraConstantData;
-    UINT m_cameraConstantBufferBaseIndex;
+    std::vector<UploadAllocation> m_cameraUploadAllocations;    // transient, for single frame
 
     LightConstantData m_lightConstantData;
+    std::vector<DescriptorAllocation> m_lightCBVAllocations;    // for each frame
 
     LightType m_type;
 
@@ -79,7 +85,6 @@ public:
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
         UINT shadowMapResolution,
-        const std::vector<std::unique_ptr<FrameResource>>& frameResources,
         DescriptorAllocation&& cbvAllocation);
 
     virtual XMVECTOR GetPosition() const override;
@@ -99,7 +104,6 @@ public:
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
         UINT shadowMapResolution,
-        const std::vector<std::unique_ptr<FrameResource>>& frameResources,
         DescriptorAllocation&& cbvAllocation,
         DescriptorAllocation&& rtvAllocation);
 
@@ -129,7 +133,6 @@ public:
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
         UINT shadowMapResolution,
-        const std::vector<std::unique_ptr<FrameResource>>& frameResources,
         DescriptorAllocation&& cbvAllocation);
 
     float GetOuterAngle() const;
