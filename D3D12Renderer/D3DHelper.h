@@ -11,6 +11,7 @@
 
 #include "SharedConfig.h"
 #include "UploadAllocation.h"
+#include "GeometryData.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -55,44 +56,13 @@ namespace D3DHelper
     D3D12_BARRIER_GROUP TextureBarrierGroup(UINT32 numBarriers, D3D12_TEXTURE_BARRIER* pBarriers);
     D3D12_BARRIER_GROUP GlobalBarrierGroup(UINT32 numBarriers, D3D12_GLOBAL_BARRIER* pBarriers);
 
-    template<typename T>
     void CreateVertexBuffer(
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         UploadAllocation intermediate,
         ComPtr<ID3D12Resource>& vertexBuffer,
         D3D12_VERTEX_BUFFER_VIEW* pVertexBufferView,
-        const std::vector<T>& vertices)
-    {
-        const UINT vertexBufferSize = UINT(vertices.size()) * UINT(sizeof(T));
-
-        CreateDefaultBuffer(pDevice, vertexBufferSize, vertexBuffer);
-
-        D3D12_SUBRESOURCE_DATA vertexData = {};
-        vertexData.pData = vertices.data();
-        vertexData.RowPitch = vertexBufferSize;
-        vertexData.SlicePitch = vertexData.RowPitch;
-
-        UpdateSubresources(pDevice, pCommandList, vertexBuffer.Get(), intermediate, 0, 1, &vertexData);
-
-        D3D12_BUFFER_BARRIER b = {
-            D3D12_BARRIER_SYNC_COPY,
-            D3D12_BARRIER_SYNC_VERTEX_SHADING,
-            D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_ACCESS_VERTEX_BUFFER,
-            vertexBuffer.Get(),
-            0,
-            UINT64_MAX
-        };
-
-        D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(1, &b) };
-        pCommandList->Barrier(1, barrierGroups);
-
-        // Initialize the vertex buffer view
-        pVertexBufferView->BufferLocation = vertexBuffer->GetGPUVirtualAddress();
-        pVertexBufferView->StrideInBytes = sizeof(T);
-        pVertexBufferView->SizeInBytes = vertexBufferSize;
-    }
+        const std::vector<Vertex>& vertices);
 
     void CreateIndexBuffer(
         ID3D12Device10* pDevice,
