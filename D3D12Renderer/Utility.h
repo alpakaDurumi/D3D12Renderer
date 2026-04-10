@@ -4,6 +4,7 @@
 
 #include <string>
 #include <cstddef>
+#include <functional>
 
 namespace Utility
 {

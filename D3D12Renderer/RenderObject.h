@@ -1,7 +1,13 @@
 #pragma once
 
+#include <DirectXMath.h>
+
 #include "Mesh.h"
 #include "SharedConfig.h"
+
+using namespace DirectX;
+
+class Material;
 
 class RenderObject
 {

@@ -7,6 +7,11 @@
 #include "DDSTextureLoader12.h"
 
 #include <vector>
+#include <utility>
+#include <cassert>
+#include <string>
+#include <stdexcept>
+#include <memory>
 
 #include "D3DHelper.h"
 #include "DescriptorAllocation.h"

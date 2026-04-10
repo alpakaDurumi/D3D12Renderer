@@ -1,8 +1,9 @@
 #pragma once
 
-#include "wrl/client.h"
+#include <Windows.h>
+#include <wrl/client.h>
 
-#include "d3d12.h"
+#include <d3d12.h>
 
 #include <cassert>
 #include <vector>

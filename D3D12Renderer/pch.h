@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdlib>
 
 // PIX Event
 #ifdef USE_PIX

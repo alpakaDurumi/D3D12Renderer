@@ -9,6 +9,8 @@
 #include <queue>
 #include <functional>
 #include <unordered_set>
+#include <vector>
+#include <utility>
 
 #include "DescriptorAllocation.h"
 

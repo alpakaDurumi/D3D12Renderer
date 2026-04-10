@@ -1,5 +1,8 @@
 #pragma once
 
+#include <Windows.h>
+
+#include <d3d12.h>
 #include <DirectXMath.h>
 
 #include "SharedConfig.h"

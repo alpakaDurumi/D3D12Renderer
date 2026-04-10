@@ -7,6 +7,7 @@
 
 #include <queue>
 #include <utility>  // for std::pair
+#include <vector>
 
 class DynamicDescriptorHeap;
 

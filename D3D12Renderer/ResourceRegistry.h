@@ -6,6 +6,8 @@
 
 #include <vector>
 #include <cassert>
+#include <algorithm>
+#include <tuple>
 
 #include "D3DHelper.h"
 #include "Aliases.h"

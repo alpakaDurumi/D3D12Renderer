@@ -7,9 +7,10 @@
 
 #include <memory>
 #include <cassert>
+#include <vector>
 
 #include "D3DHelper.h"
-#include "CacheKeys.h"
+#include "SharedConfig.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;

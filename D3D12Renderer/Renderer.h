@@ -36,6 +36,8 @@
 #include "MeshRegistry.h"
 #include "MaterialRegistry.h"
 #include "TransientUploadAllocator.h"
+#include "Aliases.h"
+#include "GeometryGenerator.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;

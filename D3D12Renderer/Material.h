@@ -1,9 +1,13 @@
 #pragma once
 
+#include <Windows.h>
+
 #include <d3d12.h>
+#include <DirectXMath.h>
 
 #include <array>
 #include <cstddef>
+#include <vector>
 
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
