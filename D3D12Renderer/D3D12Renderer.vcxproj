@@ -197,6 +197,7 @@
     </ClCompile>
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="RenderObject.cpp" />
+    <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Utility.cpp" />
     <ClCompile Include="Win32Application.cpp" />
   </ItemGroup>

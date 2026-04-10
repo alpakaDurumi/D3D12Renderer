@@ -51,7 +51,7 @@ UINT16 Light::GetArraySize() const
     return GetRequiredArraySize(m_type);
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE Light::GetDSVDescriptorHandle(UINT idx) const
+D3D12_CPU_DESCRIPTOR_HANDLE Light::GetDSVHandle(UINT idx) const
 {
     return m_dsvAllocation.GetDescriptorHandle(idx);
 }
@@ -140,7 +140,7 @@ LightConstantData* Light::GetLightConstantDataPtr()
     return &m_lightConstantData;
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE Light::GetLightCBVHandle(UINT frameIndex)
+D3D12_CPU_DESCRIPTOR_HANDLE Light::GetLightCBVHandle(UINT frameIndex) const
 {
     return m_lightCBVAllocations[frameIndex].GetDescriptorHandle();
 }
@@ -253,7 +253,7 @@ ID3D12Resource* PointLight::GetRenderTarget() const
     return m_renderTarget.Get();
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE PointLight::GetRTVDescriptorHandle(UINT idx) const
+D3D12_CPU_DESCRIPTOR_HANDLE PointLight::GetRTVHandle(UINT idx) const
 {
     return m_rtvAllocation.GetDescriptorHandle(idx);
 }

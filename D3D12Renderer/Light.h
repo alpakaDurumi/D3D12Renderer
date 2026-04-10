@@ -30,7 +30,7 @@ public:
     LightType GetType() const;
     ID3D12Resource* GetDepthBuffer() const;
     UINT16 GetArraySize() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetDSVDescriptorHandle(UINT idx) const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle(UINT idx) const;
 
     DescriptorAllocation& GetSRVAllocationRef();
 
@@ -55,7 +55,7 @@ public:
     UploadAllocation GetCameraUploadAllocation(UINT arrayIndex);
 
     LightConstantData* GetLightConstantDataPtr();
-    D3D12_CPU_DESCRIPTOR_HANDLE GetLightCBVHandle(UINT frameIndex);
+    D3D12_CPU_DESCRIPTOR_HANDLE GetLightCBVHandle(UINT frameIndex) const;
     DescriptorAllocation& GetLightCBVAllocationRef(UINT frameIndex);
 
     UINT GetDepthBufferHandle() const;
@@ -113,7 +113,7 @@ public:
     void SetDirection(XMVECTOR dir) override;
 
     ID3D12Resource* GetRenderTarget() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetRTVDescriptorHandle(UINT idx) const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetRTVHandle(UINT idx) const;
 
     UINT GetRenderTargetHandle() const;
     void SetRenderTargetHandle(UINT handle);
