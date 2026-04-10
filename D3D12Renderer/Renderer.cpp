@@ -14,6 +14,7 @@
 #include "Win32Application.h"
 #include "D3DHelper.h"
 #include "SharedConfig.h"
+#include "GeometryGenerator.h"
 
 using namespace D3DHelper;
 

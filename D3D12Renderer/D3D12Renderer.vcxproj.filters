@@ -90,6 +90,12 @@
     <ClCompile Include="FrameResource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Mesh.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderObject.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -217,6 +223,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="UploadAllocation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GeometryData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

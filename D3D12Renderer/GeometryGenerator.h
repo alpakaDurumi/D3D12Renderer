@@ -5,24 +5,10 @@
 #include <DirectXMath.h>
 
 #include <vector>
-#include <string>
+
+#include "GeometryData.h"
 
 using namespace DirectX;
-
-struct Vertex
-{
-    XMFLOAT3 position;
-    XMFLOAT2 texCoord;
-    XMFLOAT4 tangent;
-    XMFLOAT3 normal;
-};
-
-struct GeometryData
-{
-    std::wstring name;
-    std::vector<Vertex> vertices;
-    std::vector<UINT32> indices;
-};
 
 class GeometryGenerator
 {
