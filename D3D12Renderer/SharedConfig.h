@@ -1,4 +1,4 @@
-// Config file that contains several variables used in both CPP and HLSL.
+// Config file that contains several variables used in both CPP & HLSL, and enums for graphics.
 
 #ifndef SHARED_CONFIG
 #define SHARED_CONFIG
@@ -6,7 +6,6 @@
 #ifdef __cplusplus
 // For CPP
 #include <Windows.h>
-#include <DirectXMath.h>
 
 constexpr UINT MAX_CASCADES = 4;
 constexpr UINT POINT_LIGHT_ARRAY_SIZE = 6;
@@ -48,13 +47,6 @@ enum class GBufferSlot
     MATERIAL_AMBIENT,
     MATERIAL_SPECULAR,
     NUM_GBUFFER_SLOTS
-};
-
-struct InstanceData
-{
-    DirectX::XMFLOAT4X4 world;
-    DirectX::XMFLOAT4X4 inverseTranspose;
-    UINT materialIndex;
 };
 #else   // __cplusplus
 // For HLSL

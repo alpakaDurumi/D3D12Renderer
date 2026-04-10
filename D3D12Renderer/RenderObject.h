@@ -2,7 +2,7 @@
 
 #include <DirectXMath.h>
 
-#include "SharedConfig.h"
+#include "InstanceData.h"
 
 using namespace DirectX;
 

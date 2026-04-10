@@ -228,6 +228,9 @@
     <ClInclude Include="GeometryData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="InstanceData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="vs.hlsl">

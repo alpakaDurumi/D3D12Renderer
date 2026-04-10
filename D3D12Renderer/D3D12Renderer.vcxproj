@@ -218,6 +218,7 @@
     <ClInclude Include="DynamicDescriptorHeap.h" />
     <ClInclude Include="FrameResource.h" />
     <ClInclude Include="GeometryData.h" />
+    <ClInclude Include="InstanceData.h" />
     <ClInclude Include="TransientUploadAllocator.h" />
     <ClInclude Include="GeometryGenerator.h" />
     <ClInclude Include="SlotMap.h" />

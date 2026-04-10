@@ -15,6 +15,7 @@
 #include "D3DHelper.h"
 #include "SharedConfig.h"
 #include "GeometryGenerator.h"
+#include "InstanceData.h"
 
 using namespace D3DHelper;
 

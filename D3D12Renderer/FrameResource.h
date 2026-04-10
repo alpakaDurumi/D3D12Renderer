@@ -13,6 +13,7 @@
 #include "DescriptorAllocation.h"
 #include "SharedConfig.h"
 #include "TransientUploadAllocator.h"
+#include "InstanceData.h"
 
 using Microsoft::WRL::ComPtr;
 
