@@ -967,11 +967,11 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
                 UINT16 arraySize = light->GetArraySize();
                 for (UINT j = 0; j < arraySize; ++j)
                 {
-                    auto shadowMapDsvHandle = light->GetDSVDescriptorHandle(j);
+                    auto shadowMapDsvHandle = light->GetDSVHandle(j);
 
                     if (isPointLight)
                     {
-                        auto rtvHandle = static_cast<PointLight*>(light.get())->GetRTVDescriptorHandle(j);
+                        auto rtvHandle = static_cast<PointLight*>(light.get())->GetRTVHandle(j);
                         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &shadowMapDsvHandle);
 
                         XMVECTORF32 clearColor;
