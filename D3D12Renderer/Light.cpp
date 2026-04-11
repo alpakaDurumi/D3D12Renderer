@@ -206,13 +206,7 @@ PointLight::PointLight(
 {
     assert(POINT_LIGHT_ARRAY_SIZE == m_rtvAllocation.GetNumHandles());
 
-    D3D12_CLEAR_VALUE clearValue = {};
-    clearValue.Format = DXGI_FORMAT_R32_FLOAT;
-    clearValue.Color[0] = 1.0f;
-    clearValue.Color[1] = 1.0f;
-    clearValue.Color[2] = 1.0f;
-    clearValue.Color[3] = 1.0f;
-
+    auto clearValue = CreateClearValue(DXGI_FORMAT_R32_FLOAT, 1.0f, 1.0f, 1.0f, 1.0f);
     CreateRenderTarget(pDevice, shadowMapResolution, shadowMapResolution, DXGI_FORMAT_R32_TYPELESS, DXGI_FORMAT_R32_FLOAT, POINT_LIGHT_ARRAY_SIZE, m_renderTarget, &clearValue);
 
     // Create RTVs.

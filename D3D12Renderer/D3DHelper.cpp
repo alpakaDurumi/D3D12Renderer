@@ -274,12 +274,7 @@ namespace D3DHelper
     // If pClearValue is provided, rtvFormat parameter will be ignored.
     void CreateRenderTarget(ID3D12Device10* pDevice, UINT64 width, UINT height, DXGI_FORMAT format, DXGI_FORMAT rtvFormat, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& renderTarget, D3D12_CLEAR_VALUE* pClearValue)
     {
-        D3D12_CLEAR_VALUE defaultClearValue = {};
-        defaultClearValue.Format = rtvFormat;
-        defaultClearValue.Color[0] = 0.0f;
-        defaultClearValue.Color[1] = 0.0f;
-        defaultClearValue.Color[2] = 0.0f;
-        defaultClearValue.Color[3] = 0.0f;
+        auto defaultClearValue = CreateClearValue(rtvFormat, 0.0f, 0.0f, 0.0f, 0.0f);
 
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -315,10 +310,8 @@ namespace D3DHelper
 
     void CreateDepthStencilBuffer(ID3D12Device10* pDevice, UINT64 width, UINT height, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& depthStencilBuffer, bool useStencil, D3D12_CLEAR_VALUE* pClearValue)
     {
-        D3D12_CLEAR_VALUE defaultClearValue = {};
-        defaultClearValue.Format = useStencil ? DXGI_FORMAT_D24_UNORM_S8_UINT : DXGI_FORMAT_D32_FLOAT;
-        defaultClearValue.DepthStencil.Depth = 0.0f;    // reverse-z
-        defaultClearValue.DepthStencil.Stencil = 0;
+        // reverse-z
+        auto defaultClearValue = CreateClearValue(useStencil ? DXGI_FORMAT_D24_UNORM_S8_UINT : DXGI_FORMAT_D32_FLOAT, 0.0f, 0);
 
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -950,5 +943,25 @@ namespace D3DHelper
         {
             throw std::runtime_error("Failed to save dds file.");
         }
+    }
+
+    D3D12_CLEAR_VALUE CreateClearValue(DXGI_FORMAT format, float r, float g, float b, float a)
+    {
+        D3D12_CLEAR_VALUE clearValue = {};
+        clearValue.Format = format;
+        clearValue.Color[0] = r;
+        clearValue.Color[1] = g;
+        clearValue.Color[2] = b;
+        clearValue.Color[3] = a;
+        return clearValue;
+    }
+
+    D3D12_CLEAR_VALUE CreateClearValue(DXGI_FORMAT format, float depth, UINT8 stencil)
+    {
+        D3D12_CLEAR_VALUE clearValue = {};
+        clearValue.Format = format;
+        clearValue.DepthStencil.Depth = depth;
+        clearValue.DepthStencil.Stencil = stencil;
+        return clearValue;
     }
 }

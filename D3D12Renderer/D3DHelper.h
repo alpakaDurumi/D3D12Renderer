@@ -100,4 +100,7 @@ namespace D3DHelper
         bool isSRGB,
         bool useBlockCompress,
         bool flipImage);
+
+    D3D12_CLEAR_VALUE CreateClearValue(DXGI_FORMAT format, float r, float g, float b, float a);
+    D3D12_CLEAR_VALUE CreateClearValue(DXGI_FORMAT format, float depth, UINT8 stencil);
 }
