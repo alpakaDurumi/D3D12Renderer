@@ -201,10 +201,18 @@ private:
     Material* CloneMaterial(const Material& material);
 
     Mesh* CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data);
-    RenderObject* CreateRenderObject(Mesh* pMesh, Material* mat);
+    RenderObject* CreateRenderObject(Mesh* pMesh, Material* pMat);
 
     template <typename T>
     T* CreateLight();
+
+    Texture* CreateTexture(
+        ID3D12GraphicsCommandList7* pCommandList,
+        DescriptorAllocation&& allocation,
+        TransientUploadAllocator& uploadAllocator,
+        const std::vector<UINT8>& textureSrc,
+        UINT width,
+        UINT height);
 
     Texture* CreateTexture(
         ID3D12GraphicsCommandList7* pCommandList,

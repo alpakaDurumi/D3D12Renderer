@@ -39,7 +39,7 @@ Material* Mesh::GetMaterial() const
     return m_pDefaultMaterial;
 }
 
-void Mesh::SetMaterial(Material* mat)
+void Mesh::SetMaterial(Material* pMat)
 {
-    m_pDefaultMaterial = mat;
+    m_pDefaultMaterial = pMat;
 }

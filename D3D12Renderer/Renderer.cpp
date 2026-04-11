@@ -709,12 +709,33 @@ void Renderer::LoadAssets()
     }
 
     // Allocate textures
-    auto alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3);
-    auto textureAllocations = alloc.Split();
+    // Default textures
+    {
+        auto allocations = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3).Split();
+
+        // index 0: white albedo
+        CreateTexture(commandList, std::move(allocations[0]), uploadAllocator, { 255, 255, 255, 255 }, 1, 1);
+
+        // index 1: flat normal  (128, 128, 255) in linear space
+        CreateTexture(commandList, std::move(allocations[1]), uploadAllocator, { 128, 128, 255, 255 }, 1, 1);
+
+        // index 2: black height
+        CreateTexture(commandList, std::move(allocations[2]), uploadAllocator, { 0, 0, 0, 255 }, 1, 1);
+
+        auto* pDefaultMat = CreateMaterial(L"builtin://default");
+        pDefaultMat->SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
+        pDefaultMat->SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
+        pDefaultMat->SetShininess(1.0f);
+        pDefaultMat->SetTextureIndices(0, 1, 2);   // default textures
+        pDefaultMat->BuildSamplerIndices(m_currentTextureFiltering);
+        pDefaultMat->SetRenderingPath(RenderingPath::DEFERRED);
+    }
+
+    auto allocations = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3).Split();
 
     CreateTexture(
         commandList,
-        std::move(textureAllocations[0]),
+        std::move(allocations[0]),
         uploadAllocator,
         L"assets/textures/PavingStones150_4K-PNG_Color.png",
         true,
@@ -724,7 +745,7 @@ void Renderer::LoadAssets()
 
     CreateTexture(
         commandList,
-        std::move(textureAllocations[1]),
+        std::move(allocations[1]),
         uploadAllocator,
         L"assets/textures/PavingStones150_4K-PNG_NormalDX.png",
         false,
@@ -734,7 +755,7 @@ void Renderer::LoadAssets()
 
     CreateTexture(
         commandList,
-        std::move(textureAllocations[2]),
+        std::move(allocations[2]),
         uploadAllocator,
         L"assets/textures/PavingStones150_4K-PNG_Displacement.png",
         false,
@@ -747,7 +768,7 @@ void Renderer::LoadAssets()
     pBaseMat->SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
     pBaseMat->SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
     pBaseMat->SetShininess(10.0f);
-    pBaseMat->SetTextureIndices(0, 1, 2);
+    pBaseMat->SetTextureIndices(3, 4, 5);
     pBaseMat->SetTextureAddressingModes(TextureAddressingMode::WRAP, TextureAddressingMode::WRAP, TextureAddressingMode::WRAP);
     pBaseMat->BuildSamplerIndices(m_currentTextureFiltering);
     pBaseMat->SetRenderingPath(RenderingPath::DEFERRED);
@@ -915,6 +936,12 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
     BindDescriptorTables(pCommandList);
 
+    // temp map for indexing
+    std::unordered_map<Material*, UINT> matIndexMap;
+    matIndexMap.reserve(m_materials.size());
+    for (UINT i = 0; i < static_cast<UINT>(m_materials.size()); ++i)
+        matIndexMap[m_materials[i].get()] = i;
+
     std::vector<InstanceData> temp;
     UINT curOffset = 0;
     for (auto& mesh : m_meshes)
@@ -922,9 +949,17 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pMesh = mesh.get();
 
         for (auto& object : m_forwardRenderObjects[pMesh])
-            temp.push_back(object->BuildInstanceData());
+        {
+            Material* pMat = object->GetMaterial();
+            UINT matIdx = pMat ? matIndexMap.at(pMat) : 0;
+            temp.push_back(object->BuildInstanceData(matIdx));
+        }
         for (auto& object : m_deferredRenderObjects[pMesh])
-            temp.push_back(object->BuildInstanceData());
+        {
+            Material* pMat = object->GetMaterial();
+            UINT matIdx = pMat ? matIndexMap.at(pMat) : 0;
+            temp.push_back(object->BuildInstanceData(matIdx));
+        }
 
         m_instanceRanges[pMesh].offset = curOffset;
         m_instanceRanges[pMesh].forwardCount = static_cast<UINT>(m_forwardRenderObjects[pMesh].size());
@@ -1473,12 +1508,12 @@ Mesh* Renderer::CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUp
     return pMesh;
 }
 
-RenderObject* Renderer::CreateRenderObject(Mesh* pMesh, Material* mat)
+RenderObject* Renderer::CreateRenderObject(Mesh* pMesh, Material* pMat)
 {
     auto renderObject = std::make_unique<RenderObject>(pMesh);
     RenderObject* ret = renderObject.get();
 
-    RenderingPath path = mat->GetRenderingPath();
+    RenderingPath path = pMat->GetRenderingPath();
     if (path == RenderingPath::FORWARD)
     {
         m_forwardRenderObjects[pMesh].push_back(std::move(renderObject));
@@ -1492,8 +1527,31 @@ RenderObject* Renderer::CreateRenderObject(Mesh* pMesh, Material* mat)
         assert(false);
     }
 
-    ret->SetMaterial(mat);
+    ret->SetMaterial(pMat);
     return ret;
+}
+
+Texture* Renderer::CreateTexture(
+    ID3D12GraphicsCommandList7* pCommandList,
+    DescriptorAllocation&& allocation,
+    TransientUploadAllocator& uploadAllocator,
+    const std::vector<UINT8>& textureSrc,
+    UINT width,
+    UINT height)
+{
+    auto texture = std::make_unique<Texture>(
+        m_device.Get(),
+        pCommandList,
+        std::move(allocation),
+        uploadAllocator,
+        textureSrc,
+        width,
+        height);
+
+    auto* pTexture = texture.get();
+    m_textures.push_back(std::move(texture));
+
+    return pTexture;
 }
 
 Texture* Renderer::CreateTexture(

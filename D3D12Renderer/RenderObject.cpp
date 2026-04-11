@@ -6,7 +6,7 @@
 RenderObject::RenderObject(Mesh* pMesh)
     : m_pMesh(pMesh)
 {
-    m_pMaterial = pMesh->GetMaterial();
+    SetMaterial(pMesh->GetMaterial());
 
     m_prevS = XMFLOAT3(1.0f, 1.0f, 1.0f);
     m_currS = XMFLOAT3(1.0f, 1.0f, 1.0f);
@@ -70,7 +70,7 @@ void RenderObject::UpdateRenderState(float alpha)
     XMStoreFloat4x4(&m_renderTransform, XMMatrixAffineTransformation(renderS, XMVectorZero(), renderR, renderT));
 }
 
-InstanceData RenderObject::BuildInstanceData()
+InstanceData RenderObject::BuildInstanceData(UINT matIdx)
 {
     InstanceData ret;
 
@@ -81,13 +81,17 @@ InstanceData RenderObject::BuildInstanceData()
     world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
     XMStoreFloat4x4(&ret.inverseTranspose, XMMatrixInverse(nullptr, world));
 
-    // TODO: use appropriate material index. use 0 for now.
-    ret.materialIndex = 0;
+    ret.materialIndex = matIdx;
 
     return ret;
 }
 
-void RenderObject::SetMaterial(Material* mat)
+Material* RenderObject::GetMaterial() const
 {
-    m_pMaterial = mat;
+    return m_pMaterial;
+}
+
+void RenderObject::SetMaterial(Material* pMat)
+{
+    m_pMaterial = pMat;
 }

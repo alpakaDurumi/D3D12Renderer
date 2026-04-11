@@ -19,9 +19,10 @@ public:
     void Transform(const XMFLOAT3& s, const XMFLOAT3& eulerRad, const XMFLOAT3& t);
     void UpdateRenderState(float alpha);
 
-    InstanceData BuildInstanceData();
+    InstanceData BuildInstanceData(UINT matIdx);
 
-    void SetMaterial(Material* mat);
+    Material* GetMaterial() const;
+    void SetMaterial(Material* pMat);
 
 private:
     Mesh* m_pMesh;

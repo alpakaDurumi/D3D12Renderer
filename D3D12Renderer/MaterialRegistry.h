@@ -10,9 +10,9 @@ class Material;
 class MaterialRegistry
 {
 public:
-    void Register(const MaterialHandle& handle, Material* pMesh)
+    void Register(const MaterialHandle& handle, Material* pMat)
     {
-        m_hashMap[handle] = pMesh;
+        m_hashMap[handle] = pMat;
     }
 
     Material* Resolve(const MaterialHandle& handle) const

@@ -24,9 +24,9 @@ public:
     const D3D12_VERTEX_BUFFER_VIEW& GetVBV() const;
     const D3D12_INDEX_BUFFER_VIEW& GetIBV() const;
     UINT GetNumIndices() const;
-    Material* GetMaterial() const;
 
-    void SetMaterial(Material* mat);
+    Material* GetMaterial() const;
+    void SetMaterial(Material* pMat);
 
 private:
     ComPtr<ID3D12Resource> m_vertexBuffer;
