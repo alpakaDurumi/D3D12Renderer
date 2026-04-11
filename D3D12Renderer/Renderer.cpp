@@ -2125,8 +2125,8 @@ DirectionalLight* Renderer::CreateLight<DirectionalLight>()
         m_device.Get(),
         std::move(dsvAllocation),
         std::move(srvAllocation),
-        m_shadowMapResolution,
-        std::move(cbvAllocation));
+        std::move(cbvAllocation),
+        m_shadowMapResolution);
 
     auto* pLight = light.get();
     m_lights[static_cast<UINT>(LightType::DIRECTIONAL)].push_back(std::move(light));
@@ -2145,9 +2145,9 @@ PointLight* Renderer::CreateLight<PointLight>()
         m_device.Get(),
         std::move(dsvAllocation),
         std::move(srvAllocation),
-        m_shadowMapResolution,
         std::move(cbvAllocation),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(POINT_LIGHT_ARRAY_SIZE));
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(POINT_LIGHT_ARRAY_SIZE),
+        m_shadowMapResolution);
 
     auto* pLight = light.get();
     m_lights[static_cast<UINT>(LightType::POINT)].push_back(std::move(light));
@@ -2166,8 +2166,8 @@ SpotLight* Renderer::CreateLight<SpotLight>()
         m_device.Get(),
         std::move(dsvAllocation),
         std::move(srvAllocation),
-        m_shadowMapResolution,
-        std::move(cbvAllocation));
+        std::move(cbvAllocation),
+        m_shadowMapResolution);
 
     auto* pLight = light.get();
     m_lights[static_cast<UINT>(LightType::SPOT)].push_back(std::move(light));

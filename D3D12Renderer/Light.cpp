@@ -6,26 +6,20 @@
 
 using namespace D3DHelper;
 
-Light::Light(DescriptorAllocation&& dsvAllocation, DescriptorAllocation&& srvAllocation, LightType type)
+Light::Light(
+    ID3D12Device10* pDevice,
+    DescriptorAllocation&& dsvAllocation,
+    DescriptorAllocation&& srvAllocation,
+    DescriptorAllocation&& cbvAllocation,
+    UINT shadowMapResolution,
+    LightType type)
     : m_dsvAllocation(std::move(dsvAllocation)),
     m_srvAllocation(std::move(srvAllocation)),
+    m_lightCBVAllocations(cbvAllocation.Split()),
     m_type(type)
 {
-    UINT16 arraySize = GetRequiredArraySize(type);
-
+    const UINT16 arraySize = GetRequiredArraySize(m_type);
     assert(m_dsvAllocation.GetNumHandles() == arraySize && !m_srvAllocation.IsNull());
-
-    m_lightConstantData.type = static_cast<UINT32>(m_type);
-    m_cameraConstantData.resize(arraySize);
-    m_cameraUploadAllocations.resize(arraySize);
-}
-
-void Light::Init(
-    ID3D12Device10* pDevice,
-    UINT shadowMapResolution,
-    DescriptorAllocation&& cbvAllocation)
-{
-    UINT16 arraySize = GetRequiredArraySize(m_type);
 
     CreateDepthStencilBuffer(pDevice, shadowMapResolution, shadowMapResolution, arraySize, m_depthBuffer, false);
     for (UINT i = 0; i < arraySize; ++i)
@@ -33,7 +27,9 @@ void Light::Init(
         CreateDSV(pDevice, m_depthBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(i), false, false, true, i);
     }
 
-    m_lightCBVAllocations = cbvAllocation.Split();
+    m_cameraConstantData.resize(arraySize);
+    m_cameraUploadAllocations.resize(arraySize);
+    m_lightConstantData.type = static_cast<UINT32>(m_type);
 }
 
 LightType Light::GetType() const
@@ -164,11 +160,10 @@ DirectionalLight::DirectionalLight(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,
     DescriptorAllocation&& srvAllocation,
-    UINT shadowMapResolution,
-    DescriptorAllocation&& cbvAllocation)
-    : Light(std::move(dsvAllocation), std::move(srvAllocation), LightType::DIRECTIONAL)
+    DescriptorAllocation&& cbvAllocation,
+    UINT shadowMapResolution)
+    : Light(pDevice, std::move(dsvAllocation), std::move(srvAllocation), std::move(cbvAllocation), shadowMapResolution, LightType::DIRECTIONAL)
 {
-    Init(pDevice, shadowMapResolution, std::move(cbvAllocation));
     CreateSRVForShadow(pDevice, m_depthBuffer.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
 }
 
@@ -203,15 +198,13 @@ PointLight::PointLight(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,
     DescriptorAllocation&& srvAllocation,
-    UINT shadowMapResolution,
     DescriptorAllocation&& cbvAllocation,
-    DescriptorAllocation&& rtvAllocation)
-    : Light(std::move(dsvAllocation), std::move(srvAllocation), LightType::POINT)
-    , m_rtvAllocation(std::move(rtvAllocation))
+    DescriptorAllocation&& rtvAllocation,
+    UINT shadowMapResolution)
+    : Light(pDevice, std::move(dsvAllocation), std::move(srvAllocation), std::move(cbvAllocation), shadowMapResolution, LightType::POINT),
+    m_rtvAllocation(std::move(rtvAllocation))
 {
     assert(POINT_LIGHT_ARRAY_SIZE == m_rtvAllocation.GetNumHandles());
-
-    Init(pDevice, shadowMapResolution, std::move(cbvAllocation));
 
     D3D12_CLEAR_VALUE clearValue = {};
     clearValue.Format = DXGI_FORMAT_R32_FLOAT;
@@ -272,11 +265,10 @@ SpotLight::SpotLight(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,
     DescriptorAllocation&& srvAllocation,
-    UINT shadowMapResolution,
-    DescriptorAllocation&& cbvAllocation)
-    : Light(std::move(dsvAllocation), std::move(srvAllocation), LightType::SPOT)
+    DescriptorAllocation&& cbvAllocation,
+    UINT shadowMapResolution)
+    : Light(pDevice, std::move(dsvAllocation), std::move(srvAllocation), std::move(cbvAllocation), shadowMapResolution, LightType::SPOT)
 {
-    Init(pDevice, shadowMapResolution, std::move(cbvAllocation));
     CreateSRVForShadow(pDevice, m_depthBuffer.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
     SetAngles(45.0f, 20.0f);    // Set default angle
 }

@@ -19,12 +19,13 @@ using namespace DirectX;
 class Light
 {
 protected:
-    Light(DescriptorAllocation&& dsvAllocation, DescriptorAllocation&& srvAllocation, LightType type);
-
-    void Init(
+    Light(
         ID3D12Device10* pDevice,
+        DescriptorAllocation&& dsvAllocation,
+        DescriptorAllocation&& srvAllocation,
+        DescriptorAllocation&& cbvAllocation,
         UINT shadowMapResolution,
-        DescriptorAllocation&& cbvAllocation);
+        LightType type);
 
 public:
     LightType GetType() const;
@@ -84,8 +85,8 @@ public:
         ID3D12Device10* pDevice,
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
-        UINT shadowMapResolution,
-        DescriptorAllocation&& cbvAllocation);
+        DescriptorAllocation&& cbvAllocation,
+        UINT shadowMapResolution);
 
     virtual XMVECTOR GetPosition() const override;
     virtual float GetRange() const override;
@@ -103,9 +104,9 @@ public:
         ID3D12Device10* pDevice,
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
-        UINT shadowMapResolution,
         DescriptorAllocation&& cbvAllocation,
-        DescriptorAllocation&& rtvAllocation);
+        DescriptorAllocation&& rtvAllocation,
+        UINT shadowMapResolution);
 
     XMVECTOR GetDirection() const override;
 
@@ -132,8 +133,8 @@ public:
         ID3D12Device10* pDevice,
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
-        UINT shadowMapResolution,
-        DescriptorAllocation&& cbvAllocation);
+        DescriptorAllocation&& cbvAllocation,
+        UINT shadowMapResolution);
 
     float GetOuterAngle() const;
     void SetAngles(float outerAngle, float innerAngle);
