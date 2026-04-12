@@ -5,5 +5,5 @@
 #include <string>
 
 using ResourceHandle = UINT;
-using MeshHandle = std::wstring;
-using MaterialHandle = std::wstring;
+using MeshName = std::wstring;
+using MaterialName = std::wstring;

@@ -31,8 +31,7 @@
 #include "Material.h"
 #include "RenderObject.h"
 #include "SharedConfig.h"
-#include "ResourceRegistry.h"
-#include "RenderGraphNode.h"
+#include "RenderGraph.h"
 #include "MeshRegistry.h"
 #include "MaterialRegistry.h"
 #include "TransientUploadAllocator.h"
@@ -125,16 +124,7 @@ private:
 
     InputManager m_inputManager;
 
-    std::array<RenderGraphNode, static_cast<std::size_t>(PassType::NUM_PASS_TYPES)> m_renderGraph;
-
-    // Resource handles
-    ResourceRegistry m_resourceRegistry;
-    ResourceHandle m_hBackBuffer;
-    ResourceHandle m_hDepthStencilBuffer;
-    ResourceHandle m_hGBuffer;
-    ResourceHandle m_hDirectionalLightDepthBuffer;
-    ResourceHandle m_hPointLightRenderTarget;
-    ResourceHandle m_hSpotLightDepthBuffer;
+    RenderGraph m_renderGraph;
 
     struct InstanceRange
     {
@@ -191,13 +181,12 @@ private:
     void InitImGui();
 
     void PrepareRenderGraph();
-    void CompileRenderGraph();
-    void ApplyPassBarriers(PassType passType, ID3D12GraphicsCommandList7* pCommandList);
+    void ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID3D12GraphicsCommandList7* pCommandList);
 
     void SetTextureFiltering(TextureFiltering filtering);
 
     Material* CreateMaterial();
-    Material* CreateMaterial(const MaterialHandle& name);
+    Material* CreateMaterial(const MaterialName& name);
     Material* CloneMaterial(const Material& material);
 
     Mesh* CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data);

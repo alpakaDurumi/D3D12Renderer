@@ -363,12 +363,15 @@ void Renderer::OnResize(UINT width, UINT height)
     {
         pBackBuffers.push_back(m_frameResources[i]->GetRenderTarget());
     }
-    m_resourceRegistry.UpdateElement(m_hBackBuffer, 0, pBackBuffers);
+    auto hBackBuffer = m_renderGraph.GetTextureHandle("BackBuffer");
+    m_renderGraph.UpdateElement(hBackBuffer, 0, pBackBuffers);
 
     // Update registered info of depth-stencil buffer
-    m_resourceRegistry.UpdateElement(m_hDepthStencilBuffer, 0, { m_depthStencilBuffer.Get() });
+    auto hDepthStencilBuffer = m_renderGraph.GetTextureHandle("DepthStencilBuffer");
+    m_renderGraph.UpdateElement(hDepthStencilBuffer, 0, { m_depthStencilBuffer.Get() });
 
     // Update registered info of GBuffers
+    auto hGBuffer = m_renderGraph.GetTextureHandle("GBuffer");
     for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
     {
         std::vector<ID3D12Resource*> pGBuffers;
@@ -376,7 +379,7 @@ void Renderer::OnResize(UINT width, UINT height)
         {
             pGBuffers.push_back(m_frameResources[i]->GetGBuffer(static_cast<GBufferSlot>(slot)));
         }
-        m_resourceRegistry.UpdateElement(m_hGBuffer, slot, pGBuffers);
+        m_renderGraph.UpdateElement(hGBuffer, slot, pGBuffers);
     }
 }
 
@@ -818,23 +821,26 @@ void Renderer::LoadAssets()
     WaitForGPU();
 
     // Register resource handles
-    m_resourceRegistry.SetFrameCount(FrameCount);
+    m_renderGraph.Init(m_device.Get(), FrameCount);
 
     // Back buffer
-    m_hBackBuffer = m_resourceRegistry.Register(true);
+    TextureHandle hBackBuffer = m_renderGraph.RegisterTexture("BackBuffer", true,
+        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_PRESENT });
     std::vector<ID3D12Resource*> pBackBuffers;
     for (UINT i = 0; i < FrameCount; ++i)
     {
         pBackBuffers.push_back(m_frameResources[i]->GetRenderTarget());
     }
-    m_resourceRegistry.AddElement(m_hBackBuffer, pBackBuffers);
+    m_renderGraph.AddElement(hBackBuffer, pBackBuffers);
 
     // Depth-stencil buffer
-    m_hDepthStencilBuffer = m_resourceRegistry.Register(false);
-    m_resourceRegistry.AddElement(m_hDepthStencilBuffer, { m_depthStencilBuffer.Get() });
+    TextureHandle hDepthStencilBuffer = m_renderGraph.RegisterTexture("DepthStencilBuffer", false,
+        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    m_renderGraph.AddElement(hDepthStencilBuffer, { m_depthStencilBuffer.Get() });
 
     // GBuffer
-    m_hGBuffer = m_resourceRegistry.Register(true);
+    TextureHandle hGBuffer = m_renderGraph.RegisterTexture("GBuffer", true,
+        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
     for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
     {
         std::vector<ID3D12Resource*> pGBuffers;
@@ -842,29 +848,32 @@ void Renderer::LoadAssets()
         {
             pGBuffers.push_back(m_frameResources[i]->GetGBuffer(static_cast<GBufferSlot>(slot)));
         }
-        m_resourceRegistry.AddElement(m_hGBuffer, pGBuffers);
+        m_renderGraph.AddElement(hGBuffer, pGBuffers);
     }
 
     // Light
-    m_hDirectionalLightDepthBuffer = m_resourceRegistry.Register(false);
-    m_hPointLightRenderTarget = m_resourceRegistry.Register(false);
-    m_hSpotLightDepthBuffer = m_resourceRegistry.Register(false);
+    TextureHandle hDirectionalLightDepthBuffer = m_renderGraph.RegisterTexture("DirectionalLight", false,
+        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    TextureHandle hPointLightRenderTarget = m_renderGraph.RegisterTexture("PointLight", false,
+        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    TextureHandle hSpotLightDepthBuffer = m_renderGraph.RegisterTexture("SpotLight", false,
+        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
     for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
     {
         bool isPointLight = false;
 
-        ResourceHandle handle;
+        TextureHandle handle;
         switch (static_cast<LightType>(type))
         {
         case LightType::DIRECTIONAL:
-            handle = m_hDirectionalLightDepthBuffer;
+            handle = hDirectionalLightDepthBuffer;
             break;
         case LightType::POINT:
-            handle = m_hPointLightRenderTarget;
+            handle = hPointLightRenderTarget;
             isPointLight = true;
             break;
         case LightType::SPOT:
-            handle = m_hSpotLightDepthBuffer;
+            handle = hSpotLightDepthBuffer;
             break;
         }
 
@@ -873,17 +882,17 @@ void Renderer::LoadAssets()
             if (isPointLight)
             {
                 PointLight& pointLight = static_cast<PointLight&>(*light);
-                m_resourceRegistry.AddElement(handle, { pointLight.GetRenderTarget() });
+                m_renderGraph.AddElement(handle, { pointLight.GetRenderTarget() });
             }
             else
             {
-                m_resourceRegistry.AddElement(handle, { light->GetDepthBuffer() });
+                m_renderGraph.AddElement(handle, { light->GetDepthBuffer() });
             }
         }
     }
 
     PrepareRenderGraph();
-    CompileRenderGraph();
+    m_renderGraph.Compile();
 }
 
 void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
@@ -975,7 +984,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Depth-only pass");
 
-        ApplyPassBarriers(PassType::DEPTH_ONLY, pCommandList);
+        ApplyPassBarriers(m_renderGraph, PassType::DEPTH_ONLY, pCommandList);
 
         pCommandList->RSSetViewports(1, &m_shadowMapViewport);
         pCommandList->RSSetScissorRects(1, &m_shadowMapScissorRect);
@@ -1039,7 +1048,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"GBuffer pass");
 
-        ApplyPassBarriers(PassType::GBUFFER, pCommandList);
+        ApplyPassBarriers(m_renderGraph, PassType::GBUFFER, pCommandList);
 
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
@@ -1075,7 +1084,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Deferred Lighting pass");
 
-        ApplyPassBarriers(PassType::DEFERRED_LIGHTING, pCommandList);
+        ApplyPassBarriers(m_renderGraph, PassType::DEFERRED_LIGHTING, pCommandList);
 
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
@@ -1128,7 +1137,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Forward color pass");
 
-        ApplyPassBarriers(PassType::FORWARD_COLORING, pCommandList);
+        ApplyPassBarriers(m_renderGraph, PassType::FORWARD_COLORING, pCommandList);
 
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
@@ -1239,190 +1248,71 @@ void Renderer::InitImGui()
 void Renderer::PrepareRenderGraph()
 {
     // Set up render graph
-    auto& depthOnly = m_renderGraph[static_cast<UINT>(PassType::DEPTH_ONLY)];
-    auto& gBuffer = m_renderGraph[static_cast<UINT>(PassType::GBUFFER)];
-    auto& deferredLighting = m_renderGraph[static_cast<UINT>(PassType::DEFERRED_LIGHTING)];
-    auto& forwardColoring = m_renderGraph[static_cast<UINT>(PassType::FORWARD_COLORING)];
+    auto& depthOnly = m_renderGraph.m_nodes[static_cast<UINT>(PassType::DEPTH_ONLY)];
+    auto& gBuffer = m_renderGraph.m_nodes[static_cast<UINT>(PassType::GBUFFER)];
+    auto& deferredLighting = m_renderGraph.m_nodes[static_cast<UINT>(PassType::DEFERRED_LIGHTING)];
+    auto& forwardColoring = m_renderGraph.m_nodes[static_cast<UINT>(PassType::FORWARD_COLORING)];
+
+    // Resource handles
+    auto hBackBuffer = m_renderGraph.GetTextureHandle("BackBuffer");
+    auto hDepthStencilBuffer = m_renderGraph.GetTextureHandle("DepthStencilBuffer");
+    auto hGBuffer = m_renderGraph.GetTextureHandle("GBuffer");
+    auto hDirectionalLightDepthBuffer = m_renderGraph.GetTextureHandle("DirectionalLight");
+    auto hPointLightRenderTarget = m_renderGraph.GetTextureHandle("PointLight");
+    auto hSpotLightDepthBuffer = m_renderGraph.GetTextureHandle("SpotLight");
 
     // Depth-only pass
-    depthOnly.AddTextureInput(m_hDirectionalLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    depthOnly.AddTextureOutput(m_hDirectionalLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    depthOnly.AddTextureInput(m_hPointLightRenderTarget, { D3D12_BARRIER_SYNC_RENDER_TARGET ,D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    depthOnly.AddTextureOutput(m_hPointLightRenderTarget, { D3D12_BARRIER_SYNC_RENDER_TARGET ,D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    depthOnly.AddTextureInput(m_hSpotLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    depthOnly.AddTextureOutput(m_hSpotLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    depthOnly.AddTextureInput(hDirectionalLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    depthOnly.AddTextureOutput(hDirectionalLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    depthOnly.AddTextureInput(hPointLightRenderTarget, { D3D12_BARRIER_SYNC_RENDER_TARGET ,D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    depthOnly.AddTextureOutput(hPointLightRenderTarget, { D3D12_BARRIER_SYNC_RENDER_TARGET ,D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    depthOnly.AddTextureInput(hSpotLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    depthOnly.AddTextureOutput(hSpotLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
 
     // GBuffer pass
-    gBuffer.AddTextureInput(m_hDepthStencilBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    gBuffer.AddTextureOutput(m_hDepthStencilBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    gBuffer.AddTextureInput(m_hGBuffer, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    gBuffer.AddTextureOutput(m_hGBuffer, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    gBuffer.AddTextureInput(hDepthStencilBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    gBuffer.AddTextureOutput(hDepthStencilBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    gBuffer.AddTextureInput(hGBuffer, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    gBuffer.AddTextureOutput(hGBuffer, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
 
     // Deferred lighting pass
-    deferredLighting.AddTextureInput(m_hBackBuffer, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    deferredLighting.AddTextureOutput(m_hBackBuffer, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    deferredLighting.AddTextureInput(hBackBuffer, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    deferredLighting.AddTextureOutput(hBackBuffer, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
     // To use depth-stencil buffer as both SRV and DSV simultaneously
     // SRV: to reconstruct world pos
     // DSV: for stencil test
-    deferredLighting.AddTextureInput(m_hDepthStencilBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE | D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ, D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_GENERIC_READ });
-    deferredLighting.AddTextureOutput(m_hDepthStencilBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE | D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ, D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_GENERIC_READ });
-    deferredLighting.AddTextureInput(m_hGBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
-    deferredLighting.AddTextureOutput(m_hGBuffer, { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    deferredLighting.AddTextureInput(m_hDirectionalLightDepthBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
-    deferredLighting.AddTextureOutput(m_hDirectionalLightDepthBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
-    deferredLighting.AddTextureInput(m_hPointLightRenderTarget, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
-    deferredLighting.AddTextureOutput(m_hPointLightRenderTarget, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
-    deferredLighting.AddTextureInput(m_hSpotLightDepthBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
-    deferredLighting.AddTextureOutput(m_hSpotLightDepthBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
+    deferredLighting.AddTextureInput(hDepthStencilBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE | D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ, D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_GENERIC_READ });
+    deferredLighting.AddTextureOutput(hDepthStencilBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE | D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ, D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_GENERIC_READ });
+    deferredLighting.AddTextureInput(hGBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
+    deferredLighting.AddTextureOutput(hGBuffer, { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    deferredLighting.AddTextureInput(hDirectionalLightDepthBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
+    deferredLighting.AddTextureOutput(hDirectionalLightDepthBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
+    deferredLighting.AddTextureInput(hPointLightRenderTarget, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
+    deferredLighting.AddTextureOutput(hPointLightRenderTarget, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
+    deferredLighting.AddTextureInput(hSpotLightDepthBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
+    deferredLighting.AddTextureOutput(hSpotLightDepthBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
 
     // Forward coloring pass
-    forwardColoring.AddTextureInput(m_hBackBuffer, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    forwardColoring.AddTextureOutput(m_hBackBuffer, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    forwardColoring.AddTextureInput(m_hDepthStencilBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    forwardColoring.AddTextureOutput(m_hDepthStencilBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    forwardColoring.AddTextureInput(m_hDirectionalLightDepthBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
-    forwardColoring.AddTextureOutput(m_hDirectionalLightDepthBuffer, { D3D12_BARRIER_SYNC_NONE ,D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    forwardColoring.AddTextureInput(m_hPointLightRenderTarget, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
-    forwardColoring.AddTextureOutput(m_hPointLightRenderTarget, { D3D12_BARRIER_SYNC_NONE ,D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    forwardColoring.AddTextureInput(m_hSpotLightDepthBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
-    forwardColoring.AddTextureOutput(m_hSpotLightDepthBuffer, { D3D12_BARRIER_SYNC_NONE ,D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    forwardColoring.AddTextureInput(hBackBuffer, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    forwardColoring.AddTextureOutput(hBackBuffer, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    forwardColoring.AddTextureInput(hDepthStencilBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    forwardColoring.AddTextureOutput(hDepthStencilBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    forwardColoring.AddTextureInput(hDirectionalLightDepthBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
+    forwardColoring.AddTextureOutput(hDirectionalLightDepthBuffer, { D3D12_BARRIER_SYNC_NONE ,D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    forwardColoring.AddTextureInput(hPointLightRenderTarget, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
+    forwardColoring.AddTextureOutput(hPointLightRenderTarget, { D3D12_BARRIER_SYNC_NONE ,D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    forwardColoring.AddTextureInput(hSpotLightDepthBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING ,D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
+    forwardColoring.AddTextureOutput(hSpotLightDepthBuffer, { D3D12_BARRIER_SYNC_NONE ,D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
 }
 
-void Renderer::CompileRenderGraph()
-{
-    std::vector<BufferResourceUsage> currentBufferUsages(m_resourceRegistry.GetEntryCount());
-
-    // Use initialLayout when using newly created resources.
-    // For existing resources, use values queried from m_frameEndUsage.
-    std::vector<std::vector<TextureResourceUsage>> currentTextureUsages(m_resourceRegistry.GetEntryCount());
-    currentTextureUsages[m_hBackBuffer] = std::vector<TextureResourceUsage>(m_resourceRegistry.GetSubresourceCount(m_device.Get(), m_hBackBuffer),
-        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_PRESENT });
-    currentTextureUsages[m_hDepthStencilBuffer] = std::vector<TextureResourceUsage>(m_resourceRegistry.GetSubresourceCount(m_device.Get(), m_hDepthStencilBuffer),
-        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    currentTextureUsages[m_hGBuffer] = std::vector<TextureResourceUsage>(m_resourceRegistry.GetSubresourceCount(m_device.Get(), m_hGBuffer),
-        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    currentTextureUsages[m_hDirectionalLightDepthBuffer] = std::vector<TextureResourceUsage>(m_resourceRegistry.GetSubresourceCount(m_device.Get(), m_hDirectionalLightDepthBuffer),
-        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    currentTextureUsages[m_hPointLightRenderTarget] = std::vector<TextureResourceUsage>(m_resourceRegistry.GetSubresourceCount(m_device.Get(), m_hPointLightRenderTarget),
-        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    currentTextureUsages[m_hSpotLightDepthBuffer] = std::vector<TextureResourceUsage>(m_resourceRegistry.GetSubresourceCount(m_device.Get(), m_hSpotLightDepthBuffer),
-        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-
-    PassType defaultOrder[static_cast<std::size_t>(PassType::NUM_PASS_TYPES)] = {
-    PassType::DEPTH_ONLY,
-    PassType::GBUFFER,
-    PassType::DEFERRED_LIGHTING,
-    PassType::FORWARD_COLORING };
-
-    // Compile graph
-    for (const PassType& passType : defaultOrder)
-    {
-        auto& node = m_renderGraph[static_cast<UINT>(passType)];
-
-        // Process buffer inputs
-        for (auto& [handle, usage] : node.bufferInputs)
-        {
-            CompiledBufferBarrier barrier = { handle, currentBufferUsages[handle], usage };
-            node.bufferBarriers.push_back(barrier);
-        }
-
-        // Process texture inputs
-        for (auto& [handle, usage, range] : node.textureInputs)
-        {
-            auto& latestUsages = currentTextureUsages[handle];
-
-            const auto& [IndexOrFirstMipLevel, NumMipLevels, FirstArraySlice, NumArraySlices, FirstPlane, NumPlanes] = range;
-
-            if (IndexOrFirstMipLevel == 0xffff'ffff && NumMipLevels == 0)
-            {
-                UINT subresourceCount = m_resourceRegistry.GetSubresourceCount(m_device.Get(), handle);
-
-                for (UINT i = 0; i < subresourceCount; ++i)
-                {
-                    if (latestUsages[i] != usage)
-                    {
-                        CompiledTextureBarrier barrier = { handle, latestUsages[i], usage, {i, 0, 0, 0, 0, 0} };
-                        node.textureBarriers.push_back(barrier);
-                    }
-                }
-            }
-            else
-            {
-                const auto [mipLevels, depthOrArraySize, planeCount] = m_resourceRegistry.GetResourceDimension(m_device.Get(), handle);
-
-                for (UINT plane = FirstPlane; plane < FirstPlane + NumPlanes; ++plane)
-                {
-                    for (UINT array = FirstArraySlice; array < FirstArraySlice + NumArraySlices; ++array)
-                    {
-                        for (UINT mip = IndexOrFirstMipLevel; mip < IndexOrFirstMipLevel + NumMipLevels; ++mip)
-                        {
-                            UINT subresourceIndex = CalcSubresourceIndex(mip, array, plane, mipLevels, depthOrArraySize);
-
-                            if (latestUsages[subresourceIndex] != usage)
-                            {
-                                CompiledTextureBarrier barrier = { handle, latestUsages[subresourceIndex], usage, {subresourceIndex, 0, 0, 0, 0, 0} };
-                                node.textureBarriers.push_back(barrier);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Process buffer outputs
-        for (auto& [handle, usage] : node.bufferOutputs)
-        {
-            currentBufferUsages[handle] = usage;
-        }
-
-        // Process texture outputs
-        for (auto& [handle, usage, range] : node.textureOutputs)
-        {
-            auto& latestUsages = currentTextureUsages[handle];
-
-            const auto& [IndexOrFirstMipLevel, NumMipLevels, FirstArraySlice, NumArraySlices, FirstPlane, NumPlanes] = range;
-
-            if (IndexOrFirstMipLevel == 0xffff'ffff && NumMipLevels == 0)
-            {
-                UINT subresourceCount = m_resourceRegistry.GetSubresourceCount(m_device.Get(), handle);
-
-                for (UINT i = 0; i < subresourceCount; ++i)
-                {
-                    latestUsages[i] = usage;
-                }
-            }
-            else
-            {
-                const auto [mipLevels, depthOrArraySize, planeCount] = m_resourceRegistry.GetResourceDimension(m_device.Get(), handle);
-
-                for (UINT plane = FirstPlane; plane < FirstPlane + NumPlanes; ++plane)
-                {
-                    for (UINT array = FirstArraySlice; array < FirstArraySlice + NumArraySlices; ++array)
-                    {
-                        for (UINT mip = IndexOrFirstMipLevel; mip < IndexOrFirstMipLevel + NumMipLevels; ++mip)
-                        {
-                            UINT subresourceIndex = CalcSubresourceIndex(mip, array, plane, mipLevels, depthOrArraySize);
-
-                            if (latestUsages[subresourceIndex] != usage)
-                            {
-                                latestUsages[subresourceIndex] = usage;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-void Renderer::ApplyPassBarriers(PassType passType, ID3D12GraphicsCommandList7* pCommandList)
+void Renderer::ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID3D12GraphicsCommandList7* pCommandList)
 {
     std::vector<D3D12_BUFFER_BARRIER> bufferBarriers;
     std::vector<D3D12_TEXTURE_BARRIER> textureBarriers;
 
-    for (const auto& barrier : m_renderGraph[static_cast<UINT>(passType)].bufferBarriers)
+    for (const auto& barrier : renderGraph.GetCompiledBufferBarriers(passType))
     {
-        UINT elementCount = m_resourceRegistry.GetElementCount(barrier.handle);
+        UINT elementCount = renderGraph.GetElementCount(barrier.handle);
         for (UINT i = 0; i < elementCount; ++i)
         {
             D3D12_BUFFER_BARRIER b = {
@@ -1430,7 +1320,7 @@ void Renderer::ApplyPassBarriers(PassType passType, ID3D12GraphicsCommandList7* 
                 barrier.after.sync,
                 barrier.before.access,
                 barrier.after.access,
-                m_resourceRegistry.Resolve(barrier.handle, i, m_frameIndex),
+                renderGraph.Resolve(barrier.handle, i, m_frameIndex),
                 0,
                 UINT64_MAX
             };
@@ -1438,9 +1328,9 @@ void Renderer::ApplyPassBarriers(PassType passType, ID3D12GraphicsCommandList7* 
         }
     }
 
-    for (const auto& barrier : m_renderGraph[static_cast<UINT>(passType)].textureBarriers)
+    for (const auto& barrier : m_renderGraph.GetCompiledTextureBarrier(passType))
     {
-        UINT elementCount = m_resourceRegistry.GetElementCount(barrier.handle);
+        UINT elementCount = renderGraph.GetElementCount(barrier.handle);
         for (UINT i = 0; i < elementCount; ++i)
         {
             D3D12_TEXTURE_BARRIER b = {
@@ -1450,7 +1340,7 @@ void Renderer::ApplyPassBarriers(PassType passType, ID3D12GraphicsCommandList7* 
                 barrier.after.access,
                 barrier.before.layout,
                 barrier.after.layout,
-                m_resourceRegistry.Resolve(barrier.handle, i, m_frameIndex),
+                renderGraph.Resolve(barrier.handle, i, m_frameIndex),
                 barrier.subresourceRange,
                 D3D12_TEXTURE_BARRIER_FLAG_NONE
             };
@@ -1484,7 +1374,7 @@ Material* Renderer::CreateMaterial()
 }
 
 // Allocate & register Material
-Material* Renderer::CreateMaterial(const MaterialHandle& name)
+Material* Renderer::CreateMaterial(const MaterialName& name)
 {
     auto* pMat = CreateMaterial();
     m_materialRegistry.Register(name, pMat);

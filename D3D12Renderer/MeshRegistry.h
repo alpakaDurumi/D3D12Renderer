@@ -10,18 +10,18 @@ class Mesh;
 class MeshRegistry
 {
 public:
-    void Register(const MeshHandle& handle, Mesh* pMesh)
+    void Register(const MeshName& name, Mesh* pMesh)
     {
-        m_hashMap[handle] = pMesh;
+        m_hashMap[name] = pMesh;
     }
 
-    Mesh* Resolve(const MeshHandle& handle) const
+    Mesh* Resolve(const MeshName& name) const
     {
-        auto it = m_hashMap.find(handle);
+        auto it = m_hashMap.find(name);
         assert(it != m_hashMap.end());
         return it->second;
     }
 
 private:
-    std::unordered_map<MeshHandle, Mesh*> m_hashMap;
+    std::unordered_map<MeshName, Mesh*> m_hashMap;
 };

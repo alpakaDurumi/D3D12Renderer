@@ -82,6 +82,17 @@ public:
     std::vector<T>& GetDense() { return m_dense; }
     const std::vector<T>& GetDense() const { return m_dense; }
 
+    UINT GetCount() const
+    {
+        return static_cast<UINT>(m_dense.size());
+    }
+
+    UINT GetDenseIndex(Handle handle) const
+    {
+        assert(IsValid(handle));
+        return m_slots[handle.index].denseIndex;
+    }
+
 private:
     struct Slot
     {

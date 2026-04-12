@@ -220,6 +220,7 @@
     <ClInclude Include="FrameResource.h" />
     <ClInclude Include="GeometryData.h" />
     <ClInclude Include="InstanceData.h" />
+    <ClInclude Include="RenderGraph.h" />
     <ClInclude Include="TransientUploadAllocator.h" />
     <ClInclude Include="GeometryGenerator.h" />
     <ClInclude Include="SlotMap.h" />
@@ -242,7 +243,6 @@
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RenderGraphNode.h" />
     <ClInclude Include="RenderObject.h" />
-    <ClInclude Include="ResourceRegistry.h" />
     <ClInclude Include="RootSignature.h" />
     <ClInclude Include="SharedConfig.h" />
     <ClInclude Include="Texture.h" />

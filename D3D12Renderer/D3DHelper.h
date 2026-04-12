@@ -88,6 +88,8 @@ namespace D3DHelper
 
     UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format);
 
+    UINT GetSubresourceCount(ID3D12Device* pDevice, ID3D12Resource* pResource);
+
     UINT CalcSubresourceIndex(
         UINT mipIndex,
         UINT arrayIndex,

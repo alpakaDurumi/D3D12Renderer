@@ -10,18 +10,18 @@ class Material;
 class MaterialRegistry
 {
 public:
-    void Register(const MaterialHandle& handle, Material* pMat)
+    void Register(const MaterialName& name, Material* pMat)
     {
-        m_hashMap[handle] = pMat;
+        m_hashMap[name] = pMat;
     }
 
-    Material* Resolve(const MaterialHandle& handle) const
+    Material* Resolve(const MaterialName& name) const
     {
-        auto it = m_hashMap.find(handle);
+        auto it = m_hashMap.find(name);
         assert(it != m_hashMap.end());
         return it->second;
     }
 
 private:
-    std::unordered_map<MaterialHandle, Material*> m_hashMap;
+    std::unordered_map<MaterialName, Material*> m_hashMap;
 };

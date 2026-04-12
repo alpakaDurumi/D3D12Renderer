@@ -755,6 +755,14 @@ namespace D3DHelper
         return formatInfo.PlaneCount;
     }
 
+    UINT GetSubresourceCount(ID3D12Device* pDevice, ID3D12Resource* pResource)
+    {
+        auto desc = pResource->GetDesc();
+        UINT ret = desc.MipLevels * GetFormatPlaneCount(pDevice, desc.Format);
+        if (desc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D) ret *= desc.DepthOrArraySize;
+        return ret;
+    }
+
     UINT CalcSubresourceIndex(
         UINT mipIndex,
         UINT arrayIndex,
