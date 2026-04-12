@@ -14,7 +14,6 @@
 #include "RenderGraphNode.h"
 #include "CacheKeys.h"
 #include "D3DHelper.h"
-#include "Aliases.h"
 
 class RenderGraph
 {
@@ -25,79 +24,74 @@ public:
         SetFrameCount(frameCount);
     }
 
-    BufferHandle RegisterBuffer(const std::string& name, bool isPerFrame)
+    RGBuffer RegisterBuffer(const std::string& name, bool isPerFrame)
     {
         return { RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, {}) };
     }
 
-    TextureHandle RegisterTexture(const std::string& name, bool isPerFrame, TextureResourceUsage initialUsage)
+    RGTexture RegisterTexture(const std::string& name, bool isPerFrame, TextureResourceUsage initialUsage)
     {
         return { RegisterHelper(name, isPerFrame, m_textureGroups, m_textureMap, initialUsage) };
     }
 
-    void AddElement(BufferHandle handle, std::vector<ID3D12Resource*> pResources)
+    void AddElement(RGBuffer buffer, std::vector<ID3D12Resource*> pResources)
     {
-        AddElementHelper(handle.index, pResources, m_bufferGroups);
+        AddElementHelper(buffer.index, pResources, m_bufferGroups);
     }
 
-    void AddElement(TextureHandle handle, std::vector<ID3D12Resource*> pResources)
+    void AddElement(RGTexture texture, std::vector<ID3D12Resource*> pResources)
     {
-        AddElementHelper(handle.index, pResources, m_textureGroups);
+        AddElementHelper(texture.index, pResources, m_textureGroups);
     }
 
-    void UpdateElement(BufferHandle handle, UINT elementIndex, std::vector<ID3D12Resource*> pResources)
+    void UpdateElement(RGBuffer buffer, UINT elementIndex, std::vector<ID3D12Resource*> pResources)
     {
-        UpdateElementHelper(handle.index, elementIndex, pResources, m_bufferGroups);
+        UpdateElementHelper(buffer.index, elementIndex, pResources, m_bufferGroups);
     }
 
-    void UpdateElement(TextureHandle handle, UINT elementIndex, std::vector<ID3D12Resource*> pResources)
+    void UpdateElement(RGTexture texture, UINT elementIndex, std::vector<ID3D12Resource*> pResources)
     {
-        UpdateElementHelper(handle.index, elementIndex, pResources, m_textureGroups);
+        UpdateElementHelper(texture.index, elementIndex, pResources, m_textureGroups);
     }
 
-    ID3D12Resource* Resolve(BufferHandle handle, UINT elementIndex, UINT frameIndex) const
+    ID3D12Resource* Resolve(RGBuffer buffer, UINT elementIndex, UINT frameIndex) const
     {
-        return ResolveHelper(handle.index, elementIndex, frameIndex, m_bufferGroups);
+        return ResolveHelper(buffer.index, elementIndex, frameIndex, m_bufferGroups);
     }
 
-    ID3D12Resource* Resolve(TextureHandle handle, UINT elementIndex, UINT frameIndex) const
+    ID3D12Resource* Resolve(RGTexture texture, UINT elementIndex, UINT frameIndex) const
     {
-        return ResolveHelper(handle.index, elementIndex, frameIndex, m_textureGroups);
+        return ResolveHelper(texture.index, elementIndex, frameIndex, m_textureGroups);
     }
 
-    std::tuple<UINT, UINT, UINT> GetResourceDimension(ID3D12Device* pDevice, TextureHandle handle) const
+    std::tuple<UINT, UINT, UINT> GetResourceDimension(ID3D12Device* pDevice, RGTexture texture) const
     {
-        auto desc = m_textureGroups[handle.index].pResources.front()->GetDesc();
+        auto desc = m_textureGroups[texture.index].pResources.front()->GetDesc();
         UINT8 planeCount = D3DHelper::GetFormatPlaneCount(pDevice, desc.Format);
         return { desc.MipLevels, desc.DepthOrArraySize, planeCount };
     }
-
-    //UINT GetEntryCount() const
-    //{
-    //    return static_cast<UINT>(m_entries.size());
-    //}
 
     void SetFrameCount(UINT frameCount)
     {
         m_frameCount = frameCount;
     }
 
-    UINT GetElementCount(BufferHandle handle) const
+    UINT GetElementCount(RGBuffer buffer) const
     {
-        return m_bufferGroups[handle.index].elementCount;
+        return m_bufferGroups[buffer.index].elementCount;
     }
 
-    UINT GetElementCount(TextureHandle handle) const
+    UINT GetElementCount(RGTexture texture) const
     {
-        return m_textureGroups[handle.index].elementCount;
+        return m_textureGroups[texture.index].elementCount;
     }
 
-    BufferHandle GetBufferHandle(const std::string& name)
+    RGBuffer GetRGBuffer(const std::string& name)
     {
         return { m_bufferMap.at(name) };
     }
 
-    TextureHandle GetTextureHandle(const std::string& name)
+    RGTexture GetRGTexture(const std::string& name)
     {
         return { m_textureMap.at(name) };
     }
@@ -128,35 +122,35 @@ public:
             auto& node = m_nodes[static_cast<UINT>(passType)];
 
             // Process buffer inputs
-            for (auto& [handle, usage] : node.bufferInputs)
+            for (auto& [buffer, usage] : node.bufferInputs)
             {
-                CompiledBufferBarrier barrier = { handle, currentBufferUsages[handle.index], usage };
+                CompiledBufferBarrier barrier = { buffer, currentBufferUsages[buffer.index], usage };
                 node.bufferBarriers.push_back(barrier);
             }
 
             // Process texture inputs
-            for (auto& [handle, usage, range] : node.textureInputs)
+            for (auto& [texture, usage, range] : node.textureInputs)
             {
-                auto& latestUsages = currentTextureUsages[handle.index];
+                auto& latestUsages = currentTextureUsages[texture.index];
 
                 const auto& [IndexOrFirstMipLevel, NumMipLevels, FirstArraySlice, NumArraySlices, FirstPlane, NumPlanes] = range;
 
                 if (IndexOrFirstMipLevel == 0xffff'ffff && NumMipLevels == 0)
                 {
-                    UINT subresourceCount = D3DHelper::GetSubresourceCount(m_pDevice, m_textureGroups[handle.index].pResources.front());
+                    UINT subresourceCount = D3DHelper::GetSubresourceCount(m_pDevice, m_textureGroups[texture.index].pResources.front());
 
                     for (UINT i = 0; i < subresourceCount; ++i)
                     {
                         if (latestUsages[i] != usage)
                         {
-                            CompiledTextureBarrier barrier = { handle, latestUsages[i], usage, {i, 0, 0, 0, 0, 0} };
+                            CompiledTextureBarrier barrier = { texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0} };
                             node.textureBarriers.push_back(barrier);
                         }
                     }
                 }
                 else
                 {
-                    const auto [mipLevels, depthOrArraySize, planeCount] = GetResourceDimension(m_pDevice, handle);
+                    const auto [mipLevels, depthOrArraySize, planeCount] = GetResourceDimension(m_pDevice, texture);
 
                     for (UINT plane = FirstPlane; plane < FirstPlane + NumPlanes; ++plane)
                     {
@@ -168,7 +162,7 @@ public:
 
                                 if (latestUsages[subresourceIndex] != usage)
                                 {
-                                    CompiledTextureBarrier barrier = { handle, latestUsages[subresourceIndex], usage, {subresourceIndex, 0, 0, 0, 0, 0} };
+                                    CompiledTextureBarrier barrier = { texture, latestUsages[subresourceIndex], usage, {subresourceIndex, 0, 0, 0, 0, 0} };
                                     node.textureBarriers.push_back(barrier);
                                 }
                             }
@@ -178,21 +172,21 @@ public:
             }
 
             // Process buffer outputs
-            for (auto& [handle, usage] : node.bufferOutputs)
+            for (auto& [buffer, usage] : node.bufferOutputs)
             {
-                currentBufferUsages[handle.index] = usage;
+                currentBufferUsages[buffer.index] = usage;
             }
 
             // Process texture outputs
-            for (auto& [handle, usage, range] : node.textureOutputs)
+            for (auto& [texture, usage, range] : node.textureOutputs)
             {
-                auto& latestUsages = currentTextureUsages[handle.index];
+                auto& latestUsages = currentTextureUsages[texture.index];
 
                 const auto& [IndexOrFirstMipLevel, NumMipLevels, FirstArraySlice, NumArraySlices, FirstPlane, NumPlanes] = range;
 
                 if (IndexOrFirstMipLevel == 0xffff'ffff && NumMipLevels == 0)
                 {
-                    UINT subresourceCount = D3DHelper::GetSubresourceCount(m_pDevice, m_textureGroups[handle.index].pResources.front());
+                    UINT subresourceCount = D3DHelper::GetSubresourceCount(m_pDevice, m_textureGroups[texture.index].pResources.front());
 
                     for (UINT i = 0; i < subresourceCount; ++i)
                     {
@@ -201,7 +195,7 @@ public:
                 }
                 else
                 {
-                    const auto [mipLevels, depthOrArraySize, planeCount] = GetResourceDimension(m_pDevice, handle);
+                    const auto [mipLevels, depthOrArraySize, planeCount] = GetResourceDimension(m_pDevice, texture);
 
                     for (UINT plane = FirstPlane; plane < FirstPlane + NumPlanes; ++plane)
                     {

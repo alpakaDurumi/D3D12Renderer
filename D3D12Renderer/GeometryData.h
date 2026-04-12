@@ -17,7 +17,7 @@ struct Vertex
 
 struct GeometryData
 {
-    std::wstring name;
+    std::string name;
     std::vector<Vertex> vertices;
     std::vector<UINT32> indices;
 };
