@@ -38,9 +38,15 @@ struct MeshBucket
 class SceneManager
 {
 public:
-    MeshHandle AddMesh(Mesh&& mesh)
+    MeshHandle AddMesh(
+        ID3D12Device10* pDevice,
+        ID3D12GraphicsCommandList7* pCommandList,
+        TransientUploadAllocator& allocator,
+        const GeometryData& data)
     {
-        return m_meshes.Add(std::move(mesh));
+        auto handle = m_meshes.Add(Mesh(pDevice, pCommandList, allocator, data));
+        m_meshRegistry[data.name] = handle;
+        return handle;
     }
 
     Mesh* GetMesh(MeshHandle handle)
@@ -48,15 +54,27 @@ public:
         return m_meshes.Get(handle);
     }
 
-    void RegisterMesh(MeshHandle handle, MeshName& name)
+    MeshHandle GetMeshHandle(const MeshName& name)
+    {
+        return m_meshRegistry[name];
+    }
+
+    void RegisterMesh(MeshHandle handle, const MeshName& name)
     {
         m_meshRegistry[name] = handle;
     }
 
     // Material
-    MaterialHandle AddMaterial(Material&& material)
+    MaterialHandle AddMaterial(ID3D12Device10* pDevice, DescriptorAllocation&& allocation)
     {
-        return m_materials.Add(std::move(material));
+        return m_materials.Add(Material(pDevice, std::move(allocation)));
+    }
+
+    MaterialHandle AddMaterial(ID3D12Device10* pDevice, DescriptorAllocation&& allocation, const MaterialName& name)
+    {
+        auto handle = m_materials.Add(Material(pDevice, std::move(allocation)));
+        m_materialRegistry[name] = handle;
+        return handle;
     }
 
     Material* GetMaterial(MaterialHandle handle)
@@ -64,7 +82,12 @@ public:
         return m_materials.Get(handle);
     }
 
-    void RegisterMaterial(MaterialHandle handle, MaterialName& name)
+    MaterialHandle GetMaterialHandle(const MaterialName& name)
+    {
+        return m_materialRegistry[name];
+    }
+
+    void RegisterMaterial(MaterialHandle handle, const MaterialName& name)
     {
         m_materialRegistry[name] = handle;
     }
@@ -84,7 +107,17 @@ public:
         return m_renderObjects.Add(RenderObject(mesh));
     }
 
+    RenderObject* GetRenderObject(RenderObjectHandle handle)
+    {
+        return m_renderObjects.Get(handle);
+    }
+
     const std::vector<RenderObject>& GetRenderObjects() const
+    {
+        return m_renderObjects.GetDense();
+    }
+
+    std::vector<RenderObject>& GetRenderObjects()
     {
         return m_renderObjects.GetDense();
     }
@@ -148,11 +181,67 @@ public:
         return m_buckets;
     }
 
-    //RenderObject* GetRenderObject(RenderObjectHandle handle)
-    //{
-    //    auto& groups = handle.path == RenderingPath::FORWARD ? m_forwardRenderGroups : m_deferredRenderGroups;
-    //    return groups[handle.meshHandle].Get(handle.slotHandle);
-    //}
+    DirectionalLightHandle AddDirectionalLight(
+        ID3D12Device10* pDevice,
+        DescriptorAllocation&& dsvAllocation,
+        DescriptorAllocation&& srvAllocation,
+        DescriptorAllocation&& cbvAllocation,
+        UINT shadowMapResolution)
+    {
+        return m_directionalLights.Add(DirectionalLight(
+            pDevice,
+            std::move(dsvAllocation),
+            std::move(srvAllocation),
+            std::move(cbvAllocation),
+            shadowMapResolution));
+    }
+
+    PointLightHandle AddPointLight(
+        ID3D12Device10* pDevice,
+        DescriptorAllocation&& dsvAllocation,
+        DescriptorAllocation&& srvAllocation,
+        DescriptorAllocation&& cbvAllocation,
+        DescriptorAllocation&& rtvAllocation,
+        UINT shadowMapResolution)
+    {
+        return m_pointLights.Add(PointLight(
+            pDevice,
+            std::move(dsvAllocation),
+            std::move(srvAllocation),
+            std::move(cbvAllocation),
+            std::move(rtvAllocation),
+            shadowMapResolution));
+    }
+
+    SpotLightHandle AddSpotLight(
+        ID3D12Device10* pDevice,
+        DescriptorAllocation&& dsvAllocation,
+        DescriptorAllocation&& srvAllocation,
+        DescriptorAllocation&& cbvAllocation,
+        UINT shadowMapResolution)
+    {
+        return m_spotLights.Add(SpotLight(
+            pDevice,
+            std::move(dsvAllocation),
+            std::move(srvAllocation),
+            std::move(cbvAllocation),
+            shadowMapResolution));
+    }
+
+    DirectionalLight* GetLight(DirectionalLightHandle handle)
+    {
+        return m_directionalLights.Get(handle);
+    }
+
+    PointLight* GetLight(PointLightHandle handle)
+    {
+        return m_pointLights.Get(handle);
+    }
+
+    SpotLight* GetLight(SpotLightHandle handle)
+    {
+        return m_spotLights.Get(handle);
+    }
 
     const std::vector<DirectionalLight>& GetDirectionalLights() const
     {
@@ -189,11 +278,63 @@ public:
         return m_directionalLights.GetCount() + m_pointLights.GetCount() + m_spotLights.GetCount();
     }
 
-    MaterialHandle FindMaterial(MaterialName name) const
+    MaterialHandle FindMaterial(const MaterialName& name) const
     {
         auto it = m_materialRegistry.find(name);
         assert(it != m_materialRegistry.end());
         return it->second;
+    }
+
+    TextureHandle AddTexture(
+        ID3D12Device10* pDevice,
+        ID3D12GraphicsCommandList7* pCommandList,
+        DescriptorAllocation&& allocation,
+        TransientUploadAllocator& uploadAllocator,
+        const std::vector<UINT8>& textureSrc,
+        UINT width,
+        UINT height)
+    {
+        return m_textures.Add(Texture(
+            pDevice,
+            pCommandList,
+            std::move(allocation),
+            uploadAllocator,
+            textureSrc,
+            width,
+            height));
+    }
+
+    TextureHandle AddTexture(
+        ID3D12Device10* pDevice,
+        ID3D12GraphicsCommandList7* pCommandList,
+        DescriptorAllocation&& allocation,
+        TransientUploadAllocator& uploadAllocator,
+        const std::wstring& filePath,
+        bool isSRGB,
+        bool useBlockCompress,
+        bool flipImage,
+        bool isCubeMap)
+    {
+        return m_textures.Add(Texture(
+            pDevice,
+            pCommandList,
+            std::move(allocation),
+            uploadAllocator,
+            filePath,
+            isSRGB,
+            useBlockCompress,
+            flipImage,
+            isCubeMap));
+    }
+
+    const std::vector<Texture>& GetTextures() const
+    {
+        return m_textures.GetDense();
+    }
+
+    std::vector<Texture>& GetTextures()
+    {
+        return m_textures.GetDense();
     }
 
 private:

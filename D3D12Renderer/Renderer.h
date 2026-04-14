@@ -20,22 +20,17 @@
 #include "ConstantData.h"
 #include "CommandQueue.h"
 #include "FrameResource.h"
-#include "Mesh.h"
 #include "DescriptorAllocator.h"
-#include "Texture.h"
 #include "DynamicDescriptorHeap.h"
 #include "RootSignature.h"
 #include "ImGuiDescriptorAllocator.h"
 #include "CacheKeys.h"
 #include "Light.h"
-#include "Material.h"
-#include "RenderObject.h"
 #include "SharedConfig.h"
 #include "RenderGraph.h"
-#include "MeshRegistry.h"
-#include "MaterialRegistry.h"
 #include "TransientUploadAllocator.h"
 #include "Aliases.h"
+#include "SceneManager.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -126,30 +121,11 @@ private:
 
     RenderGraph m_renderGraph;
 
-    struct InstanceRange
-    {
-        UINT offset;            // offset in instance buffer
-        UINT forwardCount;
-        UINT deferredCount;
-    };
+    SceneManager m_sceneManager;
 
-    // Mesh, RenderObject
-    std::vector<std::unique_ptr<Mesh>> m_meshes;
-    MeshRegistry m_meshRegistry;
-    std::unordered_map<Mesh*, InstanceRange> m_instanceRanges;
-    std::unordered_map<Mesh*, std::vector<std::unique_ptr<RenderObject>>> m_forwardRenderObjects;
-    std::unordered_map<Mesh*, std::vector<std::unique_ptr<RenderObject>>> m_deferredRenderObjects;
+    std::vector<RenderObjectHandle> m_previewRotations;
 
-    std::vector<RenderObject*> m_previewRotations;
-
-    // Material
-    std::vector<std::unique_ptr<Material>> m_materials;
-    MaterialRegistry m_materialRegistry;
-
-    std::vector<std::unique_ptr<Texture>> m_textures;
-
-    // Lights, Shadows
-    std::array<std::vector<std::unique_ptr<Light>>, static_cast<std::size_t>(LightType::NUM_LIGHT_TYPES)> m_lights;
+    // Shadows
     D3D12_VIEWPORT m_shadowMapViewport;
     D3D12_RECT m_shadowMapScissorRect;
     UINT m_shadowMapResolution = 2048;
@@ -185,17 +161,18 @@ private:
 
     void SetTextureFiltering(TextureFiltering filtering);
 
-    Material* CreateMaterial();
-    Material* CreateMaterial(const MaterialName& name);
-    Material* CloneMaterial(const Material& material);
+    MaterialHandle CreateMaterial();
+    MaterialHandle CreateMaterial(const MaterialName& name);
+    MaterialHandle CloneMaterial(MaterialHandle src);
 
-    Mesh* CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data);
-    RenderObject* CreateRenderObject(Mesh* pMesh, Material* pMat);
+    MeshHandle CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data);
+    RenderObjectHandle CreateRenderObject(MeshHandle meshHandle);
 
-    template <typename T>
-    T* CreateLight();
+    DirectionalLightHandle CreateDirectionalLight();
+    PointLightHandle CreatePointLight();
+    SpotLightHandle CreateSpotLight();
 
-    Texture* CreateTexture(
+    TextureHandle CreateTexture(
         ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& allocation,
         TransientUploadAllocator& uploadAllocator,
@@ -203,7 +180,7 @@ private:
         UINT width,
         UINT height);
 
-    Texture* CreateTexture(
+    TextureHandle CreateTexture(
         ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& allocation,
         TransientUploadAllocator& uploadAllocator,
@@ -231,14 +208,5 @@ private:
 
     void UpdateConstantBuffers(FrameResource& frameResource);
 
-    void DrawMesh(ID3D12GraphicsCommandList7* pCommandList, Mesh& mesh, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
+    void DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
 };
-
-template <>
-DirectionalLight* Renderer::CreateLight<DirectionalLight>();
-
-template <>
-PointLight* Renderer::CreateLight<PointLight>();
-
-template <>
-SpotLight* Renderer::CreateLight<SpotLight>();

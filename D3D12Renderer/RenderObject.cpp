@@ -1,12 +1,10 @@
 #include "pch.h"
 #include "RenderObject.h"
 
-#include "Mesh.h"
-
-RenderObject::RenderObject(Mesh* pMesh)
-    : m_pMesh(pMesh)
+RenderObject::RenderObject(MeshHandle mesh)
+    : m_mesh(mesh)
 {
-    SetMaterial(pMesh->GetMaterial());
+    // 따로 머티리얼을 설정해주지 않았다면, 렌더링할때 MeshHandle 기반으로 쿼리해서 머티리얼을 얻어오기
 
     m_prevS = XMFLOAT3(1.0f, 1.0f, 1.0f);
     m_currS = XMFLOAT3(1.0f, 1.0f, 1.0f);
@@ -70,7 +68,7 @@ void RenderObject::UpdateRenderState(float alpha)
     XMStoreFloat4x4(&m_renderTransform, XMMatrixAffineTransformation(renderS, XMVectorZero(), renderR, renderT));
 }
 
-InstanceData RenderObject::BuildInstanceData(UINT matIdx)
+InstanceData RenderObject::BuildInstanceData(UINT matIdx) const
 {
     InstanceData ret;
 
@@ -86,12 +84,17 @@ InstanceData RenderObject::BuildInstanceData(UINT matIdx)
     return ret;
 }
 
-Material* RenderObject::GetMaterial() const
+MeshHandle RenderObject::GetMesh() const
 {
-    return m_pMaterial;
+    return m_mesh;
 }
 
-void RenderObject::SetMaterial(Material* pMat)
+MaterialHandle RenderObject::GetMaterial() const
 {
-    m_pMaterial = pMat;
+    return m_material;
+}
+
+void RenderObject::SetMaterial(MaterialHandle material)
+{
+    m_material = material;
 }

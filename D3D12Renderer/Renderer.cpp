@@ -16,6 +16,10 @@
 #include "SharedConfig.h"
 #include "GeometryGenerator.h"
 #include "InstanceData.h"
+#include "Mesh.h"
+#include "RenderObject.h"
+#include "Texture.h"
+#include "Material.h"
 
 using namespace D3DHelper;
 
@@ -462,11 +466,13 @@ void Renderer::BuildImGuiFrame()
 
     if (ImGui::Button("Add Cube"))
     {
-        auto* pMesh = m_meshRegistry.Resolve("builtin://cube");
-        auto* pTemplateMat = m_materialRegistry.Resolve("PavingStones150");
-        auto* pMat = CloneMaterial(*pTemplateMat);
-        auto* pCube = CreateRenderObject(pMesh, pMat);
+        auto hMesh = m_sceneManager.GetMeshHandle("builtin://cube");
+        auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
+        auto hMat = CloneMaterial(hTemplateMat);
+        auto hCube = CreateRenderObject(hMesh);
+        auto* pCube = m_sceneManager.GetRenderObject(hCube);
         pCube->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3());
+        pCube->SetMaterial(hMat);
     }
 
     ImGui::End();
@@ -725,7 +731,8 @@ void Renderer::LoadAssets()
         // index 2: black height
         CreateTexture(commandList, std::move(allocations[2]), uploadAllocator, { 0, 0, 0, 255 }, 1, 1);
 
-        auto* pDefaultMat = CreateMaterial("builtin://default");
+        auto hDefaultMat = CreateMaterial("builtin://default");
+        auto* pDefaultMat = m_sceneManager.GetMaterial(hDefaultMat);
         pDefaultMat->SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
         pDefaultMat->SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
         pDefaultMat->SetShininess(1.0f);
@@ -767,7 +774,8 @@ void Renderer::LoadAssets()
         false);
 
     // Add materials
-    auto* pBaseMat = CreateMaterial("PavingStones150");
+    auto hBaseMat = CreateMaterial("PavingStones150");
+    auto* pBaseMat = m_sceneManager.GetMaterial(hBaseMat);
     pBaseMat->SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
     pBaseMat->SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));
     pBaseMat->SetShininess(10.0f);
@@ -776,39 +784,49 @@ void Renderer::LoadAssets()
     pBaseMat->BuildSamplerIndices(m_currentTextureFiltering);
     pBaseMat->SetRenderingPath(RenderingPath::DEFERRED);
 
-    auto* pPlaneMat = CloneMaterial(*pBaseMat);
+    auto hPlaneMat = CloneMaterial(hBaseMat);
+    auto* pPlaneMat = m_sceneManager.GetMaterial(hPlaneMat);
     pPlaneMat->SetTextureTileScales(50.0f, 50.0f, 50.0f);
 
     // Add meshes
-    auto* pCubeMesh = CreateMesh(commandList, uploadAllocator, GeometryGenerator::GenerateCube());
-    auto* pSphereMesh = CreateMesh(commandList, uploadAllocator, GeometryGenerator::GenerateSphere());
+    auto hCubeMesh = m_sceneManager.AddMesh(m_device.Get(), commandList, uploadAllocator, GeometryGenerator::GenerateCube());
+    auto hSphereMesh = m_sceneManager.AddMesh(m_device.Get(), commandList, uploadAllocator, GeometryGenerator::GenerateSphere());
 
     // Add RenderObjects
-    auto* pPlane = CreateRenderObject(pCubeMesh, pPlaneMat);
+    auto hPlane = CreateRenderObject(hCubeMesh);
+    auto* pPlane = m_sceneManager.GetRenderObject(hPlane);
     pPlane->SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
+    pPlane->SetMaterial(hPlaneMat);
 
     for (UINT i = 0; i < 100; i++)
     {
         for (UINT j = 0; j < 100; j++)
         {
-            auto* pCube = CreateRenderObject(pCubeMesh, pBaseMat);
+            auto hCube = CreateRenderObject(hCubeMesh);
+            auto* pCube = m_sceneManager.GetRenderObject(hCube);
             pCube->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, 10.0f));
-            m_previewRotations.push_back(pCube);
+            pCube->SetMaterial(hBaseMat);
+            m_previewRotations.push_back(hCube);
         }
     }
 
-    auto* pSphere = CreateRenderObject(pSphereMesh, pBaseMat);
+    auto hSphere = CreateRenderObject(hSphereMesh);
+    auto* pSphere = m_sceneManager.GetRenderObject(hSphere);
     pSphere->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
+    pSphere->SetMaterial(hBaseMat);
 
     // Set up lights
-    auto* pDirectionalLight = CreateLight<DirectionalLight>();
+    auto hDirectionalLight = CreateDirectionalLight();
+    auto* pDirectionalLight = m_sceneManager.GetLight(hDirectionalLight);
     pDirectionalLight->SetDirection(XMFLOAT3(-1.0f, -1.0f, 1.0f));
 
-    auto* pPointLight = CreateLight<PointLight>();
+    auto hPointLight = CreatePointLight();
+    auto* pPointLight = m_sceneManager.GetLight(hPointLight);
     pPointLight->SetPosition(XMFLOAT3(0.0f, 4.0f, 3.0f));
     pPointLight->SetRange(30.0f);
 
-    auto* pSpotLight = CreateLight<SpotLight>();
+    auto hSpotLight = CreateSpotLight();
+    auto* pSpotLight = m_sceneManager.GetLight(hSpotLight);
     pSpotLight->SetPosition(XMFLOAT3(0.0f, 10.0f, -5.0f));
     pSpotLight->SetDirection(XMFLOAT3(0.0f, -1.0f, 1.0f));
     pSpotLight->SetRange(50.0f);
@@ -858,38 +876,13 @@ void Renderer::LoadAssets()
         { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
     RGTexture spotLightDepthBuffer = m_renderGraph.RegisterTexture("SpotLight", false,
         { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
-    {
-        bool isPointLight = false;
 
-        RGTexture texture;
-        switch (static_cast<LightType>(type))
-        {
-        case LightType::DIRECTIONAL:
-            texture = directionalLightDepthBuffer;
-            break;
-        case LightType::POINT:
-            texture = pointLightRenderTarget;
-            isPointLight = true;
-            break;
-        case LightType::SPOT:
-            texture = spotLightDepthBuffer;
-            break;
-        }
-
-        for (auto& light : m_lights[type])
-        {
-            if (isPointLight)
-            {
-                PointLight& pointLight = static_cast<PointLight&>(*light);
-                m_renderGraph.AddElement(texture, { pointLight.GetRenderTarget() });
-            }
-            else
-            {
-                m_renderGraph.AddElement(texture, { light->GetDepthBuffer() });
-            }
-        }
-    }
+    for (const auto& light : m_sceneManager.GetDirectionalLights())
+        m_renderGraph.AddElement(directionalLightDepthBuffer, { light.GetDepthBuffer() });
+    for (const auto& light : m_sceneManager.GetPointLights())
+        m_renderGraph.AddElement(pointLightRenderTarget, { light.GetRenderTarget() });
+    for (const auto& light : m_sceneManager.GetSpotLights())
+        m_renderGraph.AddElement(spotLightDepthBuffer, { light.GetDepthBuffer() });
 
     PrepareRenderGraph();
     m_renderGraph.Compile();
@@ -905,39 +898,61 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     // Set root signature
     pCommandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
 
-    UINT numLights = 0;
-    for (const auto& vec : m_lights) numLights += static_cast<UINT>(vec.size());
+    UINT numLights = m_sceneManager.GetLightCount();
     pCommandList->SetGraphicsRoot32BitConstant(2, numLights, 0);
 
     // Stage material CBVs
-    UINT numMaterials = static_cast<UINT>(m_materials.size());
-    for (UINT i = 0; i < numMaterials; ++i)
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, i, 1, m_materials[i]->GetCBVAllocationRef(m_frameIndex));
+    UINT matIdx = 0;
+    for (auto& mat : m_sceneManager.GetMaterials())
+    {
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, matIdx, 1, mat.GetCBVAllocationRef(m_frameIndex));
+        ++matIdx;
+    }
 
     // Stage light CBVs
     UINT lightIdx = 0;
-    for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
+    for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        for (auto& light : m_lights[type])
-        {
-            m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, lightIdx, 1, light->GetLightCBVAllocationRef(m_frameIndex));
-            ++lightIdx;
-        }
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, lightIdx, 1, light.GetLightCBVAllocationRef(m_frameIndex));
+        ++lightIdx;
+    }
+    for (auto& light : m_sceneManager.GetPointLights())
+    {
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, lightIdx, 1, light.GetLightCBVAllocationRef(m_frameIndex));
+        ++lightIdx;
+    }
+    for (auto& light : m_sceneManager.GetSpotLights())
+    {
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, lightIdx, 1, light.GetLightCBVAllocationRef(m_frameIndex));
+        ++lightIdx;
     }
 
     // Stage textures
-    UINT numTextures = static_cast<UINT>(m_textures.size());
-    for (UINT i = 0; i < numTextures; ++i)
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, i, 1, m_textures[i]->GetAllocationRef());
+    UINT textureIdx = 0;
+    for (auto& texture : m_sceneManager.GetTextures())
+    {
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, textureIdx, 1, texture.GetAllocationRef());
+        ++textureIdx;
+    }
 
     // Stage shadow SRVs
-    for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
+    lightIdx = 0;
+    for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        for (auto& light : m_lights[type])
-        {
-            UINT idxInArray = light->GetIdxInArray();
-            m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7 + type, idxInArray, 1, light->GetSRVAllocationRef());
-        }
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7, lightIdx, 1, light.GetSRVAllocationRef());
+        ++lightIdx;
+    }
+    lightIdx = 0;
+    for (auto& light : m_sceneManager.GetPointLights())
+    {
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(8, lightIdx, 1, light.GetSRVAllocationRef());
+        ++lightIdx;
+    }
+    lightIdx = 0;
+    for (auto& light : m_sceneManager.GetSpotLights())
+    {
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(9, lightIdx, 1, light.GetSRVAllocationRef());
+        ++lightIdx;
     }
 
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, 0, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), frameResource.GetGBufferSRVAllocationRef());
@@ -945,39 +960,9 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
     BindDescriptorTables(pCommandList);
 
-    // temp map for indexing
-    std::unordered_map<Material*, UINT> matIndexMap;
-    matIndexMap.reserve(m_materials.size());
-    for (UINT i = 0; i < static_cast<UINT>(m_materials.size()); ++i)
-        matIndexMap[m_materials[i].get()] = i;
-
-    std::vector<InstanceData> temp;
-    UINT curOffset = 0;
-    for (auto& mesh : m_meshes)
-    {
-        auto* pMesh = mesh.get();
-
-        for (auto& object : m_forwardRenderObjects[pMesh])
-        {
-            Material* pMat = object->GetMaterial();
-            UINT matIdx = pMat ? matIndexMap.at(pMat) : 0;
-            temp.push_back(object->BuildInstanceData(matIdx));
-        }
-        for (auto& object : m_deferredRenderObjects[pMesh])
-        {
-            Material* pMat = object->GetMaterial();
-            UINT matIdx = pMat ? matIndexMap.at(pMat) : 0;
-            temp.push_back(object->BuildInstanceData(matIdx));
-        }
-
-        m_instanceRanges[pMesh].offset = curOffset;
-        m_instanceRanges[pMesh].forwardCount = static_cast<UINT>(m_forwardRenderObjects[pMesh].size());
-        m_instanceRanges[pMesh].deferredCount = static_cast<UINT>(m_deferredRenderObjects[pMesh].size());
-        curOffset += m_instanceRanges[pMesh].forwardCount + m_instanceRanges[pMesh].deferredCount;
-    }
-
-    frameResource.EnsureInstanceCapacity(static_cast<UINT>(temp.size()));
-    frameResource.PushInstanceData(temp);
+    auto data = m_sceneManager.GatherInstances();
+    frameResource.EnsureInstanceCapacity(static_cast<UINT>(data.size()));
+    frameResource.PushInstanceData(data);
 
     // Depth-only pass for shadow mapping
     // Also work as z-prepass
@@ -998,24 +983,19 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         m_currentPSOKey.psName = L"PointLightShadowPS.hlsl";
         auto* pointShadowPSO = GetPipelineState(m_currentPSOKey);
 
-        UINT lightIdx = 0;
-        for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
-        {
-            bool isPointLight = static_cast<LightType>(type) == LightType::POINT;
-
-            for (auto& light : m_lights[type])
+        auto processLight = [&](Light* pLight, bool isPointLight, UINT& lightIdx)
             {
                 if (isPointLight) pCommandList->SetGraphicsRoot32BitConstant(3, lightIdx, 0);
 
                 // Render each entry of shadow map.
-                UINT16 arraySize = light->GetArraySize();
+                UINT16 arraySize = pLight->GetArraySize();
                 for (UINT j = 0; j < arraySize; ++j)
                 {
-                    auto shadowMapDsvHandle = light->GetDSVHandle(j);
+                    auto shadowMapDsvHandle = pLight->GetDSVHandle(j);
 
                     if (isPointLight)
                     {
-                        auto rtvHandle = static_cast<PointLight*>(light.get())->GetRTVHandle(j);
+                        auto rtvHandle = static_cast<PointLight*>(pLight)->GetRTVHandle(j);
                         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &shadowMapDsvHandle);
 
                         XMVECTORF32 clearColor;
@@ -1031,16 +1011,29 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
                     pCommandList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
 
-                    pCommandList->SetGraphicsRootConstantBufferView(0, light->GetCameraUploadAllocation(j).GPUPtr);
+                    pCommandList->SetGraphicsRootConstantBufferView(0, pLight->GetCameraUploadAllocation(j).GPUPtr);
 
-                    for (auto& mesh : m_meshes)
+                    for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
                     {
-                        DrawMesh(pCommandList, *mesh, PassType::DEPTH_ONLY, frameResource.GetInstanceBufferVirtualAddress());
+                        DrawMesh(pCommandList, meshHandle, PassType::DEPTH_ONLY, frameResource.GetInstanceBufferVirtualAddress());
                     }
                 }
 
                 ++lightIdx;
-            }
+            };
+
+        UINT lightIdx = 0;
+        for (auto& light : m_sceneManager.GetDirectionalLights())
+        {
+            processLight(&light, false, lightIdx);
+        }
+        for (auto& light : m_sceneManager.GetPointLights())
+        {
+            processLight(&light, true, lightIdx);
+        }
+        for (auto& light : m_sceneManager.GetSpotLights())
+        {
+            processLight(&light, false, lightIdx);
         }
     }
 
@@ -1074,9 +1067,9 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.GPUPtr);
 
-        for (auto& mesh : m_meshes)
+        for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
         {
-            DrawMesh(pCommandList, *mesh, PassType::GBUFFER, frameResource.GetInstanceBufferVirtualAddress());
+            DrawMesh(pCommandList, meshHandle, PassType::GBUFFER, frameResource.GetInstanceBufferVirtualAddress());
         }
     }
 
@@ -1157,18 +1150,14 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.GPUPtr);
         pCommandList->SetGraphicsRootConstantBufferView(1, m_shadowUploadAllocation.GPUPtr);
 
-        for (auto& mesh : m_meshes)
+        for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
         {
-            DrawMesh(pCommandList, *mesh, PassType::FORWARD_COLORING, frameResource.GetInstanceBufferVirtualAddress());
+            DrawMesh(pCommandList, meshHandle, PassType::FORWARD_COLORING, frameResource.GetInstanceBufferVirtualAddress());
         }
 
         std::vector<D3D12_TEXTURE_BARRIER> barriers;
-        UINT lightIdx = 0;
-        for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
-        {
-            bool isPointLight = static_cast<LightType>(type) == LightType::POINT;
 
-            for (auto& light : m_lights[type])
+        auto processLight = [&](Light* pLight, bool isPointLight)
             {
                 if (isPointLight)
                 {
@@ -1179,7 +1168,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
                         D3D12_BARRIER_ACCESS_NO_ACCESS,
                         D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
                         D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-                        static_cast<PointLight&>(*light).GetRenderTarget(),
+                        static_cast<PointLight*>(pLight)->GetRenderTarget(),
                         {0xffff'ffff, 0, 0, 0, 0, 0},
                         D3D12_TEXTURE_BARRIER_FLAG_NONE
                     };
@@ -1194,14 +1183,27 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
                         D3D12_BARRIER_ACCESS_NO_ACCESS,
                         D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
                         D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
-                        light->GetDepthBuffer(),
+                        pLight->GetDepthBuffer(),
                         {0xffff'ffff, 0, 0, 0, 0, 0},
                         D3D12_TEXTURE_BARRIER_FLAG_NONE
                     };
                     barriers.push_back(b);
                 }
-            }
+            };
+
+        for (auto& light : m_sceneManager.GetDirectionalLights())
+        {
+            processLight(&light, false);
         }
+        for (auto& light : m_sceneManager.GetPointLights())
+        {
+            processLight(&light, true);
+        }
+        for (auto& light : m_sceneManager.GetSpotLights())
+        {
+            processLight(&light, false);
+        }
+
         D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(static_cast<UINT32>(barriers.size()), barriers.data()) };
         pCommandList->Barrier(1, barrierGroups);
     }
@@ -1328,7 +1330,7 @@ void Renderer::ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID
         }
     }
 
-    for (const auto& barrier : m_renderGraph.GetCompiledTextureBarrier(passType))
+    for (const auto& barrier : renderGraph.GetCompiledTextureBarrier(passType))
     {
         UINT elementCount = renderGraph.GetElementCount(barrier.texture);
         for (UINT i = 0; i < elementCount; ++i)
@@ -1358,70 +1360,75 @@ void Renderer::ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID
 void Renderer::SetTextureFiltering(TextureFiltering filtering)
 {
     m_currentTextureFiltering = filtering;
-    for (auto& material : m_materials)
+    for (auto& material : m_sceneManager.GetMaterials())
     {
-        material->BuildSamplerIndices(m_currentTextureFiltering);
+        material.BuildSamplerIndices(m_currentTextureFiltering);
     }
 }
 
 // Allocate Material
-Material* Renderer::CreateMaterial()
+MaterialHandle Renderer::CreateMaterial()
 {
-    auto material = std::make_unique<Material>(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
-    auto* pMat = material.get();
-    m_materials.push_back(std::move(material));
-    return pMat;
+    return m_sceneManager.AddMaterial(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
 }
 
 // Allocate & register Material
-Material* Renderer::CreateMaterial(const MaterialName& name)
+MaterialHandle Renderer::CreateMaterial(const MaterialName& name)
 {
-    auto* pMat = CreateMaterial();
-    m_materialRegistry.Register(name, pMat);
-    return pMat;
+    return m_sceneManager.AddMaterial(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount), name);
 }
 
-Material* Renderer::CloneMaterial(const Material& src)
+MaterialHandle Renderer::CloneMaterial(MaterialHandle src)
 {
-    auto pMat = CreateMaterial();
-    pMat->CopyDataFrom(src);
-    return pMat;
+    auto hDst = CreateMaterial();
+    auto* pSrc = m_sceneManager.GetMaterial(src);
+    auto* pDst = m_sceneManager.GetMaterial(hDst);
+    pDst->CopyDataFrom(*pSrc);
+    return hDst;
 }
 
-Mesh* Renderer::CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data)
+MeshHandle Renderer::CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data)
 {
-    auto mesh = std::make_unique<Mesh>(m_device.Get(), pCommandList, allocator, data);
-    Mesh* pMesh = mesh.get();
-    m_meshRegistry.Register(data.name, pMesh);
-    m_meshes.push_back(std::move(mesh));
-
-    return pMesh;
+    return m_sceneManager.AddMesh(m_device.Get(), pCommandList, allocator, data);
 }
 
-RenderObject* Renderer::CreateRenderObject(Mesh* pMesh, Material* pMat)
+RenderObjectHandle Renderer::CreateRenderObject(MeshHandle meshHandle)
 {
-    auto renderObject = std::make_unique<RenderObject>(pMesh);
-    RenderObject* ret = renderObject.get();
-
-    RenderingPath path = pMat->GetRenderingPath();
-    if (path == RenderingPath::FORWARD)
-    {
-        m_forwardRenderObjects[pMesh].push_back(std::move(renderObject));
-    }
-    else if (path == RenderingPath::DEFERRED)
-    {
-        m_deferredRenderObjects[pMesh].push_back(std::move(renderObject));
-    }
-    else
-    {
-        assert(false);
-    }
-
-    ret->SetMaterial(pMat);
-    return ret;
+    return m_sceneManager.AddRenderObject(meshHandle);
 }
 
-Texture* Renderer::CreateTexture(
+DirectionalLightHandle Renderer::CreateDirectionalLight()
+{
+    return m_sceneManager.AddDirectionalLight(
+        m_device.Get(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(MAX_CASCADES),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount),
+        m_shadowMapResolution);
+}
+
+PointLightHandle Renderer::CreatePointLight()
+{
+    return m_sceneManager.AddPointLight(
+        m_device.Get(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(POINT_LIGHT_ARRAY_SIZE),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(POINT_LIGHT_ARRAY_SIZE),
+        m_shadowMapResolution);
+}
+
+SpotLightHandle Renderer::CreateSpotLight()
+{
+    return m_sceneManager.AddSpotLight(
+        m_device.Get(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(SPOT_LIGHT_ARRAY_SIZE),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount),
+        m_shadowMapResolution);
+}
+
+TextureHandle Renderer::CreateTexture(
     ID3D12GraphicsCommandList7* pCommandList,
     DescriptorAllocation&& allocation,
     TransientUploadAllocator& uploadAllocator,
@@ -1429,7 +1436,7 @@ Texture* Renderer::CreateTexture(
     UINT width,
     UINT height)
 {
-    auto texture = std::make_unique<Texture>(
+    return m_sceneManager.AddTexture(
         m_device.Get(),
         pCommandList,
         std::move(allocation),
@@ -1437,14 +1444,9 @@ Texture* Renderer::CreateTexture(
         textureSrc,
         width,
         height);
-
-    auto* pTexture = texture.get();
-    m_textures.push_back(std::move(texture));
-
-    return pTexture;
 }
 
-Texture* Renderer::CreateTexture(
+TextureHandle Renderer::CreateTexture(
     ID3D12GraphicsCommandList7* pCommandList,
     DescriptorAllocation&& allocation,
     TransientUploadAllocator& uploadAllocator,
@@ -1454,7 +1456,7 @@ Texture* Renderer::CreateTexture(
     bool flipImage,
     bool isCubeMap)
 {
-    auto texture = std::make_unique<Texture>(
+    return m_sceneManager.AddTexture(
         m_device.Get(),
         pCommandList,
         std::move(allocation),
@@ -1464,11 +1466,6 @@ Texture* Renderer::CreateTexture(
         useBlockCompress,
         flipImage,
         isCubeMap);
-
-    auto* pTexture = texture.get();
-    m_textures.push_back(std::move(texture));
-
-    return pTexture;
 }
 
 void Renderer::SetFpsCap(std::string fps)
@@ -1771,43 +1768,23 @@ void Renderer::FixedUpdate(double fixedDtMs)
     // RenderObjects
     static float rotationSpeed = 1.0f;  // unit : rad/s
 
-    for (auto& [pMesh, objects] : m_forwardRenderObjects)
+    for (auto& obj : m_sceneManager.GetRenderObjects())
     {
-        for (auto& ob : objects)
-        {
-            ob->SnapshotState();
-        }
-    }
-    for (auto& [pMesh, objects] : m_deferredRenderObjects)
-    {
-        for (auto& ob : objects)
-        {
-            ob->SnapshotState();
-        }
+        obj.SnapshotState();
     }
 
-    for (auto& ob : m_previewRotations)
+    for (auto& handle : m_previewRotations)
     {
-        ob->Transform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
+        m_sceneManager.GetRenderObject(handle)->Transform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
     }
 }
 
 void Renderer::PrepareConstantData(float alpha)
 {
     // RenderObjects
-    for (auto& [pMesh, objects] : m_forwardRenderObjects)
+    for (auto& obj : m_sceneManager.GetRenderObjects())
     {
-        for (auto& ob : objects)
-        {
-            ob->UpdateRenderState(alpha);
-        }
-    }
-    for (auto& [pMesh, objects] : m_deferredRenderObjects)
-    {
-        for (auto& ob : objects)
-        {
-            ob->UpdateRenderState(alpha);
-        }
+        obj.UpdateRenderState(alpha);
     }
 
     // Main Camera
@@ -1826,22 +1803,26 @@ void Renderer::PrepareConstantData(float alpha)
     // Pre-calculate common data for CSM.
     std::vector<BoundingSphere> cascadeSpheres = CalcCascadeSpheres();
 
-    UINT lightIndices[3] = { 0, 0, 0 };
-
-    // Wrap prepare... functions by lambda
-    std::function<void(Light&)> prepareFuncs[3];
-    prepareFuncs[0] = [&](Light& l) { PrepareDirectionalLight(static_cast<DirectionalLight&>(l), cascadeSpheres); };
-    prepareFuncs[1] = [&](Light& l) { PreparePointLight(static_cast<PointLight&>(l)); };
-    prepareFuncs[2] = [&](Light& l) { PrepareSpotLight(static_cast<SpotLight&>(l)); };
-
-    for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
+    UINT idx = 0;
+    for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        for (auto& light : m_lights[type])
-        {
-            prepareFuncs[type](*light);
-            light->SetIdxInArray(lightIndices[type]);
-            ++lightIndices[type];
-        }
+        PrepareDirectionalLight(light, cascadeSpheres);
+        light.SetIdxInArray(idx);
+        ++idx;
+    }
+    idx = 0;
+    for (auto& light : m_sceneManager.GetPointLights())
+    {
+        PreparePointLight(light);
+        light.SetIdxInArray(idx);
+        ++idx;
+    }
+    idx = 0;
+    for (auto& light : m_sceneManager.GetSpotLights())
+    {
+        PrepareSpotLight(light);
+        light.SetIdxInArray(idx);
+        ++idx;
     }
 }
 
@@ -2000,33 +1981,36 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
     m_cameraUploadAllocation = frameResource.PushConstantData(&m_cameraConstantData, sizeof(CameraConstantData));
     m_shadowUploadAllocation = frameResource.PushConstantData(&m_shadowConstantData, sizeof(ShadowConstantData));
 
-    for (UINT i = 0; i < m_materials.size(); ++i)
+    for (auto& mat : m_sceneManager.GetMaterials())
     {
-        auto alloc = frameResource.PushConstantData(m_materials[i]->GetConstantDataPtr(), sizeof(MaterialConstantData));
-        CreateCBV(m_device.Get(), alloc.GPUPtr, sizeof(MaterialConstantData), m_materials[i]->GetCBVHandle(m_frameIndex));
+        auto alloc = frameResource.PushConstantData(mat.GetConstantDataPtr(), sizeof(MaterialConstantData));
+        CreateCBV(m_device.Get(), alloc.GPUPtr, sizeof(MaterialConstantData), mat.GetCBVHandle(m_frameIndex));
     }
 
-    for (UINT type = 0; type < static_cast<UINT>(LightType::NUM_LIGHT_TYPES); ++type)
-    {
-        UINT16 arraySize = GetRequiredArraySize(static_cast<LightType>(type));
-        for (auto& light : m_lights[type])
+    auto processLight = [&](Light& light, UINT arraySize)
         {
             for (UINT i = 0; i < arraySize; ++i)
             {
-                auto alloc = frameResource.PushConstantData(light->GetCameraConstantDataPtr(i), sizeof(CameraConstantData));
-                light->SetCameraUploadAllocation(i, alloc);
+                auto alloc = frameResource.PushConstantData(light.GetCameraConstantDataPtr(i), sizeof(CameraConstantData));
+                light.SetCameraUploadAllocation(i, alloc);
             }
-            auto alloc = frameResource.PushConstantData(light->GetLightConstantDataPtr(), sizeof(LightConstantData));
-            CreateCBV(m_device.Get(), alloc.GPUPtr, sizeof(LightConstantData), light->GetLightCBVHandle(m_frameIndex));
-        }
-    }
+            auto alloc = frameResource.PushConstantData(light.GetLightConstantDataPtr(), sizeof(LightConstantData));
+            CreateCBV(m_device.Get(), alloc.GPUPtr, sizeof(LightConstantData), light.GetLightCBVHandle(m_frameIndex));
+        };
+
+    for (auto& light : m_sceneManager.GetDirectionalLights())
+        processLight(light, GetRequiredArraySize(LightType::DIRECTIONAL));
+    for (auto& light : m_sceneManager.GetPointLights())
+        processLight(light, GetRequiredArraySize(LightType::POINT));
+    for (auto& light : m_sceneManager.GetSpotLights())
+        processLight(light, GetRequiredArraySize(LightType::SPOT));
 }
 
-void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, Mesh& mesh, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)
+void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)
 {
     static const UINT instanceDataSize = static_cast<UINT>(sizeof(InstanceData));
 
-    const auto& instanceRange = m_instanceRanges[&mesh];
+    const auto& instanceRange = m_sceneManager.GetInstanceRange(meshhandle);
 
     if ((passType == PassType::FORWARD_COLORING && instanceRange.forwardCount == 0) ||
         (passType == PassType::DEPTH_ONLY && (instanceRange.forwardCount + instanceRange.deferredCount) == 0) ||
@@ -2051,74 +2035,16 @@ void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, Mesh& mesh, Pa
     }
 
     D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
-    instanceBufferView.BufferLocation = instanceBufferBase + instanceRange.offset * instanceDataSize;
+    instanceBufferView.BufferLocation = instanceBufferBase + instanceRange.offset;
+    if (passType == PassType::GBUFFER) instanceBufferView.BufferLocation += instanceRange.forwardCount * sizeof(InstanceData);
     instanceBufferView.StrideInBytes = instanceDataSize;
     instanceBufferView.SizeInBytes = instanceDataSize * instanceCount;
 
-    D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { mesh.GetVBV(), instanceBufferView };
+    auto* pMesh = m_sceneManager.GetMesh(meshhandle);
+
+    D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->GetVBV(), instanceBufferView };
     pCommandList->IASetVertexBuffers(0, 2, pVertexBufferViews);
-    pCommandList->IASetIndexBuffer(&mesh.GetIBV());
+    pCommandList->IASetIndexBuffer(&pMesh->GetIBV());
 
-    pCommandList->DrawIndexedInstanced(mesh.GetNumIndices(), instanceCount, 0, 0, 0);
-}
-
-template <>
-DirectionalLight* Renderer::CreateLight<DirectionalLight>()
-{
-    auto dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(MAX_CASCADES);
-    auto srvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-    auto cbvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount);
-
-    auto light = std::make_unique<DirectionalLight>(
-        m_device.Get(),
-        std::move(dsvAllocation),
-        std::move(srvAllocation),
-        std::move(cbvAllocation),
-        m_shadowMapResolution);
-
-    auto* pLight = light.get();
-    m_lights[static_cast<UINT>(LightType::DIRECTIONAL)].push_back(std::move(light));
-
-    return pLight;
-}
-
-template <>
-PointLight* Renderer::CreateLight<PointLight>()
-{
-    auto dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(POINT_LIGHT_ARRAY_SIZE);
-    auto srvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-    auto cbvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount);
-
-    auto light = std::make_unique<PointLight>(
-        m_device.Get(),
-        std::move(dsvAllocation),
-        std::move(srvAllocation),
-        std::move(cbvAllocation),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(POINT_LIGHT_ARRAY_SIZE),
-        m_shadowMapResolution);
-
-    auto* pLight = light.get();
-    m_lights[static_cast<UINT>(LightType::POINT)].push_back(std::move(light));
-
-    return pLight;
-}
-
-template <>
-SpotLight* Renderer::CreateLight<SpotLight>()
-{
-    auto dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(SPOT_LIGHT_ARRAY_SIZE);
-    auto srvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-    auto cbvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount);
-
-    auto light = std::make_unique<SpotLight>(
-        m_device.Get(),
-        std::move(dsvAllocation),
-        std::move(srvAllocation),
-        std::move(cbvAllocation),
-        m_shadowMapResolution);
-
-    auto* pLight = light.get();
-    m_lights[static_cast<UINT>(LightType::SPOT)].push_back(std::move(light));
-
-    return pLight;
+    pCommandList->DrawIndexedInstanced(pMesh->GetNumIndices(), instanceCount, 0, 0, 0);
 }

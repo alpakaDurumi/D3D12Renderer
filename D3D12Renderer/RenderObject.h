@@ -3,30 +3,28 @@
 #include <DirectXMath.h>
 
 #include "InstanceData.h"
+#include "SceneHandles.h"
 
 using namespace DirectX;
-
-class Material;
-class Mesh;
 
 class RenderObject
 {
 public:
-    RenderObject(Mesh* pMesh);
+    RenderObject(MeshHandle mesh);
 
     void SetInitialTransform(const XMFLOAT3& s, const XMFLOAT3& eulerRad, const XMFLOAT3& t);
     void SnapshotState();
     void Transform(const XMFLOAT3& s, const XMFLOAT3& eulerRad, const XMFLOAT3& t);
     void UpdateRenderState(float alpha);
 
-    InstanceData BuildInstanceData(UINT matIdx);
+    InstanceData BuildInstanceData(UINT matIdx) const;
 
-    Material* GetMaterial() const;
-    void SetMaterial(Material* pMat);
+    MeshHandle GetMesh() const;
+
+    MaterialHandle GetMaterial() const;
+    void SetMaterial(MaterialHandle material);
 
 private:
-    Mesh* m_pMesh;
-
     XMFLOAT3 m_prevS, m_currS;
     XMFLOAT4 m_prevR, m_currR;
     XMFLOAT3 m_prevT, m_currT;
@@ -37,5 +35,6 @@ private:
 
     // TODO:
     // material override
-    Material* m_pMaterial = nullptr;
+    MeshHandle m_mesh;
+    MaterialHandle m_material;
 };
