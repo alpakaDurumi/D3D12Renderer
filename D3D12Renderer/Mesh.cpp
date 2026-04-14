@@ -34,12 +34,12 @@ UINT Mesh::GetNumIndices() const
     return m_numIndices;
 }
 
-Material* Mesh::GetMaterial() const
+MaterialHandle Mesh::GetMaterial() const
 {
-    return m_pDefaultMaterial;
+    return m_material;
 }
 
-void Mesh::SetMaterial(Material* pMat)
+void Mesh::SetMaterial(MaterialHandle handle)
 {
-    m_pDefaultMaterial = pMat;
+    m_material = handle;
 }

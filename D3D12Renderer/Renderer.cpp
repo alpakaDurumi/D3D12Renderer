@@ -701,7 +701,7 @@ void Renderer::LoadAssets()
     m_shadowMapScissorRect = { 0, 0, static_cast<LONG>(m_shadowMapResolution), static_cast<LONG>(m_shadowMapResolution) };
 
     // Get command allocator and list for loading assets
-    auto [commandAllocator, commandList] = m_commandQueue->GetAvailableCommandList();
+    auto [pCommandAllocator, pCommandList] = m_commandQueue->GetAvailableCommandList();
 
     // Add samplers
     auto baseCPUHandle = m_samplerDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
@@ -723,13 +723,13 @@ void Renderer::LoadAssets()
         auto allocations = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3).Split();
 
         // index 0: white albedo
-        CreateTexture(commandList, std::move(allocations[0]), uploadAllocator, { 255, 255, 255, 255 }, 1, 1);
+        CreateTexture(pCommandList, std::move(allocations[0]), uploadAllocator, { 255, 255, 255, 255 }, 1, 1);
 
         // index 1: flat normal  (128, 128, 255) in linear space
-        CreateTexture(commandList, std::move(allocations[1]), uploadAllocator, { 128, 128, 255, 255 }, 1, 1);
+        CreateTexture(pCommandList, std::move(allocations[1]), uploadAllocator, { 128, 128, 255, 255 }, 1, 1);
 
         // index 2: black height
-        CreateTexture(commandList, std::move(allocations[2]), uploadAllocator, { 0, 0, 0, 255 }, 1, 1);
+        CreateTexture(pCommandList, std::move(allocations[2]), uploadAllocator, { 0, 0, 0, 255 }, 1, 1);
 
         auto hDefaultMat = CreateMaterial("builtin://default");
         auto* pDefaultMat = m_sceneManager.GetMaterial(hDefaultMat);
@@ -744,7 +744,7 @@ void Renderer::LoadAssets()
     auto allocations = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3).Split();
 
     CreateTexture(
-        commandList,
+        pCommandList,
         std::move(allocations[0]),
         uploadAllocator,
         L"assets/textures/PavingStones150_4K-PNG_Color.png",
@@ -754,7 +754,7 @@ void Renderer::LoadAssets()
         false);
 
     CreateTexture(
-        commandList,
+        pCommandList,
         std::move(allocations[1]),
         uploadAllocator,
         L"assets/textures/PavingStones150_4K-PNG_NormalDX.png",
@@ -764,7 +764,7 @@ void Renderer::LoadAssets()
         false);
 
     CreateTexture(
-        commandList,
+        pCommandList,
         std::move(allocations[2]),
         uploadAllocator,
         L"assets/textures/PavingStones150_4K-PNG_Displacement.png",
@@ -789,8 +789,8 @@ void Renderer::LoadAssets()
     pPlaneMat->SetTextureTileScales(50.0f, 50.0f, 50.0f);
 
     // Add meshes
-    auto hCubeMesh = m_sceneManager.AddMesh(m_device.Get(), commandList, uploadAllocator, GeometryGenerator::GenerateCube());
-    auto hSphereMesh = m_sceneManager.AddMesh(m_device.Get(), commandList, uploadAllocator, GeometryGenerator::GenerateSphere());
+    auto hCubeMesh = m_sceneManager.AddMesh(m_device.Get(), pCommandList, uploadAllocator, GeometryGenerator::GenerateCube());
+    auto hSphereMesh = m_sceneManager.AddMesh(m_device.Get(), pCommandList, uploadAllocator, GeometryGenerator::GenerateSphere());
 
     // Add RenderObjects
     auto hPlane = CreateRenderObject(hCubeMesh);
@@ -833,7 +833,7 @@ void Renderer::LoadAssets()
     pSpotLight->SetAngles(50.0f, 10.0f);
 
     // Execute commands for loading assets and store fence value
-    m_frameResources[m_frameIndex]->SetFenceValue(m_commandQueue->ExecuteCommandLists(commandAllocator, commandList));
+    m_frameResources[m_frameIndex]->SetFenceValue(m_commandQueue->ExecuteCommandLists(pCommandAllocator, pCommandList));
 
     // Wait until assets have been uploaded to the GPU
     WaitForGPU();

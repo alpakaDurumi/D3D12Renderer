@@ -7,10 +7,9 @@
 
 #include "GeometryData.h"
 #include "TransientUploadAllocator.h"
+#include "SceneHandles.h"
 
 using Microsoft::WRL::ComPtr;
-
-class Material;
 
 class Mesh
 {
@@ -25,8 +24,8 @@ public:
     const D3D12_INDEX_BUFFER_VIEW& GetIBV() const;
     UINT GetNumIndices() const;
 
-    Material* GetMaterial() const;
-    void SetMaterial(Material* pMat);
+    MaterialHandle GetMaterial() const;
+    void SetMaterial(MaterialHandle handle);
 
 private:
     ComPtr<ID3D12Resource> m_vertexBuffer;
@@ -36,5 +35,5 @@ private:
     D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
     UINT m_numIndices = 0;
 
-    Material* m_pDefaultMaterial = nullptr;
+    MaterialHandle m_material;
 };

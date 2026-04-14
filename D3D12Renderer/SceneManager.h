@@ -46,6 +46,7 @@ public:
     {
         auto handle = m_meshes.Add(Mesh(pDevice, pCommandList, allocator, data));
         m_meshRegistry[data.name] = handle;
+        GetMesh(handle)->SetMaterial(GetMaterialHandle("builtin://default"));
         return handle;
     }
 
@@ -135,6 +136,13 @@ public:
         {
             auto meshHandle = obj.GetMesh();
             auto matHandle = obj.GetMaterial();
+
+            // Use default material of Mesh if override material not set.
+            if (!m_materials.IsValid(matHandle))
+            {
+                Mesh* pMesh = GetMesh(meshHandle);
+                matHandle = pMesh->GetMaterial();
+            }
 
             auto matIdx = m_materials.GetDenseIndex(matHandle);
             auto data = obj.BuildInstanceData(matIdx);
