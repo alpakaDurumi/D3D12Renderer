@@ -2,12 +2,13 @@
 
 #include <DirectXMath.h>
 
+#include "Object.h"
 #include "InstanceData.h"
 #include "SceneHandles.h"
 
 using namespace DirectX;
 
-class RenderObject
+class RenderObject : public Object
 {
 public:
     RenderObject(MeshHandle mesh);

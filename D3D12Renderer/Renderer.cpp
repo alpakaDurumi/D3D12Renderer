@@ -466,7 +466,7 @@ void Renderer::BuildImGuiFrame()
 
     if (ImGui::Button("Add Cube"))
     {
-        auto hMesh = m_sceneManager.GetMeshHandle("builtin://cube");
+        auto hMesh = m_sceneManager.GetMeshHandle("builtin://mesh/cube");
         auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
         auto hMat = CloneMaterial(hTemplateMat);
         auto hCube = CreateRenderObject(hMesh);
@@ -731,7 +731,7 @@ void Renderer::LoadAssets()
         // index 2: black height
         CreateTexture(pCommandList, std::move(allocations[2]), uploadAllocator, { 0, 0, 0, 255 }, 1, 1);
 
-        auto hDefaultMat = CreateMaterial("builtin://default");
+        auto hDefaultMat = CreateMaterial("builtin://material/default");
         auto* pDefaultMat = m_sceneManager.GetMaterial(hDefaultMat);
         pDefaultMat->SetAmbient(XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f));
         pDefaultMat->SetSpecular(XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f));

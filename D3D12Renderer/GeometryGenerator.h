@@ -64,7 +64,7 @@ public:
             20, 21, 22, 20, 22, 23
         };
 
-        return { "builtin://cube", vertices, indices};
+        return { "builtin://mesh/cube", vertices, indices};
     }
 
     static GeometryData GenerateSphere()
@@ -125,6 +125,6 @@ public:
             }
         }
 
-        return { "builtin://sphere", vertices, indices};
+        return { "builtin://mesh/sphere", vertices, indices};
     }
 };
