@@ -8,6 +8,7 @@
 
 #include <vector>
 
+#include "Object.h"
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
 #include "SharedConfig.h"
@@ -16,7 +17,7 @@
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
-class Light
+class Light : public Object
 {
 protected:
     Light(

@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <vector>
 
+#include "Object.h"
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
 #include "SharedConfig.h"
@@ -28,7 +29,7 @@ enum class RenderingPath
     NUM_RENDERING_PATHS
 };
 
-class Material
+class Material : public Object
 {
 public:
     Material(

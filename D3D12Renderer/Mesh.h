@@ -5,13 +5,14 @@
 
 #include <d3d12.h>
 
+#include "Object.h"
 #include "GeometryData.h"
 #include "TransientUploadAllocator.h"
 #include "SceneHandles.h"
 
 using Microsoft::WRL::ComPtr;
 
-class Mesh
+class Mesh : public Object
 {
 public:
     Mesh(
