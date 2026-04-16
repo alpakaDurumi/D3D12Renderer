@@ -144,11 +144,6 @@ public:
         m_hierarchy.Remove(hh);
     }
 
-    RenderObject* GetRenderObject(RenderObjectHandle handle)
-    {
-        return m_renderObjects.Get(handle);
-    }
-
     const std::vector<RenderObject>& GetRenderObjects() const
     {
         return m_renderObjects.GetDense();
@@ -272,19 +267,24 @@ public:
             shadowMapResolution));
     }
 
-    DirectionalLight* GetLight(DirectionalLightHandle handle)
+    RenderObject* Get(RenderObjectHandle h)
     {
-        return m_directionalLights.Get(handle);
+        return m_renderObjects.Get(h);
     }
 
-    PointLight* GetLight(PointLightHandle handle)
+    DirectionalLight* Get(DirectionalLightHandle h)
     {
-        return m_pointLights.Get(handle);
+        return m_directionalLights.Get(h);
     }
 
-    SpotLight* GetLight(SpotLightHandle handle)
+    PointLight* Get(PointLightHandle h)
     {
-        return m_spotLights.Get(handle);
+        return m_pointLights.Get(h);
+    }
+
+    SpotLight* Get(SpotLightHandle h)
+    {
+        return m_spotLights.Get(h);
     }
 
     const std::vector<DirectionalLight>& GetDirectionalLights() const
@@ -411,11 +411,6 @@ private:
     {
         m_spotLights.Remove(handle);
     }
-
-    RenderObject* Get(RenderObjectHandle h) { return m_renderObjects.Get(h); }
-    DirectionalLight* Get(DirectionalLightHandle h) { return m_directionalLights.Get(h); }
-    PointLight* Get(PointLightHandle h) { return m_pointLights.Get(h); }
-    SpotLight* Get(SpotLightHandle h) { return m_spotLights.Get(h); }
 
     SlotMap<Mesh> m_meshes;
     std::unordered_map<AssetID, MeshHandle> m_meshRegistry;

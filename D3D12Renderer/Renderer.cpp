@@ -470,7 +470,7 @@ void Renderer::BuildImGuiFrame()
         auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
         auto hMat = CloneMaterial(hTemplateMat);
         auto hCube = CreateRenderObject(hMesh, "test");
-        auto* pCube = m_sceneManager.GetRenderObject(hCube);
+        auto* pCube = m_sceneManager.Get(hCube);
         pCube->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3());
         pCube->SetMaterial(hMat);
     }
@@ -845,7 +845,7 @@ void Renderer::LoadAssets()
 
     // Add RenderObjects
     auto hPlane = CreateRenderObject(hCubeMesh, "Plane");
-    auto* pPlane = m_sceneManager.GetRenderObject(hPlane);
+    auto* pPlane = m_sceneManager.Get(hPlane);
     pPlane->SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
     pPlane->SetMaterial(hPlaneMat);
 
@@ -854,7 +854,7 @@ void Renderer::LoadAssets()
         for (UINT j = 0; j < 10; j++)
         {
             auto hCube = CreateRenderObject(hCubeMesh, "Cube");
-            auto* pCube = m_sceneManager.GetRenderObject(hCube);
+            auto* pCube = m_sceneManager.Get(hCube);
             pCube->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 5.0f) * 4.0f, j * 4.0f, 10.0f));
             pCube->SetMaterial(hBaseMat);
             m_previewRotations.push_back(hCube);
@@ -862,22 +862,22 @@ void Renderer::LoadAssets()
     }
 
     auto hSphere = CreateRenderObject(hSphereMesh, "Sphere");
-    auto* pSphere = m_sceneManager.GetRenderObject(hSphere);
+    auto* pSphere = m_sceneManager.Get(hSphere);
     pSphere->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
     pSphere->SetMaterial(hBaseMat);
 
     // Set up lights
     auto hDirectionalLight = CreateDirectionalLight();
-    auto* pDirectionalLight = m_sceneManager.GetLight(hDirectionalLight);
+    auto* pDirectionalLight = m_sceneManager.Get(hDirectionalLight);
     pDirectionalLight->SetDirection(XMFLOAT3(-1.0f, -1.0f, 1.0f));
 
     auto hPointLight = CreatePointLight();
-    auto* pPointLight = m_sceneManager.GetLight(hPointLight);
+    auto* pPointLight = m_sceneManager.Get(hPointLight);
     pPointLight->SetPosition(XMFLOAT3(0.0f, 4.0f, 3.0f));
     pPointLight->SetRange(30.0f);
 
     auto hSpotLight = CreateSpotLight();
-    auto* pSpotLight = m_sceneManager.GetLight(hSpotLight);
+    auto* pSpotLight = m_sceneManager.Get(hSpotLight);
     pSpotLight->SetPosition(XMFLOAT3(0.0f, 10.0f, -5.0f));
     pSpotLight->SetDirection(XMFLOAT3(0.0f, -1.0f, 1.0f));
     pSpotLight->SetRange(50.0f);
@@ -1831,7 +1831,7 @@ void Renderer::FixedUpdate(double fixedDtMs)
 
     for (auto& handle : m_previewRotations)
     {
-        auto* pRenderObject = m_sceneManager.GetRenderObject(handle);
+        auto* pRenderObject = m_sceneManager.Get(handle);
         if (pRenderObject == nullptr) continue;
         pRenderObject->Transform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
     }
