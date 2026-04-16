@@ -30,3 +30,4 @@
 #### Language & Tone
 
 - Korean language
+- One exception: recommended commit messages must be written in English
