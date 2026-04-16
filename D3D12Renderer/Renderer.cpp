@@ -1424,9 +1424,9 @@ MaterialHandle Renderer::CreateMaterial()
 }
 
 // Allocate & register Material
-MaterialHandle Renderer::CreateMaterial(const MaterialName& name)
+MaterialHandle Renderer::CreateMaterial(const AssetID& id)
 {
-    return m_sceneManager.AddMaterial(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount), name);
+    return m_sceneManager.AddMaterial(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount), id);
 }
 
 MaterialHandle Renderer::CloneMaterial(MaterialHandle src)

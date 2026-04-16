@@ -2,5 +2,4 @@
 
 #include <string>
 
-using MeshName = std::string;
-using MaterialName = std::string;
+using AssetID = std::string;

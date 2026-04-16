@@ -162,7 +162,7 @@ private:
     void SetTextureFiltering(TextureFiltering filtering);
 
     MaterialHandle CreateMaterial();
-    MaterialHandle CreateMaterial(const MaterialName& name);
+    MaterialHandle CreateMaterial(const AssetID& id);
     MaterialHandle CloneMaterial(MaterialHandle src);
 
     MeshHandle CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data);

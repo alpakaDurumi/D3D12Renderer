@@ -67,14 +67,14 @@ public:
         return m_meshes.Get(handle);
     }
 
-    MeshHandle GetMeshHandle(const MeshName& name)
+    MeshHandle GetMeshHandle(const AssetID& id)
     {
-        return m_meshRegistry[name];
+        return m_meshRegistry[id];
     }
 
-    void RegisterMesh(MeshHandle handle, const MeshName& name)
+    void RegisterMesh(MeshHandle handle, const AssetID& id)
     {
-        m_meshRegistry[name] = handle;
+        m_meshRegistry[id] = handle;
     }
 
     // Material
@@ -83,10 +83,10 @@ public:
         return m_materials.Add(Material(pDevice, std::move(allocation)));
     }
 
-    MaterialHandle AddMaterial(ID3D12Device10* pDevice, DescriptorAllocation&& allocation, const MaterialName& name)
+    MaterialHandle AddMaterial(ID3D12Device10* pDevice, DescriptorAllocation&& allocation, const AssetID& id)
     {
         auto handle = m_materials.Add(Material(pDevice, std::move(allocation)));
-        m_materialRegistry[name] = handle;
+        m_materialRegistry[id] = handle;
         return handle;
     }
 
@@ -95,14 +95,14 @@ public:
         return m_materials.Get(handle);
     }
 
-    MaterialHandle GetMaterialHandle(const MaterialName& name)
+    MaterialHandle GetMaterialHandle(const AssetID& id)
     {
-        return m_materialRegistry[name];
+        return m_materialRegistry[id];
     }
 
-    void RegisterMaterial(MaterialHandle handle, const MaterialName& name)
+    void RegisterMaterial(MaterialHandle handle, const AssetID& id)
     {
-        m_materialRegistry[name] = handle;
+        m_materialRegistry[id] = handle;
     }
 
     const std::vector<Material>& GetMaterials() const
@@ -322,13 +322,6 @@ public:
         return m_directionalLights.GetCount() + m_pointLights.GetCount() + m_spotLights.GetCount();
     }
 
-    MaterialHandle FindMaterial(const MaterialName& name) const
-    {
-        auto it = m_materialRegistry.find(name);
-        assert(it != m_materialRegistry.end());
-        return it->second;
-    }
-
     TextureHandle AddTexture(
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
@@ -425,7 +418,7 @@ private:
     SpotLight* Get(SpotLightHandle h) { return m_spotLights.Get(h); }
 
     SlotMap<Mesh> m_meshes;
-    std::unordered_map<MeshName, MeshHandle> m_meshRegistry;
+    std::unordered_map<AssetID, MeshHandle> m_meshRegistry;
 
     SlotMap<RenderObject> m_renderObjects;
     std::unordered_map<MeshHandle, MeshBucket> m_buckets;
@@ -433,7 +426,7 @@ private:
     std::unordered_map<MeshHandle, InstanceRange> m_instanceRanges;
 
     SlotMap<Material> m_materials;
-    std::unordered_map<MaterialName, MaterialHandle> m_materialRegistry;
+    std::unordered_map<AssetID, MaterialHandle> m_materialRegistry;
 
     SlotMap<DirectionalLight> m_directionalLights;
     SlotMap<PointLight> m_pointLights;
