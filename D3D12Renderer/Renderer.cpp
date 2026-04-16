@@ -469,11 +469,51 @@ void Renderer::BuildImGuiFrame()
         auto hMesh = m_sceneManager.GetMeshHandle("builtin://mesh/cube");
         auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
         auto hMat = CloneMaterial(hTemplateMat);
-        auto hCube = CreateRenderObject(hMesh);
+        auto hCube = CreateRenderObject(hMesh, "test");
         auto* pCube = m_sceneManager.GetRenderObject(hCube);
         pCube->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3());
         pCube->SetMaterial(hMat);
     }
+
+    ImGui::End();
+
+    // Hierarchy
+    ImGui::Begin("Hierarchy");
+
+    static HierarchyHandle selected;
+    for (const auto& node : m_sceneManager.GetHierarchy())
+    {
+        Object* pObj = m_sceneManager.Get(node.handle);
+        if (!pObj) continue;
+
+        bool isSelected = (node.selfHandle == selected);
+
+        // Treat as leaf node for now.
+        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf
+            | ImGuiTreeNodeFlags_NoTreePushOnOpen
+            | ImGuiTreeNodeFlags_SpanAvailWidth;
+
+        if (isSelected)
+            flags |= ImGuiTreeNodeFlags_Selected;
+
+        // Use selfHandle as a unique id
+        UINT64 uniqueID = (static_cast<UINT64>(node.selfHandle.generation) << 32) | node.selfHandle.index;
+        ImGui::TreeNodeEx(reinterpret_cast<void*>(uniqueID),
+            flags, "%s", pObj->GetName().c_str());
+
+        if (ImGui::IsItemClicked())
+        {
+            selected = node.selfHandle;
+            //m_sceneManager.Remove(node.selfHandle);
+        }
+    }
+
+    //if (ImGui::IsKeyPressed(ImGuiKey_Delete) &&
+    //    m_hierarchy.IsValid(selected))
+    //{
+    //    m_sceneManager.Remove(selected);
+    //    m_selectedEntity = {};
+    //}
 
     ImGui::End();
 }
@@ -1395,6 +1435,11 @@ MeshHandle Renderer::CreateMesh(ID3D12GraphicsCommandList7* pCommandList, Transi
 RenderObjectHandle Renderer::CreateRenderObject(MeshHandle meshHandle)
 {
     return m_sceneManager.AddRenderObject(meshHandle);
+}
+
+RenderObjectHandle Renderer::CreateRenderObject(MeshHandle meshHandle, const std::string& name)
+{
+    return m_sceneManager.AddRenderObject(meshHandle, name);
 }
 
 DirectionalLightHandle Renderer::CreateDirectionalLight()

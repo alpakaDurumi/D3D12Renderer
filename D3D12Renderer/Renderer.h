@@ -167,6 +167,7 @@ private:
 
     MeshHandle CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data);
     RenderObjectHandle CreateRenderObject(MeshHandle meshHandle);
+    RenderObjectHandle CreateRenderObject(MeshHandle meshHandle, const std::string& name);
 
     DirectionalLightHandle CreateDirectionalLight();
     PointLightHandle CreatePointLight();

@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 #include <cassert>
+#include <variant>
 
 #include "SlotMap.h"
 #include "Mesh.h"
@@ -35,6 +36,17 @@ struct MeshBucket
     std::vector<InstanceData> deferred;
 };
 
+struct HierarchyNode
+{
+    HierarchyHandle selfHandle;
+    //HierarchyHandle parent;
+    std::variant<
+        RenderObjectHandle,
+        DirectionalLightHandle,
+        PointLightHandle,
+        SpotLightHandle> handle;
+};
+
 class SceneManager
 {
 public:
@@ -46,7 +58,7 @@ public:
     {
         auto handle = m_meshes.Add(Mesh(pDevice, pCommandList, allocator, data));
         m_meshRegistry[data.name] = handle;
-        GetMesh(handle)->SetMaterial(GetMaterialHandle("builtin://default"));
+        GetMesh(handle)->SetMaterial(GetMaterialHandle("builtin://material/default"));
         return handle;
     }
 
@@ -106,6 +118,28 @@ public:
     RenderObjectHandle AddRenderObject(MeshHandle mesh)
     {
         return m_renderObjects.Add(RenderObject(mesh));
+    }
+
+    RenderObjectHandle AddRenderObject(MeshHandle mesh, const std::string& name)
+    {
+        auto handle = m_renderObjects.Add(RenderObject(mesh));
+        m_renderObjects.Get(handle)->SetName(name);
+
+        HierarchyNode node;
+        node.handle = handle;
+        auto hh = m_hierarchy.Add(std::move(node));
+        m_hierarchy.Get(hh)->selfHandle = hh;
+
+        return handle;
+    }
+
+    void Remove(HierarchyHandle hh)
+    {
+        auto* pEntry = m_hierarchy.Get(hh);
+
+        std::visit([&](auto&& h) { Remove(h); }, pEntry->handle);
+
+        m_hierarchy.Remove(hh);
     }
 
     RenderObject* GetRenderObject(RenderObjectHandle handle)
@@ -345,7 +379,49 @@ public:
         return m_textures.GetDense();
     }
 
+    const std::vector<HierarchyNode>& GetHierarchy() const
+    {
+        return m_hierarchy.GetDense();
+    }
+
+    Object* Get(std::variant<
+        RenderObjectHandle,
+        DirectionalLightHandle,
+        PointLightHandle,
+        SpotLightHandle> handle)
+    {
+        return std::visit([this](auto&& h) -> Object*
+            {
+                return this->Get(h);
+            }, handle);
+    }
+
 private:
+    void Remove(RenderObjectHandle handle)
+    {
+        m_renderObjects.Remove(handle);
+    }
+
+    void Remove(DirectionalLightHandle handle)
+    {
+        m_directionalLights.Remove(handle);
+    }
+
+    void Remove(PointLightHandle handle)
+    {
+        m_pointLights.Remove(handle);
+    }
+
+    void Remove(SpotLightHandle handle)
+    {
+        m_spotLights.Remove(handle);
+    }
+
+    RenderObject* Get(RenderObjectHandle h) { return m_renderObjects.Get(h); }
+    DirectionalLight* Get(DirectionalLightHandle h) { return m_directionalLights.Get(h); }
+    PointLight* Get(PointLightHandle h) { return m_pointLights.Get(h); }
+    SpotLight* Get(SpotLightHandle h) { return m_spotLights.Get(h); }
+
     SlotMap<Mesh> m_meshes;
     std::unordered_map<MeshName, MeshHandle> m_meshRegistry;
     // 모든 메쉬에 대한 순회는 dense array를 얻어서 간단하게 가능하지만,
@@ -366,4 +442,6 @@ private:
     SlotMap<SpotLight> m_spotLights;
 
     SlotMap<Texture> m_textures;
+
+    SlotMap<HierarchyNode> m_hierarchy;
 };
