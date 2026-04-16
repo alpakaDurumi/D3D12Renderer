@@ -426,10 +426,6 @@ private:
 
     SlotMap<Mesh> m_meshes;
     std::unordered_map<MeshName, MeshHandle> m_meshRegistry;
-    // 모든 메쉬에 대한 순회는 dense array를 얻어서 간단하게 가능하지만,
-    // CreateRenderObject같은 함수가 요구하는 '특정 메쉬`에 대한 정보는 SlotMap만으로는 부족함.
-    // 즉 SlotMap은 handle -> data를 제공하지만, string(name) -> handle을 제공하는 구현체가 있어야 함.
-    // 현재는 그것이 MeshRegistry, MaterialRegistry인데, ResourceManager에 통합하는게 더 깔끔할 것 같음. (아무래도 이름이 ResourceManager니까)
 
     SlotMap<RenderObject> m_renderObjects;
     std::unordered_map<MeshHandle, MeshBucket> m_buckets;

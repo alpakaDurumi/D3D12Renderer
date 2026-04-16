@@ -844,24 +844,24 @@ void Renderer::LoadAssets()
     auto hSphereMesh = m_sceneManager.AddMesh(m_device.Get(), pCommandList, uploadAllocator, GeometryGenerator::GenerateSphere());
 
     // Add RenderObjects
-    auto hPlane = CreateRenderObject(hCubeMesh);
+    auto hPlane = CreateRenderObject(hCubeMesh, "Plane");
     auto* pPlane = m_sceneManager.GetRenderObject(hPlane);
     pPlane->SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
     pPlane->SetMaterial(hPlaneMat);
 
-    for (UINT i = 0; i < 100; i++)
+    for (UINT i = 0; i < 10; i++)
     {
-        for (UINT j = 0; j < 100; j++)
+        for (UINT j = 0; j < 10; j++)
         {
-            auto hCube = CreateRenderObject(hCubeMesh);
+            auto hCube = CreateRenderObject(hCubeMesh, "Cube");
             auto* pCube = m_sceneManager.GetRenderObject(hCube);
-            pCube->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 50.0f) * 4.0f, (j - 50.0f) * 4.0f, 10.0f));
+            pCube->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 5.0f) * 4.0f, j * 4.0f, 10.0f));
             pCube->SetMaterial(hBaseMat);
             m_previewRotations.push_back(hCube);
         }
     }
 
-    auto hSphere = CreateRenderObject(hSphereMesh);
+    auto hSphere = CreateRenderObject(hSphereMesh, "Sphere");
     auto* pSphere = m_sceneManager.GetRenderObject(hSphere);
     pSphere->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
     pSphere->SetMaterial(hBaseMat);
@@ -1831,7 +1831,9 @@ void Renderer::FixedUpdate(double fixedDtMs)
 
     for (auto& handle : m_previewRotations)
     {
-        m_sceneManager.GetRenderObject(handle)->Transform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
+        auto* pRenderObject = m_sceneManager.GetRenderObject(handle);
+        if (pRenderObject == nullptr) continue;
+        pRenderObject->Transform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
     }
 }
 
