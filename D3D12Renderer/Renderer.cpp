@@ -481,6 +481,11 @@ void Renderer::BuildImGuiFrame()
     ImGui::Begin("Hierarchy");
 
     static HierarchyHandle selected;
+    HierarchyHandle toDelete;
+
+    if (ImGui::IsKeyPressed(ImGuiKey_Delete))
+        toDelete = selected;
+
     for (const auto& node : m_sceneManager.GetHierarchy())
     {
         Object* pObj = m_sceneManager.Get(node.handle);
@@ -504,16 +509,22 @@ void Renderer::BuildImGuiFrame()
         if (ImGui::IsItemClicked())
         {
             selected = node.selfHandle;
-            //m_sceneManager.Remove(node.selfHandle);
+        }
+
+        if (ImGui::BeginPopupContextItem())
+        {
+            if (ImGui::MenuItem("Delete"))
+            {
+                toDelete = node.selfHandle;
+            }
+
+            ImGui::EndPopup();
         }
     }
 
-    //if (ImGui::IsKeyPressed(ImGuiKey_Delete) &&
-    //    m_hierarchy.IsValid(selected))
-    //{
-    //    m_sceneManager.Remove(selected);
-    //    m_selectedEntity = {};
-    //}
+    m_sceneManager.Remove(toDelete);
+    if (selected == toDelete)
+        selected = {};
 
     ImGui::End();
 }

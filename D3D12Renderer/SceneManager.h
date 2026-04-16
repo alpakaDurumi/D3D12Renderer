@@ -135,6 +135,8 @@ public:
 
     void Remove(HierarchyHandle hh)
     {
+        if (!m_hierarchy.IsValid(hh)) return;
+
         auto* pEntry = m_hierarchy.Get(hh);
 
         std::visit([&](auto&& h) { Remove(h); }, pEntry->handle);
