@@ -469,10 +469,13 @@ void Renderer::BuildImGuiFrame()
         auto hMesh = m_sceneManager.GetMeshHandle("builtin://mesh/cube");
         auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
         auto hMat = CloneMaterial(hTemplateMat);
-        auto hCube = CreateRenderObject(hMesh, "test");
-        auto* pCube = m_sceneManager.Get(hCube);
-        pCube->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3());
-        pCube->SetMaterial(hMat);
+
+        auto hCube = m_sceneManager.AddEntity("New Cube");
+        auto hCubeRO = CreateRenderObject(hMesh);
+        m_sceneManager.AddComponent(hCube, hCubeRO);
+        auto* pCubeRO = m_sceneManager.Get(hCubeRO);
+        pCubeRO->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3());
+        pCubeRO->SetMaterial(hMat);
     }
 
     ImGui::End();
@@ -480,18 +483,15 @@ void Renderer::BuildImGuiFrame()
     // Hierarchy
     ImGui::Begin("Hierarchy");
 
-    static HierarchyHandle selected;
-    HierarchyHandle toDelete;
+    static EntityHandle selected;
+    EntityHandle toDelete;
 
     if (ImGui::IsKeyPressed(ImGuiKey_Delete))
         toDelete = selected;
 
-    for (const auto& node : m_sceneManager.GetHierarchy())
+    for (const auto& entity : m_sceneManager.GetEntities())
     {
-        Object* pObj = m_sceneManager.Get(node.handle);
-        if (!pObj) continue;
-
-        bool isSelected = (node.selfHandle == selected);
+        bool isSelected = (entity.selfHandle == selected);
 
         // Treat as leaf node for now.
         ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf
@@ -502,20 +502,20 @@ void Renderer::BuildImGuiFrame()
             flags |= ImGuiTreeNodeFlags_Selected;
 
         // Use selfHandle as a unique id
-        UINT64 uniqueID = (static_cast<UINT64>(node.selfHandle.generation) << 32) | node.selfHandle.index;
+        UINT64 uniqueID = (static_cast<UINT64>(entity.selfHandle.generation) << 32) | entity.selfHandle.index;
         ImGui::TreeNodeEx(reinterpret_cast<void*>(uniqueID),
-            flags, "%s", pObj->GetName().c_str());
+            flags, "%s", entity.name.c_str());
 
         if (ImGui::IsItemClicked())
         {
-            selected = node.selfHandle;
+            selected = entity.selfHandle;
         }
 
         if (ImGui::BeginPopupContextItem())
         {
             if (ImGui::MenuItem("Delete"))
             {
-                toDelete = node.selfHandle;
+                toDelete = entity.selfHandle;
             }
 
             ImGui::EndPopup();
@@ -844,27 +844,33 @@ void Renderer::LoadAssets()
     auto hSphereMesh = m_sceneManager.AddMesh(m_device.Get(), pCommandList, uploadAllocator, GeometryGenerator::GenerateSphere());
 
     // Add RenderObjects
-    auto hPlane = CreateRenderObject(hCubeMesh, "Plane");
-    auto* pPlane = m_sceneManager.Get(hPlane);
-    pPlane->SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
-    pPlane->SetMaterial(hPlaneMat);
+    auto hPlane = m_sceneManager.AddEntity("Plane");
+    auto hCubeRO = CreateRenderObject(hCubeMesh);
+    m_sceneManager.AddComponent(hPlane, hCubeRO);
+    auto* pPlaneRO = m_sceneManager.Get(hCubeRO);
+    pPlaneRO->SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
+    pPlaneRO->SetMaterial(hPlaneMat);
 
     for (UINT i = 0; i < 10; i++)
     {
         for (UINT j = 0; j < 10; j++)
         {
-            auto hCube = CreateRenderObject(hCubeMesh, "Cube");
-            auto* pCube = m_sceneManager.Get(hCube);
-            pCube->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 5.0f) * 4.0f, j * 4.0f, 10.0f));
-            pCube->SetMaterial(hBaseMat);
-            m_previewRotations.push_back(hCube);
+            auto hCube = m_sceneManager.AddEntity("Cube");
+            auto hCubeRO = CreateRenderObject(hCubeMesh);
+            m_sceneManager.AddComponent(hCube, hCubeRO);
+            auto* pCubeRO = m_sceneManager.Get(hCubeRO);
+            pCubeRO->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 5.0f) * 4.0f, j * 4.0f, 10.0f));
+            pCubeRO->SetMaterial(hBaseMat);
+            m_previewRotations.push_back(hCubeRO);
         }
     }
 
-    auto hSphere = CreateRenderObject(hSphereMesh, "Sphere");
-    auto* pSphere = m_sceneManager.Get(hSphere);
-    pSphere->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
-    pSphere->SetMaterial(hBaseMat);
+    auto hSphere = m_sceneManager.AddEntity("Sphere");
+    auto hSphereRO = CreateRenderObject(hSphereMesh);
+    m_sceneManager.AddComponent(hSphere, hSphereRO);
+    auto* pSphereRO = m_sceneManager.Get(hSphereRO);
+    pSphereRO->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
+    pSphereRO->SetMaterial(hBaseMat);
 
     // Set up lights
     auto hDirectionalLight = CreateDirectionalLight();
@@ -1446,11 +1452,6 @@ MeshHandle Renderer::CreateMesh(ID3D12GraphicsCommandList7* pCommandList, Transi
 RenderObjectHandle Renderer::CreateRenderObject(MeshHandle meshHandle)
 {
     return m_sceneManager.AddRenderObject(meshHandle);
-}
-
-RenderObjectHandle Renderer::CreateRenderObject(MeshHandle meshHandle, const std::string& name)
-{
-    return m_sceneManager.AddRenderObject(meshHandle, name);
 }
 
 DirectionalLightHandle Renderer::CreateDirectionalLight()

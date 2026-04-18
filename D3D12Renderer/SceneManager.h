@@ -36,20 +36,69 @@ struct MeshBucket
     std::vector<InstanceData> deferred;
 };
 
-struct HierarchyNode
+using LightHandle = std::variant<
+    DirectionalLightHandle,
+    PointLightHandle,
+    SpotLightHandle>;
+
+struct Entity
 {
-    HierarchyHandle selfHandle;
-    //HierarchyHandle parent;
-    std::variant<
-        RenderObjectHandle,
-        DirectionalLightHandle,
-        PointLightHandle,
-        SpotLightHandle> handle;
+    std::string name;
+
+    EntityHandle selfHandle;
+    EntityHandle parent;
+    std::vector<EntityHandle> children;
+
+    std::optional<RenderObjectHandle> renderObject;
+    std::optional<LightHandle> light;
 };
 
 class SceneManager
 {
 public:
+    EntityHandle AddEntity(const std::string& name)
+    {
+        auto handle = m_entities.Add(Entity());
+        
+        auto* pEntity = m_entities.Get(handle);
+        pEntity->name = name;
+        pEntity->selfHandle = handle;
+
+        return handle;
+    }
+
+    void Remove(EntityHandle handle)
+    {
+        if (!m_entities.IsValid(handle)) return;
+
+        auto* pEntity = m_entities.Get(handle);
+
+        if (pEntity->renderObject.has_value())
+            Remove(pEntity->renderObject.value());
+
+        if (pEntity->light.has_value())
+            std::visit([&](auto&& handle) { Remove(handle); }, pEntity->light.value());
+
+        m_entities.Remove(handle);
+    }
+
+    void AddComponent(EntityHandle eh, RenderObjectHandle rh)
+    {
+        auto* pEntity = m_entities.Get(eh);
+        pEntity->renderObject = rh;
+    }
+
+    void AddComponent(EntityHandle eh, LightHandle lh)
+    {
+        auto* pEntity = m_entities.Get(eh);
+        pEntity->light = lh;
+    }
+
+    const std::vector<Entity>& GetEntities() const
+    {
+        return m_entities.GetDense();
+    }
+
     MeshHandle AddMesh(
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
@@ -118,30 +167,6 @@ public:
     RenderObjectHandle AddRenderObject(MeshHandle mesh)
     {
         return m_renderObjects.Add(RenderObject(mesh));
-    }
-
-    RenderObjectHandle AddRenderObject(MeshHandle mesh, const std::string& name)
-    {
-        auto handle = m_renderObjects.Add(RenderObject(mesh));
-        m_renderObjects.Get(handle)->SetName(name);
-
-        HierarchyNode node;
-        node.handle = handle;
-        auto hh = m_hierarchy.Add(std::move(node));
-        m_hierarchy.Get(hh)->selfHandle = hh;
-
-        return handle;
-    }
-
-    void Remove(HierarchyHandle hh)
-    {
-        if (!m_hierarchy.IsValid(hh)) return;
-
-        auto* pEntry = m_hierarchy.Get(hh);
-
-        std::visit([&](auto&& h) { Remove(h); }, pEntry->handle);
-
-        m_hierarchy.Remove(hh);
     }
 
     const std::vector<RenderObject>& GetRenderObjects() const
@@ -267,6 +292,11 @@ public:
             shadowMapResolution));
     }
 
+    Entity* Get(EntityHandle h)
+    {
+        return m_entities.Get(h);
+    }
+
     RenderObject* Get(RenderObjectHandle h)
     {
         return m_renderObjects.Get(h);
@@ -374,11 +404,6 @@ public:
         return m_textures.GetDense();
     }
 
-    const std::vector<HierarchyNode>& GetHierarchy() const
-    {
-        return m_hierarchy.GetDense();
-    }
-
     Object* Get(std::variant<
         RenderObjectHandle,
         DirectionalLightHandle,
@@ -429,5 +454,5 @@ private:
 
     SlotMap<Texture> m_textures;
 
-    SlotMap<HierarchyNode> m_hierarchy;
+    SlotMap<Entity> m_entities;
 };
