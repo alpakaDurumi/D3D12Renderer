@@ -17,7 +17,6 @@
 #include "GeometryGenerator.h"
 #include "InstanceData.h"
 #include "Mesh.h"
-#include "RenderObject.h"
 #include "Texture.h"
 #include "Material.h"
 
@@ -471,11 +470,9 @@ void Renderer::BuildImGuiFrame()
         auto hMat = CloneMaterial(hTemplateMat);
 
         auto hCube = m_sceneManager.AddEntity("New Cube");
-        auto hCubeRO = CreateRenderObject(hMesh);
-        m_sceneManager.AddComponent(hCube, hCubeRO);
-        auto* pCubeRO = m_sceneManager.Get(hCubeRO);
-        pCubeRO->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3());
-        pCubeRO->SetMaterial(hMat);
+        m_sceneManager.AddTransform(hCube);
+        m_sceneManager.SetMesh(hCube, hMesh);
+        m_sceneManager.SetMaterial(hCube, hMat);
     }
 
     ImGui::End();
@@ -843,34 +840,28 @@ void Renderer::LoadAssets()
     auto hCubeMesh = m_sceneManager.AddMesh(m_device.Get(), pCommandList, uploadAllocator, GeometryGenerator::GenerateCube());
     auto hSphereMesh = m_sceneManager.AddMesh(m_device.Get(), pCommandList, uploadAllocator, GeometryGenerator::GenerateSphere());
 
-    // Add RenderObjects
+    // Add Entities
     auto hPlane = m_sceneManager.AddEntity("Plane");
-    auto hCubeRO = CreateRenderObject(hCubeMesh);
-    m_sceneManager.AddComponent(hPlane, hCubeRO);
-    auto* pPlaneRO = m_sceneManager.Get(hCubeRO);
-    pPlaneRO->SetInitialTransform(XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
-    pPlaneRO->SetMaterial(hPlaneMat);
+    m_sceneManager.AddTransform(hPlane, XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
+    m_sceneManager.SetMesh(hPlane, hCubeMesh);
+    m_sceneManager.SetMaterial(hPlane, hPlaneMat);
 
     for (UINT i = 0; i < 10; i++)
     {
         for (UINT j = 0; j < 10; j++)
         {
             auto hCube = m_sceneManager.AddEntity("Cube");
-            auto hCubeRO = CreateRenderObject(hCubeMesh);
-            m_sceneManager.AddComponent(hCube, hCubeRO);
-            auto* pCubeRO = m_sceneManager.Get(hCubeRO);
-            pCubeRO->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 5.0f) * 4.0f, j * 4.0f, 10.0f));
-            pCubeRO->SetMaterial(hBaseMat);
-            m_previewRotations.push_back(hCubeRO);
+            m_sceneManager.AddTransform(hCube, XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 5.0f) * 4.0f, j * 4.0f, 10.0f));
+            m_sceneManager.SetMesh(hCube, hCubeMesh);
+            m_sceneManager.SetMaterial(hCube, hBaseMat);
+            m_previewRotations.push_back(hCube);
         }
     }
 
     auto hSphere = m_sceneManager.AddEntity("Sphere");
-    auto hSphereRO = CreateRenderObject(hSphereMesh);
-    m_sceneManager.AddComponent(hSphere, hSphereRO);
-    auto* pSphereRO = m_sceneManager.Get(hSphereRO);
-    pSphereRO->SetInitialTransform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
-    pSphereRO->SetMaterial(hBaseMat);
+    m_sceneManager.AddTransform(hSphere, XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
+    m_sceneManager.SetMesh(hSphere, hSphereMesh);
+    m_sceneManager.SetMaterial(hSphere, hBaseMat);
 
     // Set up lights
     auto hDirectionalLight = CreateDirectionalLight();
@@ -1449,11 +1440,6 @@ MeshHandle Renderer::CreateMesh(ID3D12GraphicsCommandList7* pCommandList, Transi
     return m_sceneManager.AddMesh(m_device.Get(), pCommandList, allocator, data);
 }
 
-RenderObjectHandle Renderer::CreateRenderObject(MeshHandle meshHandle)
-{
-    return m_sceneManager.AddRenderObject(meshHandle);
-}
-
 DirectionalLightHandle Renderer::CreateDirectionalLight()
 {
     return m_sceneManager.AddDirectionalLight(
@@ -1822,28 +1808,30 @@ void Renderer::FixedUpdate(double fixedDtMs)
     if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-dist);
     if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(dist);
 
-    // RenderObjects
+    // Transforms
     static float rotationSpeed = 1.0f;  // unit : rad/s
 
-    for (auto& obj : m_sceneManager.GetRenderObjects())
+    for (auto& entity : m_sceneManager.GetEntities())
     {
-        obj.SnapshotState();
+        if (!entity.transform.has_value()) continue;
+        entity.transform->SnapshotState();
     }
 
     for (auto& handle : m_previewRotations)
     {
-        auto* pRenderObject = m_sceneManager.Get(handle);
-        if (pRenderObject == nullptr) continue;
-        pRenderObject->Transform(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
+        auto* pEntity = m_sceneManager.Get(handle);
+        if (pEntity == nullptr) continue;
+        pEntity->transform->Apply(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
     }
 }
 
 void Renderer::PrepareConstantData(float alpha)
 {
-    // RenderObjects
-    for (auto& obj : m_sceneManager.GetRenderObjects())
+    // Transforms
+    for (auto& entity : m_sceneManager.GetEntities())
     {
-        obj.UpdateRenderState(alpha);
+        if (!entity.transform.has_value()) continue;
+        entity.transform->UpdateRenderState(alpha);
     }
 
     // Main Camera

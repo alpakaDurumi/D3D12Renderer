@@ -3,7 +3,6 @@
 #include "SlotMap.h"
 
 class Mesh;
-class RenderObject;
 class Material;
 class DirectionalLight;
 class PointLight;
@@ -12,7 +11,6 @@ class Texture;
 struct Entity;
 
 using MeshHandle = SlotMap<Mesh>::Handle;
-using RenderObjectHandle = SlotMap<RenderObject>::Handle;
 using MaterialHandle = SlotMap<Material>::Handle;
 using DirectionalLightHandle = SlotMap<DirectionalLight>::Handle;
 using PointLightHandle = SlotMap<PointLight>::Handle;

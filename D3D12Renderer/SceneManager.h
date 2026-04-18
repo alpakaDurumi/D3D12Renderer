@@ -2,16 +2,17 @@
 
 #include <unordered_map>
 #include <variant>
+#include <cassert>
 
 #include "SlotMap.h"
 #include "Mesh.h"
 #include "Material.h"
 #include "Light.h"
-#include "RenderObject.h"
 #include "Texture.h"
 #include "Aliases.h"
 #include "InstanceData.h"
 #include "SceneHandles.h"
+#include "Transform.h"
 
 template<>
 struct std::hash<MeshHandle>
@@ -40,6 +41,12 @@ using LightHandle = std::variant<
     PointLightHandle,
     SpotLightHandle>;
 
+struct MeshRenderer
+{
+    MeshHandle mesh;
+    MaterialHandle material;
+};
+
 struct Entity
 {
     std::string name;
@@ -48,7 +55,8 @@ struct Entity
     EntityHandle parent;
     std::vector<EntityHandle> children;
 
-    std::optional<RenderObjectHandle> renderObject;
+    std::optional<Transform> transform;
+    std::optional<MeshRenderer> meshRenderer;
     std::optional<LightHandle> light;
 };
 
@@ -58,7 +66,7 @@ public:
     EntityHandle AddEntity(const std::string& name)
     {
         auto handle = m_entities.Add(Entity());
-        
+
         auto* pEntity = m_entities.Get(handle);
         pEntity->name = name;
         pEntity->selfHandle = handle;
@@ -72,8 +80,7 @@ public:
 
         auto* pEntity = m_entities.Get(handle);
 
-        if (pEntity->renderObject.has_value())
-            Remove(pEntity->renderObject.value());
+        // Should delete material with 0 usage?
 
         if (pEntity->light.has_value())
             std::visit([&](auto&& handle) { Remove(handle); }, pEntity->light.value());
@@ -81,10 +88,55 @@ public:
         m_entities.Remove(handle);
     }
 
-    void AddComponent(EntityHandle eh, RenderObjectHandle rh)
+    void AddTransform(EntityHandle eh)
     {
         auto* pEntity = m_entities.Get(eh);
-        pEntity->renderObject = rh;
+        if (pEntity->transform.has_value()) assert(false);
+
+        pEntity->transform.emplace();
+    }
+
+    void AddTransform(EntityHandle eh, const XMFLOAT3& s, const XMFLOAT3& eulerRad, const XMFLOAT3& t)
+    {
+        auto* pEntity = m_entities.Get(eh);
+        if (pEntity->transform.has_value()) assert(false);
+
+        pEntity->transform.emplace(s, eulerRad, t);
+    }
+
+    void ApplyTransform(EntityHandle eh, const XMFLOAT3& s, const XMFLOAT3& eulerRad, const XMFLOAT3& t)
+    {
+        auto* pEntity = m_entities.Get(eh);
+        if (!pEntity->transform.has_value()) assert(false);
+        pEntity->transform->Apply(s, eulerRad, t);
+    }
+
+    void SetMesh(EntityHandle eh, MeshHandle mh)
+    {
+        auto* pEntity = m_entities.Get(eh);
+
+        if (pEntity->meshRenderer.has_value())
+        {
+            pEntity->meshRenderer->mesh = mh;
+        }
+        else
+        {
+            pEntity->meshRenderer = { mh, GetMaterialHandle("builtin://material/default") };
+        }
+    }
+
+    void SetMaterial(EntityHandle eh, MaterialHandle mh)
+    {
+        auto* pEntity = m_entities.Get(eh);
+
+        if (pEntity->meshRenderer.has_value())
+        {
+            pEntity->meshRenderer->material = mh;
+        }
+        else
+        {
+            assert(false);
+        }
     }
 
     void AddComponent(EntityHandle eh, LightHandle lh)
@@ -94,6 +146,11 @@ public:
     }
 
     const std::vector<Entity>& GetEntities() const
+    {
+        return m_entities.GetDense();
+    }
+
+    std::vector<Entity>& GetEntities()
     {
         return m_entities.GetDense();
     }
@@ -163,19 +220,20 @@ public:
         return m_materials.GetDense();
     }
 
-    RenderObjectHandle AddRenderObject(MeshHandle mesh)
+    InstanceData BuildInstanceData(const XMFLOAT4X4& transform, UINT matIdx) const
     {
-        return m_renderObjects.Add(RenderObject(mesh));
-    }
+        InstanceData ret;
 
-    const std::vector<RenderObject>& GetRenderObjects() const
-    {
-        return m_renderObjects.GetDense();
-    }
+        auto world = XMLoadFloat4x4(&transform);
 
-    std::vector<RenderObject>& GetRenderObjects()
-    {
-        return m_renderObjects.GetDense();
+        XMStoreFloat4x4(&ret.world, XMMatrixTranspose(world));
+
+        world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+        XMStoreFloat4x4(&ret.inverseTranspose, XMMatrixInverse(nullptr, world));
+
+        ret.materialIndex = matIdx;
+
+        return ret;
     }
 
     std::vector<InstanceData> GatherInstances()
@@ -187,20 +245,15 @@ public:
         }
         m_instanceRanges.clear();
 
-        for (const auto& obj : m_renderObjects.GetDense())
+        for (const auto& entity : m_entities.GetDense())
         {
-            auto meshHandle = obj.GetMesh();
-            auto matHandle = obj.GetMaterial();
+            if (!entity.transform.has_value() && !entity.meshRenderer.has_value()) continue;
 
-            // Use default material of Mesh if override material not set.
-            if (!m_materials.IsValid(matHandle))
-            {
-                Mesh* pMesh = GetMesh(meshHandle);
-                matHandle = pMesh->GetMaterial();
-            }
+            auto meshHandle = entity.meshRenderer->mesh;
+            auto matHandle = entity.meshRenderer->material;
 
             auto matIdx = m_materials.GetDenseIndex(matHandle);
-            auto data = obj.BuildInstanceData(matIdx);
+            auto data = BuildInstanceData(entity.transform->GetRenderTransform(), matIdx);
 
             auto renderingPath = GetMaterial(matHandle)->GetRenderingPath();
 
@@ -294,11 +347,6 @@ public:
     Entity* Get(EntityHandle h)
     {
         return m_entities.Get(h);
-    }
-
-    RenderObject* Get(RenderObjectHandle h)
-    {
-        return m_renderObjects.Get(h);
     }
 
     DirectionalLight* Get(DirectionalLightHandle h)
@@ -404,11 +452,6 @@ public:
     }
 
 private:
-    void Remove(RenderObjectHandle handle)
-    {
-        m_renderObjects.Remove(handle);
-    }
-
     void Remove(DirectionalLightHandle handle)
     {
         m_directionalLights.Remove(handle);
@@ -427,7 +470,6 @@ private:
     SlotMap<Mesh> m_meshes;
     std::unordered_map<AssetID, MeshHandle> m_meshRegistry;
 
-    SlotMap<RenderObject> m_renderObjects;
     std::unordered_map<MeshHandle, MeshBucket> m_buckets;
 
     std::unordered_map<MeshHandle, InstanceRange> m_instanceRanges;

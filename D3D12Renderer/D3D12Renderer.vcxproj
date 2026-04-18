@@ -196,7 +196,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_PIX|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Renderer.cpp" />
-    <ClCompile Include="RenderObject.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Utility.cpp" />
     <ClCompile Include="Win32Application.cpp" />
@@ -223,6 +222,7 @@
     <ClInclude Include="RenderGraph.h" />
     <ClInclude Include="SceneHandles.h" />
     <ClInclude Include="SceneManager.h" />
+    <ClInclude Include="Transform.h" />
     <ClInclude Include="TransientUploadAllocator.h" />
     <ClInclude Include="GeometryGenerator.h" />
     <ClInclude Include="SlotMap.h" />
@@ -242,7 +242,6 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RenderGraphNode.h" />
-    <ClInclude Include="RenderObject.h" />
     <ClInclude Include="RootSignature.h" />
     <ClInclude Include="SharedConfig.h" />
     <ClInclude Include="Texture.h" />

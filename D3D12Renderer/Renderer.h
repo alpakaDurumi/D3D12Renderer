@@ -123,7 +123,7 @@ private:
 
     SceneManager m_sceneManager;
 
-    std::vector<RenderObjectHandle> m_previewRotations;
+    std::vector<EntityHandle> m_previewRotations;
 
     // Shadows
     D3D12_VIEWPORT m_shadowMapViewport;
@@ -166,7 +166,6 @@ private:
     MaterialHandle CloneMaterial(MaterialHandle src);
 
     MeshHandle CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data);
-    RenderObjectHandle CreateRenderObject(MeshHandle meshHandle);
 
     DirectionalLightHandle CreateDirectionalLight();
     PointLightHandle CreatePointLight();
