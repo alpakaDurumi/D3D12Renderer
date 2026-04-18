@@ -8,13 +8,12 @@
 #include <vector>
 #include <string>
 
-#include "Object.h"
 #include "DescriptorAllocation.h"
 #include "TransientUploadAllocator.h"
 
 using Microsoft::WRL::ComPtr;
 
-class Texture : public Object
+class Texture
 {
 public:
     Texture(

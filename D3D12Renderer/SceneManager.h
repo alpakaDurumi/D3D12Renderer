@@ -1,7 +1,6 @@
 #pragma once
 
 #include <unordered_map>
-#include <cassert>
 #include <variant>
 
 #include "SlotMap.h"
@@ -402,18 +401,6 @@ public:
     std::vector<Texture>& GetTextures()
     {
         return m_textures.GetDense();
-    }
-
-    Object* Get(std::variant<
-        RenderObjectHandle,
-        DirectionalLightHandle,
-        PointLightHandle,
-        SpotLightHandle> handle)
-    {
-        return std::visit([this](auto&& h) -> Object*
-            {
-                return this->Get(h);
-            }, handle);
     }
 
 private:
