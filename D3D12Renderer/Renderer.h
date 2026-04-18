@@ -151,10 +151,12 @@ private:
     void LoadPipeline();
     void LoadAssets();
     void PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList);
-    void BuildImGuiFrame();
     void WaitForGPU();
     void MoveToNextFrame();
+
     void InitImGui();
+    void BuildImGuiFrame();
+    void RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete);
 
     void PrepareRenderGraph();
     void ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID3D12GraphicsCommandList7* pCommandList);

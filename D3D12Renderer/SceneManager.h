@@ -85,7 +85,24 @@ public:
         if (pEntity->light.has_value())
             std::visit([&](auto&& handle) { Remove(handle); }, pEntity->light.value());
 
+        // If it have parent, remove handle from parent's children
+        auto* pParent = m_entities.Get(pEntity->parent);
+        if (pParent)
+        {
+            auto& children = pParent->children;
+            children.erase(std::remove(children.begin(), children.end(), handle));
+        }
+
         m_entities.Remove(handle);
+    }
+
+    void AddChild(EntityHandle parent, EntityHandle child)
+    {
+        auto* pParent = m_entities.Get(parent);
+        auto* pChild = m_entities.Get(child);
+
+        pParent->children.push_back(child);
+        pChild->parent = parent;
     }
 
     void AddTransform(EntityHandle eh)

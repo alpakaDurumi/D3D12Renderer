@@ -488,35 +488,8 @@ void Renderer::BuildImGuiFrame()
 
     for (const auto& entity : m_sceneManager.GetEntities())
     {
-        bool isSelected = (entity.selfHandle == selected);
-
-        // Treat as leaf node for now.
-        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf
-            | ImGuiTreeNodeFlags_NoTreePushOnOpen
-            | ImGuiTreeNodeFlags_SpanAvailWidth;
-
-        if (isSelected)
-            flags |= ImGuiTreeNodeFlags_Selected;
-
-        // Use selfHandle as a unique id
-        UINT64 uniqueID = (static_cast<UINT64>(entity.selfHandle.generation) << 32) | entity.selfHandle.index;
-        ImGui::TreeNodeEx(reinterpret_cast<void*>(uniqueID),
-            flags, "%s", entity.name.c_str());
-
-        if (ImGui::IsItemClicked())
-        {
-            selected = entity.selfHandle;
-        }
-
-        if (ImGui::BeginPopupContextItem())
-        {
-            if (ImGui::MenuItem("Delete"))
-            {
-                toDelete = entity.selfHandle;
-            }
-
-            ImGui::EndPopup();
-        }
+        if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
+            RenderEntityNode(entity, selected, toDelete);
     }
 
     m_sceneManager.Remove(toDelete);
@@ -524,6 +497,36 @@ void Renderer::BuildImGuiFrame()
         selected = {};
 
     ImGui::End();
+}
+
+void Renderer::RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete)
+{
+    bool isSelected = (entity.selfHandle == selected);
+
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth;
+    if (entity.children.empty())
+        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+    if (isSelected)
+        flags |= ImGuiTreeNodeFlags_Selected;
+
+    UINT64 id = (static_cast<UINT64>(entity.selfHandle.index) << 32) | entity.selfHandle.generation;
+    bool isExpanded = ImGui::TreeNodeEx(reinterpret_cast<void*>(id), flags, "%s", entity.name.c_str());
+
+    if (ImGui::IsItemClicked())
+        selected = entity.selfHandle;
+
+    if (ImGui::BeginPopupContextItem())
+    {
+        if (ImGui::MenuItem("Delete"))
+            toDelete = entity.selfHandle;
+        ImGui::EndPopup();
+    }
+    if (!(flags & ImGuiTreeNodeFlags_NoTreePushOnOpen) && isExpanded)
+    {
+        for (auto c : entity.children)
+            RenderEntityNode(*m_sceneManager.Get(c), selected, toDelete);
+        ImGui::TreePop();
+    }
 }
 
 void Renderer::LoadPipeline()
@@ -846,6 +849,7 @@ void Renderer::LoadAssets()
     m_sceneManager.SetMesh(hPlane, hCubeMesh);
     m_sceneManager.SetMaterial(hPlane, hPlaneMat);
 
+    auto hFolder = m_sceneManager.AddEntity("Folder");
     for (UINT i = 0; i < 10; i++)
     {
         for (UINT j = 0; j < 10; j++)
@@ -854,7 +858,9 @@ void Renderer::LoadAssets()
             m_sceneManager.AddTransform(hCube, XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 5.0f) * 4.0f, j * 4.0f, 10.0f));
             m_sceneManager.SetMesh(hCube, hCubeMesh);
             m_sceneManager.SetMaterial(hCube, hBaseMat);
+
             m_previewRotations.push_back(hCube);
+            m_sceneManager.AddChild(hFolder, hCube);
         }
     }
 
