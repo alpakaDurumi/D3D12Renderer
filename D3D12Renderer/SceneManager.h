@@ -85,6 +85,11 @@ public:
         if (pEntity->light.has_value())
             std::visit([&](auto&& handle) { Remove(handle); }, pEntity->light.value());
 
+        // Recursively Remove children entities
+        auto childrenCopy = pEntity->children;
+        for (auto child : childrenCopy)
+            Remove(child);
+
         // If it have parent, remove handle from parent's children
         auto* pParent = m_entities.Get(pEntity->parent);
         if (pParent)
