@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <tuple>
 #include <unordered_map>
+#include <functional>
 
 #include "RenderGraphNode.h"
 #include "CacheKeys.h"
@@ -24,14 +25,88 @@ public:
         SetFrameCount(frameCount);
     }
 
-    RGBuffer RegisterBuffer(const std::string& name, bool isPerFrame)
+    // Each register functions have two versions: Static list vs Dynamic list
+    // Latter needs provider function that dynamically provides actual list
+    RGBuffer RegisterBuffer(
+        const std::string& name,
+        bool isPerFrame)
     {
-        return { RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, {}) };
+        auto idx = RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, {});
+        m_bufferGroups[idx].isDynamic = false;
+        return { idx };
     }
 
-    RGTexture RegisterTexture(const std::string& name, bool isPerFrame, TextureResourceUsage initialUsage)
+    RGBuffer RegisterBuffer(
+        const std::string& name,
+        bool isPerFrame,
+        std::function<std::vector<ID3D12Resource*>()> provider)
     {
-        return { RegisterHelper(name, isPerFrame, m_textureGroups, m_textureMap, initialUsage) };
+        auto idx = RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, {});
+        m_bufferGroups[idx].isDynamic = true;
+        m_bufferGroups[idx].provider = provider;
+        return { idx };
+    }
+
+    RGTexture RegisterTexture(
+        const std::string& name,
+        bool isPerFrame,
+        TextureResourceUsage initialUsage,
+        UINT subresourceCount)
+    {
+        auto idx = RegisterHelper(name, isPerFrame, m_textureGroups, m_textureMap, initialUsage);
+        m_textureGroups[idx].isDynamic = false;
+        m_textureGroups[idx].subresourceCount = subresourceCount;
+        return { idx };
+    }
+
+    RGTexture RegisterTexture(
+        const std::string& name,
+        bool isPerFrame,
+        TextureResourceUsage initialUsage,
+        UINT subresourceCount,
+        std::function<std::vector<ID3D12Resource*>()> provider)
+    {
+        auto idx = RegisterHelper(name, isPerFrame, m_textureGroups, m_textureMap, initialUsage);
+        m_textureGroups[idx].isDynamic = true;
+        m_textureGroups[idx].subresourceCount = subresourceCount;
+        m_textureGroups[idx].provider = provider;
+        return { idx };
+    }
+
+    std::vector<ID3D12Resource*> GetResources(RGBuffer buffer, UINT frameIndex = 0) const
+    {
+        auto& group = m_bufferGroups[buffer.index];
+
+        if (group.isDynamic)
+        {
+            return group.provider();
+        }
+        else
+        {
+            UINT elementCount = GetElementCount(buffer);
+            std::vector<ID3D12Resource*> ret(elementCount);
+            for (UINT i = 0; i < elementCount; ++i)
+                ret[i] = Resolve(buffer, i, frameIndex);
+            return ret;
+        }
+    }
+
+    std::vector<ID3D12Resource*> GetResources(RGTexture texture, UINT frameIndex = 0) const
+    {
+        auto& group = m_textureGroups[texture.index];
+
+        if (group.isDynamic)
+        {
+            return group.provider();
+        }
+        else
+        {
+            UINT elementCount = GetElementCount(texture);
+            std::vector<ID3D12Resource*> ret(elementCount);
+            for (UINT i = 0; i < elementCount; ++i)
+                ret[i] = Resolve(texture, i, frameIndex);
+            return ret;
+        }
     }
 
     void AddElement(RGBuffer buffer, std::vector<ID3D12Resource*> pResources)
@@ -106,7 +181,7 @@ public:
         for (UINT i = 0; i < m_textureGroups.size(); ++i)
         {
             auto& group = m_textureGroups[i];
-            UINT subresourceCount = D3DHelper::GetSubresourceCount(m_pDevice, group.pResources.front());
+            UINT subresourceCount = group.subresourceCount;
             currentTextureUsages[i] = std::vector<TextureResourceUsage>(subresourceCount, group.initialUsage);
         }
 
@@ -137,7 +212,7 @@ public:
 
                 if (IndexOrFirstMipLevel == 0xffff'ffff && NumMipLevels == 0)
                 {
-                    UINT subresourceCount = D3DHelper::GetSubresourceCount(m_pDevice, m_textureGroups[texture.index].pResources.front());
+                    UINT subresourceCount = m_textureGroups[texture.index].subresourceCount;
 
                     for (UINT i = 0; i < subresourceCount; ++i)
                     {
@@ -186,7 +261,7 @@ public:
 
                 if (IndexOrFirstMipLevel == 0xffff'ffff && NumMipLevels == 0)
                 {
-                    UINT subresourceCount = D3DHelper::GetSubresourceCount(m_pDevice, m_textureGroups[texture.index].pResources.front());
+                    UINT subresourceCount = m_textureGroups[texture.index].subresourceCount;
 
                     for (UINT i = 0; i < subresourceCount; ++i)
                     {
@@ -235,8 +310,13 @@ private:
         std::vector<ID3D12Resource*> pResources;    // size = elementCount * (isPerFrame ? frameCount : 1)
         UINT elementCount;
         bool isPerFrame;
+        bool isDynamic;
+
+        UINT subresourceCount;
 
         TextureResourceUsage initialUsage;
+
+        std::function<std::vector<ID3D12Resource*>()> provider;
     };
 
     UINT RegisterHelper(

@@ -62,6 +62,8 @@ public:
     UINT GetDepthBufferHandle() const;
     void SetDepthBufferHandle(UINT handle);
 
+    virtual std::vector<ComPtr<ID3D12Resource>> TakeResources();
+
 protected:
     std::vector<CameraConstantData> m_cameraConstantData;
     std::vector<UploadAllocation> m_cameraUploadAllocations;    // transient, for single frame
@@ -118,6 +120,8 @@ public:
 
     UINT GetRenderTargetHandle() const;
     void SetRenderTargetHandle(UINT handle);
+
+    virtual std::vector<ComPtr<ID3D12Resource>> TakeResources() override;
 
 private:
     ComPtr<ID3D12Resource> m_renderTarget;

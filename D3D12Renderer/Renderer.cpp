@@ -277,6 +277,7 @@ void Renderer::OnRender()
     UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(pCommandAllocator, pCommandList);
     m_frameResources[m_frameIndex]->SetFenceValue(fenceValue);
     m_dynamicDescriptorHeapForCBVSRVUAV->QueueRetiredHeaps(fenceValue);
+    m_sceneManager.QueueDeferredDeletions(fenceValue, m_commandQueue->GetCompletedFenceValue());
 
     // Present the frame.
     UINT syncInterval = m_vSync ? 1 : 0;
@@ -870,17 +871,23 @@ void Renderer::LoadAssets()
     m_sceneManager.SetMaterial(hSphere, hBaseMat);
 
     // Set up lights
-    auto hDirectionalLight = CreateDirectionalLight();
-    auto* pDirectionalLight = m_sceneManager.Get(hDirectionalLight);
+    auto hDirectionalLight = m_sceneManager.AddEntity("DirectionalLight");
+    auto hDirectionalLightComponent = CreateDirectionalLight();
+    m_sceneManager.AddComponent(hDirectionalLight, hDirectionalLightComponent);
+    auto* pDirectionalLight = m_sceneManager.Get(hDirectionalLightComponent);
     pDirectionalLight->SetDirection(XMFLOAT3(-1.0f, -1.0f, 1.0f));
 
-    auto hPointLight = CreatePointLight();
-    auto* pPointLight = m_sceneManager.Get(hPointLight);
+    auto hPointLight = m_sceneManager.AddEntity("PointLight");
+    auto hPointLightComponent = CreatePointLight();
+    m_sceneManager.AddComponent(hPointLight, hPointLightComponent);
+    auto* pPointLight = m_sceneManager.Get(hPointLightComponent);
     pPointLight->SetPosition(XMFLOAT3(0.0f, 4.0f, 3.0f));
     pPointLight->SetRange(30.0f);
 
-    auto hSpotLight = CreateSpotLight();
-    auto* pSpotLight = m_sceneManager.Get(hSpotLight);
+    auto hSpotLight = m_sceneManager.AddEntity("SpotLight");
+    auto hSpotLightComponent = CreateSpotLight();
+    m_sceneManager.AddComponent(hSpotLight, hSpotLightComponent);
+    auto* pSpotLight = m_sceneManager.Get(hSpotLightComponent);
     pSpotLight->SetPosition(XMFLOAT3(0.0f, 10.0f, -5.0f));
     pSpotLight->SetDirection(XMFLOAT3(0.0f, -1.0f, 1.0f));
     pSpotLight->SetRange(50.0f);
@@ -896,8 +903,11 @@ void Renderer::LoadAssets()
     m_renderGraph.Init(m_device.Get(), FrameCount);
 
     // Back buffer
-    RGTexture backBuffer = m_renderGraph.RegisterTexture("BackBuffer", true,
-        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_PRESENT });
+    RGTexture backBuffer = m_renderGraph.RegisterTexture(
+        "BackBuffer",
+        true,
+        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_PRESENT },
+        GetSubresourceCount(m_device.Get(), m_frameResources.front()->GetRenderTarget()));
     std::vector<ID3D12Resource*> pBackBuffers;
     for (UINT i = 0; i < FrameCount; ++i)
     {
@@ -906,13 +916,19 @@ void Renderer::LoadAssets()
     m_renderGraph.AddElement(backBuffer, pBackBuffers);
 
     // Depth-stencil buffer
-    RGTexture depthStencilBuffer = m_renderGraph.RegisterTexture("DepthStencilBuffer", false,
-        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    RGTexture depthStencilBuffer = m_renderGraph.RegisterTexture(
+        "DepthStencilBuffer",
+        false,
+        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE },
+        GetSubresourceCount(m_device.Get(), m_depthStencilBuffer.Get()));
     m_renderGraph.AddElement(depthStencilBuffer, { m_depthStencilBuffer.Get() });
 
     // GBuffer
-    RGTexture gBuffer = m_renderGraph.RegisterTexture("GBuffer", true,
-        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    RGTexture gBuffer = m_renderGraph.RegisterTexture(
+        "GBuffer",
+        true,
+        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET },
+        GetSubresourceCount(m_device.Get(), m_frameResources.front()->GetGBuffer(GBufferSlot::ALBEDO)));
     for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
     {
         std::vector<ID3D12Resource*> pGBuffers;
@@ -924,19 +940,47 @@ void Renderer::LoadAssets()
     }
 
     // Light
-    RGTexture directionalLightDepthBuffer = m_renderGraph.RegisterTexture("DirectionalLight", false,
-        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    RGTexture pointLightRenderTarget = m_renderGraph.RegisterTexture("PointLight", false,
-        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    RGTexture spotLightDepthBuffer = m_renderGraph.RegisterTexture("SpotLight", false,
-        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    m_renderGraph.RegisterTexture(
+        "DirectionalLight",
+        false,
+        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE },
+        GetSubresourceCount(m_device.Get(), GetDepthStencilBufferDesc(m_shadowMapResolution, m_shadowMapResolution, MAX_CASCADES, false)),
+        [this]()
+        {
+            std::vector<ID3D12Resource*> pResources;
+            for (auto& light : m_sceneManager.GetDirectionalLights())
+                pResources.push_back(light.GetDepthBuffer());
+            return pResources;
+        }
+    );
 
-    for (const auto& light : m_sceneManager.GetDirectionalLights())
-        m_renderGraph.AddElement(directionalLightDepthBuffer, { light.GetDepthBuffer() });
-    for (const auto& light : m_sceneManager.GetPointLights())
-        m_renderGraph.AddElement(pointLightRenderTarget, { light.GetRenderTarget() });
-    for (const auto& light : m_sceneManager.GetSpotLights())
-        m_renderGraph.AddElement(spotLightDepthBuffer, { light.GetDepthBuffer() });
+    m_renderGraph.RegisterTexture(
+        "PointLight",
+        false,
+        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET },
+        GetSubresourceCount(m_device.Get(), GetRenderTargetDesc(m_shadowMapResolution, m_shadowMapResolution, POINT_LIGHT_ARRAY_SIZE, DXGI_FORMAT_R32_TYPELESS)),
+        [this]()
+        {
+            std::vector<ID3D12Resource*> pResources;
+            for (auto& light : m_sceneManager.GetPointLights())
+                pResources.push_back(light.GetRenderTarget());
+            return pResources;
+        }
+    );
+
+    m_renderGraph.RegisterTexture(
+        "SpotLight",
+        false,
+        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE },
+        GetSubresourceCount(m_device.Get(), GetDepthStencilBufferDesc(m_shadowMapResolution, m_shadowMapResolution, SPOT_LIGHT_ARRAY_SIZE, false)),
+        [this]()
+        {
+            std::vector<ID3D12Resource*> pResources;
+            for (auto& light : m_sceneManager.GetSpotLights())
+                pResources.push_back(light.GetDepthBuffer());
+            return pResources;
+        }
+    );
 
     PrepareRenderGraph();
     m_renderGraph.Compile();
@@ -1368,15 +1412,15 @@ void Renderer::ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID
 
     for (const auto& barrier : renderGraph.GetCompiledBufferBarriers(passType))
     {
-        UINT elementCount = renderGraph.GetElementCount(barrier.buffer);
-        for (UINT i = 0; i < elementCount; ++i)
+        auto pResources = renderGraph.GetResources(barrier.buffer, m_frameIndex);
+        for (const auto& pResource : pResources)
         {
             D3D12_BUFFER_BARRIER b = {
                 barrier.before.sync,
                 barrier.after.sync,
                 barrier.before.access,
                 barrier.after.access,
-                renderGraph.Resolve(barrier.buffer, i, m_frameIndex),
+                pResource,
                 0,
                 UINT64_MAX
             };
@@ -1386,8 +1430,8 @@ void Renderer::ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID
 
     for (const auto& barrier : renderGraph.GetCompiledTextureBarrier(passType))
     {
-        UINT elementCount = renderGraph.GetElementCount(barrier.texture);
-        for (UINT i = 0; i < elementCount; ++i)
+        auto pResources = renderGraph.GetResources(barrier.texture, m_frameIndex);
+        for (const auto& pResource : pResources)
         {
             D3D12_TEXTURE_BARRIER b = {
                 barrier.before.sync,
@@ -1396,7 +1440,7 @@ void Renderer::ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID
                 barrier.after.access,
                 barrier.before.layout,
                 barrier.after.layout,
-                renderGraph.Resolve(barrier.texture, i, m_frameIndex),
+                pResource,
                 barrier.subresourceRange,
                 D3D12_TEXTURE_BARRIER_FLAG_NONE
             };
@@ -1408,7 +1452,8 @@ void Renderer::ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID
     if (!bufferBarriers.empty()) barrierGroups.push_back(BufferBarrierGroup(static_cast<UINT32>(bufferBarriers.size()), bufferBarriers.data()));
     if (!textureBarriers.empty()) barrierGroups.push_back(TextureBarrierGroup(static_cast<UINT32>(textureBarriers.size()), textureBarriers.data()));
 
-    pCommandList->Barrier(static_cast<UINT32>(barrierGroups.size()), barrierGroups.data());
+    if (!barrierGroups.empty())
+        pCommandList->Barrier(static_cast<UINT32>(barrierGroups.size()), barrierGroups.data());
 }
 
 void Renderer::SetTextureFiltering(TextureFiltering filtering)

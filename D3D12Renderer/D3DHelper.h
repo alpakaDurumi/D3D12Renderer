@@ -41,6 +41,9 @@ namespace D3DHelper
     void CreateSRV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
     void CreateCBV(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr, UINT size, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
 
+    D3D12_RESOURCE_DESC1 GetDepthStencilBufferDesc(UINT64 width, UINT height, UINT16 depthOrArraySize, bool useStencil);
+    D3D12_RESOURCE_DESC1 GetRenderTargetDesc(UINT64 width, UINT height, UINT16 depthOrArraySize, DXGI_FORMAT format);
+
     void UpdateSubresources(
         ID3D12Device* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
@@ -89,6 +92,8 @@ namespace D3DHelper
     UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format);
 
     UINT GetSubresourceCount(ID3D12Device* pDevice, ID3D12Resource* pResource);
+    UINT GetSubresourceCount(ID3D12Device* pDevice, D3D12_RESOURCE_DESC desc);
+    UINT GetSubresourceCount(ID3D12Device* pDevice, D3D12_RESOURCE_DESC1 desc);
 
     UINT CalcSubresourceIndex(
         UINT mipIndex,

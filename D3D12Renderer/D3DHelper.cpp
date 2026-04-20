@@ -283,18 +283,7 @@ namespace D3DHelper
         heapProperties.CreationNodeMask = 1;
         heapProperties.VisibleNodeMask = 1;
 
-        D3D12_RESOURCE_DESC1 resourceDesc = {};
-        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        resourceDesc.Alignment = 0;
-        resourceDesc.Width = width;
-        resourceDesc.Height = height;
-        resourceDesc.DepthOrArraySize = depthOrArraySize;
-        resourceDesc.MipLevels = 1;
-        resourceDesc.Format = format;
-        resourceDesc.SampleDesc = { 1, 0 };
-        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
+        auto resourceDesc = GetRenderTargetDesc(width, height, depthOrArraySize, format);
 
         ThrowIfFailed(pDevice->CreateCommittedResource3(
             &heapProperties,
@@ -320,18 +309,7 @@ namespace D3DHelper
         heapProperties.CreationNodeMask = 1;
         heapProperties.VisibleNodeMask = 1;
 
-        D3D12_RESOURCE_DESC1 resourceDesc = {};
-        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        resourceDesc.Alignment = 0;
-        resourceDesc.Width = width;
-        resourceDesc.Height = height;
-        resourceDesc.DepthOrArraySize = depthOrArraySize;
-        resourceDesc.MipLevels = 1;
-        resourceDesc.Format = useStencil ? DXGI_FORMAT_R24G8_TYPELESS : DXGI_FORMAT_R32_TYPELESS;
-        resourceDesc.SampleDesc = { 1, 0 };
-        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
+        auto resourceDesc = GetDepthStencilBufferDesc(width, height, depthOrArraySize, useStencil);
 
         ThrowIfFailed(pDevice->CreateCommittedResource3(
             &heapProperties,
@@ -411,6 +389,40 @@ namespace D3DHelper
         cbvDesc.SizeInBytes = size;
 
         pDevice->CreateConstantBufferView(&cbvDesc, cpuHandle);
+    }
+
+    D3D12_RESOURCE_DESC1 GetDepthStencilBufferDesc(UINT64 width, UINT height, UINT16 depthOrArraySize, bool useStencil)
+    {
+        D3D12_RESOURCE_DESC1 desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Alignment = 0;
+        desc.Width = width;
+        desc.Height = height;
+        desc.DepthOrArraySize = depthOrArraySize;
+        desc.MipLevels = 1;
+        desc.Format = useStencil ? DXGI_FORMAT_R24G8_TYPELESS : DXGI_FORMAT_R32_TYPELESS;
+        desc.SampleDesc = { 1, 0 };
+        desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+        desc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
+        return desc;
+    }
+
+    D3D12_RESOURCE_DESC1 GetRenderTargetDesc(UINT64 width, UINT height, UINT16 depthOrArraySize, DXGI_FORMAT format)
+    {
+        D3D12_RESOURCE_DESC1 desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Alignment = 0;
+        desc.Width = width;
+        desc.Height = height;
+        desc.DepthOrArraySize = depthOrArraySize;
+        desc.MipLevels = 1;
+        desc.Format = format;
+        desc.SampleDesc = { 1, 0 };
+        desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        desc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
+        return desc;
     }
 
     // Assume that intermediate resource is already mapped
@@ -758,6 +770,18 @@ namespace D3DHelper
     UINT GetSubresourceCount(ID3D12Device* pDevice, ID3D12Resource* pResource)
     {
         auto desc = pResource->GetDesc();
+        return GetSubresourceCount(pDevice, desc);
+    }
+
+    UINT GetSubresourceCount(ID3D12Device* pDevice, D3D12_RESOURCE_DESC desc)
+    {
+        UINT ret = desc.MipLevels * GetFormatPlaneCount(pDevice, desc.Format);
+        if (desc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D) ret *= desc.DepthOrArraySize;
+        return ret;
+    }
+
+    UINT GetSubresourceCount(ID3D12Device* pDevice, D3D12_RESOURCE_DESC1 desc)
+    {
         UINT ret = desc.MipLevels * GetFormatPlaneCount(pDevice, desc.Format);
         if (desc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D) ret *= desc.DepthOrArraySize;
         return ret;

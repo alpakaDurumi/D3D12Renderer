@@ -156,6 +156,13 @@ void Light::SetDepthBufferHandle(UINT handle)
     m_hDepthBuffer = handle;
 }
 
+std::vector<ComPtr<ID3D12Resource>> Light::TakeResources()
+{
+    std::vector<ComPtr<ID3D12Resource>> ret;
+    ret.push_back(std::move(m_depthBuffer));
+    return ret;
+}
+
 DirectionalLight::DirectionalLight(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,
@@ -253,6 +260,13 @@ UINT PointLight::GetRenderTargetHandle() const
 void PointLight::SetRenderTargetHandle(UINT handle)
 {
     m_hRenderTarget = handle;
+}
+
+std::vector<ComPtr<ID3D12Resource>> PointLight::TakeResources()
+{
+    auto ret = Light::TakeResources();
+    ret.push_back(std::move(m_renderTarget));
+    return ret;
 }
 
 SpotLight::SpotLight(

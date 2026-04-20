@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <variant>
 #include <cassert>
+#include <queue>
 
 #include "SlotMap.h"
 #include "Mesh.h"
@@ -83,7 +84,16 @@ public:
         // Should delete material with 0 usage?
 
         if (pEntity->light.has_value())
-            std::visit([&](auto&& handle) { Remove(handle); }, pEntity->light.value());
+        {
+            auto lightHandle = pEntity->light.value();
+
+            auto resources = std::visit([&](auto&& handle) { return Get(handle)->TakeResources(); }, lightHandle);
+            for (auto& res : resources)
+                m_deferred.push_back(std::move(res));
+
+            // It is valid to Remove Light after moving resources
+            std::visit([&](auto&& handle) { Remove(handle); }, lightHandle);
+        }
 
         // Recursively Remove children entities
         auto childrenCopy = pEntity->children;
@@ -473,6 +483,18 @@ public:
         return m_textures.GetDense();
     }
 
+    void QueueDeferredDeletions(UINT64 fenceValue, UINT64 completedFenceValue)
+    {
+        // 1. push resources to queue with fenceValue
+        for (auto& res : m_deferred)
+            m_deletionQueue.push({ fenceValue, std::move(res) });
+        m_deferred.clear();
+
+        // 2. Delete resources that completed in GPU timeline
+        while (!m_deletionQueue.empty() && m_deletionQueue.front().fenceValue <= completedFenceValue)
+            m_deletionQueue.pop();
+    }
+
 private:
     void Remove(DirectionalLightHandle handle)
     {
@@ -506,4 +528,13 @@ private:
     SlotMap<Texture> m_textures;
 
     SlotMap<Entity> m_entities;
+
+    std::vector<ComPtr<ID3D12Resource>> m_deferred;     // List of resources requested to be removed
+
+    struct DeferredResource
+    {
+        UINT64 fenceValue;
+        ComPtr<ID3D12Resource> resource;
+    };
+    std::queue<DeferredResource> m_deletionQueue;
 };
