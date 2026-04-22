@@ -279,13 +279,13 @@ public:
 
         for (const auto& entity : m_entities.GetDense())
         {
-            if (!entity.transform.has_value() && !entity.meshRenderer.has_value()) continue;
+            if (!entity.meshRenderer.has_value()) continue;
 
             auto meshHandle = entity.meshRenderer->mesh;
             auto matHandle = entity.meshRenderer->material;
 
             auto matIdx = m_materials.GetDenseIndex(matHandle);
-            auto data = BuildInstanceData(entity.transform->GetRenderTransform(), matIdx);
+            auto data = BuildInstanceData(entity.transform->GetWorldRenderTransform(), matIdx);
 
             auto renderingPath = GetMaterial(matHandle)->GetRenderingPath();
 

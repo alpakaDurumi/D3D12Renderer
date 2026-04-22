@@ -883,6 +883,7 @@ void Renderer::LoadAssets()
     m_sceneManager.SetMaterial(hPlane, hPlaneMat);
 
     auto hFolder = m_sceneManager.AddEntity("Folder");
+    m_sceneManager.AddTransform(hFolder);
     for (UINT i = 0; i < 10; i++)
     {
         for (UINT j = 0; j < 10; j++)
@@ -1913,8 +1914,11 @@ void Renderer::PrepareConstantData(float alpha)
     // Transforms
     for (auto& entity : m_sceneManager.GetEntities())
     {
-        if (!entity.transform.has_value()) continue;
-        entity.transform->UpdateRenderState(alpha);
+        if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
+        {
+            XMMATRIX accumulated = XMMatrixIdentity();
+            PrepareTransform(entity, accumulated, alpha);
+        }
     }
 
     // Main Camera
@@ -1954,6 +1958,20 @@ void Renderer::PrepareConstantData(float alpha)
         light.SetIdxInArray(idx);
         ++idx;
     }
+}
+
+void Renderer::PrepareTransform(Entity& entity, XMMATRIX& accumulated, float alpha)
+{
+    if (!entity.transform.has_value()) return;
+
+    entity.transform->UpdateLocalRenderState(alpha);
+    XMMATRIX localRenderTransform = XMLoadFloat4x4(&entity.transform->GetLocalRenderTransform());
+
+    XMMATRIX world = localRenderTransform * accumulated;
+    entity.transform->SetWorldRenderTransform(world);
+
+    for (auto& child : entity.children)
+        PrepareTransform(*m_sceneManager.Get(child), world, alpha);
 }
 
 std::vector<BoundingSphere> Renderer::CalcCascadeSpheres()

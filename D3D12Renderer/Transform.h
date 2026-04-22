@@ -20,7 +20,7 @@ public:
         m_prevT = XMFLOAT3(0.0f, 0.0f, 0.0f);
         m_currT = XMFLOAT3(0.0f, 0.0f, 0.0f);
 
-        XMStoreFloat4x4(&m_renderTransform, XMMatrixIdentity());
+        XMStoreFloat4x4(&m_localRenderTransform, XMMatrixIdentity());
     }
 
     Transform(const XMFLOAT3& s, const XMFLOAT3& eulerRad, const XMFLOAT3& t)
@@ -33,7 +33,7 @@ public:
 
         m_prevT = m_currT = t;
 
-        XMStoreFloat4x4(&m_renderTransform, XMMatrixIdentity());
+        XMStoreFloat4x4(&m_localRenderTransform, XMMatrixIdentity());
     }
 
     void SnapshotState()
@@ -63,7 +63,8 @@ public:
         m_currT.z += t.z;
     }
 
-    void UpdateRenderState(float alpha)
+    // Calculate local transform
+    void UpdateLocalRenderState(float alpha)
     {
         XMVECTOR prevS = XMVectorSetW(XMLoadFloat3(&m_prevS), 0.0f);
         XMVECTOR currS = XMVectorSetW(XMLoadFloat3(&m_currS), 0.0f);
@@ -76,28 +77,22 @@ public:
         XMVECTOR renderR = XMQuaternionSlerp(prevR, currR, alpha);
         XMVECTOR renderT = XMVectorLerp(prevT, currT, alpha);
 
-        XMStoreFloat4x4(&m_renderTransform, XMMatrixAffineTransformation(renderS, XMVectorZero(), renderR, renderT));
+        XMStoreFloat4x4(&m_localRenderTransform, XMMatrixAffineTransformation(renderS, XMVectorZero(), renderR, renderT));
     }
 
-    const XMFLOAT4X4& GetRenderTransform() const
+    const XMFLOAT4X4& GetLocalRenderTransform() const
     {
-        return m_renderTransform;
+        return m_localRenderTransform;
     }
 
-    InstanceData BuildInstanceData(UINT matIdx) const
+    void SetWorldRenderTransform(const XMMATRIX& transform)
     {
-        InstanceData ret;
+        XMStoreFloat4x4(&m_worldRenderTransform, transform);
+    }
 
-        auto world = XMLoadFloat4x4(&m_renderTransform);
-
-        XMStoreFloat4x4(&ret.world, XMMatrixTranspose(world));
-
-        world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        XMStoreFloat4x4(&ret.inverseTranspose, XMMatrixInverse(nullptr, world));
-
-        ret.materialIndex = matIdx;
-
-        return ret;
+    XMFLOAT4X4 GetWorldRenderTransform() const
+    {
+        return m_worldRenderTransform;
     }
 
     XMFLOAT3 GetScale() const
@@ -171,7 +166,8 @@ private:
     XMFLOAT4 m_prevR, m_currR;
     XMFLOAT3 m_prevT, m_currT;
 
-    XMFLOAT4X4 m_renderTransform;
+    XMFLOAT4X4 m_localRenderTransform;
+    XMFLOAT4X4 m_worldRenderTransform;
 
     XMFLOAT3 m_eulerCache;
 };
