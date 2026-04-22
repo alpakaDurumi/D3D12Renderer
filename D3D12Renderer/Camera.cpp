@@ -5,8 +5,6 @@ Camera::Camera(XMFLOAT3 initialPosition)
 {
     m_prevPosition = initialPosition;
     m_currPosition = initialPosition;
-    m_orientation = { 0.0f, 0.0f, 1.0f };
-    m_up = { 0.0f, 1.0f, 0.0f };
 
     m_yaw = 0.0f;
     m_pitch = 0.0f;
@@ -42,7 +40,13 @@ float Camera::GetFarPlane() const
 
 XMMATRIX Camera::GetViewMatrix() const
 {
-    return XMMatrixLookToLH(XMLoadFloat3(&m_renderPosition), XMLoadFloat3(&m_orientation), XMLoadFloat3(&m_up));
+    XMVECTOR pos = XMLoadFloat3(&m_renderPosition);
+    XMVECTOR rot = XMLoadFloat4(&m_rotation);
+
+    XMVECTOR forward = XMVector3Rotate(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), rot);
+    XMVECTOR up = XMVector3Rotate(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), rot);
+
+    return XMMatrixLookToLH(pos, forward, up);
 }
 
 XMMATRIX Camera::GetProjectionMatrix(bool usePerspectiveProjection) const
@@ -71,48 +75,48 @@ void Camera::SnapshotState()
 
 void Camera::MoveForward(float speedScale)
 {
-    XMVECTOR position = XMLoadFloat3(&m_currPosition);
-    XMVECTOR orientation = XMLoadFloat3(&m_orientation);
+    XMVECTOR pos = XMLoadFloat3(&m_currPosition);
+    XMVECTOR rot = XMLoadFloat4(&m_rotation);
 
-    XMVECTOR nextPosition = position + orientation * speedScale;
+    XMVECTOR forward = XMVector3Rotate(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), rot);
 
-    XMStoreFloat3(&m_currPosition, nextPosition);
+    pos += forward * speedScale;
+
+    XMStoreFloat3(&m_currPosition, pos);
 }
 
 void Camera::MoveRight(float speedScale)
 {
-    XMVECTOR position = XMLoadFloat3(&m_currPosition);
-    XMVECTOR orientation = XMLoadFloat3(&m_orientation);
-    XMVECTOR up = XMLoadFloat3(&m_up);
+    XMVECTOR pos = XMLoadFloat3(&m_currPosition);
+    XMVECTOR rot = XMLoadFloat4(&m_rotation);
 
-    XMVECTOR right = XMVector3Normalize(XMVector3Cross(up, orientation));
+    XMVECTOR right = XMVector3Rotate(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), rot);
 
-    XMVECTOR nextPosition = position + right * speedScale;
+    pos += right * speedScale;
 
-    XMStoreFloat3(&m_currPosition, nextPosition);
+    XMStoreFloat3(&m_currPosition, pos);
 }
 
 void Camera::MoveUp(float speedScale)
 {
-    XMVECTOR position = XMLoadFloat3(&m_currPosition);
-    XMVECTOR up = XMLoadFloat3(&m_up);
+    XMVECTOR pos = XMLoadFloat3(&m_currPosition);
+    XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
-    XMVECTOR nextPosition = position + up * speedScale;
+    pos += up * speedScale;
 
-    XMStoreFloat3(&m_currPosition, nextPosition);
+    XMStoreFloat3(&m_currPosition, pos);
 }
 
 void Camera::Rotate(XMINT2 mouseMove)
 {
-    const float sensitivity = 0.005f;
-    
-    m_yaw += mouseMove.x * sensitivity * XM_PIDIV2;
-    m_pitch += mouseMove.y * sensitivity * XM_PIDIV2;
+    const float radiansPerPixel = 0.0035f;
 
-    m_pitch = std::clamp(m_pitch, -XM_PIDIV2, XM_PIDIV2);
+    m_yaw += mouseMove.x * radiansPerPixel;
+    m_pitch += mouseMove.y * radiansPerPixel;
+    m_pitch = std::clamp(m_pitch, -XM_PIDIV2 + 0.01f, XM_PIDIV2 - 0.01f);
 
-    XMVECTOR lookDirection = XMVector3Transform(g_XMIdentityR2, XMMatrixRotationRollPitchYaw(m_pitch, m_yaw, 0.0f));
-    XMStoreFloat3(&m_orientation, lookDirection);
+    XMVECTOR q = XMQuaternionRotationRollPitchYaw(m_pitch, m_yaw, 0.0f);
+    XMStoreFloat4(&m_rotation, q);
 }
 
 float Camera::CalcVerticalFOV(float horizontalFOV)
