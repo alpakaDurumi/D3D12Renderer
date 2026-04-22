@@ -242,7 +242,6 @@ void Renderer::OnRender()
 {
     auto [pCommandAllocator, pCommandList] = m_commandQueue->GetAvailableCommandList();
 
-    BuildImGuiFrame();
     PopulateCommandList(pCommandList);
 
     m_dynamicDescriptorHeapForCBVSRVUAV->Reset();

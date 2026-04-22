@@ -63,6 +63,8 @@ public:
     void OnResize(UINT width, UINT height);
     void OnDpiChanged(UINT dpi);
 
+    void BuildImGuiFrame();
+
     static void ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle);
     static void ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle);
 
@@ -155,7 +157,6 @@ private:
     void MoveToNextFrame();
 
     void InitImGui();
-    void BuildImGuiFrame();
     void RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete, bool& selectionChanged);
 
     void PrepareRenderGraph();
