@@ -20,6 +20,11 @@ public:
             return this->index == other.index &&
                 this->generation == other.generation;
         }
+
+        bool operator!=(const Handle& other) const
+        {
+            return !(*this == other);
+        }
     };
 
     Handle Add(T&& obj)

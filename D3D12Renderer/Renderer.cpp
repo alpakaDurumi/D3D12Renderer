@@ -478,6 +478,8 @@ void Renderer::BuildImGuiFrame()
 
     ImGui::End();
 
+    bool selectionChanged = false;
+
     // Hierarchy
     ImGui::Begin("Hierarchy");
 
@@ -490,7 +492,7 @@ void Renderer::BuildImGuiFrame()
     for (const auto& entity : m_sceneManager.GetEntities())
     {
         if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
-            RenderEntityNode(entity, selected, toDelete);
+            RenderEntityNode(entity, selected, toDelete, selectionChanged);
     }
 
     m_sceneManager.Remove(toDelete);
@@ -498,9 +500,37 @@ void Renderer::BuildImGuiFrame()
         selected = {};
 
     ImGui::End();
+
+    // Inspector
+    ImGui::Begin("Inspector");
+
+    auto* pEntity = m_sceneManager.Get(selected);
+    if (pEntity)
+    {
+        if (pEntity->transform.has_value())
+        {
+            auto& transform = pEntity->transform.value();
+
+            XMFLOAT3 s = transform.GetScale();
+            if (ImGui::DragFloat3("Scale", &s.x))
+                transform.SetScale(s);
+
+            XMFLOAT3 eulerR = transform.GetEulerCache(selectionChanged);
+            if (ImGui::DragFloat3("Rotation", &eulerR.x))
+            {
+                transform.SetRotation(eulerR);
+            }
+
+            XMFLOAT3 t = transform.GetTranslation();
+            if (ImGui::DragFloat3("Translation", &t.x))
+                transform.SetTranslation(t);
+        }
+    }
+
+    ImGui::End();
 }
 
-void Renderer::RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete)
+void Renderer::RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete, bool& selectionChanged)
 {
     bool isSelected = (entity.selfHandle == selected);
 
@@ -513,8 +543,11 @@ void Renderer::RenderEntityNode(const Entity& entity, EntityHandle& selected, En
     UINT64 id = (static_cast<UINT64>(entity.selfHandle.index) << 32) | entity.selfHandle.generation;
     bool isExpanded = ImGui::TreeNodeEx(reinterpret_cast<void*>(id), flags, "%s", entity.name.c_str());
 
-    if (ImGui::IsItemClicked())
+    if (ImGui::IsItemClicked() && selected != entity.selfHandle)
+    {
         selected = entity.selfHandle;
+        selectionChanged = true;
+    }
 
     if (ImGui::BeginPopupContextItem())
     {
@@ -525,7 +558,7 @@ void Renderer::RenderEntityNode(const Entity& entity, EntityHandle& selected, En
     if (!(flags & ImGuiTreeNodeFlags_NoTreePushOnOpen) && isExpanded)
     {
         for (auto c : entity.children)
-            RenderEntityNode(*m_sceneManager.Get(c), selected, toDelete);
+            RenderEntityNode(*m_sceneManager.Get(c), selected, toDelete, selectionChanged);
         ImGui::TreePop();
     }
 }

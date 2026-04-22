@@ -156,7 +156,7 @@ private:
 
     void InitImGui();
     void BuildImGuiFrame();
-    void RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete);
+    void RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete, bool& selectionChanged);
 
     void PrepareRenderGraph();
     void ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID3D12GraphicsCommandList7* pCommandList);
