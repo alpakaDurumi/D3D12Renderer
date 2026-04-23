@@ -13,8 +13,8 @@ public:
     {
         if (key < 256)
         {
-            m_keyPressed[key] = true;
             m_keyDown[key] = true;
+            m_keyPressed[key] = true;
         }
     }
 
@@ -31,6 +31,27 @@ public:
     bool IsKeyPressed(WPARAM key) const
     {
         return m_keyPressed[key];
+    }
+
+    void SetMouseButtonDown(UINT button)
+    {
+        m_mouseButtonDown[button] = true;
+        m_mouseButtonPressed[button] = true;
+    }
+
+    void SetMouseButtonUp(UINT button)
+    {
+        m_mouseButtonDown[button] = false;
+    }
+
+    bool IsMouseButtonDown(UINT button) const
+    {
+        return m_mouseButtonDown[button];
+    }
+
+    bool IsMouseButtonPressed(UINT button) const
+    {
+        return m_mouseButtonPressed[button];
     }
 
     // Accumulate mouse moves.
@@ -53,9 +74,10 @@ public:
         return delta;
     }
 
-    void ResetKeyPressed()
+    void ResetPressedFlags()
     {
         memset(m_keyPressed, false, sizeof(m_keyPressed));
+        memset(m_mouseButtonPressed, false, sizeof(m_mouseButtonPressed));
     }
 
 private:
@@ -63,5 +85,9 @@ private:
     bool m_keyPressed[256] = { false };
     int m_lastPosX = -1;
     int m_lastPosY = -1;
+
+    // 0 = LMB, 1 = RMB, 2 = MMB
+    bool m_mouseButtonDown[3] = { false };
+    bool m_mouseButtonPressed[3] = { false };
     XMINT2 m_mouseMove = { 0, 0 };
 };

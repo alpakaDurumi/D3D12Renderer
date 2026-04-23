@@ -156,6 +156,42 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
             renderer->OnKeyUp(wParam);
         }
         return 0;
+    case WM_LBUTTONDOWN:
+        if (renderer)
+        {
+            renderer->OnMouseButtonDown(0);
+        }
+        return 0;
+    case WM_LBUTTONUP:
+        if (renderer)
+        {
+            renderer->OnMouseButtonUp(0);
+        }
+        return 0;
+    case WM_RBUTTONDOWN:
+        if (renderer)
+        {
+            renderer->OnMouseButtonDown(1);
+        }
+        return 0;
+    case WM_RBUTTONUP:
+        if (renderer)
+        {
+            renderer->OnMouseButtonUp(1);
+        }
+        return 0;
+    case WM_MBUTTONDOWN:
+        if (renderer)
+        {
+            renderer->OnMouseButtonDown(2);
+        }
+        return 0;
+    case WM_MBUTTONUP:
+        if (renderer)
+        {
+            renderer->OnMouseButtonUp(2);
+        }
+        return 0;
     case WM_MOUSEMOVE:
         if (renderer)
         {

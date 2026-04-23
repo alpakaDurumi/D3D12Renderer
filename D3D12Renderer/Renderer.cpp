@@ -226,6 +226,9 @@ void Renderer::OnUpdate()
     {
         FixedUpdate(fixedDtMs);
         accumulatedMs -= fixedDtMs;
+
+        // Pressed flags is remains valid for one tick
+        m_inputManager.ResetPressedFlags();
     }
 
     float alpha = std::clamp(static_cast<float>(accumulatedMs / fixedDtMs), 0.0f, 1.0f);
@@ -306,6 +309,16 @@ void Renderer::OnKeyDown(WPARAM key)
 void Renderer::OnKeyUp(WPARAM key)
 {
     m_inputManager.SetKeyUp(key);
+}
+
+void Renderer::OnMouseButtonDown(UINT button)
+{
+    m_inputManager.SetMouseButtonDown(button);
+}
+
+void Renderer::OnMouseButtonUp(UINT button)
+{
+    m_inputManager.SetMouseButtonUp(button);
 }
 
 void Renderer::OnMouseMove(int xPos, int yPos)
@@ -1875,9 +1888,7 @@ void Renderer::FixedUpdate(double fixedDtMs)
     {
         m_vSync = !m_vSync;
     }
-
-    m_inputManager.ResetKeyPressed();
-
+    
     // Camera
     static float cameraMoveSpeed = 10.0f;
 
@@ -1922,8 +1933,11 @@ void Renderer::PrepareConstantData(float alpha)
     }
 
     // Main Camera
+    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
+
     m_camera.UpdateRenderState(alpha);
-    m_camera.Rotate(m_inputManager.GetAndResetMouseMove());
+    if (m_inputManager.IsMouseButtonDown(1))
+        m_camera.Rotate(mouseMove);
     m_cameraConstantData.SetPos(m_camera.GetPosition());
     m_cameraConstantData.SetView(m_camera.GetViewMatrix());
     m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());

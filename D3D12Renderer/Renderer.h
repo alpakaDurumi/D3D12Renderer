@@ -59,6 +59,8 @@ public:
     void OnDestroy();
     void OnKeyDown(WPARAM key);
     void OnKeyUp(WPARAM key);
+    void OnMouseButtonDown(UINT button);
+    void OnMouseButtonUp(UINT button);
     void OnMouseMove(int xPos, int yPos);
     void OnResize(UINT width, UINT height);
     void OnDpiChanged(UINT dpi);
