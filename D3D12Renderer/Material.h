@@ -1,16 +1,16 @@
 #pragma once
 
-#include <d3d12.h>
+#include <Windows.h>
 
-#include <vector>
-#include <memory>
-#include <utility>
+#include <d3d12.h>
+#include <DirectXMath.h>
+
 #include <array>
 #include <cstddef>
+#include <vector>
 
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
-#include "FrameResource.h"
 #include "SharedConfig.h"
 
 enum class TextureSlot
@@ -33,28 +33,11 @@ class Material
 public:
     Material(
         ID3D12Device10* pDevice,
-        DescriptorAllocation&& allocation,
-        const std::vector<std::unique_ptr<FrameResource>>& frameResources)
+        DescriptorAllocation&& allocation)
     {
-        assert(allocation.GetNumHandles() == frameResources.size());
-
-        auto allocations = allocation.Split();
-
-        // Create constant buffers
-        for (UINT i = 0; i < frameResources.size(); ++i)
-        {
-            FrameResource& frameResource = *frameResources[i];
-
-            if (i == 0) m_constantBufferIndex = frameResource.GetMaterialConstantBufferCount();
-            frameResource.AddMaterialConstantBuffer(std::move(allocations[i]));
-        }
+        m_cbvAllocations = allocation.Split();
 
         m_textureAddressingModes.fill(TextureAddressingMode::WRAP);
-    }
-
-    UINT GetMaterialConstantBufferIndex() const
-    {
-        return m_constantBufferIndex;
     }
 
     void SetAmbient(XMFLOAT4 ambient)
@@ -121,6 +104,16 @@ public:
         return &m_constantData;
     }
 
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCBVHandle(UINT frameIndex) const
+    {
+        return m_cbvAllocations[frameIndex].GetDescriptorHandle();
+    }
+
+    DescriptorAllocation& GetCBVAllocationRef(UINT frameIndex)
+    {
+        return m_cbvAllocations[frameIndex];
+    }
+
     void CopyDataFrom(const Material& src)
     {
         m_constantData = src.m_constantData;
@@ -145,7 +138,7 @@ private:
     }
 
     MaterialConstantData m_constantData;
-    UINT m_constantBufferIndex;
+    std::vector<DescriptorAllocation> m_cbvAllocations;
 
     std::array<TextureAddressingMode, static_cast<std::size_t>(TextureSlot::NUM_TEXTURE_SLOTS)> m_textureAddressingModes;
 

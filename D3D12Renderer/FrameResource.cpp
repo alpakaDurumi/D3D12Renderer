@@ -14,7 +14,8 @@ FrameResource::FrameResource(
     : m_pDevice(pDevice),
     m_rtvAllocation(std::move(rtvAllocation)),
     m_gBufferRTVAllocation(std::move(gBufferRTVAllocation)),
-    m_gBufferSRVAllocation(std::move(gBufferSRVAllocation))
+    m_gBufferSRVAllocation(std::move(gBufferSRVAllocation)),
+    m_uploadAllocator(pDevice)
 {
     assert(!m_rtvAllocation.IsNull() &&
         m_gBufferRTVAllocation.GetNumHandles() == static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS) &&
@@ -22,9 +23,9 @@ FrameResource::FrameResource(
 
     AcquireBackBuffer(pSwapChain, frameIndex);
 
-    CreateRTV(m_pDevice, m_renderTarget.Get(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_rtvAllocation.GetDescriptorHandle());
+    D3DHelper::CreateRTV(m_pDevice, m_renderTarget.Get(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_rtvAllocation.GetDescriptorHandle());
 
-    CreateUploadBuffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, m_instanceUploadBuffer);
+    D3DHelper::CreateUploadBuffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, m_instanceUploadBuffer);
     D3D12_RANGE readRange = { 0, 0 };
     D3DHelper::ThrowIfFailed(m_instanceUploadBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
 
@@ -54,7 +55,7 @@ void FrameResource::EnsureInstanceCapacity(UINT requiredSize)
 
         m_instanceCapacity = Utility::CeilPowerOfTwo(requiredSize);
 
-        CreateUploadBuffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, m_instanceUploadBuffer);
+        D3DHelper::CreateUploadBuffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, m_instanceUploadBuffer);
         D3D12_RANGE readRange = { 0, 0 };
         D3DHelper::ThrowIfFailed(m_instanceUploadBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
     }
@@ -66,10 +67,10 @@ void FrameResource::CreateGBuffers(UINT64 width, UINT height)
     {
         auto format = GetGBufferFormat(static_cast<GBufferSlot>(i));
 
-        CreateRenderTarget(m_pDevice, width, height, format, format, 1, m_gBuffers[i]);
+        D3DHelper::CreateRenderTarget(m_pDevice, width, height, format, format, 1, m_gBuffers[i]);
 
-        CreateRTV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferRTVAllocation.GetDescriptorHandle(i));
-        CreateSRV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferSRVAllocation.GetDescriptorHandle(i));
+        D3DHelper::CreateRTV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferRTVAllocation.GetDescriptorHandle(i));
+        D3DHelper::CreateSRV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferSRVAllocation.GetDescriptorHandle(i));
     }
 }
 
@@ -118,74 +119,9 @@ UINT64 FrameResource::GetFenceValue() const
     return m_fenceValue;
 }
 
-UINT FrameResource::GetCameraConstantBufferCount() const
+UploadAllocation FrameResource::PushConstantData(void* src, std::size_t size)
 {
-    return static_cast<UINT>(m_cameraConstantBuffers.size());
-}
-
-UINT FrameResource::GetMaterialConstantBufferCount() const
-{
-    return static_cast<UINT>(m_materialConstantBuffers.size());
-}
-
-void FrameResource::AddCameraConstantBuffer()
-{
-    m_cameraConstantBuffers.push_back(std::make_unique<CameraCB>(m_pDevice));
-}
-
-void FrameResource::CreateShadowConstantBuffer()
-{
-    m_shadowConstantBuffer = std::make_unique<ShadowCB>(m_pDevice);
-}
-
-void FrameResource::AddLightConstantBuffer(DescriptorAllocation&& allocation)
-{
-    m_lightConstantBuffers.push_back(std::make_unique<LightCB>(m_pDevice, std::move(allocation)));
-}
-
-void FrameResource::AddMaterialConstantBuffer(DescriptorAllocation&& allocation)
-{
-    m_materialConstantBuffers.push_back(std::make_unique<MaterialCB>(m_pDevice, std::move(allocation)));
-}
-
-DescriptorAllocation& FrameResource::GetMaterialCBVAllocationRef(UINT idx)
-{
-    return m_materialConstantBuffers[idx]->GetAllocationRef();
-}
-
-DescriptorAllocation& FrameResource::GetLightCBVAllocationRef(UINT idx)
-{
-    return m_lightConstantBuffers[idx]->GetAllocationRef();
-}
-
-D3D12_GPU_VIRTUAL_ADDRESS FrameResource::GetCameraCBVirtualAddress(UINT idx) const
-{
-    return m_cameraConstantBuffers[idx]->GetGPUVirtualAddress();
-}
-
-D3D12_GPU_VIRTUAL_ADDRESS FrameResource::GetShadowCBVirtualAddress() const
-{
-    return m_shadowConstantBuffer->GetGPUVirtualAddress();
-}
-
-void FrameResource::UpdateCameraConstantBuffer(UINT idx, CameraConstantData* pData)
-{
-    m_cameraConstantBuffers[idx]->Update(pData);
-}
-
-void FrameResource::UpdateShadowConstantBuffer(ShadowConstantData* pData)
-{
-    m_shadowConstantBuffer->Update(pData);
-}
-
-void FrameResource::UpdateMaterialConstantBuffer(UINT idx, MaterialConstantData* pData)
-{
-    m_materialConstantBuffers[idx]->Update(pData);
-}
-
-void FrameResource::UpdateLightConstantBuffer(UINT idx, LightConstantData* pData)
-{
-    m_lightConstantBuffers[idx]->Update(pData);
+    return m_uploadAllocator.Push(src, size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 }
 
 void FrameResource::PushInstanceData(std::vector<InstanceData>& data)

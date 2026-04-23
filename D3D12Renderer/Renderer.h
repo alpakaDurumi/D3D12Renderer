@@ -20,20 +20,17 @@
 #include "ConstantData.h"
 #include "CommandQueue.h"
 #include "FrameResource.h"
-#include "UploadBuffer.h"
-#include "Mesh.h"
 #include "DescriptorAllocator.h"
-#include "Texture.h"
 #include "DynamicDescriptorHeap.h"
 #include "RootSignature.h"
 #include "ImGuiDescriptorAllocator.h"
 #include "CacheKeys.h"
 #include "Light.h"
-#include "Material.h"
-#include "RenderObject.h"
 #include "SharedConfig.h"
-#include "ResourceRegistry.h"
-#include "RenderGraphNode.h"
+#include "RenderGraph.h"
+#include "TransientUploadAllocator.h"
+#include "Aliases.h"
+#include "SceneManager.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -66,6 +63,8 @@ public:
     void OnResize(UINT width, UINT height);
     void OnDpiChanged(UINT dpi);
 
+    void BuildImGuiFrame();
+
     static void ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle);
     static void ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle);
 
@@ -97,7 +96,6 @@ private:
     std::unique_ptr<DynamicDescriptorHeap> m_dynamicDescriptorHeapForCBVSRVUAV;
     ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
     std::unique_ptr<CommandQueue> m_commandQueue;
-    std::unique_ptr<UploadBuffer> m_uploadBuffer;
     std::array<std::unique_ptr<DescriptorAllocator>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
     std::vector<std::unique_ptr<FrameResource>> m_frameResources;
 
@@ -118,46 +116,23 @@ private:
     // 
     // Main Camera
     Camera m_camera;
-    UINT m_mainCameraIndex = 0;
     CameraConstantData m_cameraConstantData;
+    UploadAllocation m_cameraUploadAllocation;
 
     InputManager m_inputManager;
 
-    std::array<RenderGraphNode, static_cast<std::size_t>(PassType::NUM_PASS_TYPES)> m_renderGraph;
+    RenderGraph m_renderGraph;
 
-    // Resource handles
-    ResourceRegistry m_resourceRegistry;
-    ResourceHandle m_hBackBuffer;
-    ResourceHandle m_hDepthStencilBuffer;
-    ResourceHandle m_hGBuffer;
-    ResourceHandle m_hDirectionalLightDepthBuffer;
-    ResourceHandle m_hPointLightRenderTarget;
-    ResourceHandle m_hSpotLightDepthBuffer;
+    SceneManager m_sceneManager;
 
-    struct InstanceRange
-    {
-        UINT offset;            // offset in instance buffer
-        UINT forwardCount;
-        UINT deferredCount;
-    };
+    std::vector<EntityHandle> m_previewRotations;
 
-    std::vector<std::unique_ptr<Mesh>> m_meshes;
-    std::unordered_map<Mesh*, InstanceRange> m_instanceRanges;
-    std::unordered_map<Mesh*, std::vector<RenderObject>> m_forwardRenderObjects;
-    std::unordered_map<Mesh*, std::vector<RenderObject>> m_deferredRenderObjects;
-
-    std::vector<RenderObject*> m_previewRotations;
-
-    std::vector<std::unique_ptr<Material>> m_materials;
-
-    std::vector<std::unique_ptr<Texture>> m_textures;
-
-    // Lights, Shadows
-    std::array<std::vector<std::unique_ptr<Light>>, static_cast<std::size_t>(LightType::NUM_LIGHT_TYPES)> m_lights;
+    // Shadows
     D3D12_VIEWPORT m_shadowMapViewport;
     D3D12_RECT m_shadowMapScissorRect;
     UINT m_shadowMapResolution = 2048;
     ShadowConstantData m_shadowConstantData;
+    UploadAllocation m_shadowUploadAllocation;
 
     TextureFiltering m_currentTextureFiltering = TextureFiltering::ANISOTROPIC_X16;
 
@@ -178,28 +153,39 @@ private:
     void LoadPipeline();
     void LoadAssets();
     void PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList);
-    void BuildImGuiFrame();
     void WaitForGPU();
     void MoveToNextFrame();
+
     void InitImGui();
+    void RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete, bool& selectionChanged);
 
     void PrepareRenderGraph();
-    void CompileRenderGraph();
-    void ApplyPassBarriers(PassType passType, ID3D12GraphicsCommandList7* pCommandList);
+    void ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID3D12GraphicsCommandList7* pCommandList);
 
     void SetTextureFiltering(TextureFiltering filtering);
 
-    Material* CreateMaterial();
-    Material* CloneMaterial(const Material& material);
+    MaterialHandle CreateMaterial();
+    MaterialHandle CreateMaterial(const AssetID& id);
+    MaterialHandle CloneMaterial(MaterialHandle src);
 
-    RenderObject* CreateRenderObject(Mesh* pMesh, Material* mat);
+    MeshHandle CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data);
 
-    template <typename T>
-    T* CreateLight();
+    DirectionalLightHandle CreateDirectionalLight();
+    PointLightHandle CreatePointLight();
+    SpotLightHandle CreateSpotLight();
 
-    Texture* CreateTexture(
+    TextureHandle CreateTexture(
         ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& allocation,
+        TransientUploadAllocator& uploadAllocator,
+        const std::vector<UINT8>& textureSrc,
+        UINT width,
+        UINT height);
+
+    TextureHandle CreateTexture(
+        ID3D12GraphicsCommandList7* pCommandList,
+        DescriptorAllocation&& allocation,
+        TransientUploadAllocator& uploadAllocator,
         const std::wstring& filePath,
         bool isSRGB,
         bool useBlockCompress,
@@ -217,6 +203,7 @@ private:
     void FixedUpdate(double fixedDt);
 
     void PrepareConstantData(float alpha);
+    void PrepareTransform(Entity& entity, XMMATRIX& accumulated, float alpha);
     std::vector<BoundingSphere> CalcCascadeSpheres();
     void PrepareDirectionalLight(DirectionalLight& light, const std::vector<BoundingSphere>& cascadeSpheres);
     void PreparePointLight(PointLight& light);
@@ -224,14 +211,5 @@ private:
 
     void UpdateConstantBuffers(FrameResource& frameResource);
 
-    void DrawMesh(ID3D12GraphicsCommandList7* pCommandList, Mesh& mesh, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
+    void DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
 };
-
-template <>
-DirectionalLight* Renderer::CreateLight<DirectionalLight>();
-
-template <>
-PointLight* Renderer::CreateLight<PointLight>();
-
-template <>
-SpotLight* Renderer::CreateLight<SpotLight>();

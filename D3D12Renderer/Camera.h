@@ -4,7 +4,11 @@
 
 using namespace DirectX;
 
-class Camera {
+// Scene Editor Camera
+// Position uses fixed timestep interpolation for smoothness.
+// Rotation uses immediate input response for low latency.
+class Camera
+{
 public:
     Camera(XMFLOAT3 initialPosition = { 0.0f, 0.0f, 0.0f });
 
@@ -31,11 +35,10 @@ private:
     XMFLOAT3 m_prevPosition;
     XMFLOAT3 m_currPosition;
     XMFLOAT3 m_renderPosition;
-    XMFLOAT3 m_orientation;
-    XMFLOAT3 m_up;
 
     float m_yaw;
     float m_pitch;
+    XMFLOAT4 m_rotation = { 0.0f, 0.0f, 0.0f, 1.0f };    // quaternion
 
     float m_verticalFOV;
     float m_horizontalFOV;

@@ -274,12 +274,7 @@ namespace D3DHelper
     // If pClearValue is provided, rtvFormat parameter will be ignored.
     void CreateRenderTarget(ID3D12Device10* pDevice, UINT64 width, UINT height, DXGI_FORMAT format, DXGI_FORMAT rtvFormat, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& renderTarget, D3D12_CLEAR_VALUE* pClearValue)
     {
-        D3D12_CLEAR_VALUE defaultClearValue = {};
-        defaultClearValue.Format = rtvFormat;
-        defaultClearValue.Color[0] = 0.0f;
-        defaultClearValue.Color[1] = 0.0f;
-        defaultClearValue.Color[2] = 0.0f;
-        defaultClearValue.Color[3] = 0.0f;
+        auto defaultClearValue = CreateClearValue(rtvFormat, 0.0f, 0.0f, 0.0f, 0.0f);
 
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -288,18 +283,7 @@ namespace D3DHelper
         heapProperties.CreationNodeMask = 1;
         heapProperties.VisibleNodeMask = 1;
 
-        D3D12_RESOURCE_DESC1 resourceDesc = {};
-        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        resourceDesc.Alignment = 0;
-        resourceDesc.Width = width;
-        resourceDesc.Height = height;
-        resourceDesc.DepthOrArraySize = depthOrArraySize;
-        resourceDesc.MipLevels = 1;
-        resourceDesc.Format = format;
-        resourceDesc.SampleDesc = { 1, 0 };
-        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
+        auto resourceDesc = GetRenderTargetDesc(width, height, depthOrArraySize, format);
 
         ThrowIfFailed(pDevice->CreateCommittedResource3(
             &heapProperties,
@@ -315,10 +299,8 @@ namespace D3DHelper
 
     void CreateDepthStencilBuffer(ID3D12Device10* pDevice, UINT64 width, UINT height, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& depthStencilBuffer, bool useStencil, D3D12_CLEAR_VALUE* pClearValue)
     {
-        D3D12_CLEAR_VALUE defaultClearValue = {};
-        defaultClearValue.Format = useStencil ? DXGI_FORMAT_D24_UNORM_S8_UINT : DXGI_FORMAT_D32_FLOAT;
-        defaultClearValue.DepthStencil.Depth = 0.0f;    // reverse-z
-        defaultClearValue.DepthStencil.Stencil = 0;
+        // reverse-z
+        auto defaultClearValue = CreateClearValue(useStencil ? DXGI_FORMAT_D24_UNORM_S8_UINT : DXGI_FORMAT_D32_FLOAT, 0.0f, 0);
 
         D3D12_HEAP_PROPERTIES heapProperties = {};
         heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -327,18 +309,7 @@ namespace D3DHelper
         heapProperties.CreationNodeMask = 1;
         heapProperties.VisibleNodeMask = 1;
 
-        D3D12_RESOURCE_DESC1 resourceDesc = {};
-        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        resourceDesc.Alignment = 0;
-        resourceDesc.Width = width;
-        resourceDesc.Height = height;
-        resourceDesc.DepthOrArraySize = depthOrArraySize;
-        resourceDesc.MipLevels = 1;
-        resourceDesc.Format = useStencil ? DXGI_FORMAT_R24G8_TYPELESS : DXGI_FORMAT_R32_TYPELESS;
-        resourceDesc.SampleDesc = { 1, 0 };
-        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
+        auto resourceDesc = GetDepthStencilBufferDesc(width, height, depthOrArraySize, useStencil);
 
         ThrowIfFailed(pDevice->CreateCommittedResource3(
             &heapProperties,
@@ -411,12 +382,55 @@ namespace D3DHelper
         pDevice->CreateShaderResourceView(pResource, &srvDesc, cpuHandle);
     }
 
+    void CreateCBV(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr, UINT size, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
+    {
+        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+        cbvDesc.BufferLocation = gpuPtr;
+        cbvDesc.SizeInBytes = size;
+
+        pDevice->CreateConstantBufferView(&cbvDesc, cpuHandle);
+    }
+
+    D3D12_RESOURCE_DESC1 GetDepthStencilBufferDesc(UINT64 width, UINT height, UINT16 depthOrArraySize, bool useStencil)
+    {
+        D3D12_RESOURCE_DESC1 desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Alignment = 0;
+        desc.Width = width;
+        desc.Height = height;
+        desc.DepthOrArraySize = depthOrArraySize;
+        desc.MipLevels = 1;
+        desc.Format = useStencil ? DXGI_FORMAT_R24G8_TYPELESS : DXGI_FORMAT_R32_TYPELESS;
+        desc.SampleDesc = { 1, 0 };
+        desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+        desc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
+        return desc;
+    }
+
+    D3D12_RESOURCE_DESC1 GetRenderTargetDesc(UINT64 width, UINT height, UINT16 depthOrArraySize, DXGI_FORMAT format)
+    {
+        D3D12_RESOURCE_DESC1 desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Alignment = 0;
+        desc.Width = width;
+        desc.Height = height;
+        desc.DepthOrArraySize = depthOrArraySize;
+        desc.MipLevels = 1;
+        desc.Format = format;
+        desc.SampleDesc = { 1, 0 };
+        desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        desc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
+        return desc;
+    }
+
+    // Assume that intermediate resource is already mapped
     void UpdateSubresources(
         ID3D12Device* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         ID3D12Resource* pDest,
-        ID3D12Resource* pIntermediate,
-        UINT64 intermediateOffset,
+        UploadAllocation intermediate,
         UINT firstSubresource,
         UINT numSubresources,
         D3D12_SUBRESOURCE_DATA* pSrcData)
@@ -437,98 +451,14 @@ namespace D3DHelper
         UINT64* pRowSizeInBytes = reinterpret_cast<UINT64*>(pNumRows + numSubresources);
         UINT64 requiredSize = 0;
         // 네 번째 인자인 BaseOffset은 출력되는 pLayouts[i].Offset들에 더해지는 값이다
-        pDevice->GetCopyableFootprints(&desc, firstSubresource, numSubresources, intermediateOffset, pLayouts, pNumRows, pRowSizeInBytes, &requiredSize);
-
-        // Map intermediate resource (upload heap)
-        D3D12_RANGE readRange = { 0, 0 };   // do not read from CPU. only write
-        UINT8* pData;
-        ThrowIfFailed(pIntermediate->Map(0, &readRange, reinterpret_cast<void**>(&pData)));
-
-        // dest의 레이아웃에 맞춰서 intermediate로 데이터를 복사
-        // Each subresource
-        for (UINT i = 0; i < numSubresources; i++)
-        {
-            //D3D12_MEMCPY_DEST DestData = { pData + pLayouts[i].Offset, pLayouts[i].Footprint.RowPitch, SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]) };
-            auto pIntermediateStart = pData + pLayouts[i].Offset;
-            auto rowPitch = pLayouts[i].Footprint.RowPitch;
-            auto slicePitch = SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]);
-            // Each depth (slice)
-            for (UINT z = 0; z < pLayouts[i].Footprint.Depth; ++z)
-            {
-                auto pIntermediateSlice = static_cast<UINT8*>(pIntermediateStart) + slicePitch * z;
-                auto pSrcSlice = static_cast<const UINT8*>(pSrcData[i].pData) + pSrcData[i].SlicePitch * LONG_PTR(z);
-                // Each Row
-                for (UINT y = 0; y < pNumRows[i]; ++y)
-                {
-                    memcpy(pIntermediateSlice + rowPitch * y,
-                        pSrcSlice + pSrcData[i].RowPitch * LONG_PTR(y),
-                        pRowSizeInBytes[i]);
-                }
-            }
-        }
-
-        // Unmap
-        pIntermediate->Unmap(0, nullptr);
-
-        // Copy from upload heap to default heap
-        // Buffer has only one subresource
-        if (desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
-        {
-            pCommandList->CopyBufferRegion(pDest, 0, pIntermediate, pLayouts[0].Offset, pLayouts[0].Footprint.Width);
-        }
-        // Texture has one or more subresources
-        else
-        {
-            for (UINT i = 0; i < numSubresources; i++)
-            {
-                D3D12_TEXTURE_COPY_LOCATION dst = {};
-                dst.pResource = pDest;
-                dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-                dst.SubresourceIndex = i + firstSubresource;
-
-                D3D12_TEXTURE_COPY_LOCATION src = {};
-                src.pResource = pIntermediate;
-                src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                src.PlacedFootprint = pLayouts[i];
-
-                pCommandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-            }
-        }
-
-        HeapFree(GetProcessHeap(), 0, pMem);
-    }
-
-    void UpdateSubresources(
-        ID3D12Device* pDevice,
-        ID3D12GraphicsCommandList7* pCommandList,
-        ID3D12Resource* pDest,
-        UploadBuffer::Allocation& uploadAllocation,
-        UINT firstSubresource,
-        UINT numSubresources,
-        D3D12_SUBRESOURCE_DATA* pSrcData)
-    {
-        // Calculate required size for data upload and allocate heap memory for footprints
-        // Structure of Arrays
-        UINT64 memToAlloc = static_cast<UINT64>(sizeof(D3D12_PLACED_SUBRESOURCE_FOOTPRINT) + sizeof(UINT) + sizeof(UINT64)) * numSubresources;
-        void* pMem = HeapAlloc(GetProcessHeap(), 0, static_cast<SIZE_T>(memToAlloc));
-        if (pMem == nullptr)
-        {
-            return;
-        }
-
-        // Acquire footprint of each subresource
-        D3D12_RESOURCE_DESC desc = pDest->GetDesc();
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT* pLayouts = static_cast<D3D12_PLACED_SUBRESOURCE_FOOTPRINT*>(pMem);
-        UINT* pNumRows = reinterpret_cast<UINT*>(pLayouts + numSubresources);
-        UINT64* pRowSizeInBytes = reinterpret_cast<UINT64*>(pNumRows + numSubresources);
-        UINT64 requiredSize = 0;
         pDevice->GetCopyableFootprints(&desc, firstSubresource, numSubresources, 0, pLayouts, pNumRows, pRowSizeInBytes, &requiredSize);
 
         // dest의 레이아웃에 맞춰서 intermediate로 데이터를 복사
         // Each subresource
         for (UINT i = 0; i < numSubresources; i++)
         {
-            auto pIntermediateStart = static_cast<UINT8*>(uploadAllocation.CPUPtr) + pLayouts[i].Offset;
+            //D3D12_MEMCPY_DEST DestData = { pData + pLayouts[i].Offset, pLayouts[i].Footprint.RowPitch, SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]) };
+            auto pIntermediateStart = static_cast<UINT8*>(intermediate.CPUPtr) + pLayouts[i].Offset;
             auto rowPitch = pLayouts[i].Footprint.RowPitch;
             auto slicePitch = SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]);
             // Each depth (slice)
@@ -550,7 +480,7 @@ namespace D3DHelper
         // Buffer has only one subresource
         if (desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
         {
-            pCommandList->CopyBufferRegion(pDest, 0, uploadAllocation.pResource, uploadAllocation.Offset + pLayouts[0].Offset, pLayouts[0].Footprint.Width);
+            pCommandList->CopyBufferRegion(pDest, 0, intermediate.pResource, intermediate.Offset + pLayouts[0].Offset, pLayouts[0].Footprint.Width);
         }
         // Texture has one or more subresources
         else
@@ -563,10 +493,10 @@ namespace D3DHelper
                 dst.SubresourceIndex = i + firstSubresource;
 
                 D3D12_TEXTURE_COPY_LOCATION src = {};
-                src.pResource = uploadAllocation.pResource;
+                src.pResource = intermediate.pResource;
                 src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
                 src.PlacedFootprint = pLayouts[i];
-                src.PlacedFootprint.Offset += uploadAllocation.Offset;
+                src.PlacedFootprint.Offset += intermediate.Offset;
 
                 pCommandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
             }
@@ -615,10 +545,48 @@ namespace D3DHelper
         return group;
     }
 
+    void CreateVertexBuffer(
+        ID3D12Device10* pDevice,
+        ID3D12GraphicsCommandList7* pCommandList,
+        UploadAllocation intermediate,
+        ComPtr<ID3D12Resource>& vertexBuffer,
+        D3D12_VERTEX_BUFFER_VIEW* pVertexBufferView,
+        const std::vector<Vertex>& vertices)
+    {
+        const UINT vertexBufferSize = UINT(vertices.size()) * UINT(sizeof(Vertex));
+
+        CreateDefaultBuffer(pDevice, vertexBufferSize, vertexBuffer);
+
+        D3D12_SUBRESOURCE_DATA vertexData = {};
+        vertexData.pData = vertices.data();
+        vertexData.RowPitch = vertexBufferSize;
+        vertexData.SlicePitch = vertexData.RowPitch;
+
+        UpdateSubresources(pDevice, pCommandList, vertexBuffer.Get(), intermediate, 0, 1, &vertexData);
+
+        D3D12_BUFFER_BARRIER b = {
+            D3D12_BARRIER_SYNC_COPY,
+            D3D12_BARRIER_SYNC_VERTEX_SHADING,
+            D3D12_BARRIER_ACCESS_COPY_DEST,
+            D3D12_BARRIER_ACCESS_VERTEX_BUFFER,
+            vertexBuffer.Get(),
+            0,
+            UINT64_MAX
+        };
+
+        D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(1, &b) };
+        pCommandList->Barrier(1, barrierGroups);
+
+        // Initialize the vertex buffer view
+        pVertexBufferView->BufferLocation = vertexBuffer->GetGPUVirtualAddress();
+        pVertexBufferView->StrideInBytes = static_cast<UINT>(sizeof(Vertex));
+        pVertexBufferView->SizeInBytes = vertexBufferSize;
+    }
+
     void CreateIndexBuffer(
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
-        UploadBuffer& uploadBuffer,
+        UploadAllocation intermediate,
         ComPtr<ID3D12Resource>& indexBuffer,
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
         const std::vector<UINT32>& indices)
@@ -627,14 +595,12 @@ namespace D3DHelper
 
         CreateDefaultBuffer(pDevice, indexBufferSize, indexBuffer);
 
-        auto uploadAllocation = uploadBuffer.Allocate(indexBufferSize, sizeof(UINT32));
-
         D3D12_SUBRESOURCE_DATA indexData = {};
         indexData.pData = indices.data();
         indexData.RowPitch = indexBufferSize;
         indexData.SlicePitch = indexData.RowPitch;
 
-        UpdateSubresources(pDevice, pCommandList, indexBuffer.Get(), uploadAllocation, 0, 1, &indexData);
+        UpdateSubresources(pDevice, pCommandList, indexBuffer.Get(), intermediate, 0, 1, &indexData);
 
         D3D12_BUFFER_BARRIER b = {
             D3D12_BARRIER_SYNC_COPY,
@@ -799,6 +765,26 @@ namespace D3DHelper
             return 0;
         }
         return formatInfo.PlaneCount;
+    }
+
+    UINT GetSubresourceCount(ID3D12Device* pDevice, ID3D12Resource* pResource)
+    {
+        auto desc = pResource->GetDesc();
+        return GetSubresourceCount(pDevice, desc);
+    }
+
+    UINT GetSubresourceCount(ID3D12Device* pDevice, D3D12_RESOURCE_DESC desc)
+    {
+        UINT ret = desc.MipLevels * GetFormatPlaneCount(pDevice, desc.Format);
+        if (desc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D) ret *= desc.DepthOrArraySize;
+        return ret;
+    }
+
+    UINT GetSubresourceCount(ID3D12Device* pDevice, D3D12_RESOURCE_DESC1 desc)
+    {
+        UINT ret = desc.MipLevels * GetFormatPlaneCount(pDevice, desc.Format);
+        if (desc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D) ret *= desc.DepthOrArraySize;
+        return ret;
     }
 
     UINT CalcSubresourceIndex(
@@ -989,5 +975,25 @@ namespace D3DHelper
         {
             throw std::runtime_error("Failed to save dds file.");
         }
+    }
+
+    D3D12_CLEAR_VALUE CreateClearValue(DXGI_FORMAT format, float r, float g, float b, float a)
+    {
+        D3D12_CLEAR_VALUE clearValue = {};
+        clearValue.Format = format;
+        clearValue.Color[0] = r;
+        clearValue.Color[1] = g;
+        clearValue.Color[2] = b;
+        clearValue.Color[3] = a;
+        return clearValue;
+    }
+
+    D3D12_CLEAR_VALUE CreateClearValue(DXGI_FORMAT format, float depth, UINT8 stencil)
+    {
+        D3D12_CLEAR_VALUE clearValue = {};
+        clearValue.Format = format;
+        clearValue.DepthStencil.Depth = depth;
+        clearValue.DepthStencil.Stencil = stencil;
+        return clearValue;
     }
 }

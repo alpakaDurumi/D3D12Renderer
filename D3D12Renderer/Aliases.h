@@ -1,5 +1,5 @@
 #pragma once
 
-#include <Windows.h>
+#include <string>
 
-using ResourceHandle = UINT;
+using AssetID = std::string;

@@ -6,7 +6,8 @@
 #include <utility>
 #include <tuple>
 
-#include "Aliases.h"
+struct RGBuffer { UINT index; };
+struct RGTexture { UINT index; };
 
 struct BufferResourceUsage
 {
@@ -46,14 +47,14 @@ struct TextureResourceUsage
 
 struct CompiledBufferBarrier
 {
-    ResourceHandle handle;
+    RGBuffer buffer;
     BufferResourceUsage before;
     BufferResourceUsage after;
 };
 
 struct CompiledTextureBarrier
 {
-    ResourceHandle handle;
+    RGTexture texture;
     TextureResourceUsage before;
     TextureResourceUsage after;
     D3D12_BARRIER_SUBRESOURCE_RANGE subresourceRange;
@@ -62,31 +63,31 @@ struct CompiledTextureBarrier
 struct RenderGraphNode
 {
 public:
-    void AddBufferInput(ResourceHandle handle, BufferResourceUsage usage)
+    void AddBufferInput(RGBuffer buffer, BufferResourceUsage usage)
     {
-        bufferInputs.emplace_back(handle, usage);
+        bufferInputs.emplace_back(buffer, usage);
     }
 
-    void AddBufferOutput(ResourceHandle handle, BufferResourceUsage usage)
+    void AddBufferOutput(RGBuffer buffer, BufferResourceUsage usage)
     {
-        bufferOutputs.emplace_back(handle, usage);
+        bufferOutputs.emplace_back(buffer, usage);
     }
 
-    void AddTextureInput(ResourceHandle handle, TextureResourceUsage usage, D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 })
+    void AddTextureInput(RGTexture texture, TextureResourceUsage usage, D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 })
     {
-        textureInputs.emplace_back(handle, usage, range);
+        textureInputs.emplace_back(texture, usage, range);
     }
 
-    void AddTextureOutput(ResourceHandle handle, TextureResourceUsage usage, D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 })
+    void AddTextureOutput(RGTexture texture, TextureResourceUsage usage, D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 })
     {
-        textureOutputs.emplace_back(handle, usage, range);
+        textureOutputs.emplace_back(texture, usage, range);
     }
 
-    std::vector<std::pair<ResourceHandle, BufferResourceUsage>> bufferInputs;
-    std::vector<std::pair<ResourceHandle, BufferResourceUsage>> bufferOutputs;
+    std::vector<std::pair<RGBuffer, BufferResourceUsage>> bufferInputs;
+    std::vector<std::pair<RGBuffer, BufferResourceUsage>> bufferOutputs;
 
-    std::vector<std::tuple<ResourceHandle, TextureResourceUsage, D3D12_BARRIER_SUBRESOURCE_RANGE>> textureInputs;
-    std::vector<std::tuple<ResourceHandle, TextureResourceUsage, D3D12_BARRIER_SUBRESOURCE_RANGE>> textureOutputs;
+    std::vector<std::tuple<RGTexture, TextureResourceUsage, D3D12_BARRIER_SUBRESOURCE_RANGE>> textureInputs;
+    std::vector<std::tuple<RGTexture, TextureResourceUsage, D3D12_BARRIER_SUBRESOURCE_RANGE>> textureOutputs;
 
     std::vector<CompiledBufferBarrier> bufferBarriers;
     std::vector<CompiledTextureBarrier> textureBarriers;

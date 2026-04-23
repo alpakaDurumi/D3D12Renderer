@@ -6,21 +6,9 @@
 
 #include <vector>
 
+#include "GeometryData.h"
+
 using namespace DirectX;
-
-struct Vertex
-{
-    XMFLOAT3 position;
-    XMFLOAT2 texCoord;
-    XMFLOAT4 tangent;
-    XMFLOAT3 normal;
-};
-
-struct GeometryData
-{
-    std::vector<Vertex> vertices;
-    std::vector<UINT32> indices;
-};
 
 class GeometryGenerator
 {
@@ -76,7 +64,7 @@ public:
             20, 21, 22, 20, 22, 23
         };
 
-        return { vertices, indices };
+        return { "builtin://mesh/cube", vertices, indices};
     }
 
     static GeometryData GenerateSphere()
@@ -137,6 +125,6 @@ public:
             }
         }
 
-        return { vertices, indices };
+        return { "builtin://mesh/sphere", vertices, indices};
     }
 };

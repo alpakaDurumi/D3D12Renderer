@@ -91,6 +91,7 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
+        pRenderer->BuildImGuiFrame();
         pRenderer->OnUpdate();
         pRenderer->OnRender();
     }

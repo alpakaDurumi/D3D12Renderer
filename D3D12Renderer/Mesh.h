@@ -5,13 +5,11 @@
 
 #include <d3d12.h>
 
-#include "D3DHelper.h"
-#include "GeometryGenerator.h"
+#include "GeometryData.h"
+#include "TransientUploadAllocator.h"
+#include "SceneHandles.h"
 
 using Microsoft::WRL::ComPtr;
-using namespace D3DHelper;
-
-class Material;
 
 class Mesh
 {
@@ -19,38 +17,15 @@ public:
     Mesh(
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
-        UploadBuffer& uploadBuffer,
-        const GeometryData& geometryData)
-    {
-        CreateVertexBuffer(pDevice, pCommandList, uploadBuffer, m_vertexBuffer, &m_vertexBufferView, geometryData.vertices);
-        CreateIndexBuffer(pDevice, pCommandList, uploadBuffer, m_indexBuffer, &m_indexBufferView, geometryData.indices);
-        m_numIndices = UINT(geometryData.indices.size());
-    }
+        TransientUploadAllocator& allocator,
+        const GeometryData& geometryData);
 
-    void SetMaterial(Material* mat)
-    {
-        m_pDefaultMaterial = mat;
-    }
+    const D3D12_VERTEX_BUFFER_VIEW& GetVBV() const;
+    const D3D12_INDEX_BUFFER_VIEW& GetIBV() const;
+    UINT GetNumIndices() const;
 
-    const D3D12_VERTEX_BUFFER_VIEW& GetVBV() const
-    {
-        return m_vertexBufferView;
-    }
-
-    const D3D12_INDEX_BUFFER_VIEW& GetIBV() const
-    {
-        return m_indexBufferView;
-    }
-
-    UINT GetNumIndices() const
-    {
-        return m_numIndices;
-    }
-
-    Material* GetMaterial() const
-    {
-        return m_pDefaultMaterial;
-    }
+    MaterialHandle GetMaterial() const;
+    void SetMaterial(MaterialHandle handle);
 
 private:
     ComPtr<ID3D12Resource> m_vertexBuffer;
@@ -60,5 +35,5 @@ private:
     D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
     UINT m_numIndices = 0;
 
-    Material* m_pDefaultMaterial = nullptr;
+    MaterialHandle m_material;
 };

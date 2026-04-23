@@ -4,11 +4,14 @@
 #include <wrl/client.h>
 
 #include <d3d12.h>
+#include <DirectXMath.h>
+
+#include <vector>
 
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
-#include "FrameResource.h"
 #include "SharedConfig.h"
+#include "UploadAllocation.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -16,21 +19,19 @@ using namespace DirectX;
 class Light
 {
 protected:
-    Light(DescriptorAllocation&& dsvAllocation, DescriptorAllocation&& srvAllocation, LightType type);
-
-    void Init(
+    Light(
         ID3D12Device10* pDevice,
+        DescriptorAllocation&& dsvAllocation,
+        DescriptorAllocation&& srvAllocation,
+        DescriptorAllocation&& cbvAllocation,
         UINT shadowMapResolution,
-        const std::vector<std::unique_ptr<FrameResource>>& frameResources,
-        DescriptorAllocation&& cbvAllocation);
+        LightType type);
 
 public:
     LightType GetType() const;
     ID3D12Resource* GetDepthBuffer() const;
     UINT16 GetArraySize() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetDSVDescriptorHandle(UINT idx) const;
-
-    UINT GetCameraConstantBufferBaseIndex() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle(UINT idx) const;
 
     DescriptorAllocation& GetSRVAllocationRef();
 
@@ -50,17 +51,25 @@ public:
 
     void SetIdxInArray(UINT idxInArray);
 
-    CameraConstantData* GetCameraConstantDataPtr(UINT idx);
+    CameraConstantData* GetCameraConstantDataPtr(UINT arrayIndex);
+    void SetCameraUploadAllocation(UINT arrayIndex, UploadAllocation alloc);
+    UploadAllocation GetCameraUploadAllocation(UINT arrayIndex);
+
     LightConstantData* GetLightConstantDataPtr();
+    D3D12_CPU_DESCRIPTOR_HANDLE GetLightCBVHandle(UINT frameIndex) const;
+    DescriptorAllocation& GetLightCBVAllocationRef(UINT frameIndex);
 
     UINT GetDepthBufferHandle() const;
     void SetDepthBufferHandle(UINT handle);
 
+    virtual std::vector<ComPtr<ID3D12Resource>> TakeResources();
+
 protected:
     std::vector<CameraConstantData> m_cameraConstantData;
-    UINT m_cameraConstantBufferBaseIndex;
+    std::vector<UploadAllocation> m_cameraUploadAllocations;    // transient, for single frame
 
     LightConstantData m_lightConstantData;
+    std::vector<DescriptorAllocation> m_lightCBVAllocations;    // for each frame
 
     LightType m_type;
 
@@ -78,9 +87,8 @@ public:
         ID3D12Device10* pDevice,
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
-        UINT shadowMapResolution,
-        const std::vector<std::unique_ptr<FrameResource>>& frameResources,
-        DescriptorAllocation&& cbvAllocation);
+        DescriptorAllocation&& cbvAllocation,
+        UINT shadowMapResolution);
 
     virtual XMVECTOR GetPosition() const override;
     virtual float GetRange() const override;
@@ -98,10 +106,9 @@ public:
         ID3D12Device10* pDevice,
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
-        UINT shadowMapResolution,
-        const std::vector<std::unique_ptr<FrameResource>>& frameResources,
         DescriptorAllocation&& cbvAllocation,
-        DescriptorAllocation&& rtvAllocation);
+        DescriptorAllocation&& rtvAllocation,
+        UINT shadowMapResolution);
 
     XMVECTOR GetDirection() const override;
 
@@ -109,10 +116,12 @@ public:
     void SetDirection(XMVECTOR dir) override;
 
     ID3D12Resource* GetRenderTarget() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetRTVDescriptorHandle(UINT idx) const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetRTVHandle(UINT idx) const;
 
     UINT GetRenderTargetHandle() const;
     void SetRenderTargetHandle(UINT handle);
+
+    virtual std::vector<ComPtr<ID3D12Resource>> TakeResources() override;
 
 private:
     ComPtr<ID3D12Resource> m_renderTarget;
@@ -128,9 +137,8 @@ public:
         ID3D12Device10* pDevice,
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
-        UINT shadowMapResolution,
-        const std::vector<std::unique_ptr<FrameResource>>& frameResources,
-        DescriptorAllocation&& cbvAllocation);
+        DescriptorAllocation&& cbvAllocation,
+        UINT shadowMapResolution);
 
     float GetOuterAngle() const;
     void SetAngles(float outerAngle, float innerAngle);

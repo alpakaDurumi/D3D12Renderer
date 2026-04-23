@@ -4,6 +4,8 @@
 
 #include <DirectXMath.h>
 
+#include <cstring>
+
 class InputManager
 {
 public:

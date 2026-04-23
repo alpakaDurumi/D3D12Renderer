@@ -7,9 +7,11 @@
 #include <dxgi1_6.h>    // DXGI 1.6
 
 #include <vector>
+#include <string>
 
-#include "UploadBuffer.h"
 #include "SharedConfig.h"
+#include "UploadAllocation.h"
+#include "GeometryData.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -37,22 +39,16 @@ namespace D3DHelper
     void CreateRTV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, bool isArray = false, UINT firstArraySlice = 0);
     void CreateDSV(ID3D12Device10* pDevice, ID3D12Resource* pResource, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, bool useStencil, bool isReadOnly, bool isArray = false, UINT firstArraySlice = 0);
     void CreateSRV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
+    void CreateCBV(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr, UINT size, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
+
+    D3D12_RESOURCE_DESC1 GetDepthStencilBufferDesc(UINT64 width, UINT height, UINT16 depthOrArraySize, bool useStencil);
+    D3D12_RESOURCE_DESC1 GetRenderTargetDesc(UINT64 width, UINT height, UINT16 depthOrArraySize, DXGI_FORMAT format);
 
     void UpdateSubresources(
         ID3D12Device* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         ID3D12Resource* pDest,
-        ID3D12Resource* pIntermediate,
-        UINT64 intermediateOffset,
-        UINT firstSubresource,
-        UINT numSubresources,
-        D3D12_SUBRESOURCE_DATA* pSrcData);
-
-    void UpdateSubresources(
-        ID3D12Device* pDevice,
-        ID3D12GraphicsCommandList7* pCommandList,
-        ID3D12Resource* pDest,
-        UploadBuffer::Allocation& uploadAllocation,
+        UploadAllocation intermediate,
         UINT firstSubresource,
         UINT numSubresources,
         D3D12_SUBRESOURCE_DATA* pSrcData);
@@ -63,51 +59,18 @@ namespace D3DHelper
     D3D12_BARRIER_GROUP TextureBarrierGroup(UINT32 numBarriers, D3D12_TEXTURE_BARRIER* pBarriers);
     D3D12_BARRIER_GROUP GlobalBarrierGroup(UINT32 numBarriers, D3D12_GLOBAL_BARRIER* pBarriers);
 
-    template<typename T>
     void CreateVertexBuffer(
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
-        UploadBuffer& uploadBuffer,
+        UploadAllocation intermediate,
         ComPtr<ID3D12Resource>& vertexBuffer,
         D3D12_VERTEX_BUFFER_VIEW* pVertexBufferView,
-        const std::vector<T>& vertices)
-    {
-        const UINT vertexBufferSize = UINT(vertices.size()) * UINT(sizeof(T));
-
-        CreateDefaultBuffer(pDevice, vertexBufferSize, vertexBuffer);
-
-        auto uploadAllocation = uploadBuffer.Allocate(vertexBufferSize, sizeof(T));
-
-        D3D12_SUBRESOURCE_DATA vertexData = {};
-        vertexData.pData = vertices.data();
-        vertexData.RowPitch = vertexBufferSize;
-        vertexData.SlicePitch = vertexData.RowPitch;
-
-        UpdateSubresources(pDevice, pCommandList, vertexBuffer.Get(), uploadAllocation, 0, 1, &vertexData);
-
-        D3D12_BUFFER_BARRIER b = {
-            D3D12_BARRIER_SYNC_COPY,
-            D3D12_BARRIER_SYNC_VERTEX_SHADING,
-            D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_ACCESS_VERTEX_BUFFER,
-            vertexBuffer.Get(),
-            0,
-            UINT64_MAX
-        };
-
-        D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(1, &b) };
-        pCommandList->Barrier(1, barrierGroups);
-
-        // Initialize the vertex buffer view
-        pVertexBufferView->BufferLocation = vertexBuffer->GetGPUVirtualAddress();
-        pVertexBufferView->StrideInBytes = sizeof(T);
-        pVertexBufferView->SizeInBytes = vertexBufferSize;
-    }
+        const std::vector<Vertex>& vertices);
 
     void CreateIndexBuffer(
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
-        UploadBuffer& uploadBuffer,
+        UploadAllocation intermediate,
         ComPtr<ID3D12Resource>& indexBuffer,
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
         const std::vector<UINT32>& indices);
@@ -128,6 +91,10 @@ namespace D3DHelper
 
     UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format);
 
+    UINT GetSubresourceCount(ID3D12Device* pDevice, ID3D12Resource* pResource);
+    UINT GetSubresourceCount(ID3D12Device* pDevice, D3D12_RESOURCE_DESC desc);
+    UINT GetSubresourceCount(ID3D12Device* pDevice, D3D12_RESOURCE_DESC1 desc);
+
     UINT CalcSubresourceIndex(
         UINT mipIndex,
         UINT arrayIndex,
@@ -140,4 +107,7 @@ namespace D3DHelper
         bool isSRGB,
         bool useBlockCompress,
         bool flipImage);
+
+    D3D12_CLEAR_VALUE CreateClearValue(DXGI_FORMAT format, float r, float g, float b, float a);
+    D3D12_CLEAR_VALUE CreateClearValue(DXGI_FORMAT format, float depth, UINT8 stencil);
 }
