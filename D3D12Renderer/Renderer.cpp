@@ -326,6 +326,12 @@ void Renderer::OnMouseMove(int xPos, int yPos)
     m_inputManager.CalcMouseMove(xPos, yPos);
 }
 
+void Renderer::OnKillFocus()
+{
+    for (UINT i = 0; i < 3; ++i)
+        OnMouseButtonUp(i);
+}
+
 void Renderer::OnResize(UINT width, UINT height)
 {
     if (width == m_width && height == m_height) return;
@@ -1896,12 +1902,15 @@ void Renderer::FixedUpdate(double fixedDtMs)
 
     m_camera.SnapshotState();
 
-    if (m_inputManager.IsKeyDown('W')) m_camera.MoveForward(dist);
-    if (m_inputManager.IsKeyDown('A')) m_camera.MoveRight(-dist);
-    if (m_inputManager.IsKeyDown('S')) m_camera.MoveForward(-dist);
-    if (m_inputManager.IsKeyDown('D')) m_camera.MoveRight(dist);
-    if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-dist);
-    if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(dist);
+    if (m_inputManager.IsMouseButtonDown(1))
+    {
+        if (m_inputManager.IsKeyDown('W')) m_camera.MoveForward(dist);
+        if (m_inputManager.IsKeyDown('A')) m_camera.MoveRight(-dist);
+        if (m_inputManager.IsKeyDown('S')) m_camera.MoveForward(-dist);
+        if (m_inputManager.IsKeyDown('D')) m_camera.MoveRight(dist);
+        if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-dist);
+        if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(dist);
+    }
 
     // Transforms
     static float rotationSpeed = 1.0f;  // unit : rad/s
