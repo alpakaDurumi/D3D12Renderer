@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "Win32Application.h"
 
+#include <windowsx.h>
+
 #include <locale>
 
 #include "imgui_impl_win32.h"
@@ -201,8 +203,8 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
     case WM_MOUSEMOVE:
         if (renderer)
         {
-            int xPos = LOWORD(lParam);
-            int yPos = HIWORD(lParam);
+            int xPos = GET_X_LPARAM(lParam);
+            int yPos = GET_Y_LPARAM(lParam);
             renderer->OnMouseMove(xPos, yPos);
         }
         return 0;
