@@ -10,6 +10,7 @@
 #include <timeapi.h>
 
 #include "Renderer.h"
+#include "Aliases.h"
 
 int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
@@ -121,8 +122,6 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
     if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
         return true;
 
-    Renderer* renderer = reinterpret_cast<Renderer*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
-
     switch (message)
     {
     case WM_CREATE:
@@ -130,117 +129,99 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
         // Save the Renderer* passed in to CreateWindow.
         LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
         SetWindowLongPtrW(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
+        return 0;
     }
-    return 0;
-    case WM_SYSKEYDOWN:
-        if (renderer)
-        {
-            // ALT + ENTER. Only if prev key is up
-            if (wParam == VK_RETURN && lParam & (1 << 29) && !(lParam & (1 << 30)))
-            {
-                renderer->ToggleFullScreen();
-            }
-        }
-        return 0;
-    case WM_KEYDOWN:
-        if (renderer)
-        {
-            // Only if prev key is up
-            if (!(lParam & (1 << 30)))
-            {
-                renderer->OnKeyDown(wParam);
-            }
-        }
-        return 0;
-    case WM_KEYUP:
-        if (renderer)
-        {
-            renderer->OnKeyUp(wParam);
-        }
-        return 0;
-    case WM_LBUTTONDOWN:
-        if (renderer)
-        {
-            renderer->OnMouseButtonDown(0);
-        }
-        return 0;
-    case WM_LBUTTONUP:
-        if (renderer)
-        {
-            renderer->OnMouseButtonUp(0);
-        }
-        return 0;
-    case WM_RBUTTONDOWN:
-        if (renderer)
-        {
-            renderer->OnMouseButtonDown(1);
-            HideCursor();
-            GetCursorPos(&sm_savedCursorPos);
-            sm_cursorPosValid = true;
-        }
-        return 0;
-    case WM_RBUTTONUP:
-        if (renderer)
-        {
-            if (sm_cursorPosValid) SetCursorPos(sm_savedCursorPos.x, sm_savedCursorPos.y);
-            sm_cursorPosValid = false;
-            RestoreCursor();
-            renderer->OnMouseButtonUp(1);
-        }
-        return 0;
-    case WM_MBUTTONDOWN:
-        if (renderer)
-        {
-            renderer->OnMouseButtonDown(2);
-        }
-        return 0;
-    case WM_MBUTTONUP:
-        if (renderer)
-        {
-            renderer->OnMouseButtonUp(2);
-        }
-        return 0;
-    case WM_MOUSEMOVE:
-        if (renderer)
-        {
-            int xPos = GET_X_LPARAM(lParam);
-            int yPos = GET_Y_LPARAM(lParam);
-            renderer->OnMouseMove(xPos, yPos);
-        }
-        return 0;
-    case WM_KILLFOCUS:
-        if (renderer)
-        {
-            sm_cursorPosValid = false;
-            RestoreCursor();
-            renderer->OnKillFocus();
-        }
-        return 0;
-    case WM_SIZE:
-        if (renderer)
-        {
-            int width = LOWORD(lParam);
-            int height = HIWORD(lParam);
-            renderer->OnResize(width, height);
-        }
-        return 0;
-    case WM_DPICHANGED:
-        if (renderer)
-        {
-            UINT dpi = LOWORD(wParam);
-            RECT* const newRect = (RECT*)lParam;
-            SetWindowPos(sm_hwnd, HWND_TOP,
-                newRect->left,
-                newRect->top,
-                newRect->right - newRect->left,
-                newRect->bottom - newRect->top,
-                SWP_NOZORDER | SWP_NOACTIVATE);
-            renderer->OnDpiChanged(dpi);
-        }
-        return 0;
     case WM_DESTROY:
+    {
         PostQuitMessage(0);
         return 0;
+    }
+    }
+
+    Renderer* renderer = reinterpret_cast<Renderer*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+    if (!renderer) return DefWindowProcW(hWnd, message, wParam, lParam);
+
+    switch (message)
+    {
+    case WM_KEYDOWN:
+    case WM_SYSKEYDOWN:
+    case WM_KEYUP:
+    case WM_SYSKEYUP:
+    {
+        VKCode key = static_cast<VKCode>(wParam);
+        WORD keyFlags = HIWORD(lParam);
+
+        switch (message)
+        {
+        case WM_KEYDOWN:
+        case WM_SYSKEYDOWN:
+            // Only if prev key is up
+            if (!(keyFlags & KF_REPEAT))
+                renderer->OnKeyDown(key);
+            return 0;
+        case WM_KEYUP:
+        case WM_SYSKEYUP:
+            renderer->OnKeyUp(key);
+            return 0;
+        }
+        return 0;
+    }
+    case WM_LBUTTONDOWN:
+        renderer->OnMouseButtonDown(0);
+        return 0;
+    case WM_LBUTTONUP:
+        renderer->OnMouseButtonUp(0);
+        return 0;
+    case WM_RBUTTONDOWN:
+        renderer->OnMouseButtonDown(1);
+        HideCursor();
+        GetCursorPos(&sm_savedCursorPos);
+        sm_cursorPosValid = true;
+        return 0;
+    case WM_RBUTTONUP:
+        if (sm_cursorPosValid) SetCursorPos(sm_savedCursorPos.x, sm_savedCursorPos.y);
+        sm_cursorPosValid = false;
+        RestoreCursor();
+        renderer->OnMouseButtonUp(1);
+        return 0;
+    case WM_MBUTTONDOWN:
+        renderer->OnMouseButtonDown(2);
+        return 0;
+    case WM_MBUTTONUP:
+        renderer->OnMouseButtonUp(2);
+        return 0;
+    case WM_MOUSEMOVE:
+    {
+        int xPos = GET_X_LPARAM(lParam);
+        int yPos = GET_Y_LPARAM(lParam);
+        renderer->OnMouseMove(xPos, yPos);
+        return 0;
+    }
+    case WM_KILLFOCUS:
+        sm_cursorPosValid = false;
+        RestoreCursor();
+        renderer->OnKillFocus();
+        return 0;
+    case WM_SIZE:
+    {
+        UINT width = LOWORD(lParam);
+        UINT height = HIWORD(lParam);
+        renderer->OnResize(width, height);
+        return 0;
+    }
+    case WM_DPICHANGED:
+    {
+        UINT dpi = LOWORD(wParam);
+        RECT* const newRect = (RECT*)lParam;
+        SetWindowPos(hWnd, HWND_TOP,
+            newRect->left,
+            newRect->top,
+            newRect->right - newRect->left,
+            newRect->bottom - newRect->top,
+            SWP_NOZORDER | SWP_NOACTIVATE);
+        renderer->OnDpiChanged(dpi);
+        return 0;
+    }
     }
 
     return DefWindowProcW(hWnd, message, wParam, lParam);

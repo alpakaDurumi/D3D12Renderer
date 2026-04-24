@@ -301,12 +301,12 @@ void Renderer::OnDestroy()
     ImGui::DestroyContext();
 }
 
-void Renderer::OnKeyDown(WPARAM key)
+void Renderer::OnKeyDown(VKCode key)
 {
     m_inputManager.SetKeyDown(key);
 }
 
-void Renderer::OnKeyUp(WPARAM key)
+void Renderer::OnKeyUp(VKCode key)
 {
     m_inputManager.SetKeyUp(key);
 }
@@ -1884,7 +1884,8 @@ void Renderer::FixedUpdate(double fixedDtMs)
         }
     }
 
-    if (m_inputManager.IsKeyPressed(VK_F11))
+    if (m_inputManager.IsKeyPressed(VK_F11) ||
+        (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsKeyPressed(VK_RETURN)))
     {
         ToggleFullScreen();
     }
@@ -1893,7 +1894,7 @@ void Renderer::FixedUpdate(double fixedDtMs)
     {
         m_vSync = !m_vSync;
     }
-    
+
     // Camera
     static float cameraMoveSpeed = 10.0f;
 

@@ -57,8 +57,8 @@ public:
     void OnUpdate();
     void OnRender();
     void OnDestroy();
-    void OnKeyDown(WPARAM key);
-    void OnKeyUp(WPARAM key);
+    void OnKeyDown(VKCode key);
+    void OnKeyUp(VKCode key);
     void OnMouseButtonDown(UINT button);
     void OnMouseButtonUp(UINT button);
     void OnMouseMove(int xPos, int yPos);

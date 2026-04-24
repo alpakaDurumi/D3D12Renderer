@@ -6,10 +6,12 @@
 
 #include <cstring>
 
+#include "Aliases.h"
+
 class InputManager
 {
 public:
-    void SetKeyDown(WPARAM key)
+    void SetKeyDown(VKCode key)
     {
         if (key < 256)
         {
@@ -18,17 +20,17 @@ public:
         }
     }
 
-    void SetKeyUp(WPARAM key)
+    void SetKeyUp(VKCode key)
     {
         if (key < 256) m_keyDown[key] = false;
     }
 
-    bool IsKeyDown(WPARAM key) const
+    bool IsKeyDown(VKCode key) const
     {
         return m_keyDown[key];
     }
 
-    bool IsKeyPressed(WPARAM key) const
+    bool IsKeyPressed(VKCode key) const
     {
         return m_keyPressed[key];
     }
