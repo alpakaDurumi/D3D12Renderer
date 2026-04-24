@@ -57,14 +57,14 @@ public:
     // Accumulate mouse moves.
     void CalcMouseMove(int posX, int posY)
     {
-        if (!(m_lastPosX == -1 && m_lastPosY == -1))
+        if (!(m_lastMousePos.x == -1 && m_lastMousePos.y == -1))
         {
-            m_mouseMove.x += posX - m_lastPosX;
-            m_mouseMove.y += posY - m_lastPosY;
+            m_mouseMove.x += posX - m_lastMousePos.x;
+            m_mouseMove.y += posY - m_lastMousePos.y;
         }
 
-        m_lastPosX = posX;
-        m_lastPosY = posY;
+        m_lastMousePos.x = posX;
+        m_lastMousePos.y = posY;
     }
 
     XMINT2 GetAndResetMouseMove()
@@ -80,14 +80,24 @@ public:
         memset(m_mouseButtonPressed, false, sizeof(m_mouseButtonPressed));
     }
 
+    void Reset()
+    {
+        memset(m_keyDown, false, sizeof(m_keyDown));
+        memset(m_mouseButtonDown, false, sizeof(m_mouseButtonDown));
+        ResetPressedFlags();
+        m_lastMousePos = { -1, -1 };
+        m_mouseMove = { 0, 0 };
+    }
+
 private:
+    // Keyboard
     bool m_keyDown[256] = { false };
     bool m_keyPressed[256] = { false };
-    int m_lastPosX = -1;
-    int m_lastPosY = -1;
 
+    // Mouse
     // 0 = LMB, 1 = RMB, 2 = MMB
     bool m_mouseButtonDown[3] = { false };
     bool m_mouseButtonPressed[3] = { false };
-    XMINT2 m_mouseMove = { 0, 0 };
+    DirectX::XMINT2 m_lastMousePos = { -1, -1 };
+    DirectX::XMINT2 m_mouseMove = { 0, 0 };
 };

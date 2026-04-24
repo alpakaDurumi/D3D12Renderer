@@ -328,8 +328,7 @@ void Renderer::OnMouseMove(int xPos, int yPos)
 
 void Renderer::OnKillFocus()
 {
-    for (UINT i = 0; i < 3; ++i)
-        OnMouseButtonUp(i);
+    m_inputManager.Reset();
 }
 
 void Renderer::OnResize(UINT width, UINT height)
