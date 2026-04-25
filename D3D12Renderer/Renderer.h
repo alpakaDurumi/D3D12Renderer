@@ -62,6 +62,7 @@ public:
     void OnMouseButtonDown(UINT button);
     void OnMouseButtonUp(UINT button);
     void OnMouseMove(int xPos, int yPos);
+    void OnMouseWheel(float step);
     void OnKillFocus();
     void OnResize(UINT width, UINT height);
     void OnDpiChanged(UINT dpi);

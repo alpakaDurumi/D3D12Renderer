@@ -76,6 +76,18 @@ public:
         return delta;
     }
 
+    void AccumulateMouseWheelStep(float step)
+    {
+        m_accumulatedMouseWheelStep += step;
+    }
+
+    float GetAndResetMouseWheelStep()
+    {
+        float step = m_accumulatedMouseWheelStep;
+        m_accumulatedMouseWheelStep = 0.0f;
+        return step;
+    }
+
     void ResetPressedFlags()
     {
         memset(m_keyPressed, false, sizeof(m_keyPressed));
@@ -89,6 +101,7 @@ public:
         ResetPressedFlags();
         m_lastMousePos = { -1, -1 };
         m_mouseMove = { 0, 0 };
+        m_accumulatedMouseWheelStep = 0.0f;
     }
 
 private:
@@ -102,4 +115,5 @@ private:
     bool m_mouseButtonPressed[3] = { false };
     DirectX::XMINT2 m_lastMousePos = { -1, -1 };
     DirectX::XMINT2 m_mouseMove = { 0, 0 };
+    float m_accumulatedMouseWheelStep = 0.0f;
 };

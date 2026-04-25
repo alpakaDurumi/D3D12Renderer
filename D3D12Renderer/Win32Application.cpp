@@ -197,6 +197,12 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
         renderer->OnMouseMove(xPos, yPos);
         return 0;
     }
+    case WM_MOUSEWHEEL:
+    {
+        float step = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) / WHEEL_DELTA;
+        renderer->OnMouseWheel(step);
+        return 0;
+    }
     case WM_KILLFOCUS:
         sm_cursorPosValid = false;
         RestoreCursor();

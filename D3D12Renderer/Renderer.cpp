@@ -326,6 +326,11 @@ void Renderer::OnMouseMove(int xPos, int yPos)
     m_inputManager.CalcMouseMove(xPos, yPos);
 }
 
+void Renderer::OnMouseWheel(float step)
+{
+    m_inputManager.AccumulateMouseWheelStep(step);
+}
+
 void Renderer::OnKillFocus()
 {
     m_inputManager.Reset();
@@ -1943,6 +1948,9 @@ void Renderer::PrepareConstantData(float alpha)
 
     // Main Camera
     XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
+
+    static float cameraDollySpeed = 5.0f;
+    m_camera.MoveForward(m_inputManager.GetAndResetMouseWheelStep() * cameraDollySpeed);
 
     m_camera.UpdateRenderState(alpha);
     if (m_inputManager.IsMouseButtonDown(1))
