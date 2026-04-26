@@ -21,4 +21,5 @@ private:
     inline static POINT sm_savedCursorPos;
     inline static bool sm_isCursorHidden = false;
     inline static bool sm_cursorPosValid = false;
+    inline static UINT sm_dpi;
 };

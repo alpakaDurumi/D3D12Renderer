@@ -44,8 +44,8 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     RECT windowRect = { 0, 0, static_cast<LONG>(pRenderer->GetWidth()), static_cast<LONG>(pRenderer->GetHeight()) };
-    UINT dpi = GetDpiForSystem();
-    AdjustWindowRectExForDpi(&windowRect, WS_OVERLAPPEDWINDOW, FALSE, 0, dpi);
+    sm_dpi = GetDpiForSystem();       // Before creating window, get DPI from system
+    AdjustWindowRectExForDpi(&windowRect, WS_OVERLAPPEDWINDOW, FALSE, 0, sm_dpi);
 
     // Create the window and store a handle to it.
     sm_hwnd = CreateWindowExW(
@@ -67,7 +67,10 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
         return 1;
     }
 
-    pRenderer->OnInit(dpi);
+    // Replace DPI with fresh value
+    sm_dpi = GetDpiForWindow(sm_hwnd);
+
+    pRenderer->OnInit(sm_dpi);
 
     ShowWindow(sm_hwnd, nCmdShow);
 
@@ -217,7 +220,8 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
     }
     case WM_DPICHANGED:
     {
-        UINT dpi = LOWORD(wParam);
+        sm_dpi = LOWORD(wParam);
+
         RECT* const newRect = (RECT*)lParam;
         SetWindowPos(hWnd, HWND_TOP,
             newRect->left,
@@ -225,7 +229,7 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
             newRect->right - newRect->left,
             newRect->bottom - newRect->top,
             SWP_NOZORDER | SWP_NOACTIVATE);
-        renderer->OnDpiChanged(dpi);
+        renderer->OnDpiChanged(sm_dpi);
         return 0;
     }
     }
