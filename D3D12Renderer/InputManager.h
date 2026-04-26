@@ -57,16 +57,12 @@ public:
     }
 
     // Accumulate mouse moves.
-    void CalcMouseMove(int posX, int posY)
+    void CalcMouseMove(int dx, int dy, int cx, int cy)
     {
-        if (!(m_lastMousePos.x == -1 && m_lastMousePos.y == -1))
-        {
-            m_mouseMove.x += posX - m_lastMousePos.x;
-            m_mouseMove.y += posY - m_lastMousePos.y;
-        }
+        m_mouseMove.x += dx;
+        m_mouseMove.y += dy;
 
-        m_lastMousePos.x = posX;
-        m_lastMousePos.y = posY;
+        m_mousePos = { cx, cy };
     }
 
     XMINT2 GetAndResetMouseMove()
@@ -76,9 +72,9 @@ public:
         return delta;
     }
 
-    void AccumulateMouseWheelStep(float step)
+    void AccumulateMouseWheelStep(float stepDelta)
     {
-        m_accumulatedMouseWheelStep += step;
+        m_accumulatedMouseWheelStep += stepDelta;
     }
 
     float GetAndResetMouseWheelStep()
@@ -99,8 +95,8 @@ public:
         memset(m_keyDown, false, sizeof(m_keyDown));
         memset(m_mouseButtonDown, false, sizeof(m_mouseButtonDown));
         ResetPressedFlags();
-        m_lastMousePos = { -1, -1 };
         m_mouseMove = { 0, 0 };
+        m_mousePos = { 0, 0 };
         m_accumulatedMouseWheelStep = 0.0f;
     }
 
@@ -113,7 +109,7 @@ private:
     // 0 = LMB, 1 = RMB, 2 = MMB
     bool m_mouseButtonDown[3] = { false };
     bool m_mouseButtonPressed[3] = { false };
-    DirectX::XMINT2 m_lastMousePos = { -1, -1 };
     DirectX::XMINT2 m_mouseMove = { 0, 0 };
+    DirectX::XMINT2 m_mousePos = { 0, 0 };
     float m_accumulatedMouseWheelStep = 0.0f;
 };

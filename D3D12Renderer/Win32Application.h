@@ -17,9 +17,13 @@ private:
     static void HideCursor();
     static void RestoreCursor();
 
+    static void HandleRawInput(Renderer* pRenderer, LPARAM lParam);
+
     inline static HWND sm_hwnd = nullptr;
     inline static POINT sm_savedCursorPos;
     inline static bool sm_isCursorHidden = false;
     inline static bool sm_cursorPosValid = false;
     inline static UINT sm_dpi;
+
+    inline static POINT sm_lastCursorPos;
 };

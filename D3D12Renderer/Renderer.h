@@ -61,8 +61,8 @@ public:
     void OnKeyUp(VKCode key);
     void OnMouseButtonDown(UINT button);
     void OnMouseButtonUp(UINT button);
-    void OnMouseMove(int xPos, int yPos);
-    void OnMouseWheel(float step);
+    void OnMouseMove(int x, int y, int cx, int cy);
+    void OnMouseWheel(float stepDelta);
     void OnKillFocus();
     void OnResize(UINT width, UINT height);
     void OnDpiChanged(UINT dpi);

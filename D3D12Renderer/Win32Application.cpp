@@ -2,6 +2,7 @@
 #include "Win32Application.h"
 
 #include <windowsx.h>
+#include <hidusage.h>
 
 #include <locale>
 
@@ -69,6 +70,21 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
 
     // Replace DPI with fresh value
     sm_dpi = GetDpiForWindow(sm_hwnd);
+
+    // Register Raw Input Devices
+    RAWINPUTDEVICE devices[2];
+
+    devices[0].usUsagePage = HID_USAGE_PAGE_GENERIC;
+    devices[0].usUsage = HID_USAGE_GENERIC_MOUSE;
+    devices[0].dwFlags = RIDEV_INPUTSINK;
+    devices[0].hwndTarget = sm_hwnd;
+
+    devices[1].usUsagePage = HID_USAGE_PAGE_GENERIC;
+    devices[1].usUsage = HID_USAGE_GENERIC_KEYBOARD;
+    devices[1].dwFlags = 0;
+    devices[1].hwndTarget = sm_hwnd;
+
+    RegisterRawInputDevices(devices, 2, sizeof(RAWINPUTDEVICE));
 
     pRenderer->OnInit(sm_dpi);
 
@@ -146,6 +162,11 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
 
     switch (message)
     {
+    case WM_INPUT:
+    {
+        HandleRawInput(renderer, lParam);
+        break;      // To call DefWindowProcW so the system can perform cleanup
+    }
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN:
     case WM_KEYUP:
@@ -193,19 +214,6 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
     case WM_MBUTTONUP:
         renderer->OnMouseButtonUp(2);
         return 0;
-    case WM_MOUSEMOVE:
-    {
-        int xPos = GET_X_LPARAM(lParam);
-        int yPos = GET_Y_LPARAM(lParam);
-        renderer->OnMouseMove(xPos, yPos);
-        return 0;
-    }
-    case WM_MOUSEWHEEL:
-    {
-        float step = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) / WHEEL_DELTA;
-        renderer->OnMouseWheel(step);
-        return 0;
-    }
     case WM_KILLFOCUS:
         sm_cursorPosValid = false;
         RestoreCursor();
@@ -222,7 +230,7 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
     {
         sm_dpi = LOWORD(wParam);
 
-        RECT* const newRect = (RECT*)lParam;
+        RECT* const newRect = reinterpret_cast<RECT*>(lParam);
         SetWindowPos(hWnd, HWND_TOP,
             newRect->left,
             newRect->top,
@@ -272,5 +280,71 @@ void Win32Application::RestoreCursor()
     {
         ShowCursor(TRUE);
         sm_isCursorHidden = false;
+    }
+}
+
+void Win32Application::HandleRawInput(Renderer* pRenderer, LPARAM lParam)
+{
+    UINT size = 0;
+
+    // Get required size first
+    GetRawInputData(
+        reinterpret_cast<HRAWINPUT>(lParam),
+        RID_INPUT,
+        nullptr,
+        &size,
+        sizeof(RAWINPUTHEADER));
+
+    UINT8 buffer[256];
+    if (size > sizeof(buffer))
+        return;
+
+    // Get actual data
+    GetRawInputData(
+        reinterpret_cast<HRAWINPUT>(lParam),
+        RID_INPUT,
+        buffer,
+        &size,
+        sizeof(RAWINPUTHEADER));
+
+    RAWINPUT* raw = reinterpret_cast<RAWINPUT*>(buffer);
+
+    if (raw->header.dwType == RIM_TYPEMOUSE)
+    {
+        const RAWMOUSE& mouse = raw->data.mouse;
+
+        // Get cursor position
+        POINT curPos;
+        GetCursorPos(&curPos);
+        ScreenToClient(sm_hwnd, &curPos);
+
+        int dx = 0;
+        int dy = 0;
+
+        if (mouse.usFlags & MOUSE_MOVE_ABSOLUTE)
+        {
+            dx = curPos.x - sm_lastCursorPos.x;
+            dy = curPos.y - sm_lastCursorPos.y;
+        }
+        else
+        {
+            dx = static_cast<int>(mouse.lLastX);
+            dy = static_cast<int>(mouse.lLastY);
+        }
+
+        pRenderer->OnMouseMove(dx, dy, curPos.x, curPos.y);
+
+        sm_lastCursorPos = curPos;
+
+        if (mouse.usButtonFlags & RI_MOUSE_WHEEL)
+        {
+            short wheelDelta = static_cast<short>(mouse.usButtonData);
+            float stepDelta = static_cast<float>(wheelDelta) / WHEEL_DELTA;
+            pRenderer->OnMouseWheel(stepDelta);
+        }
+    }
+    else    // TODO: Keyboard
+    {
+
     }
 }

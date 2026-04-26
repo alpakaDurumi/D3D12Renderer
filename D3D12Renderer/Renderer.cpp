@@ -321,14 +321,14 @@ void Renderer::OnMouseButtonUp(UINT button)
     m_inputManager.SetMouseButtonUp(button);
 }
 
-void Renderer::OnMouseMove(int xPos, int yPos)
+void Renderer::OnMouseMove(int dx, int dy, int cx, int cy)
 {
-    m_inputManager.CalcMouseMove(xPos, yPos);
+    m_inputManager.CalcMouseMove(dx, dy, cx, cy);
 }
 
-void Renderer::OnMouseWheel(float step)
+void Renderer::OnMouseWheel(float stepDelta)
 {
-    m_inputManager.AccumulateMouseWheelStep(step);
+    m_inputManager.AccumulateMouseWheelStep(stepDelta);
 }
 
 void Renderer::OnKillFocus()
