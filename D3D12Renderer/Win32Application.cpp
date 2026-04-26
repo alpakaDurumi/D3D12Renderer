@@ -323,18 +323,22 @@ void Win32Application::HandleRawInput(Renderer* pRenderer, LPARAM lParam)
 
         if (mouse.usFlags & MOUSE_MOVE_ABSOLUTE)
         {
-            dx = curPos.x - sm_lastCursorPos.x;
-            dy = curPos.y - sm_lastCursorPos.y;
+            if (sm_lastCursorPosValid)
+            {
+                dx = curPos.x - sm_lastCursorPos.x;
+                dy = curPos.y - sm_lastCursorPos.y;
+                pRenderer->OnMouseMove(dx, dy, curPos.x, curPos.y);
+            }
         }
         else
         {
             dx = static_cast<int>(mouse.lLastX);
             dy = static_cast<int>(mouse.lLastY);
+            pRenderer->OnMouseMove(dx, dy, curPos.x, curPos.y);
         }
 
-        pRenderer->OnMouseMove(dx, dy, curPos.x, curPos.y);
-
         sm_lastCursorPos = curPos;
+        sm_lastCursorPosValid = false;
 
         if (mouse.usButtonFlags & RI_MOUSE_WHEEL)
         {
@@ -345,6 +349,5 @@ void Win32Application::HandleRawInput(Renderer* pRenderer, LPARAM lParam)
     }
     else    // TODO: Keyboard
     {
-
     }
 }

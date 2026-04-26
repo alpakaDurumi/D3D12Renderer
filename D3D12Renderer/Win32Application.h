@@ -26,4 +26,5 @@ private:
     inline static UINT sm_dpi;
 
     inline static POINT sm_lastCursorPos;
+    inline static bool sm_lastCursorPosValid = false;
 };
