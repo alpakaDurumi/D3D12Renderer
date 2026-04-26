@@ -167,3 +167,8 @@ DXGI_FORMAT FrameResource::GetGBufferFormat(GBufferSlot slot)
         return DXGI_FORMAT_UNKNOWN;
     }
 }
+
+void FrameResource::ResetUploadAllocator()
+{
+    m_uploadAllocator.Reset();
+}

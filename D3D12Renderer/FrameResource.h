@@ -58,6 +58,8 @@ public:
 
     static DXGI_FORMAT GetGBufferFormat(GBufferSlot slot);
 
+    void ResetUploadAllocator();
+
 private:
     ComPtr<ID3D12Resource> m_renderTarget;
     DescriptorAllocation m_rtvAllocation;

@@ -2157,6 +2157,8 @@ void Renderer::PrepareSpotLight(SpotLight& light)
 
 void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
 {
+    frameResource.ResetUploadAllocator();
+
     m_cameraUploadAllocation = frameResource.PushConstantData(&m_cameraConstantData, sizeof(CameraConstantData));
     m_shadowUploadAllocation = frameResource.PushConstantData(&m_shadowConstantData, sizeof(ShadowConstantData));
 
