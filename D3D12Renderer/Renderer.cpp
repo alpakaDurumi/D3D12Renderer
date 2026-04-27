@@ -194,6 +194,8 @@ void Renderer::OnInit(UINT dpi)
 
 void Renderer::OnUpdate()
 {
+    ProcessInput();
+
     auto now = m_clock.now();
 
     if (!m_vSync && m_fpsCap > 0)
@@ -226,9 +228,6 @@ void Renderer::OnUpdate()
     {
         FixedUpdate(fixedDtMs);
         accumulatedMs -= fixedDtMs;
-
-        // Pressed flags is remains valid for one tick
-        m_inputManager.ResetPressedFlags();
     }
 
     float alpha = std::clamp(static_cast<float>(accumulatedMs / fixedDtMs), 0.0f, 1.0f);
@@ -238,6 +237,8 @@ void Renderer::OnUpdate()
 
     PrepareConstantData(alpha);
     UpdateConstantBuffers(frameResource);
+
+    m_inputManager.ResetPressedFlags();
 }
 
 // Render the scene.
@@ -1875,33 +1876,8 @@ void Renderer::FixedUpdate(double fixedDtMs)
 {
     float fixedDtSec = static_cast<float>(fixedDtMs) * 0.001f;
 
-    if (m_inputManager.IsKeyPressed(VK_ESCAPE))
-    {
-        if (!PostMessageW(Win32Application::GetHwnd(), WM_CLOSE, 0, 0))
-        {
-            DWORD err = GetLastError();
-            WCHAR buf[128];
-            swprintf_s(buf, L"PostMessageW(WM_CLOSE) failed. GetLastError=%lu\n", err);
-            OutputDebugStringW(buf);
-
-            // fallback
-            PostQuitMessage(static_cast<int>(err));
-        }
-    }
-
-    if (m_inputManager.IsKeyPressed(VK_F11) ||
-        (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsKeyPressed(VK_RETURN)))
-    {
-        ToggleFullScreen();
-    }
-
-    if (m_inputManager.IsKeyPressed('V'))
-    {
-        m_vSync = !m_vSync;
-    }
-
     // Camera
-    static float cameraMoveSpeed = 10.0f;
+    static float cameraMoveSpeed = 50.0f;
 
     float dist = cameraMoveSpeed * fixedDtSec;
 
@@ -1947,14 +1923,7 @@ void Renderer::PrepareConstantData(float alpha)
     }
 
     // Main Camera
-    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
-
-    static float cameraDollySpeed = 5.0f;
-    m_camera.MoveForward(m_inputManager.GetAndResetMouseWheelStep() * cameraDollySpeed);
-
     m_camera.UpdateRenderState(alpha);
-    if (m_inputManager.IsMouseButtonDown(1))
-        m_camera.Rotate(mouseMove);
     m_cameraConstantData.SetPos(m_camera.GetPosition());
     m_cameraConstantData.SetView(m_camera.GetViewMatrix());
     m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());
@@ -2185,6 +2154,42 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
         processLight(light, GetRequiredArraySize(LightType::POINT));
     for (auto& light : m_sceneManager.GetSpotLights())
         processLight(light, GetRequiredArraySize(LightType::SPOT));
+}
+
+void Renderer::ProcessInput()
+{
+    if (m_inputManager.IsKeyPressed(VK_ESCAPE))
+    {
+        if (!PostMessageW(Win32Application::GetHwnd(), WM_CLOSE, 0, 0))
+        {
+            DWORD err = GetLastError();
+            WCHAR buf[128];
+            swprintf_s(buf, L"PostMessageW(WM_CLOSE) failed. GetLastError=%lu\n", err);
+            OutputDebugStringW(buf);
+
+            // fallback
+            PostQuitMessage(static_cast<int>(err));
+        }
+    }
+
+    if (m_inputManager.IsKeyPressed(VK_F11) ||
+        (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsKeyPressed(VK_RETURN)))
+    {
+        ToggleFullScreen();
+    }
+
+    if (m_inputManager.IsKeyPressed('V'))
+    {
+        m_vSync = !m_vSync;
+    }
+
+    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
+
+    static float cameraDollySpeed = 5.0f;
+    m_camera.MoveForward(m_inputManager.GetAndResetMouseWheelStep() * cameraDollySpeed);
+
+    if (m_inputManager.IsMouseButtonDown(1))
+        m_camera.Rotate(mouseMove);
 }
 
 void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)

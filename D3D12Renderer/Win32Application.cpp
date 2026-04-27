@@ -76,7 +76,7 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
 
     devices[0].usUsagePage = HID_USAGE_PAGE_GENERIC;
     devices[0].usUsage = HID_USAGE_GENERIC_MOUSE;
-    devices[0].dwFlags = RIDEV_INPUTSINK;
+    devices[0].dwFlags = 0;
     devices[0].hwndTarget = sm_hwnd;
 
     devices[1].usUsagePage = HID_USAGE_PAGE_GENERIC;
@@ -104,6 +104,9 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     {
         while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
         {
+            if (msg.message == WM_QUIT)
+                break;
+
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
