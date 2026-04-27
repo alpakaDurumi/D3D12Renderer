@@ -100,16 +100,22 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
 
     // main loop
     MSG msg = {};
-    while (msg.message != WM_QUIT)
+    bool running = true;
+    while (running)
     {
         while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
         {
             if (msg.message == WM_QUIT)
+            {
+                running = false;
                 break;
+            }
 
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
+
+        if (!running) break;
 
         // Start the Dear ImGui frame
         ImGui_ImplDX12_NewFrame();
@@ -341,7 +347,7 @@ void Win32Application::HandleRawInput(Renderer* pRenderer, LPARAM lParam)
         }
 
         sm_lastCursorPos = curPos;
-        sm_lastCursorPosValid = false;
+        sm_lastCursorPosValid = true;
 
         if (mouse.usButtonFlags & RI_MOUSE_WHEEL)
         {
