@@ -1923,7 +1923,7 @@ void Renderer::PrepareConstantData(float alpha)
 
     // Main Camera
     m_camera.UpdateRenderState(alpha);
-    m_cameraConstantData.SetPos(m_camera.GetPosition());
+    m_cameraConstantData.SetPos(m_camera.GetRenderPosition());
     m_cameraConstantData.SetView(m_camera.GetViewMatrix());
     m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());
 
@@ -2043,7 +2043,7 @@ void Renderer::PrepareDirectionalLight(DirectionalLight& light, const std::vecto
 {
     static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
-    XMVECTOR cameraPos = m_camera.GetPosition();
+    XMVECTOR cameraPos = m_camera.GetRenderPosition();
     XMVECTOR dir = light.GetDirection();
 
     for (UINT i = 0; i < MAX_CASCADES; ++i)
@@ -2250,7 +2250,7 @@ void Renderer::BeginOrbit()
 {
     static const float DEFAULT_ORBIT_DIST = 50.0f;
 
-    XMVECTOR camPos = m_camera.GetPosition();
+    XMVECTOR camPos = m_camera.GetCurrentPosition();
 
     // If no entity selected
     if (m_selected.index == UINT_MAX && m_selected.generation == 0)

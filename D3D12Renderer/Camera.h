@@ -14,7 +14,8 @@ public:
 
     void UpdateRenderState(float alpha);
 
-    XMVECTOR GetPosition() const;
+    XMVECTOR GetCurrentPosition() const;
+    XMVECTOR GetRenderPosition() const;
     XMVECTOR GetForward() const;
     float GetNearPlane() const;
     float GetFarPlane() const;

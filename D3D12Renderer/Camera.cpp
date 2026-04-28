@@ -23,7 +23,12 @@ void Camera::UpdateRenderState(float alpha)
     XMStoreFloat3(&m_renderPosition, interpolated);
 }
 
-XMVECTOR Camera::GetPosition() const
+XMVECTOR Camera::GetCurrentPosition() const
+{
+    return XMVectorSetW(XMLoadFloat3(&m_currPosition), 1.0f);
+}
+
+XMVECTOR Camera::GetRenderPosition() const
 {
     return XMVectorSetW(XMLoadFloat3(&m_renderPosition), 1.0f);
 }
