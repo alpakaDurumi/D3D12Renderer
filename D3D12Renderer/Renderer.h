@@ -128,6 +128,10 @@ private:
     RenderGraph m_renderGraph;
 
     SceneManager m_sceneManager;
+    EntityHandle m_selected;
+    XMFLOAT3 m_orbitPivot;
+    float m_orbitDistance;
+    bool m_orbiting = false;
 
     std::vector<EntityHandle> m_previewRotations;
 
@@ -218,4 +222,5 @@ private:
     void DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
 
     void ProcessInput();
+    void BeginOrbit();
 };

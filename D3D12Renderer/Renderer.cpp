@@ -506,28 +506,27 @@ void Renderer::BuildImGuiFrame()
     // Hierarchy
     ImGui::Begin("Hierarchy");
 
-    static EntityHandle selected;
     EntityHandle toDelete;
 
     if (ImGui::IsKeyPressed(ImGuiKey_Delete))
-        toDelete = selected;
+        toDelete = m_selected;
 
     for (const auto& entity : m_sceneManager.GetEntities())
     {
         if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
-            RenderEntityNode(entity, selected, toDelete, selectionChanged);
+            RenderEntityNode(entity, m_selected, toDelete, selectionChanged);
     }
 
     m_sceneManager.Remove(toDelete);
-    if (selected == toDelete)
-        selected = {};
+    if (m_selected == toDelete)
+        m_selected = {};
 
     ImGui::End();
 
     // Inspector
     ImGui::Begin("Inspector");
 
-    auto* pEntity = m_sceneManager.Get(selected);
+    auto* pEntity = m_sceneManager.Get(m_selected);
     if (pEntity)
     {
         if (pEntity->transform.has_value())
@@ -2185,11 +2184,23 @@ void Renderer::ProcessInput()
 
     XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
 
+    if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonPressed(0))
+        BeginOrbit();
+
+    if (m_orbiting)
+        m_camera.Orbit(XMLoadFloat3(&m_orbitPivot), m_orbitDistance, mouseMove);
+
+    if (m_orbiting && !m_inputManager.IsMouseButtonDown(0))
+        m_orbiting = false;
+
     static float cameraDollySpeed = 5.0f;
     m_camera.MoveForward(m_inputManager.GetAndResetMouseWheelStep() * cameraDollySpeed);
 
     if (m_inputManager.IsMouseButtonDown(1))
         m_camera.Rotate(mouseMove);
+
+    // Operations in ProcessInput are immediate, requiring no interpolation.
+    m_camera.SnapshotState();
 }
 
 void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)
@@ -2233,4 +2244,27 @@ void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle mes
     pCommandList->IASetIndexBuffer(&pMesh->GetIBV());
 
     pCommandList->DrawIndexedInstanced(pMesh->GetNumIndices(), instanceCount, 0, 0, 0);
+}
+
+void Renderer::BeginOrbit()
+{
+    static const float DEFAULT_ORBIT_DIST = 50.0f;
+
+    XMVECTOR camPos = m_camera.GetPosition();
+
+    // If no entity selected
+    if (m_selected.index == UINT_MAX && m_selected.generation == 0)
+    {
+        XMStoreFloat3(&m_orbitPivot, camPos + m_camera.GetForward() * DEFAULT_ORBIT_DIST);
+    }
+    else
+    {
+        auto* pEntity = m_sceneManager.Get(m_selected);
+        auto pos = pEntity->transform->GetTranslation();
+
+        m_orbitPivot = pos;
+    }
+
+    m_orbitDistance = XMVectorGetX(XMVector3Length(camPos - XMLoadFloat3(&m_orbitPivot)));
+    m_orbiting = true;
 }

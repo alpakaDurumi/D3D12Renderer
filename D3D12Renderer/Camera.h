@@ -15,6 +15,7 @@ public:
     void UpdateRenderState(float alpha);
 
     XMVECTOR GetPosition() const;
+    XMVECTOR GetForward() const;
     float GetNearPlane() const;
     float GetFarPlane() const;
     XMMATRIX GetViewMatrix() const;
@@ -28,6 +29,7 @@ public:
     void MoveRight(float speedScale);
     void MoveUp(float speedScale);
     void Rotate(XMINT2 mouseMove);
+    void Orbit(XMVECTOR pivot, float distance, XMINT2 mouseMove);
 
 private:
     float CalcVerticalFOV(float horizontalFOV);

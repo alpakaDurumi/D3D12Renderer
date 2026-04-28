@@ -28,6 +28,13 @@ XMVECTOR Camera::GetPosition() const
     return XMVectorSetW(XMLoadFloat3(&m_renderPosition), 1.0f);
 }
 
+XMVECTOR Camera::GetForward() const
+{
+    XMVECTOR rot = XMLoadFloat4(&m_rotation);
+    XMVECTOR forward = XMVector3Rotate(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), rot);
+    return forward;
+}
+
 float Camera::GetNearPlane() const
 {
     return m_nearPlane;
@@ -117,6 +124,13 @@ void Camera::Rotate(XMINT2 mouseMove)
 
     XMVECTOR q = XMQuaternionRotationRollPitchYaw(m_pitch, m_yaw, 0.0f);
     XMStoreFloat4(&m_rotation, q);
+}
+
+void Camera::Orbit(XMVECTOR pivot, float distance, XMINT2 mouseMove)
+{
+    Rotate(mouseMove);
+    XMVECTOR newPos = pivot - GetForward() * distance;
+    XMStoreFloat3(&m_currPosition, newPos);
 }
 
 float Camera::CalcVerticalFOV(float horizontalFOV)
