@@ -121,10 +121,10 @@ void Camera::MoveUp(float speedScale)
 
 void Camera::Rotate(XMINT2 mouseMove)
 {
-    const float radiansPerPixel = 0.0035f;
+    const float angularSensitivity = 0.0035f;
 
-    m_yaw += mouseMove.x * radiansPerPixel;
-    m_pitch += mouseMove.y * radiansPerPixel;
+    m_yaw += mouseMove.x * angularSensitivity;
+    m_pitch += mouseMove.y * angularSensitivity;
     m_pitch = std::clamp(m_pitch, -XM_PIDIV2 + 0.01f, XM_PIDIV2 - 0.01f);
 
     XMVECTOR q = XMQuaternionRotationRollPitchYaw(m_pitch, m_yaw, 0.0f);
