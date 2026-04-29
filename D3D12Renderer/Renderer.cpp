@@ -2197,9 +2197,23 @@ void Renderer::ProcessInput()
 
     XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
 
+    // Camera control
     if (m_cameraControl)
         m_camera.Rotate(mouseMove);
 
+    // Dolly
+    {
+        static float cameraDollySpeed = 5.0f;
+
+        float wheelStep = m_inputManager.GetAndResetMouseWheelStep();
+        m_camera.MoveForward(wheelStep * cameraDollySpeed);
+        if (m_orbiting && wheelStep != 0.0f)
+        {
+            XMVECTOR camPos = m_camera.GetCurrentPosition();
+            m_orbitDistance = XMVectorGetX(XMVector3Length(camPos - XMLoadFloat3(&m_orbitPivot)));
+        }
+    }
+    
     if (m_orbiting)
         m_camera.Orbit(XMLoadFloat3(&m_orbitPivot), m_orbitDistance, mouseMove);
 
@@ -2214,9 +2228,6 @@ void Renderer::ProcessInput()
         m_orbiting = false;
         Win32Application::RestoreCursor();
     }
-
-    static float cameraDollySpeed = 5.0f;
-    m_camera.MoveForward(m_inputManager.GetAndResetMouseWheelStep() * cameraDollySpeed);
 
     // Operations in ProcessInput are immediate, requiring no interpolation.
     m_camera.SnapshotState();
