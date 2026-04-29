@@ -207,14 +207,8 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
         return 0;
     case WM_RBUTTONDOWN:
         renderer->OnMouseButtonDown(1);
-        HideCursor();
-        GetCursorPos(&sm_savedCursorPos);
-        sm_cursorPosValid = true;
         return 0;
     case WM_RBUTTONUP:
-        if (sm_cursorPosValid) SetCursorPos(sm_savedCursorPos.x, sm_savedCursorPos.y);
-        sm_cursorPosValid = false;
-        RestoreCursor();
         renderer->OnMouseButtonUp(1);
         return 0;
     case WM_MBUTTONDOWN:
@@ -224,7 +218,6 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
         renderer->OnMouseButtonUp(2);
         return 0;
     case WM_KILLFOCUS:
-        sm_cursorPosValid = false;
         RestoreCursor();
         renderer->OnKillFocus();
         return 0;
@@ -276,20 +269,20 @@ void Win32Application::ParseCommandLineArgs(Renderer* pRenderer, LPWSTR lpCmdLin
 
 void Win32Application::HideCursor()
 {
-    if (!sm_isCursorHidden)
-    {
-        ShowCursor(FALSE);
-        sm_isCursorHidden = true;
-    }
+    if (sm_isCursorHidden) return;
+
+    ShowCursor(FALSE);
+    GetCursorPos(&sm_savedCursorPos);
+    sm_isCursorHidden = true;
 }
 
 void Win32Application::RestoreCursor()
 {
-    if (sm_isCursorHidden)
-    {
-        ShowCursor(TRUE);
-        sm_isCursorHidden = false;
-    }
+    if (!sm_isCursorHidden) return;
+
+    SetCursorPos(sm_savedCursorPos.x, sm_savedCursorPos.y);
+    ShowCursor(TRUE);
+    sm_isCursorHidden = false;
 }
 
 void Win32Application::HandleRawInput(Renderer* pRenderer, LPARAM lParam)

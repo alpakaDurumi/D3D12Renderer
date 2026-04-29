@@ -2182,22 +2182,41 @@ void Renderer::ProcessInput()
         m_vSync = !m_vSync;
     }
 
-    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
+    // Camera
+    if (m_inputManager.IsMouseButtonPressed(1))
+    {
+        m_cameraControl = true;
+        Win32Application::HideCursor();
+    }
 
     if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonPressed(0))
+    {
         BeginOrbit();
+        Win32Application::HideCursor();
+    }
+
+    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
+
+    if (m_cameraControl)
+        m_camera.Rotate(mouseMove);
 
     if (m_orbiting)
         m_camera.Orbit(XMLoadFloat3(&m_orbitPivot), m_orbitDistance, mouseMove);
 
-    if (m_orbiting && !m_inputManager.IsMouseButtonDown(0))
+    if (m_cameraControl && !m_inputManager.IsMouseButtonDown(1))
+    {
+        m_cameraControl = false;
+        Win32Application::RestoreCursor();
+    }
+
+    if (m_orbiting && (!m_inputManager.IsKeyDown(VK_MENU) || !m_inputManager.IsMouseButtonDown(0)))
+    {
         m_orbiting = false;
+        Win32Application::RestoreCursor();
+    }
 
     static float cameraDollySpeed = 5.0f;
     m_camera.MoveForward(m_inputManager.GetAndResetMouseWheelStep() * cameraDollySpeed);
-
-    if (m_inputManager.IsMouseButtonDown(1))
-        m_camera.Rotate(mouseMove);
 
     // Operations in ProcessInput are immediate, requiring no interpolation.
     m_camera.SnapshotState();

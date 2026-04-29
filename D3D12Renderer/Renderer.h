@@ -132,6 +132,7 @@ private:
     XMFLOAT3 m_orbitPivot;
     float m_orbitDistance;
     bool m_orbiting = false;
+    bool m_cameraControl = false;
 
     std::vector<EntityHandle> m_previewRotations;
 
