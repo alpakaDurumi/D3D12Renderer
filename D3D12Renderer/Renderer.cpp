@@ -1119,7 +1119,6 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     frameResource.PushInstanceData(data);
 
     // Depth-only pass for shadow mapping
-    // Also work as z-prepass
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Depth-only pass");
 
