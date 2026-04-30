@@ -2195,6 +2195,17 @@ void Renderer::ProcessInput()
         Win32Application::HideCursor();
     }
 
+    // Focus
+    if (m_inputManager.IsKeyPressed('F') && !(m_selected.index == UINT_MAX && m_selected.generation == 0))
+    {
+        auto* pEntity = m_sceneManager.Get(m_selected);
+        auto pos = pEntity->transform->GetTranslation();
+
+        m_camera.SetCurrentPosition(XMLoadFloat3(&pos) - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
+
+        m_orbitDistance = DEFAULT_FOCUS_DIST;
+    }
+
     XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
 
     // Camera control
@@ -2206,14 +2217,14 @@ void Renderer::ProcessInput()
         static float cameraDollySpeed = 5.0f;
 
         float wheelStep = m_inputManager.GetAndResetMouseWheelStep();
-        m_camera.MoveForward(wheelStep * cameraDollySpeed);
-        if (m_orbiting && wheelStep != 0.0f)
+        if (wheelStep != 0.0f)
         {
+            m_camera.MoveForward(wheelStep * cameraDollySpeed);
             XMVECTOR camPos = m_camera.GetCurrentPosition();
             m_orbitDistance = XMVectorGetX(XMVector3Length(camPos - XMLoadFloat3(&m_orbitPivot)));
         }
     }
-    
+
     if (m_orbiting)
         m_camera.Orbit(XMLoadFloat3(&m_orbitPivot), m_orbitDistance, mouseMove);
 
@@ -2278,23 +2289,7 @@ void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle mes
 
 void Renderer::BeginOrbit()
 {
-    static const float DEFAULT_ORBIT_DIST = 50.0f;
-
     XMVECTOR camPos = m_camera.GetCurrentPosition();
-
-    // If no entity selected
-    if (m_selected.index == UINT_MAX && m_selected.generation == 0)
-    {
-        XMStoreFloat3(&m_orbitPivot, camPos + m_camera.GetForward() * DEFAULT_ORBIT_DIST);
-    }
-    else
-    {
-        auto* pEntity = m_sceneManager.Get(m_selected);
-        auto pos = pEntity->transform->GetTranslation();
-
-        m_orbitPivot = pos;
-    }
-
-    m_orbitDistance = XMVectorGetX(XMVector3Length(camPos - XMLoadFloat3(&m_orbitPivot)));
+    XMStoreFloat3(&m_orbitPivot, camPos + m_camera.GetForward() * m_orbitDistance);
     m_orbiting = true;
 }

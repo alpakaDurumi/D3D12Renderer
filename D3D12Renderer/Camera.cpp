@@ -68,6 +68,11 @@ XMMATRIX Camera::GetProjectionMatrix(bool usePerspectiveProjection) const
         XMMatrixOrthographicLH(2 * m_aspectRatio, 2.0f, m_farPlane, m_nearPlane);
 }
 
+void Camera::SetCurrentPosition(const XMVECTOR& pos)
+{
+    XMStoreFloat3(&m_currPosition, pos);
+}
+
 void Camera::SetAspectRatio(float aspectRatio)
 {
     m_aspectRatio = aspectRatio;

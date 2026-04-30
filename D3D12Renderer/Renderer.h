@@ -88,7 +88,7 @@ private:
     D3D12_VIEWPORT m_viewport;
     D3D12_RECT m_scissorRect;
 
-    static const UINT FrameCount = 2;
+    inline static constexpr UINT FrameCount = 2;
 
     // Adapter info
     bool m_useWarpDevice = false;
@@ -129,8 +129,11 @@ private:
 
     SceneManager m_sceneManager;
     EntityHandle m_selected;
+
+    inline static constexpr float DEFAULT_FOCUS_DIST = 30.0f;
+
     XMFLOAT3 m_orbitPivot;
-    float m_orbitDistance;
+    float m_orbitDistance = DEFAULT_FOCUS_DIST;
     bool m_orbiting = false;
     bool m_cameraControl = false;
 

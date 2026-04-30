@@ -22,6 +22,7 @@ public:
     XMMATRIX GetViewMatrix() const;
     XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection = true) const;
 
+    void SetCurrentPosition(const XMVECTOR& pos);
     void SetAspectRatio(float aspectRatio);
     void SetHorizontalFOV(float horizontalFOV);
 
