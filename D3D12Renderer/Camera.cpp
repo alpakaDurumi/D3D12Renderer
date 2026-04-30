@@ -126,7 +126,7 @@ void Camera::MoveUp(float speedScale)
 
 void Camera::Rotate(XMINT2 mouseMove)
 {
-    const float angularSensitivity = 0.0035f;
+    constexpr float angularSensitivity = 0.0035f;
 
     m_yaw += mouseMove.x * angularSensitivity;
     m_pitch += mouseMove.y * angularSensitivity;
@@ -141,6 +141,21 @@ void Camera::Orbit(XMVECTOR pivot, float distance, XMINT2 mouseMove)
     Rotate(mouseMove);
     XMVECTOR newPos = pivot - GetForward() * distance;
     XMStoreFloat3(&m_currPosition, newPos);
+}
+
+void Camera::Pan(XMINT2 mouseMove)
+{
+    constexpr float panSensitivity = 0.01f;
+
+    MoveRight(mouseMove.x * panSensitivity);
+
+    XMVECTOR pos = XMLoadFloat3(&m_currPosition);
+    XMVECTOR rot = XMLoadFloat4(&m_rotation);
+    XMVECTOR localUp = XMVector3Rotate(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), rot);
+
+    pos += -localUp * mouseMove.y * panSensitivity;
+
+    XMStoreFloat3(&m_currPosition, pos);
 }
 
 float Camera::CalcVerticalFOV(float horizontalFOV)

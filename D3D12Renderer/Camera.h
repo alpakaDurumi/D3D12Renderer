@@ -32,6 +32,7 @@ public:
     void MoveUp(float speedScale);
     void Rotate(XMINT2 mouseMove);
     void Orbit(XMVECTOR pivot, float distance, XMINT2 mouseMove);
+    void Pan(XMINT2 mouseMove);
 
 private:
     float CalcVerticalFOV(float horizontalFOV);

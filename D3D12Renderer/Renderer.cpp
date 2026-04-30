@@ -2182,19 +2182,6 @@ void Renderer::ProcessInput()
         m_vSync = !m_vSync;
     }
 
-    // Camera
-    if (m_inputManager.IsMouseButtonPressed(1))
-    {
-        m_cameraControl = true;
-        Win32Application::HideCursor();
-    }
-
-    if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonPressed(0))
-    {
-        BeginOrbit();
-        Win32Application::HideCursor();
-    }
-
     // Focus
     if (m_inputManager.IsKeyPressed('F') && !(m_selected.index == UINT_MAX && m_selected.generation == 0))
     {
@@ -2205,12 +2192,6 @@ void Renderer::ProcessInput()
 
         m_orbitDistance = DEFAULT_FOCUS_DIST;
     }
-
-    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
-
-    // Camera control
-    if (m_cameraControl)
-        m_camera.Rotate(mouseMove);
 
     // Dolly
     {
@@ -2225,19 +2206,63 @@ void Renderer::ProcessInput()
         }
     }
 
-    if (m_orbiting)
-        m_camera.Orbit(XMLoadFloat3(&m_orbitPivot), m_orbitDistance, mouseMove);
+    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
 
-    if (m_cameraControl && !m_inputManager.IsMouseButtonDown(1))
+    // Camera control
+    if (m_inputManager.IsMouseButtonPressed(1))
     {
-        m_cameraControl = false;
-        Win32Application::RestoreCursor();
+        m_cameraControl = true;
+        Win32Application::HideCursor();
+    }
+    if (m_cameraControl)
+    {
+        if (m_inputManager.IsMouseButtonDown(1))
+        {
+            m_camera.Rotate(mouseMove);
+        }
+        else
+        {
+            m_cameraControl = false;
+            Win32Application::RestoreCursor();
+        }
     }
 
-    if (m_orbiting && (!m_inputManager.IsKeyDown(VK_MENU) || !m_inputManager.IsMouseButtonDown(0)))
+    // Orbit
+    if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonPressed(0))
     {
-        m_orbiting = false;
-        Win32Application::RestoreCursor();
+        BeginOrbit();
+        Win32Application::HideCursor();
+    }
+    if (m_orbiting)
+    {
+        if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonDown(0))
+        {
+            m_camera.Orbit(XMLoadFloat3(&m_orbitPivot), m_orbitDistance, mouseMove);
+        }
+        else
+        {
+            m_orbiting = false;
+            Win32Application::RestoreCursor();
+        }
+    }
+
+    // Pan
+    if (m_inputManager.IsMouseButtonPressed(2))
+    {
+        m_panning = true;
+        Win32Application::HideCursor();
+    }
+    if (m_panning)
+    {
+        if (m_inputManager.IsMouseButtonDown(2))
+        {
+            m_camera.Pan(mouseMove);
+        }
+        else
+        {
+            m_panning = false;
+            Win32Application::RestoreCursor();
+        }
     }
 
     // Operations in ProcessInput are immediate, requiring no interpolation.

@@ -132,10 +132,11 @@ private:
 
     inline static constexpr float DEFAULT_FOCUS_DIST = 30.0f;
 
+    bool m_cameraControl = false;
+    bool m_orbiting = false;
     XMFLOAT3 m_orbitPivot;
     float m_orbitDistance = DEFAULT_FOCUS_DIST;
-    bool m_orbiting = false;
-    bool m_cameraControl = false;
+    bool m_panning = false;
 
     std::vector<EntityHandle> m_previewRotations;
 
