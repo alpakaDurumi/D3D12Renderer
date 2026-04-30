@@ -194,6 +194,8 @@ void Renderer::OnInit(UINT dpi)
 
 void Renderer::OnUpdate()
 {
+    ProcessInput();
+
     auto now = m_clock.now();
 
     if (!m_vSync && m_fpsCap > 0)
@@ -235,6 +237,8 @@ void Renderer::OnUpdate()
 
     PrepareConstantData(alpha);
     UpdateConstantBuffers(frameResource);
+
+    m_inputManager.ResetPressedFlags();
 }
 
 // Render the scene.
@@ -298,19 +302,39 @@ void Renderer::OnDestroy()
     ImGui::DestroyContext();
 }
 
-void Renderer::OnKeyDown(WPARAM key)
+void Renderer::OnKeyDown(VKCode key)
 {
     m_inputManager.SetKeyDown(key);
 }
 
-void Renderer::OnKeyUp(WPARAM key)
+void Renderer::OnKeyUp(VKCode key)
 {
     m_inputManager.SetKeyUp(key);
 }
 
-void Renderer::OnMouseMove(int xPos, int yPos)
+void Renderer::OnMouseButtonDown(UINT button)
 {
-    m_inputManager.CalcMouseMove(xPos, yPos);
+    m_inputManager.SetMouseButtonDown(button);
+}
+
+void Renderer::OnMouseButtonUp(UINT button)
+{
+    m_inputManager.SetMouseButtonUp(button);
+}
+
+void Renderer::OnMouseMove(int dx, int dy, int cx, int cy)
+{
+    m_inputManager.CalcMouseMove(dx, dy, cx, cy);
+}
+
+void Renderer::OnMouseWheel(float stepDelta)
+{
+    m_inputManager.AccumulateMouseWheelStep(stepDelta);
+}
+
+void Renderer::OnKillFocus()
+{
+    m_inputManager.Reset();
 }
 
 void Renderer::OnResize(UINT width, UINT height)
@@ -482,28 +506,27 @@ void Renderer::BuildImGuiFrame()
     // Hierarchy
     ImGui::Begin("Hierarchy");
 
-    static EntityHandle selected;
     EntityHandle toDelete;
 
     if (ImGui::IsKeyPressed(ImGuiKey_Delete))
-        toDelete = selected;
+        toDelete = m_selected;
 
     for (const auto& entity : m_sceneManager.GetEntities())
     {
         if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
-            RenderEntityNode(entity, selected, toDelete, selectionChanged);
+            RenderEntityNode(entity, m_selected, toDelete, selectionChanged);
     }
 
     m_sceneManager.Remove(toDelete);
-    if (selected == toDelete)
-        selected = {};
+    if (m_selected == toDelete)
+        m_selected = {};
 
     ImGui::End();
 
     // Inspector
     ImGui::Begin("Inspector");
 
-    auto* pEntity = m_sceneManager.Get(selected);
+    auto* pEntity = m_sceneManager.Get(m_selected);
     if (pEntity)
     {
         if (pEntity->transform.has_value())
@@ -1852,45 +1875,22 @@ void Renderer::FixedUpdate(double fixedDtMs)
 {
     float fixedDtSec = static_cast<float>(fixedDtMs) * 0.001f;
 
-    if (m_inputManager.IsKeyPressed(VK_ESCAPE))
-    {
-        if (!PostMessageW(Win32Application::GetHwnd(), WM_CLOSE, 0, 0))
-        {
-            DWORD err = GetLastError();
-            WCHAR buf[128];
-            swprintf_s(buf, L"PostMessageW(WM_CLOSE) failed. GetLastError=%lu\n", err);
-            OutputDebugStringW(buf);
-
-            // fallback
-            PostQuitMessage(static_cast<int>(err));
-        }
-    }
-
-    if (m_inputManager.IsKeyPressed(VK_F11))
-    {
-        ToggleFullScreen();
-    }
-
-    if (m_inputManager.IsKeyPressed('V'))
-    {
-        m_vSync = !m_vSync;
-    }
-
-    m_inputManager.ResetKeyPressed();
-
     // Camera
-    static float cameraMoveSpeed = 10.0f;
+    static float cameraMoveSpeed = 50.0f;
 
     float dist = cameraMoveSpeed * fixedDtSec;
 
     m_camera.SnapshotState();
 
-    if (m_inputManager.IsKeyDown('W')) m_camera.MoveForward(dist);
-    if (m_inputManager.IsKeyDown('A')) m_camera.MoveRight(-dist);
-    if (m_inputManager.IsKeyDown('S')) m_camera.MoveForward(-dist);
-    if (m_inputManager.IsKeyDown('D')) m_camera.MoveRight(dist);
-    if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-dist);
-    if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(dist);
+    if (m_inputManager.IsMouseButtonDown(1))
+    {
+        if (m_inputManager.IsKeyDown('W')) m_camera.MoveForward(dist);
+        if (m_inputManager.IsKeyDown('A')) m_camera.MoveRight(-dist);
+        if (m_inputManager.IsKeyDown('S')) m_camera.MoveForward(-dist);
+        if (m_inputManager.IsKeyDown('D')) m_camera.MoveRight(dist);
+        if (m_inputManager.IsKeyDown('Q')) m_camera.MoveUp(-dist);
+        if (m_inputManager.IsKeyDown('E')) m_camera.MoveUp(dist);
+    }
 
     // Transforms
     static float rotationSpeed = 1.0f;  // unit : rad/s
@@ -1923,8 +1923,7 @@ void Renderer::PrepareConstantData(float alpha)
 
     // Main Camera
     m_camera.UpdateRenderState(alpha);
-    m_camera.Rotate(m_inputManager.GetAndResetMouseMove());
-    m_cameraConstantData.SetPos(m_camera.GetPosition());
+    m_cameraConstantData.SetPos(m_camera.GetRenderPosition());
     m_cameraConstantData.SetView(m_camera.GetViewMatrix());
     m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());
 
@@ -2044,7 +2043,7 @@ void Renderer::PrepareDirectionalLight(DirectionalLight& light, const std::vecto
 {
     static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
-    XMVECTOR cameraPos = m_camera.GetPosition();
+    XMVECTOR cameraPos = m_camera.GetRenderPosition();
     XMVECTOR dir = light.GetDirection();
 
     for (UINT i = 0; i < MAX_CASCADES; ++i)
@@ -2126,6 +2125,8 @@ void Renderer::PrepareSpotLight(SpotLight& light)
 
 void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
 {
+    frameResource.ResetUploadAllocator();
+
     m_cameraUploadAllocation = frameResource.PushConstantData(&m_cameraConstantData, sizeof(CameraConstantData));
     m_shadowUploadAllocation = frameResource.PushConstantData(&m_shadowConstantData, sizeof(ShadowConstantData));
 
@@ -2152,6 +2153,120 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
         processLight(light, GetRequiredArraySize(LightType::POINT));
     for (auto& light : m_sceneManager.GetSpotLights())
         processLight(light, GetRequiredArraySize(LightType::SPOT));
+}
+
+void Renderer::ProcessInput()
+{
+    if (m_inputManager.IsKeyPressed(VK_ESCAPE))
+    {
+        if (!PostMessageW(Win32Application::GetHwnd(), WM_CLOSE, 0, 0))
+        {
+            DWORD err = GetLastError();
+            WCHAR buf[128];
+            swprintf_s(buf, L"PostMessageW(WM_CLOSE) failed. GetLastError=%lu\n", err);
+            OutputDebugStringW(buf);
+
+            // fallback
+            PostQuitMessage(static_cast<int>(err));
+        }
+    }
+
+    if (m_inputManager.IsKeyPressed(VK_F11) ||
+        (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsKeyPressed(VK_RETURN)))
+    {
+        ToggleFullScreen();
+    }
+
+    if (m_inputManager.IsKeyPressed('V'))
+    {
+        m_vSync = !m_vSync;
+    }
+
+    // Focus
+    if (m_inputManager.IsKeyPressed('F') && !(m_selected.index == UINT_MAX && m_selected.generation == 0))
+    {
+        auto* pEntity = m_sceneManager.Get(m_selected);
+        auto pos = pEntity->transform->GetTranslation();
+
+        m_camera.SetCurrentPosition(XMLoadFloat3(&pos) - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
+
+        m_orbitDistance = DEFAULT_FOCUS_DIST;
+    }
+
+    // Dolly
+    {
+        static float cameraDollySpeed = 5.0f;
+
+        float wheelStep = m_inputManager.GetAndResetMouseWheelStep();
+        if (wheelStep != 0.0f)
+        {
+            m_camera.MoveForward(wheelStep * cameraDollySpeed);
+            XMVECTOR camPos = m_camera.GetCurrentPosition();
+            m_orbitDistance = XMVectorGetX(XMVector3Length(camPos - XMLoadFloat3(&m_orbitPivot)));
+        }
+    }
+
+    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
+
+    // Camera control
+    if (m_inputManager.IsMouseButtonPressed(1))
+    {
+        m_cameraControl = true;
+        Win32Application::HideCursor();
+    }
+    if (m_cameraControl)
+    {
+        if (m_inputManager.IsMouseButtonDown(1))
+        {
+            m_camera.Rotate(mouseMove);
+        }
+        else
+        {
+            m_cameraControl = false;
+            Win32Application::RestoreCursor();
+        }
+    }
+
+    // Orbit
+    if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonPressed(0))
+    {
+        BeginOrbit();
+        Win32Application::HideCursor();
+    }
+    if (m_orbiting)
+    {
+        if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonDown(0))
+        {
+            m_camera.Orbit(XMLoadFloat3(&m_orbitPivot), m_orbitDistance, mouseMove);
+        }
+        else
+        {
+            m_orbiting = false;
+            Win32Application::RestoreCursor();
+        }
+    }
+
+    // Pan
+    if (m_inputManager.IsMouseButtonPressed(2))
+    {
+        m_panning = true;
+        Win32Application::HideCursor();
+    }
+    if (m_panning)
+    {
+        if (m_inputManager.IsMouseButtonDown(2))
+        {
+            m_camera.Pan(mouseMove);
+        }
+        else
+        {
+            m_panning = false;
+            Win32Application::RestoreCursor();
+        }
+    }
+
+    // Operations in ProcessInput are immediate, requiring no interpolation.
+    m_camera.SnapshotState();
 }
 
 void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)
@@ -2195,4 +2310,11 @@ void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle mes
     pCommandList->IASetIndexBuffer(&pMesh->GetIBV());
 
     pCommandList->DrawIndexedInstanced(pMesh->GetNumIndices(), instanceCount, 0, 0, 0);
+}
+
+void Renderer::BeginOrbit()
+{
+    XMVECTOR camPos = m_camera.GetCurrentPosition();
+    XMStoreFloat3(&m_orbitPivot, camPos + m_camera.GetForward() * m_orbitDistance);
+    m_orbiting = true;
 }

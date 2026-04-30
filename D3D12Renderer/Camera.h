@@ -14,12 +14,15 @@ public:
 
     void UpdateRenderState(float alpha);
 
-    XMVECTOR GetPosition() const;
+    XMVECTOR GetCurrentPosition() const;
+    XMVECTOR GetRenderPosition() const;
+    XMVECTOR GetForward() const;
     float GetNearPlane() const;
     float GetFarPlane() const;
     XMMATRIX GetViewMatrix() const;
     XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection = true) const;
 
+    void SetCurrentPosition(const XMVECTOR& pos);
     void SetAspectRatio(float aspectRatio);
     void SetHorizontalFOV(float horizontalFOV);
 
@@ -28,6 +31,8 @@ public:
     void MoveRight(float speedScale);
     void MoveUp(float speedScale);
     void Rotate(XMINT2 mouseMove);
+    void Orbit(XMVECTOR pivot, float distance, XMINT2 mouseMove);
+    void Pan(XMINT2 mouseMove);
 
 private:
     float CalcVerticalFOV(float horizontalFOV);

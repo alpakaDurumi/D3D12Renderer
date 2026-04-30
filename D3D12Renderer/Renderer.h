@@ -57,9 +57,13 @@ public:
     void OnUpdate();
     void OnRender();
     void OnDestroy();
-    void OnKeyDown(WPARAM key);
-    void OnKeyUp(WPARAM key);
-    void OnMouseMove(int xPos, int yPos);
+    void OnKeyDown(VKCode key);
+    void OnKeyUp(VKCode key);
+    void OnMouseButtonDown(UINT button);
+    void OnMouseButtonUp(UINT button);
+    void OnMouseMove(int x, int y, int cx, int cy);
+    void OnMouseWheel(float stepDelta);
+    void OnKillFocus();
     void OnResize(UINT width, UINT height);
     void OnDpiChanged(UINT dpi);
 
@@ -84,7 +88,7 @@ private:
     D3D12_VIEWPORT m_viewport;
     D3D12_RECT m_scissorRect;
 
-    static const UINT FrameCount = 2;
+    inline static constexpr UINT FrameCount = 2;
 
     // Adapter info
     bool m_useWarpDevice = false;
@@ -124,6 +128,15 @@ private:
     RenderGraph m_renderGraph;
 
     SceneManager m_sceneManager;
+    EntityHandle m_selected;
+
+    inline static constexpr float DEFAULT_FOCUS_DIST = 30.0f;
+
+    bool m_cameraControl = false;
+    bool m_orbiting = false;
+    XMFLOAT3 m_orbitPivot;
+    float m_orbitDistance = DEFAULT_FOCUS_DIST;
+    bool m_panning = false;
 
     std::vector<EntityHandle> m_previewRotations;
 
@@ -212,4 +225,7 @@ private:
     void UpdateConstantBuffers(FrameResource& frameResource);
 
     void DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
+
+    void ProcessInput();
+    void BeginOrbit();
 };

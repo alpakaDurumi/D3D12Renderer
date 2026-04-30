@@ -10,8 +10,19 @@ public:
     static int Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmdLine, int nCmdShow);
     static HWND GetHwnd() { return sm_hwnd; }
 
+    static void HideCursor();
+    static void RestoreCursor();
 private:
     static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
     static void ParseCommandLineArgs(Renderer* pRenderer, LPWSTR lpCmdLine);
+
+    static void HandleRawInput(Renderer* pRenderer, LPARAM lParam);
+
     inline static HWND sm_hwnd = nullptr;
+    inline static POINT sm_savedCursorPos;
+    inline static bool sm_isCursorHidden = false;
+    inline static UINT sm_dpi;
+
+    inline static POINT sm_lastCursorPos;
+    inline static bool sm_lastCursorPosValid = false;
 };

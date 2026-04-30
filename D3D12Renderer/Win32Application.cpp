@@ -1,6 +1,9 @@
 #include "pch.h"
 #include "Win32Application.h"
 
+#include <windowsx.h>
+#include <hidusage.h>
+
 #include <locale>
 
 #include "imgui_impl_win32.h"
@@ -8,6 +11,7 @@
 #include <timeapi.h>
 
 #include "Renderer.h"
+#include "Aliases.h"
 
 int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
@@ -41,8 +45,8 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     RECT windowRect = { 0, 0, static_cast<LONG>(pRenderer->GetWidth()), static_cast<LONG>(pRenderer->GetHeight()) };
-    UINT dpi = GetDpiForSystem();
-    AdjustWindowRectExForDpi(&windowRect, WS_OVERLAPPEDWINDOW, FALSE, 0, dpi);
+    sm_dpi = GetDpiForSystem();       // Before creating window, get DPI from system
+    AdjustWindowRectExForDpi(&windowRect, WS_OVERLAPPEDWINDOW, FALSE, 0, sm_dpi);
 
     // Create the window and store a handle to it.
     sm_hwnd = CreateWindowExW(
@@ -64,7 +68,25 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
         return 1;
     }
 
-    pRenderer->OnInit(dpi);
+    // Replace DPI with fresh value
+    sm_dpi = GetDpiForWindow(sm_hwnd);
+
+    // Register Raw Input Devices
+    RAWINPUTDEVICE devices[2];
+
+    devices[0].usUsagePage = HID_USAGE_PAGE_GENERIC;
+    devices[0].usUsage = HID_USAGE_GENERIC_MOUSE;
+    devices[0].dwFlags = 0;
+    devices[0].hwndTarget = sm_hwnd;
+
+    devices[1].usUsagePage = HID_USAGE_PAGE_GENERIC;
+    devices[1].usUsage = HID_USAGE_GENERIC_KEYBOARD;
+    devices[1].dwFlags = 0;
+    devices[1].hwndTarget = sm_hwnd;
+
+    RegisterRawInputDevices(devices, 2, sizeof(RAWINPUTDEVICE));
+
+    pRenderer->OnInit(sm_dpi);
 
     ShowWindow(sm_hwnd, nCmdShow);
 
@@ -78,13 +100,22 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
 
     // main loop
     MSG msg = {};
-    while (msg.message != WM_QUIT)
+    bool running = true;
+    while (running)
     {
         while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
         {
+            if (msg.message == WM_QUIT)
+            {
+                running = false;
+                break;
+            }
+
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
+
+        if (!running) break;
 
         // Start the Dear ImGui frame
         ImGui_ImplDX12_NewFrame();
@@ -119,8 +150,6 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
     if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
         return true;
 
-    Renderer* renderer = reinterpret_cast<Renderer*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
-
     switch (message)
     {
     case WM_CREATE:
@@ -128,67 +157,91 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
         // Save the Renderer* passed in to CreateWindow.
         LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
         SetWindowLongPtrW(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
+        return 0;
     }
-    return 0;
-    case WM_SYSKEYDOWN:
-        if (renderer)
-        {
-            // ALT + ENTER. Only if prev key is up
-            if (wParam == VK_RETURN && lParam & (1 << 29) && !(lParam & (1 << 30)))
-            {
-                renderer->ToggleFullScreen();
-            }
-        }
-        return 0;
-    case WM_KEYDOWN:
-        if (renderer)
-        {
-            // Only if prev key is up
-            if (!(lParam & (1 << 30)))
-            {
-                renderer->OnKeyDown(wParam);
-            }
-        }
-        return 0;
-    case WM_KEYUP:
-        if (renderer)
-        {
-            renderer->OnKeyUp(wParam);
-        }
-        return 0;
-    case WM_MOUSEMOVE:
-        if (renderer)
-        {
-            int xPos = LOWORD(lParam);
-            int yPos = HIWORD(lParam);
-            renderer->OnMouseMove(xPos, yPos);
-        }
-        return 0;
-    case WM_SIZE:
-        if (renderer)
-        {
-            int width = LOWORD(lParam);
-            int height = HIWORD(lParam);
-            renderer->OnResize(width, height);
-        }
-        return 0;
-    case WM_DPICHANGED:
-        if (renderer)
-        {
-            UINT dpi = LOWORD(wParam);
-            RECT* const newRect = (RECT*)lParam;
-            SetWindowPos(sm_hwnd, HWND_TOP,
-                newRect->left,
-                newRect->top,
-                newRect->right - newRect->left,
-                newRect->bottom - newRect->top,
-                SWP_NOZORDER | SWP_NOACTIVATE);
-            renderer->OnDpiChanged(dpi);
-        }
-        return 0;
     case WM_DESTROY:
+    {
         PostQuitMessage(0);
         return 0;
+    }
+    }
+
+    Renderer* renderer = reinterpret_cast<Renderer*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+    if (!renderer) return DefWindowProcW(hWnd, message, wParam, lParam);
+
+    switch (message)
+    {
+    case WM_INPUT:
+    {
+        HandleRawInput(renderer, lParam);
+        break;      // To call DefWindowProcW so the system can perform cleanup
+    }
+    case WM_KEYDOWN:
+    case WM_SYSKEYDOWN:
+    case WM_KEYUP:
+    case WM_SYSKEYUP:
+    {
+        VKCode key = static_cast<VKCode>(wParam);
+        WORD keyFlags = HIWORD(lParam);
+
+        switch (message)
+        {
+        case WM_KEYDOWN:
+        case WM_SYSKEYDOWN:
+            // Only if prev key is up
+            if (!(keyFlags & KF_REPEAT))
+                renderer->OnKeyDown(key);
+            return 0;
+        case WM_KEYUP:
+        case WM_SYSKEYUP:
+            renderer->OnKeyUp(key);
+            return 0;
+        }
+        return 0;
+    }
+    case WM_LBUTTONDOWN:
+        renderer->OnMouseButtonDown(0);
+        return 0;
+    case WM_LBUTTONUP:
+        renderer->OnMouseButtonUp(0);
+        return 0;
+    case WM_RBUTTONDOWN:
+        renderer->OnMouseButtonDown(1);
+        return 0;
+    case WM_RBUTTONUP:
+        renderer->OnMouseButtonUp(1);
+        return 0;
+    case WM_MBUTTONDOWN:
+        renderer->OnMouseButtonDown(2);
+        return 0;
+    case WM_MBUTTONUP:
+        renderer->OnMouseButtonUp(2);
+        return 0;
+    case WM_KILLFOCUS:
+        RestoreCursor();
+        renderer->OnKillFocus();
+        return 0;
+    case WM_SIZE:
+    {
+        UINT width = LOWORD(lParam);
+        UINT height = HIWORD(lParam);
+        renderer->OnResize(width, height);
+        return 0;
+    }
+    case WM_DPICHANGED:
+    {
+        sm_dpi = LOWORD(wParam);
+
+        RECT* const newRect = reinterpret_cast<RECT*>(lParam);
+        SetWindowPos(hWnd, HWND_TOP,
+            newRect->left,
+            newRect->top,
+            newRect->right - newRect->left,
+            newRect->bottom - newRect->top,
+            SWP_NOZORDER | SWP_NOACTIVATE);
+        renderer->OnDpiChanged(sm_dpi);
+        return 0;
+    }
     }
 
     return DefWindowProcW(hWnd, message, wParam, lParam);
@@ -212,4 +265,91 @@ void Win32Application::ParseCommandLineArgs(Renderer* pRenderer, LPWSTR lpCmdLin
     }
 
     LocalFree(argv);
+}
+
+void Win32Application::HideCursor()
+{
+    if (sm_isCursorHidden) return;
+
+    ShowCursor(FALSE);
+    GetCursorPos(&sm_savedCursorPos);
+    sm_isCursorHidden = true;
+}
+
+void Win32Application::RestoreCursor()
+{
+    if (!sm_isCursorHidden) return;
+
+    SetCursorPos(sm_savedCursorPos.x, sm_savedCursorPos.y);
+    ShowCursor(TRUE);
+    sm_isCursorHidden = false;
+}
+
+void Win32Application::HandleRawInput(Renderer* pRenderer, LPARAM lParam)
+{
+    UINT size = 0;
+
+    // Get required size first
+    GetRawInputData(
+        reinterpret_cast<HRAWINPUT>(lParam),
+        RID_INPUT,
+        nullptr,
+        &size,
+        sizeof(RAWINPUTHEADER));
+
+    UINT8 buffer[256];
+    if (size > sizeof(buffer))
+        return;
+
+    // Get actual data
+    GetRawInputData(
+        reinterpret_cast<HRAWINPUT>(lParam),
+        RID_INPUT,
+        buffer,
+        &size,
+        sizeof(RAWINPUTHEADER));
+
+    RAWINPUT* raw = reinterpret_cast<RAWINPUT*>(buffer);
+
+    if (raw->header.dwType == RIM_TYPEMOUSE)
+    {
+        const RAWMOUSE& mouse = raw->data.mouse;
+
+        // Get cursor position
+        POINT curPos;
+        GetCursorPos(&curPos);
+        ScreenToClient(sm_hwnd, &curPos);
+
+        int dx = 0;
+        int dy = 0;
+
+        if (mouse.usFlags & MOUSE_MOVE_ABSOLUTE)
+        {
+            if (sm_lastCursorPosValid)
+            {
+                dx = curPos.x - sm_lastCursorPos.x;
+                dy = curPos.y - sm_lastCursorPos.y;
+                pRenderer->OnMouseMove(dx, dy, curPos.x, curPos.y);
+            }
+        }
+        else
+        {
+            dx = static_cast<int>(mouse.lLastX);
+            dy = static_cast<int>(mouse.lLastY);
+            pRenderer->OnMouseMove(dx, dy, curPos.x, curPos.y);
+        }
+
+        sm_lastCursorPos = curPos;
+        sm_lastCursorPosValid = true;
+
+        if (mouse.usButtonFlags & RI_MOUSE_WHEEL)
+        {
+            short wheelDelta = static_cast<short>(mouse.usButtonData);
+            float stepDelta = static_cast<float>(wheelDelta) / WHEEL_DELTA;
+            pRenderer->OnMouseWheel(stepDelta);
+        }
+    }
+    else    // TODO: Keyboard
+    {
+    }
 }

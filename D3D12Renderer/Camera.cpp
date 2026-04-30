@@ -23,9 +23,21 @@ void Camera::UpdateRenderState(float alpha)
     XMStoreFloat3(&m_renderPosition, interpolated);
 }
 
-XMVECTOR Camera::GetPosition() const
+XMVECTOR Camera::GetCurrentPosition() const
+{
+    return XMVectorSetW(XMLoadFloat3(&m_currPosition), 1.0f);
+}
+
+XMVECTOR Camera::GetRenderPosition() const
 {
     return XMVectorSetW(XMLoadFloat3(&m_renderPosition), 1.0f);
+}
+
+XMVECTOR Camera::GetForward() const
+{
+    XMVECTOR rot = XMLoadFloat4(&m_rotation);
+    XMVECTOR forward = XMVector3Rotate(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), rot);
+    return forward;
 }
 
 float Camera::GetNearPlane() const
@@ -54,6 +66,11 @@ XMMATRIX Camera::GetProjectionMatrix(bool usePerspectiveProjection) const
     return usePerspectiveProjection ?
         XMMatrixPerspectiveFovLH(m_verticalFOV, m_aspectRatio, m_farPlane, m_nearPlane) :
         XMMatrixOrthographicLH(2 * m_aspectRatio, 2.0f, m_farPlane, m_nearPlane);
+}
+
+void Camera::SetCurrentPosition(const XMVECTOR& pos)
+{
+    XMStoreFloat3(&m_currPosition, pos);
 }
 
 void Camera::SetAspectRatio(float aspectRatio)
@@ -109,14 +126,36 @@ void Camera::MoveUp(float speedScale)
 
 void Camera::Rotate(XMINT2 mouseMove)
 {
-    const float radiansPerPixel = 0.0035f;
+    constexpr float angularSensitivity = 0.0035f;
 
-    m_yaw += mouseMove.x * radiansPerPixel;
-    m_pitch += mouseMove.y * radiansPerPixel;
+    m_yaw += mouseMove.x * angularSensitivity;
+    m_pitch += mouseMove.y * angularSensitivity;
     m_pitch = std::clamp(m_pitch, -XM_PIDIV2 + 0.01f, XM_PIDIV2 - 0.01f);
 
     XMVECTOR q = XMQuaternionRotationRollPitchYaw(m_pitch, m_yaw, 0.0f);
     XMStoreFloat4(&m_rotation, q);
+}
+
+void Camera::Orbit(XMVECTOR pivot, float distance, XMINT2 mouseMove)
+{
+    Rotate(mouseMove);
+    XMVECTOR newPos = pivot - GetForward() * distance;
+    XMStoreFloat3(&m_currPosition, newPos);
+}
+
+void Camera::Pan(XMINT2 mouseMove)
+{
+    constexpr float panSensitivity = 0.01f;
+
+    MoveRight(mouseMove.x * panSensitivity);
+
+    XMVECTOR pos = XMLoadFloat3(&m_currPosition);
+    XMVECTOR rot = XMLoadFloat4(&m_rotation);
+    XMVECTOR localUp = XMVector3Rotate(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), rot);
+
+    pos += -localUp * mouseMove.y * panSensitivity;
+
+    XMStoreFloat3(&m_currPosition, pos);
 }
 
 float Camera::CalcVerticalFOV(float horizontalFOV)
