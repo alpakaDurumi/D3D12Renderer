@@ -189,7 +189,9 @@ public:
             PassType::DEPTH_ONLY,
             PassType::GBUFFER,
             PassType::DEFERRED_LIGHTING,
-            PassType::FORWARD_COLORING };
+            PassType::FORWARD_COLORING,
+            PassType::SELECTION_MASK,
+            PassType::OUTLINE_DRAWING };
 
         // Compile graph
         for (const PassType& passType : defaultOrder)

@@ -1281,7 +1281,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
     // Forward Coloring pass
     {
-        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Forward color pass");
+        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Forward coloring pass");
 
         ApplyPassBarriers(m_renderGraph, PassType::FORWARD_COLORING, pCommandList);
 
@@ -1359,6 +1359,39 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(static_cast<UINT32>(barriers.size()), barriers.data()) };
         pCommandList->Barrier(1, barrierGroups);
+    }
+
+    if (!(m_selected.index == UINT_MAX && m_selected.generation == 0))
+    {
+        // Selection mask pass
+        {
+            PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Selection mask pass");
+
+            ApplyPassBarriers(m_renderGraph, PassType::SELECTION_MASK, pCommandList);
+
+            pCommandList->RSSetViewports(1, &m_viewport);
+            pCommandList->RSSetScissorRects(1, &m_scissorRect);
+
+            // Pre-query PSOs
+            m_currentPSOKey.passType = PassType::SELECTION_MASK;
+            m_currentPSOKey.vsName = L"vs.hlsl";
+            m_currentPSOKey.psName = L"";
+            auto* pso = GetPipelineState(m_currentPSOKey);
+
+            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetRTVHandle();
+            D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
+            pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+            pCommandList->OMSetStencilRef(2);
+
+            pCommandList->SetPipelineState(pso);
+
+            pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.GPUPtr);
+            pCommandList->SetGraphicsRootConstantBufferView(1, m_shadowUploadAllocation.GPUPtr);
+
+            // 선택된 Entity들에 대해서만 draw call을 호출해야 함 (나중에는 여러 Entity를 다중 선택할 수도 있어야 함)
+            auto* pEntity = m_sceneManager.Get(m_selected);
+            DrawEntity(pCommandList, m_selected, frameResource.GetInstanceBufferVirtualAddress());
+        }
     }
 }
 
@@ -1757,6 +1790,18 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
             depthStencilDesc.StencilWriteMask = 0;
             const D3D12_DEPTH_STENCILOP_DESC stencilOp =
             { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_EQUAL };
+            depthStencilDesc.FrontFace = stencilOp;
+            depthStencilDesc.BackFace = stencilOp;
+        }
+        else if (psoKey.passType == PassType::SELECTION_MASK)
+        {
+            depthStencilDesc.DepthEnable = FALSE;
+
+            depthStencilDesc.StencilEnable = TRUE;
+            depthStencilDesc.StencilReadMask = 0;
+            depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+            const D3D12_DEPTH_STENCILOP_DESC stencilOp =
+            { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_REPLACE, D3D12_COMPARISON_FUNC_ALWAYS };
             depthStencilDesc.FrontFace = stencilOp;
             depthStencilDesc.BackFace = stencilOp;
         }
@@ -2280,8 +2325,6 @@ void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle mes
         (passType == PassType::DEFERRED_LIGHTING))
         return;
 
-    pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
     UINT instanceCount;
     switch (passType)
     {
@@ -2307,8 +2350,34 @@ void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle mes
     D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->GetVBV(), instanceBufferView };
     pCommandList->IASetVertexBuffers(0, 2, pVertexBufferViews);
     pCommandList->IASetIndexBuffer(&pMesh->GetIBV());
+    pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     pCommandList->DrawIndexedInstanced(pMesh->GetNumIndices(), instanceCount, 0, 0, 0);
+}
+
+void Renderer::DrawEntity(ID3D12GraphicsCommandList7* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)
+{
+    static const UINT instanceDataSize = static_cast<UINT>(sizeof(InstanceData));
+
+    auto* pEntity = m_sceneManager.Get(entityHandle);
+    auto meshHandle = pEntity->meshRenderer->mesh;
+    auto* pMesh = m_sceneManager.GetMesh(meshHandle);
+
+    auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
+
+    UINT indexInBucket = m_sceneManager.GetEntityIndexInBucket(entityHandle);
+
+    D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
+    instanceBufferView.BufferLocation = instanceBufferBase + instanceRange.offset + indexInBucket * instanceDataSize;
+    instanceBufferView.StrideInBytes = instanceDataSize;
+    instanceBufferView.SizeInBytes = instanceDataSize;
+
+    D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->GetVBV(), instanceBufferView };
+    pCommandList->IASetVertexBuffers(0, 2, pVertexBufferViews);
+    pCommandList->IASetIndexBuffer(&pMesh->GetIBV());
+    pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    pCommandList->DrawIndexedInstanced(pMesh->GetNumIndices(), 1, 0, 0, 0);
 }
 
 void Renderer::BeginOrbit()

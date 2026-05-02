@@ -4,6 +4,7 @@
 #include <variant>
 #include <cassert>
 #include <queue>
+#include <functional>
 
 #include "SlotMap.h"
 #include "Mesh.h"
@@ -19,6 +20,15 @@ template<>
 struct std::hash<MeshHandle>
 {
     std::size_t operator()(const MeshHandle& h) const
+    {
+        return (static_cast<UINT64>(h.index) << 32) | static_cast<UINT64>(h.generation);
+    }
+};
+
+template<>
+struct std::hash<EntityHandle>
+{
+    std::size_t operator()(const EntityHandle& h) const
     {
         return (static_cast<UINT64>(h.index) << 32) | static_cast<UINT64>(h.generation);
     }
@@ -276,6 +286,7 @@ public:
             bucket.deferred.clear();
         }
         m_instanceRanges.clear();
+        //m_entityIndexInBucket.clear();
 
         for (const auto& entity : m_entities.GetDense())
         {
@@ -290,9 +301,28 @@ public:
             auto renderingPath = GetMaterial(matHandle)->GetRenderingPath();
 
             if (renderingPath == RenderingPath::FORWARD)
+            {
+                m_entityIndexInBucket[entity.selfHandle] = m_buckets[meshHandle].forward.size();
                 m_buckets[meshHandle].forward.push_back(data);
+            }
             else
+            {
+                m_entityIndexInBucket[entity.selfHandle] = m_buckets[meshHandle].deferred.size();
                 m_buckets[meshHandle].deferred.push_back(data);
+            }
+        }
+
+        for (const auto& entity : m_entities.GetDense())
+        {
+            if (!entity.meshRenderer.has_value()) continue;
+
+            auto meshHandle = entity.meshRenderer->mesh;
+            auto matHandle = entity.meshRenderer->material;
+
+            auto renderingPath = GetMaterial(matHandle)->GetRenderingPath();
+
+            if (renderingPath == RenderingPath::DEFERRED)
+                m_entityIndexInBucket[entity.selfHandle] += m_buckets[meshHandle].forward.size();
         }
 
         UINT currentOffset = 0;
@@ -322,6 +352,11 @@ public:
     InstanceRange GetInstanceRange(MeshHandle mesh)
     {
         return m_instanceRanges[mesh];
+    }
+
+    UINT GetEntityIndexInBucket(EntityHandle entity)
+    {
+        return m_entityIndexInBucket[entity];
     }
 
     const std::unordered_map<MeshHandle, MeshBucket>& GetBuckets() const
@@ -517,6 +552,8 @@ private:
     std::unordered_map<MeshHandle, MeshBucket> m_buckets;
 
     std::unordered_map<MeshHandle, InstanceRange> m_instanceRanges;
+
+    std::unordered_map<EntityHandle, UINT> m_entityIndexInBucket;
 
     SlotMap<Material> m_materials;
     std::unordered_map<AssetID, MaterialHandle> m_materialRegistry;

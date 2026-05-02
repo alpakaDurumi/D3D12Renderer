@@ -12,6 +12,8 @@ enum class PassType
     DEPTH_ONLY,
     GBUFFER,
     DEFERRED_LIGHTING,
+    SELECTION_MASK,
+    OUTLINE_DRAWING,
     NUM_PASS_TYPES
 };
 
