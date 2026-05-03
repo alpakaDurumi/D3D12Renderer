@@ -368,7 +368,7 @@ namespace D3DHelper
         pDevice->CreateDepthStencilView(pResource, &dsvDesc, cpuHandle);
     }
 
-    void CreateSRV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
+    void CreateSRV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, UINT planeSlice)
     {
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         srvDesc.Format = format;
@@ -376,7 +376,7 @@ namespace D3DHelper
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         srvDesc.Texture2D.MostDetailedMip = 0;
         srvDesc.Texture2D.MipLevels = 1;
-        srvDesc.Texture2D.PlaneSlice = 0;
+        srvDesc.Texture2D.PlaneSlice = planeSlice;
         srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 
         pDevice->CreateShaderResourceView(pResource, &srvDesc, cpuHandle);
