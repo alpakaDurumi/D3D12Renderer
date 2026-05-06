@@ -268,7 +268,7 @@ void Renderer::OnRender()
         D3D12_BARRIER_ACCESS_NO_ACCESS,
         D3D12_BARRIER_LAYOUT_RENDER_TARGET,
         D3D12_BARRIER_LAYOUT_PRESENT,
-        m_frameResources[m_frameIndex]->GetRenderTarget(),
+        m_frameResources[m_frameIndex]->GetBackBuffer(),
         {0xffff'ffff, 0, 0, 0, 0, 0},
         D3D12_TEXTURE_BARRIER_FLAG_NONE
     };
@@ -349,17 +349,17 @@ void Renderer::OnResize(UINT width, UINT height)
     m_height = std::max(1u, height);
     UpdateWidthHeight();
 
-    // Unregister and release current render target, set frame fence values to the current fence value
+    // Reset back buffer
+    // Reset & create scene color buffers and gbuffers
+    // Set current frame's fence value to all frameResources
     for (UINT i = 0; i < FrameCount; i++)
     {
-        m_frameResources[i]->ResetRenderTarget();
+        m_frameResources[i]->ResetBackBuffer();
 
-        // Release previous gbuffers and create new ones
-        for (UINT j = 0; j < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++j)
-        {
-            auto slot = static_cast<GBufferSlot>(j);
-            m_frameResources[i]->ResetGBuffer(slot);
-        }
+        m_frameResources[i]->ResetSceneColorBuffers();
+        m_frameResources[i]->CreateSceneColorBuffers(m_width, m_height);
+
+        m_frameResources[i]->ResetGBuffers();
         m_frameResources[i]->CreateGBuffers(m_width, m_height);
 
         m_frameResources[i]->SetFenceValue(m_frameResources[m_frameIndex]->GetFenceValue());
@@ -375,7 +375,7 @@ void Renderer::OnResize(UINT width, UINT height)
     for (UINT i = 0; i < FrameCount; i++)
     {
         m_frameResources[i]->AcquireBackBuffer(m_swapChain.Get(), i);
-        CreateRTV(m_device.Get(), m_frameResources[i]->GetRenderTarget(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_frameResources[i]->GetRTVHandle());
+        CreateRTV(m_device.Get(), m_frameResources[i]->GetBackBuffer(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_frameResources[i]->GetBackBufferRTVHandle());
     }
 
     // Recreate depth-stencil buffer, DSV, and SRV
@@ -388,7 +388,7 @@ void Renderer::OnResize(UINT width, UINT height)
     std::vector<ID3D12Resource*> pBackBuffers;
     for (UINT i = 0; i < FrameCount; ++i)
     {
-        pBackBuffers.push_back(m_frameResources[i]->GetRenderTarget());
+        pBackBuffers.push_back(m_frameResources[i]->GetBackBuffer());
     }
     auto backBuffer = m_renderGraph.GetRGTexture("BackBuffer");
     m_renderGraph.UpdateElement(backBuffer, 0, pBackBuffers);
@@ -731,6 +731,8 @@ void Renderer::LoadPipeline()
     {
         auto frameResource = std::make_unique<FrameResource>(m_device.Get(), m_swapChain.Get(), i,
             std::move(rtvAllocations[i]),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(FrameResource::SceneColorBufferCount),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameResource::SceneColorBufferCount),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)));
 
@@ -963,11 +965,11 @@ void Renderer::LoadAssets()
         "BackBuffer",
         true,
         { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_PRESENT },
-        GetSubresourceCount(m_device.Get(), m_frameResources.front()->GetRenderTarget()));
+        GetSubresourceCount(m_device.Get(), m_frameResources.front()->GetBackBuffer()));
     std::vector<ID3D12Resource*> pBackBuffers;
     for (UINT i = 0; i < FrameCount; ++i)
     {
-        pBackBuffers.push_back(m_frameResources[i]->GetRenderTarget());
+        pBackBuffers.push_back(m_frameResources[i]->GetBackBuffer());
     }
     m_renderGraph.AddElement(backBuffer, pBackBuffers);
 
@@ -1241,7 +1243,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         m_currentPSOKey.psName = L"DeferredLightingPS.hlsl";
         auto* pso = GetPipelineState(m_currentPSOKey);
 
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetRTVHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetBackBufferRTVHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_readOnlyDSVAllocation.GetDescriptorHandle();
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
         pCommandList->OMSetStencilRef(1);
@@ -1294,7 +1296,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         m_currentPSOKey.psName = L"ps.hlsl";
         auto* pso = GetPipelineState(m_currentPSOKey);
 
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetRTVHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetBackBufferRTVHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
@@ -1377,19 +1379,16 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             m_currentPSOKey.vsName = L"vs.hlsl";
             m_currentPSOKey.psName = L"";
             auto* pso = GetPipelineState(m_currentPSOKey);
+            pCommandList->SetPipelineState(pso);
 
-            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetRTVHandle();
+            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetBackBufferRTVHandle();
             D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
             pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
             pCommandList->OMSetStencilRef(2);
 
-            pCommandList->SetPipelineState(pso);
-
             pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.GPUPtr);
-            pCommandList->SetGraphicsRootConstantBufferView(1, m_shadowUploadAllocation.GPUPtr);
 
             // 선택된 Entity들에 대해서만 draw call을 호출해야 함 (나중에는 여러 Entity를 다중 선택할 수도 있어야 함)
-            auto* pEntity = m_sceneManager.Get(m_selected);
             DrawEntity(pCommandList, m_selected, frameResource.GetInstanceBufferVirtualAddress());
         }
     }
