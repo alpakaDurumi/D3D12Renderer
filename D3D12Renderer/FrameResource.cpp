@@ -50,43 +50,28 @@ FrameResource::~FrameResource()
     m_instanceUploadBuffer->Unmap(0, nullptr);
 }
 
-void FrameResource::ResetInstanceOffsetByte()
-{
-    m_instanceOffsetByte = 0;
-}
-
-void FrameResource::EnsureInstanceCapacity(UINT requiredSize)
-{
-    if (m_instanceCapacity < requiredSize)
-    {
-        m_instanceUploadBuffer->Unmap(0, nullptr);
-
-        m_instanceCapacity = Utility::CeilPowerOfTwo(requiredSize);
-
-        D3DHelper::CreateUploadBuffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, m_instanceUploadBuffer);
-        D3D12_RANGE readRange = { 0, 0 };
-        D3DHelper::ThrowIfFailed(m_instanceUploadBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
-    }
-}
-
-void FrameResource::CreateGBuffers(UINT64 width, UINT height)
-{
-    for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
-    {
-        auto format = GetGBufferFormat(static_cast<GBufferSlot>(i));
-
-        D3DHelper::CreateRenderTarget(m_pDevice, width, height, format, format, 1, m_gBuffers[i]);
-
-        D3DHelper::CreateRTV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferRTVAllocation.GetDescriptorHandle(i));
-        D3DHelper::CreateSRV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferSRVAllocation.GetDescriptorHandle(i));
-    }
-}
-
+// Back buffer
 void FrameResource::AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameIndex)
 {
     D3DHelper::ThrowIfFailed(pSwapChain->GetBuffer(frameIndex, IID_PPV_ARGS(&m_backBuffer)));
 }
 
+ID3D12Resource* FrameResource::GetBackBuffer() const
+{
+    return m_backBuffer.Get();
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetBackBufferRTVHandle() const
+{
+    return m_backBufferRTVAllocation.GetDescriptorHandle();
+}
+
+void FrameResource::ResetBackBuffer()
+{
+    m_backBuffer.Reset();
+}
+
+// Scene color buffer
 void FrameResource::CreateSceneColorBuffers(UINT64 width, UINT height)
 {
     for (UINT i = 0; i < SceneColorBufferCount; ++i)
@@ -100,30 +85,9 @@ void FrameResource::CreateSceneColorBuffers(UINT64 width, UINT height)
     }
 }
 
-void FrameResource::ResetSceneColorBuffers()
-{
-    for (UINT i = 0; i < SceneColorBufferCount; ++i)
-        m_sceneColorBuffers[i].Reset();
-}
-
-ID3D12Resource* FrameResource::GetBackBuffer() const
-{
-    return m_backBuffer.Get();
-}
-
 ID3D12Resource* FrameResource::GetSceneColorBuffer(UINT index) const
 {
     return m_sceneColorBuffers[index].Get();
-}
-
-ID3D12Resource* FrameResource::GetGBuffer(GBufferSlot slot) const
-{
-    return m_gBuffers[static_cast<UINT>(slot)].Get();
-}
-
-D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetBackBufferRTVHandle() const
-{
-    return m_backBufferRTVAllocation.GetDescriptorHandle();
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetSceneColorBufferRTVHandle(UINT index) const
@@ -134,6 +98,31 @@ D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetSceneColorBufferRTVHandle(UINT ind
 DescriptorAllocation& FrameResource::GetSceneColorBufferSRVAllocationRef()
 {
     return m_sceneColorBufferSRVAllocation;
+}
+
+void FrameResource::ResetSceneColorBuffers()
+{
+    for (UINT i = 0; i < SceneColorBufferCount; ++i)
+        m_sceneColorBuffers[i].Reset();
+}
+
+// GBuffer
+void FrameResource::CreateGBuffers(UINT64 width, UINT height)
+{
+    for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
+    {
+        auto format = GetGBufferFormat(static_cast<GBufferSlot>(i));
+
+        D3DHelper::CreateRenderTarget(m_pDevice, width, height, format, format, 1, m_gBuffers[i]);
+
+        D3DHelper::CreateRTV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferRTVAllocation.GetDescriptorHandle(i));
+        D3DHelper::CreateSRV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferSRVAllocation.GetDescriptorHandle(i));
+    }
+}
+
+ID3D12Resource* FrameResource::GetGBuffer(GBufferSlot slot) const
+{
+    return m_gBuffers[static_cast<UINT>(slot)].Get();
 }
 
 std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> FrameResource::GetGBufferRTVHandles() const
@@ -149,43 +138,6 @@ std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> FrameResource::GetGBufferRTVHandles() c
 DescriptorAllocation& FrameResource::GetGBufferSRVAllocationRef()
 {
     return m_gBufferSRVAllocation;
-}
-
-UINT64 FrameResource::GetFenceValue() const
-{
-    return m_fenceValue;
-}
-
-UploadAllocation FrameResource::PushConstantData(void* src, std::size_t size)
-{
-    return m_uploadAllocator.Push(src, size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-}
-
-void FrameResource::PushInstanceData(std::vector<InstanceData>& data)
-{
-    memcpy(m_instanceBufferBegin + m_instanceOffsetByte, data.data(), sizeof(InstanceData) * data.size());
-    m_instanceOffsetByte += sizeof(InstanceData) * static_cast<UINT>(data.size());
-}
-
-D3D12_GPU_VIRTUAL_ADDRESS FrameResource::GetInstanceBufferVirtualAddress() const
-{
-    return m_instanceUploadBuffer->GetGPUVirtualAddress();
-}
-
-void FrameResource::SetFenceValue(UINT64 fenceValue)
-{
-    m_fenceValue = fenceValue;
-}
-
-void FrameResource::ResetBackBuffer()
-{
-    m_backBuffer.Reset();
-}
-
-void FrameResource::ResetGBuffers()
-{
-    for (auto& gBuffer : m_gBuffers)
-        gBuffer.Reset();
 }
 
 DXGI_FORMAT FrameResource::GetGBufferFormat(GBufferSlot slot)
@@ -206,7 +158,61 @@ DXGI_FORMAT FrameResource::GetGBufferFormat(GBufferSlot slot)
     }
 }
 
+void FrameResource::ResetGBuffers()
+{
+    for (auto& gBuffer : m_gBuffers)
+        gBuffer.Reset();
+}
+
+// Instance data
+void FrameResource::ResetInstanceOffsetByte()
+{
+    m_instanceOffsetByte = 0;
+}
+
+void FrameResource::EnsureInstanceCapacity(UINT requiredSize)
+{
+    if (m_instanceCapacity < requiredSize)
+    {
+        m_instanceUploadBuffer->Unmap(0, nullptr);
+
+        m_instanceCapacity = Utility::CeilPowerOfTwo(requiredSize);
+
+        D3DHelper::CreateUploadBuffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, m_instanceUploadBuffer);
+        D3D12_RANGE readRange = { 0, 0 };
+        D3DHelper::ThrowIfFailed(m_instanceUploadBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
+    }
+}
+
+void FrameResource::PushInstanceData(std::vector<InstanceData>& data)
+{
+    memcpy(m_instanceBufferBegin + m_instanceOffsetByte, data.data(), sizeof(InstanceData) * data.size());
+    m_instanceOffsetByte += sizeof(InstanceData) * static_cast<UINT>(data.size());
+}
+
+D3D12_GPU_VIRTUAL_ADDRESS FrameResource::GetInstanceBufferVirtualAddress() const
+{
+    return m_instanceUploadBuffer->GetGPUVirtualAddress();
+}
+
+// Transient upload
+UploadAllocation FrameResource::PushConstantData(void* src, std::size_t size)
+{
+    return m_uploadAllocator.Push(src, size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+}
+
 void FrameResource::ResetUploadAllocator()
 {
     m_uploadAllocator.Reset();
+}
+
+// Synchronization
+UINT64 FrameResource::GetFenceValue() const
+{
+    return m_fenceValue;
+}
+
+void FrameResource::SetFenceValue(UINT64 fenceValue)
+{
+    m_fenceValue = fenceValue;
 }
