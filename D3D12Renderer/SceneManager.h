@@ -302,12 +302,12 @@ public:
 
             if (renderingPath == RenderingPath::FORWARD)
             {
-                m_entityIndexInBucket[entity.selfHandle] = m_buckets[meshHandle].forward.size();
+                m_entityIndexInBucket[entity.selfHandle] = static_cast<UINT>(m_buckets[meshHandle].forward.size());
                 m_buckets[meshHandle].forward.push_back(data);
             }
             else
             {
-                m_entityIndexInBucket[entity.selfHandle] = m_buckets[meshHandle].deferred.size();
+                m_entityIndexInBucket[entity.selfHandle] = static_cast<UINT>(m_buckets[meshHandle].deferred.size());
                 m_buckets[meshHandle].deferred.push_back(data);
             }
         }
@@ -322,7 +322,7 @@ public:
             auto renderingPath = GetMaterial(matHandle)->GetRenderingPath();
 
             if (renderingPath == RenderingPath::DEFERRED)
-                m_entityIndexInBucket[entity.selfHandle] += m_buckets[meshHandle].forward.size();
+                m_entityIndexInBucket[entity.selfHandle] += static_cast<UINT>(m_buckets[meshHandle].forward.size());
         }
 
         UINT currentOffset = 0;
