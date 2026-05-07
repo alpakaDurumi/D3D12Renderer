@@ -250,11 +250,11 @@
     <ClInclude Include="Win32Application.h" />
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="vs.hlsl" />
-    <CustomBuild Include="ps.hlsl" />
+    <CustomBuild Include="MeshVS.hlsl" />
+    <CustomBuild Include="ForwardColoringPS.hlsl" />
     <CustomBuild Include="PointLightShadowPS.hlsl" />
     <CustomBuild Include="GBufferPS.hlsl" />
-    <CustomBuild Include="DeferredLightingVS.hlsl" />
+    <CustomBuild Include="FullScreenTriangleVS.hlsl" />
     <CustomBuild Include="DeferredLightingPS.hlsl" />
     <CustomBuild Include="OutlinePS.hlsl" />
   </ItemGroup>

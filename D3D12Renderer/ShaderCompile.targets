@@ -14,64 +14,64 @@
 
   <ItemGroup>
     <!-- VS -->
-    <CustomBuild Update="vs.hlsl">
-      <Message>DXC: vs.hlsl (all variants)</Message>
+    <CustomBuild Update="MeshVS.hlsl">
+      <Message>DXC: MeshVS.hlsl (all variants)</Message>
 
-      <PdbFlagDefault Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)vs.pdb"</PdbFlagDefault>
-      <PdbFlagDepthOnly Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)vs_depth_only.pdb"</PdbFlagDepthOnly>
+      <PdbFlagDefault Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)MeshVS.pdb"</PdbFlagDefault>
+      <PdbFlagDepthOnly Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)MeshVS_depth_only.pdb"</PdbFlagDepthOnly>
       <PdbFlagDefault Condition="'$(Configuration)'=='Release'"></PdbFlagDefault>
       <PdbFlagDepthOnly Condition="'$(Configuration)'=='Release'"></PdbFlagDepthOnly>
 
       <Command>
-        "$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlagDefault) -Fo "$(ShaderOutDir)vs.cso" ^
-        &amp;&amp; "$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 -D DEPTH_ONLY=1 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlagDepthOnly) -Fo "$(ShaderOutDir)vs_depth_only.cso"
+        "$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlagDefault) -Fo "$(ShaderOutDir)MeshVS.cso" ^
+        &amp;&amp; "$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 -D DEPTH_ONLY=1 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlagDepthOnly) -Fo "$(ShaderOutDir)MeshVS_depth_only.cso"
       </Command>
 
       <Outputs Condition="'$(Configuration)'!='Release'">
-        $(ShaderOutDir)vs.cso;
-        $(ShaderOutDir)vs_depth_only.cso;
-        $(ShaderPdbDir)vs.pdb;
-        $(ShaderPdbDir)vs_depth_only.pdb;
+        $(ShaderOutDir)MeshVS.cso;
+        $(ShaderOutDir)MeshVS_depth_only.cso;
+        $(ShaderPdbDir)MeshVS.pdb;
+        $(ShaderPdbDir)MeshVS_depth_only.pdb;
       </Outputs>
       <Outputs Condition="'$(Configuration)'=='Release'">
-        $(ShaderOutDir)vs.cso;
-        $(ShaderOutDir)vs_depth_only.cso;
+        $(ShaderOutDir)MeshVS.cso;
+        $(ShaderOutDir)MeshVS_depth_only.cso;
       </Outputs>
       <AdditionalInputs>SharedConfig.h</AdditionalInputs>
     </CustomBuild>
+    
+    <CustomBuild Update="FullScreenTriangleVS.hlsl">
+      <Message>DXC: FullScreenTriangleVS.hlsl (all variants)</Message>
 
-    <CustomBuild Update="DeferredLightingVS.hlsl">
-      <Message>DXC: DeferredLightingVS.hlsl (all variants)</Message>
-
-      <PdbFlag Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)DeferredLightingVS.pdb"</PdbFlag>
+      <PdbFlag Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)FullScreenTriangleVS.pdb"</PdbFlag>
       <PdbFlag Condition="'$(Configuration)'=='Release'"></PdbFlag>
 
-      <Command>"$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)DeferredLightingVS.cso"</Command>
+      <Command>"$(DxcExe)" "%(FullPath)" -E main -T vs_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)FullScreenTriangleVS.cso"</Command>
 
       <Outputs Condition="'$(Configuration)'!='Release'">
-        $(ShaderOutDir)DeferredLightingVS.cso;
-        $(ShaderPdbDir)DeferredLightingVS.pdb;
+        $(ShaderOutDir)FullScreenTriangleVS.cso;
+        $(ShaderPdbDir)FullScreenTriangleVS.pdb;
       </Outputs>
       <Outputs Condition="'$(Configuration)'=='Release'">
-        $(ShaderOutDir)DeferredLightingVS.cso;
+        $(ShaderOutDir)FullScreenTriangleVS.cso;
       </Outputs>
     </CustomBuild>
 
     <!-- PS -->
-    <CustomBuild Update="ps.hlsl">
-      <Message>DXC: ps.hlsl</Message>
+    <CustomBuild Update="ForwardColoringPS.hlsl">
+      <Message>DXC: ForwardColoringPS.hlsl</Message>
 
-      <PdbFlag Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)ps.pdb"</PdbFlag>
+      <PdbFlag Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)ForwardColoringPS.pdb"</PdbFlag>
       <PdbFlag Condition="'$(Configuration)'=='Release'"></PdbFlag>
 
-      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)ps.cso"</Command>
+      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)ForwardColoringPS.cso"</Command>
 
       <Outputs Condition="'$(Configuration)'!='Release'">
-        $(ShaderOutDir)ps.cso;
-        $(ShaderPdbDir)ps.pdb;
+        $(ShaderOutDir)ForwardColoringPS.cso;
+        $(ShaderPdbDir)ForwardColoringPS.pdb;
       </Outputs>
       <Outputs Condition="'$(Configuration)'=='Release'">
-        $(ShaderOutDir)ps.cso;
+        $(ShaderOutDir)ForwardColoringPS.cso;
       </Outputs>
       <AdditionalInputs>SharedConfig.h</AdditionalInputs>
     </CustomBuild>

@@ -752,12 +752,12 @@ void Renderer::LoadAssets()
     // Read shaders
     {
         std::vector<std::wstring> shaderNames;
-        shaderNames.push_back(L"vs.cso");
-        shaderNames.push_back(L"vs_depth_only.cso");
-        shaderNames.push_back(L"ps.cso");
+        shaderNames.push_back(L"MeshVS.cso");
+        shaderNames.push_back(L"MeshVS_depth_only.cso");
+        shaderNames.push_back(L"ForwardColoringPS.cso");
         shaderNames.push_back(L"PointLightShadowPS.cso");
         shaderNames.push_back(L"GBufferPS.cso");
-        shaderNames.push_back(L"DeferredLightingVS.cso");
+        shaderNames.push_back(L"FullScreenTriangleVS.cso");
         shaderNames.push_back(L"DeferredLightingPS.cso");
         shaderNames.push_back(L"OutlinePS.cso");
 
@@ -1136,7 +1136,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         // Pre-query PSOs
         m_currentPSOKey.passType = PassType::DEPTH_ONLY;
-        m_currentPSOKey.vsName = L"vs.hlsl";
+        m_currentPSOKey.vsName = L"MeshVS.hlsl";
         m_currentPSOKey.psName = L"";
         auto* shadowPSO = GetPipelineState(m_currentPSOKey);
 
@@ -1208,7 +1208,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         // Pre-query PSOs
         m_currentPSOKey.passType = PassType::GBUFFER;
-        m_currentPSOKey.vsName = L"vs.hlsl";
+        m_currentPSOKey.vsName = L"MeshVS.hlsl";
         m_currentPSOKey.psName = L"GBufferPS.hlsl";
         auto* pso = GetPipelineState(m_currentPSOKey);
 
@@ -1244,7 +1244,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         // Pre-query PSOs
         m_currentPSOKey.passType = PassType::DEFERRED_LIGHTING;
-        m_currentPSOKey.vsName = L"DeferredLightingVS.hlsl";
+        m_currentPSOKey.vsName = L"FullScreenTriangleVS.hlsl";
         m_currentPSOKey.psName = L"DeferredLightingPS.hlsl";
         auto* pso = GetPipelineState(m_currentPSOKey);
 
@@ -1297,8 +1297,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         // Pre-query PSOs
         m_currentPSOKey.passType = PassType::FORWARD_COLORING;
-        m_currentPSOKey.vsName = L"vs.hlsl";
-        m_currentPSOKey.psName = L"ps.hlsl";
+        m_currentPSOKey.vsName = L"MeshVS.hlsl";
+        m_currentPSOKey.psName = L"ForwardColoringPS.hlsl";
         auto* pso = GetPipelineState(m_currentPSOKey);
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetBackBufferRTVHandle();
@@ -1381,7 +1381,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
             // Pre-query PSOs
             m_currentPSOKey.passType = PassType::SELECTION_MASK;
-            m_currentPSOKey.vsName = L"vs.hlsl";
+            m_currentPSOKey.vsName = L"MeshVS.hlsl";
             m_currentPSOKey.psName = L"";
             auto* pso = GetPipelineState(m_currentPSOKey);
             pCommandList->SetPipelineState(pso);
@@ -1408,7 +1408,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
             // Pre-query PSOs
             m_currentPSOKey.passType = PassType::OUTLINE_DRAWING;
-            m_currentPSOKey.vsName = L"DeferredLightingVS.hlsl";
+            m_currentPSOKey.vsName = L"FullScreenTriangleVS.hlsl";
             m_currentPSOKey.psName = L"OutlinePS.hlsl";
             auto* pso = GetPipelineState(m_currentPSOKey);
             pCommandList->SetPipelineState(pso);
@@ -1897,7 +1897,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         // VS is essential for rasterization.
         // PS is optional. (e.g. Depth-only pass)
         std::wstring vsCsoName = Utility::RemoveFileExtension(psoKey.vsName) +
-            (psoKey.passType == PassType::DEPTH_ONLY ? L"_depth_only" : L"") +
+            (psoKey.passType == PassType::DEPTH_ONLY || psoKey.passType == PassType::SELECTION_MASK ? L"_depth_only" : L"") +
             L".cso";
 
         std::wstring psCsoName = Utility::RemoveFileExtension(psoKey.psName) + L".cso";

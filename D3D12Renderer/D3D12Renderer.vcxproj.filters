@@ -233,10 +233,10 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="vs.hlsl">
+    <CustomBuild Include="MeshVS.hlsl">
       <Filter>Shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="ps.hlsl">
+    <CustomBuild Include="ForwardColoringPS.hlsl">
       <Filter>Shaders</Filter>
     </CustomBuild>
     <CustomBuild Include="PointLightShadowPS.hlsl">
@@ -248,7 +248,7 @@
     <CustomBuild Include="DeferredLightingPS.hlsl">
       <Filter>Shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="DeferredLightingVS.hlsl">
+    <CustomBuild Include="FullScreenTriangleVS.hlsl">
       <Filter>Shaders</Filter>
     </CustomBuild>
     <CustomBuild Include="OutlinePS.hlsl">
