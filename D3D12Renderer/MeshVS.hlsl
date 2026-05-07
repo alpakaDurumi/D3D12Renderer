@@ -13,11 +13,13 @@ struct PSInput
 {
     float4 pos : SV_POSITION;
     float3 posWorld : POSITION;
+#ifndef DEPTH_ONLY
     float2 texCoord : TEXCOORD0;
     float3 tangentWorld : TANGENT;
     float3 normalWorld : NORMAL;
     nointerpolation float tangentW : TEXCOORD1;     // Do not interpolate w component of tangent vector.
     nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
+#endif  // DEPTH_ONLY
 };
 
 cbuffer CameraConstantBuffer : register(b0)
@@ -35,9 +37,8 @@ PSInput main(VSInput input)
     
     output.posWorld = mul(float4(input.pos, 1.0f), input.instanceWorld).xyz;
     output.pos = mul(float4(output.posWorld, 1.0f), mul(view, projection));
-    output.texCoord = input.texCoord;
-    
 #ifndef DEPTH_ONLY
+    output.texCoord = input.texCoord;
     output.tangentWorld = normalize(mul(float4(input.tangent.xyz, 0.0f), input.instanceInverseTranspose).xyz);
     output.normalWorld = normalize(mul(float4(input.normal, 0.0f), input.instanceInverseTranspose).xyz);
     output.tangentW = input.tangent.w;

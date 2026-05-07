@@ -4,11 +4,6 @@ struct PSInput
 {
     float4 pos : SV_POSITION;
     float3 posWorld : POSITION;
-    float2 texCoord : TEXCOORD0;
-    float3 tangentWorld : TANGENT;
-    float3 normalWorld : NORMAL;
-    nointerpolation float tangentW : TEXCOORD1; // Do not interpolate w component of tangent vector.
-    nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
 };
 
 struct LightConstants
