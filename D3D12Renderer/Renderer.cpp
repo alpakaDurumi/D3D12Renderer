@@ -1125,17 +1125,17 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     frameResource.EnsureInstanceCapacity(static_cast<UINT>(data.size()));
     frameResource.PushInstanceData(data);
 
-    // Depth-only pass for shadow mapping
+    // Shadow map pass
     {
-        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Depth-only pass");
+        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Shadow map pass");
 
-        ApplyPassBarriers(m_renderGraph, PassType::DEPTH_ONLY, pCommandList);
+        ApplyPassBarriers(m_renderGraph, PassType::SHADOW_MAP, pCommandList);
 
         pCommandList->RSSetViewports(1, &m_shadowMapViewport);
         pCommandList->RSSetScissorRects(1, &m_shadowMapScissorRect);
 
         // Pre-query PSOs
-        m_currentPSOKey.passType = PassType::DEPTH_ONLY;
+        m_currentPSOKey.passType = PassType::SHADOW_MAP;
         m_currentPSOKey.vsName = L"MeshVS.hlsl";
         m_currentPSOKey.psName = L"";
         auto* shadowPSO = GetPipelineState(m_currentPSOKey);
@@ -1175,7 +1175,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
                     for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
                     {
-                        DrawMesh(pCommandList, meshHandle, PassType::DEPTH_ONLY, frameResource.GetInstanceBufferVirtualAddress());
+                        DrawMesh(pCommandList, meshHandle, PassType::SHADOW_MAP, frameResource.GetInstanceBufferVirtualAddress());
                     }
                 }
 
@@ -1477,7 +1477,7 @@ void Renderer::InitImGui()
 void Renderer::PrepareRenderGraph()
 {
     // Set up render graph
-    auto& depthOnlyPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::DEPTH_ONLY)];
+    auto& shadowMapPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::SHADOW_MAP)];
     auto& gBufferPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::GBUFFER)];
     auto& deferredLightingPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::DEFERRED_LIGHTING)];
     auto& forwardColoringPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::FORWARD_COLORING)];
@@ -1492,13 +1492,13 @@ void Renderer::PrepareRenderGraph()
     auto pointLightRenderTarget = m_renderGraph.GetRGTexture("PointLight");
     auto spotLightDepthBuffer = m_renderGraph.GetRGTexture("SpotLight");
 
-    // Depth-only pass
-    depthOnlyPass.AddTextureInput(directionalLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    depthOnlyPass.AddTextureOutput(directionalLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    depthOnlyPass.AddTextureInput(pointLightRenderTarget, { D3D12_BARRIER_SYNC_RENDER_TARGET ,D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    depthOnlyPass.AddTextureOutput(pointLightRenderTarget, { D3D12_BARRIER_SYNC_RENDER_TARGET ,D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    depthOnlyPass.AddTextureInput(spotLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    depthOnlyPass.AddTextureOutput(spotLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    // Shadow map pass
+    shadowMapPass.AddTextureInput(directionalLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    shadowMapPass.AddTextureOutput(directionalLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    shadowMapPass.AddTextureInput(pointLightRenderTarget, { D3D12_BARRIER_SYNC_RENDER_TARGET ,D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    shadowMapPass.AddTextureOutput(pointLightRenderTarget, { D3D12_BARRIER_SYNC_RENDER_TARGET ,D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    shadowMapPass.AddTextureInput(spotLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    shadowMapPass.AddTextureOutput(spotLightDepthBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL ,D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
 
     // GBuffer pass
     gBufferPass.AddTextureInput(depthStencilBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
@@ -1798,7 +1798,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
         rasterizerDesc.FrontCounterClockwise = FALSE;
 
-        if (psoKey.passType == PassType::DEPTH_ONLY)
+        if (psoKey.passType == PassType::SHADOW_MAP)
         {
             rasterizerDesc.DepthBias = -5000;
             rasterizerDesc.DepthBiasClamp = -0.1f;
@@ -1895,9 +1895,9 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
 
         // Shader stages are selected by demand.
         // VS is essential for rasterization.
-        // PS is optional. (e.g. Depth-only pass)
+        // PS is optional. (e.g. Shadow map pass)
         std::wstring vsCsoName = Utility::RemoveFileExtension(psoKey.vsName) +
-            (psoKey.passType == PassType::DEPTH_ONLY || psoKey.passType == PassType::SELECTION_MASK ? L"_depth_only" : L"") +
+            (psoKey.passType == PassType::SHADOW_MAP || psoKey.passType == PassType::SELECTION_MASK ? L"_depth_only" : L"") +
             L".cso";
 
         std::wstring psCsoName = Utility::RemoveFileExtension(psoKey.psName) + L".cso";
@@ -1917,7 +1917,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         psoDesc.RasterizerState = rasterizerDesc;
         psoDesc.BlendState = blendDesc;
         psoDesc.DepthStencilState = depthStencilDesc;
-        psoDesc.DSVFormat = psoKey.passType == PassType::DEPTH_ONLY ? DXGI_FORMAT_D32_FLOAT : DXGI_FORMAT_D24_UNORM_S8_UINT;
+        psoDesc.DSVFormat = psoKey.passType == PassType::SHADOW_MAP ? DXGI_FORMAT_D32_FLOAT : DXGI_FORMAT_D24_UNORM_S8_UINT;
         psoDesc.SampleMask = UINT_MAX;
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
@@ -1927,7 +1927,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
             psoDesc.NumRenderTargets = 1;
             psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
             break;
-        case PassType::DEPTH_ONLY:
+        case PassType::SHADOW_MAP:
             if (psoKey.psName == L"PointLightShadowPS.hlsl")
             {
                 psoDesc.NumRenderTargets = 1;
@@ -2385,7 +2385,7 @@ void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle mes
     const auto& instanceRange = m_sceneManager.GetInstanceRange(meshhandle);
 
     if ((passType == PassType::FORWARD_COLORING && instanceRange.forwardCount == 0) ||
-        (passType == PassType::DEPTH_ONLY && (instanceRange.forwardCount + instanceRange.deferredCount) == 0) ||
+        (passType == PassType::SHADOW_MAP && (instanceRange.forwardCount + instanceRange.deferredCount) == 0) ||
         (passType == PassType::GBUFFER && instanceRange.deferredCount == 0) ||
         (passType == PassType::DEFERRED_LIGHTING))
         return;
@@ -2396,7 +2396,7 @@ void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle mes
     case PassType::FORWARD_COLORING:
         instanceCount = instanceRange.forwardCount;
         break;
-    case PassType::DEPTH_ONLY:
+    case PassType::SHADOW_MAP:
         instanceCount = instanceRange.forwardCount + instanceRange.deferredCount;
         break;
     case PassType::GBUFFER:

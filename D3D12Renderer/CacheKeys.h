@@ -9,7 +9,7 @@
 enum class PassType
 {
     FORWARD_COLORING,
-    DEPTH_ONLY,
+    SHADOW_MAP,
     GBUFFER,
     DEFERRED_LIGHTING,
     SELECTION_MASK,

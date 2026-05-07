@@ -186,7 +186,7 @@ public:
         }
 
         std::vector<PassType> defaultOrder = {
-            PassType::DEPTH_ONLY,
+            PassType::SHADOW_MAP,
             PassType::GBUFFER,
             PassType::DEFERRED_LIGHTING,
             PassType::FORWARD_COLORING,
