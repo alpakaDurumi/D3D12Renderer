@@ -286,7 +286,7 @@ public:
             bucket.deferred.clear();
         }
         m_instanceRanges.clear();
-        //m_entityIndexInBucket.clear();
+        m_entityIndexInBucket.clear();      // 실제로 entity dense array에 변화가 있을 때만 clear하거나, 구조를 개선하기.
 
         for (const auto& entity : m_entities.GetDense())
         {

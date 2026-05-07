@@ -251,5 +251,8 @@
     <CustomBuild Include="DeferredLightingVS.hlsl">
       <Filter>Shaders</Filter>
     </CustomBuild>
+    <CustomBuild Include="OutlinePS.hlsl">
+      <Filter>Shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

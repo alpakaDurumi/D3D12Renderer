@@ -185,7 +185,7 @@ public:
             currentTextureUsages[i] = std::vector<TextureResourceUsage>(subresourceCount, group.initialUsage);
         }
 
-        PassType defaultOrder[static_cast<std::size_t>(PassType::NUM_PASS_TYPES)] = {
+        std::vector<PassType> defaultOrder = {
             PassType::DEPTH_ONLY,
             PassType::GBUFFER,
             PassType::DEFERRED_LIGHTING,

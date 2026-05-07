@@ -128,5 +128,22 @@
       </Outputs>
       <AdditionalInputs>SharedConfig.h</AdditionalInputs>
     </CustomBuild>
+
+    <CustomBuild Update="OutlinePS.hlsl">
+      <Message>DXC: OutlinePS.hlsl</Message>
+
+      <PdbFlag Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)OutlinePS.pdb"</PdbFlag>
+      <PdbFlag Condition="'$(Configuration)'=='Release'"></PdbFlag>
+
+      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)OutlinePS.cso"</Command>
+
+      <Outputs Condition="'$(Configuration)'!='Release'">
+        $(ShaderOutDir)OutlinePS.cso;
+        $(ShaderPdbDir)OutlinePS.pdb;
+      </Outputs>
+      <Outputs Condition="'$(Configuration)'=='Release'">
+        $(ShaderOutDir)OutlinePS.cso;
+      </Outputs>
+    </CustomBuild>
   </ItemGroup>
 </Project>

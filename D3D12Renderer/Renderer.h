@@ -115,6 +115,7 @@ private:
     DescriptorAllocation m_dsvAllocation;
     DescriptorAllocation m_readOnlyDSVAllocation;
     DescriptorAllocation m_depthSRVAllocation;
+    DescriptorAllocation m_stencilSRVAllocation;
 
     // App resources
     // 
