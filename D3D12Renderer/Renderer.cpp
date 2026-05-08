@@ -1388,9 +1388,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             auto* pso = GetPipelineState(m_currentPSOKey);
             pCommandList->SetPipelineState(pso);
 
-            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetBackBufferRTVHandle();
             D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
-            pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+            pCommandList->OMSetRenderTargets(0, nullptr, FALSE, &dsvHandle);
             pCommandList->OMSetStencilRef(2);
 
             pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.GPUPtr);
@@ -1419,8 +1418,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             pCommandList->SetPipelineState(pso);
 
             D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetBackBufferRTVHandle();
-            D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
-            pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+            pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
             pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             pCommandList->DrawInstanced(3, 1, 0, 0);
