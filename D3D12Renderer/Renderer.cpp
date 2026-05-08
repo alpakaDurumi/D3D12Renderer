@@ -1368,14 +1368,16 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->Barrier(1, barrierGroups);
     }
 
-    if (!(m_selected.index == UINT_MAX && m_selected.generation == 0))
+    bool selectionExists = !(m_selected.index == UINT_MAX && m_selected.generation == 0);
+
+    // Selection mask pass
     {
-        // Selection mask pass
+        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Selection mask pass");
+
+        ApplyPassBarriers(m_renderGraph, PassType::SELECTION_MASK, pCommandList);
+
+        if (selectionExists)
         {
-            PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Selection mask pass");
-
-            ApplyPassBarriers(m_renderGraph, PassType::SELECTION_MASK, pCommandList);
-
             pCommandList->RSSetViewports(1, &m_viewport);
             pCommandList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -1396,13 +1398,16 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             // 선택된 Entity들에 대해서만 draw call을 호출해야 함 (나중에는 여러 Entity를 다중 선택할 수도 있어야 함)
             DrawEntity(pCommandList, m_selected, frameResource.GetInstanceBufferVirtualAddress());
         }
-        
-        // Outline drawing pass
+    }
+
+    // Outline drawing pass
+    {
+        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Outline drawing pass");
+
+        ApplyPassBarriers(m_renderGraph, PassType::OUTLINE_DRAWING, pCommandList);
+
+        if (selectionExists)
         {
-            PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Outline drawing pass");
-
-            ApplyPassBarriers(m_renderGraph, PassType::OUTLINE_DRAWING, pCommandList);
-
             pCommandList->RSSetViewports(1, &m_viewport);
             pCommandList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -1419,20 +1424,20 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
             pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             pCommandList->DrawInstanced(3, 1, 0, 0);
-
-            D3D12_TEXTURE_BARRIER b = {
-                D3D12_BARRIER_SYNC_PIXEL_SHADING,
-                D3D12_BARRIER_SYNC_DEPTH_STENCIL,
-                D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-                D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
-                D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
-                D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
-                m_depthStencilBuffer.Get(),
-                {0xffff'ffff, 0, 0, 0, 0, 0},
-                D3D12_TEXTURE_BARRIER_FLAG_NONE };
-            D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(1, &b) };
-            pCommandList->Barrier(1, barrierGroups);
         }
+
+        D3D12_TEXTURE_BARRIER b = {
+            D3D12_BARRIER_SYNC_PIXEL_SHADING,
+            D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+            D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+            D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+            D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+            D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
+            m_depthStencilBuffer.Get(),
+            {0xffff'ffff, 0, 0, 0, 0, 0},
+            D3D12_TEXTURE_BARRIER_FLAG_NONE };
+        D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(1, &b) };
+        pCommandList->Barrier(1, barrierGroups);
     }
 }
 
@@ -2423,6 +2428,8 @@ void Renderer::DrawEntity(ID3D12GraphicsCommandList7* pCommandList, EntityHandle
     static const UINT instanceDataSize = static_cast<UINT>(sizeof(InstanceData));
 
     auto* pEntity = m_sceneManager.Get(entityHandle);
+
+    if (!pEntity->meshRenderer.has_value()) return;
     auto meshHandle = pEntity->meshRenderer->mesh;
     auto* pMesh = m_sceneManager.GetMesh(meshHandle);
 
