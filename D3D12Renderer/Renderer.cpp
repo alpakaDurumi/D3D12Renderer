@@ -1792,13 +1792,15 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
 
     if (inserted)
     {
+        const auto& passType = psoKey.passType;
+
         // Rasterizer State
         D3D12_RASTERIZER_DESC rasterizerDesc = {};
         rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
         rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
         rasterizerDesc.FrontCounterClockwise = FALSE;
 
-        if (psoKey.passType == PassType::SHADOW_MAP)
+        if (passType == PassType::SHADOW_MAP)
         {
             rasterizerDesc.DepthBias = -5000;
             rasterizerDesc.DepthBiasClamp = -0.1f;
@@ -1829,27 +1831,24 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
             D3D12_LOGIC_OP_NOOP,
             D3D12_COLOR_WRITE_ENABLE_ALL,
         };
-        for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
-            blendDesc.RenderTarget[i] = defaultRenderTargetBlendDesc;
+        blendDesc.RenderTarget[0] = defaultRenderTargetBlendDesc;
 
         // Depth-stencil
         D3D12_DEPTH_STENCIL_DESC depthStencilDesc = {};
-        if (psoKey.passType == PassType::DEFERRED_LIGHTING)
+        switch (passType)
         {
-            depthStencilDesc.DepthEnable = FALSE;
-
-            depthStencilDesc.StencilEnable = TRUE;
-            depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
-            depthStencilDesc.StencilWriteMask = 0;
-            const D3D12_DEPTH_STENCILOP_DESC stencilOp =
-            { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_EQUAL };
-            depthStencilDesc.FrontFace = stencilOp;
-            depthStencilDesc.BackFace = stencilOp;
-        }
-        else if (psoKey.passType == PassType::SELECTION_MASK)
+        case PassType::FORWARD_COLORING:
+        case PassType::SHADOW_MAP:
+            depthStencilDesc.DepthEnable = TRUE;
+            depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+            depthStencilDesc.StencilEnable = FALSE;
+            break;
+        case PassType::GBUFFER:
         {
-            depthStencilDesc.DepthEnable = FALSE;
-
+            depthStencilDesc.DepthEnable = TRUE;
+            depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+            depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
             depthStencilDesc.StencilEnable = TRUE;
             depthStencilDesc.StencilReadMask = 0;
             depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
@@ -1857,37 +1856,41 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
             { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_REPLACE, D3D12_COMPARISON_FUNC_ALWAYS };
             depthStencilDesc.FrontFace = stencilOp;
             depthStencilDesc.BackFace = stencilOp;
+            break;
         }
-        else if (psoKey.passType == PassType::OUTLINE_DRAWING)
+        case PassType::DEFERRED_LIGHTING:
         {
             depthStencilDesc.DepthEnable = FALSE;
-            depthStencilDesc.StencilEnable = FALSE;
+            depthStencilDesc.StencilEnable = TRUE;
+            depthStencilDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+            depthStencilDesc.StencilWriteMask = 0;
+            const D3D12_DEPTH_STENCILOP_DESC stencilOp =
+            { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_EQUAL };
+            depthStencilDesc.FrontFace = stencilOp;
+            depthStencilDesc.BackFace = stencilOp;
+            break;
         }
-        else
+        case PassType::SELECTION_MASK:
         {
-            depthStencilDesc.DepthEnable = TRUE;
-            depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-            depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
-
-            if (psoKey.passType == PassType::GBUFFER)
-            {
-                depthStencilDesc.StencilEnable = TRUE;
-                depthStencilDesc.StencilReadMask = 0;
-                depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-                const D3D12_DEPTH_STENCILOP_DESC stencilOp =
-                { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_REPLACE, D3D12_COMPARISON_FUNC_ALWAYS };
-                depthStencilDesc.FrontFace = stencilOp;
-                depthStencilDesc.BackFace = stencilOp;
-            }
-            else
-            {
-                depthStencilDesc.StencilEnable = FALSE;
-            }
+            depthStencilDesc.DepthEnable = FALSE;
+            depthStencilDesc.StencilEnable = TRUE;
+            depthStencilDesc.StencilReadMask = 0;
+            depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+            const D3D12_DEPTH_STENCILOP_DESC stencilOp =
+            { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_REPLACE, D3D12_COMPARISON_FUNC_ALWAYS };
+            depthStencilDesc.FrontFace = stencilOp;
+            depthStencilDesc.BackFace = stencilOp;
+            break;
+        }
+        case PassType::OUTLINE_DRAWING:
+            depthStencilDesc.DepthEnable = FALSE;
+            depthStencilDesc.StencilEnable = FALSE;
+            break;
         }
 
         // Describe and create the graphics pipeline state object (PSO).
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-        if (psoKey.passType == PassType::DEFERRED_LIGHTING)
+        if (passType == PassType::DEFERRED_LIGHTING || passType == PassType::OUTLINE_DRAWING)
             psoDesc.InputLayout = { nullptr, 0 };
         else
             psoDesc.InputLayout = { m_inputLayout.data(), static_cast<UINT>(m_inputLayout.size()) };
@@ -1895,33 +1898,28 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
 
         // Shader stages are selected by demand.
         // VS is essential for rasterization.
-        // PS is optional. (e.g. Shadow map pass)
         std::wstring vsCsoName = Utility::RemoveFileExtension(psoKey.vsName) +
-            (psoKey.passType == PassType::SHADOW_MAP || psoKey.passType == PassType::SELECTION_MASK ? L"_depth_only" : L"") +
+            (passType == PassType::SHADOW_MAP || passType == PassType::SELECTION_MASK ? L"_depth_only" : L"") +
             L".cso";
-
-        std::wstring psCsoName = Utility::RemoveFileExtension(psoKey.psName) + L".cso";
-
         const std::vector<char>& vsBlob = GetShaderBlobRef(ShaderKey{ vsCsoName });
-
         psoDesc.VS = { vsBlob.data(), vsBlob.size() };
 
-        const std::vector<char>* psBlob = nullptr;
-
+        // PS is optional. (e.g. Shadow map pass)
         if (!psoKey.psName.empty())
         {
-            psBlob = &GetShaderBlobRef(ShaderKey{ psCsoName });
-            psoDesc.PS = { psBlob->data(), psBlob->size() };
+            std::wstring psCsoName = Utility::RemoveFileExtension(psoKey.psName) + L".cso";
+            const std::vector<char>& psBlob = GetShaderBlobRef(ShaderKey{ psCsoName });
+            psoDesc.PS = { psBlob.data(), psBlob.size() };
         }
 
         psoDesc.RasterizerState = rasterizerDesc;
         psoDesc.BlendState = blendDesc;
         psoDesc.DepthStencilState = depthStencilDesc;
-        psoDesc.DSVFormat = psoKey.passType == PassType::SHADOW_MAP ? DXGI_FORMAT_D32_FLOAT : DXGI_FORMAT_D24_UNORM_S8_UINT;
+        psoDesc.DSVFormat = passType == PassType::SHADOW_MAP ? DXGI_FORMAT_D32_FLOAT : DXGI_FORMAT_D24_UNORM_S8_UINT;
         psoDesc.SampleMask = UINT_MAX;
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
-        switch (psoKey.passType)
+        switch (passType)
         {
         case PassType::FORWARD_COLORING:
             psoDesc.NumRenderTargets = 1;
