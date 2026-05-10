@@ -136,14 +136,9 @@ ID3D12Resource* FrameResource::GetGBuffer(GBufferSlot slot) const
     return m_gBuffers[static_cast<UINT>(slot)].Get();
 }
 
-std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> FrameResource::GetGBufferRTVHandles() const
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetGBufferRTVHandle() const
 {
-    std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> ret(static_cast<std::size_t>(GBufferSlot::NUM_GBUFFER_SLOTS));
-    for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
-    {
-        ret[i] = m_gBufferRTVAllocation.GetDescriptorHandle(i);
-    }
-    return ret;
+    return m_gBufferRTVAllocation.GetDescriptorHandle();
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetGBufferSRVHandle() const

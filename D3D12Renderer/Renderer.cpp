@@ -1096,6 +1096,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 {
     PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"PopulateCommandList");
 
+    static constexpr UINT NUM_GBUFFER_SLOTS = static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS);
+
     FrameResource& frameResource = *m_frameResources[m_frameIndex];
     frameResource.ResetInstanceOffsetByte();
 
@@ -1159,10 +1161,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         ++lightIdx;
     }
 
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, 0, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), frameResource.GetGBufferSRVHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), 1, m_depthSRVAllocation.GetDescriptorHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS) + 1, 1, m_stencilSRVAllocation.GetDescriptorHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS) + 2, 1, frameResource.GetSceneColorBufferSRVHandle(0));
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferSRVHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, NUM_GBUFFER_SLOTS, 1, m_depthSRVAllocation.GetDescriptorHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, NUM_GBUFFER_SLOTS + 1, 1, m_stencilSRVAllocation.GetDescriptorHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetSceneColorBufferSRVHandle(0));
 
     BindDescriptorTables(pCommandList);
 
@@ -1257,14 +1259,18 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         m_currentPSOKey.psName = L"GBufferPS.hlsl";
         auto* pso = GetPipelineState(m_currentPSOKey);
 
-        auto rtvHandles = frameResource.GetGBufferRTVHandles();
+        D3D12_CPU_DESCRIPTOR_HANDLE baseRTVHandle = frameResource.GetGBufferRTVHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
-        pCommandList->OMSetRenderTargets(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), rtvHandles.data(), FALSE, &dsvHandle);
+        pCommandList->OMSetRenderTargets(NUM_GBUFFER_SLOTS, &baseRTVHandle, TRUE, &dsvHandle);
 
         XMVECTORF32 clearColor;
         clearColor.v = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
-        for (auto& rtvHandle : rtvHandles)
+        static UINT rtvHandleIncrementSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+        for (UINT i = 0; i < NUM_GBUFFER_SLOTS; ++i)
+        {
+            auto rtvHandle = GetCPUDescriptorHandle(baseRTVHandle, i, rtvHandleIncrementSize);
             pCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        }
         pCommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 0.0f, 0, 0, nullptr);
         pCommandList->OMSetStencilRef(1);
 
@@ -1312,7 +1318,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->DrawInstanced(3, 1, 0, 0);
 
         std::vector<D3D12_TEXTURE_BARRIER> barriers;
-        for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
+        for (UINT slot = 0; slot < NUM_GBUFFER_SLOTS; ++slot)
         {
             D3D12_TEXTURE_BARRIER b = {
                 D3D12_BARRIER_SYNC_PIXEL_SHADING,

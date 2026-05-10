@@ -48,7 +48,7 @@ public:
     // GBuffer
     void CreateGBuffers(UINT64 width, UINT height);
     ID3D12Resource* GetGBuffer(GBufferSlot slot) const;
-    std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> GetGBufferRTVHandles() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferRTVHandle() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferSRVHandle() const;
     static DXGI_FORMAT GetGBufferFormat(GBufferSlot slot);
     void ResetGBuffers();
