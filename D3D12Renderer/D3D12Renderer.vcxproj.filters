@@ -254,5 +254,8 @@
     <CustomBuild Include="OutlinePS.hlsl">
       <Filter>Shaders</Filter>
     </CustomBuild>
+    <CustomBuild Include="ToneMapPS.hlsl">
+      <Filter>Shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

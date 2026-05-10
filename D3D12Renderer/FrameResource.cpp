@@ -15,15 +15,13 @@ FrameResource::FrameResource(
     DescriptorAllocation&& gBufferSRVAllocation)
     : m_pDevice(pDevice),
     m_backBufferRTVAllocation(std::move(rtvAllocation)),
-    m_sceneColorBufferRTVAllocation(std::move(sceneBufferRTVAllocation)),
-    m_sceneColorBufferSRVAllocation(std::move(sceneBufferSRVAllocation)),
     m_gBufferRTVAllocation(std::move(gBufferRTVAllocation)),
     m_gBufferSRVAllocation(std::move(gBufferSRVAllocation)),
     m_uploadAllocator(pDevice)
 {
     assert(!m_backBufferRTVAllocation.IsNull() &&
-        m_sceneColorBufferRTVAllocation.GetNumHandles() == SceneColorBufferCount &&
-        m_sceneColorBufferSRVAllocation.GetNumHandles() == SceneColorBufferCount &&
+        sceneBufferRTVAllocation.GetNumHandles() == SceneColorBufferCount &&
+        sceneBufferSRVAllocation.GetNumHandles() == SceneColorBufferCount &&
         m_gBufferRTVAllocation.GetNumHandles() == static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS) &&
         m_gBufferSRVAllocation.GetNumHandles() == static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS));
 
@@ -37,6 +35,15 @@ FrameResource::FrameResource(
     const UINT height = rtDesc.Height;
 
     CreateGBuffers(width, height);
+
+    auto sceneColorBufferRTVAllocations = sceneBufferRTVAllocation.Split();
+    for (UINT i = 0; i < SceneColorBufferCount; ++i)
+        m_sceneColorBufferRTVAllocations[i] = std::move(sceneColorBufferRTVAllocations[i]);
+
+    auto sceneColorBufferSRVAllocations = sceneBufferSRVAllocation.Split();
+    for (UINT i = 0; i < SceneColorBufferCount; ++i)
+        m_sceneColorBufferSRVAllocations[i] = std::move(sceneColorBufferSRVAllocations[i]);
+
     CreateSceneColorBuffers(width, height);
 
     // Create Upload buffer
@@ -78,10 +85,14 @@ void FrameResource::CreateSceneColorBuffers(UINT64 width, UINT height)
     {
         auto format = DXGI_FORMAT_R8G8B8A8_UNORM;
 
-        D3DHelper::CreateRenderTarget(m_pDevice, width, height, format, format, 1, m_sceneColorBuffers[i]);
+        DirectX::XMVECTORF32 color;
+        color.v = DirectX::XMColorSRGBToRGB(DirectX::XMVectorSet(0.5f, 0.5f, 0.5f, 1.0f));
+        auto clearValue = D3DHelper::CreateClearValue(format, color.f[0], color.f[1], color.f[2], color.f[3]);
 
-        D3DHelper::CreateRTV(m_pDevice, m_sceneColorBuffers[i].Get(), format, m_sceneColorBufferRTVAllocation.GetDescriptorHandle(i));
-        D3DHelper::CreateSRV(m_pDevice, m_sceneColorBuffers[i].Get(), format, m_sceneColorBufferSRVAllocation.GetDescriptorHandle(i));
+        D3DHelper::CreateRenderTarget(m_pDevice, width, height, format, format, 1, m_sceneColorBuffers[i], &clearValue);
+
+        D3DHelper::CreateRTV(m_pDevice, m_sceneColorBuffers[i].Get(), format, m_sceneColorBufferRTVAllocations[i].GetDescriptorHandle());
+        D3DHelper::CreateSRV(m_pDevice, m_sceneColorBuffers[i].Get(), format, m_sceneColorBufferSRVAllocations[i].GetDescriptorHandle());
     }
 }
 
@@ -92,12 +103,12 @@ ID3D12Resource* FrameResource::GetSceneColorBuffer(UINT index) const
 
 D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetSceneColorBufferRTVHandle(UINT index) const
 {
-    return m_sceneColorBufferRTVAllocation.GetDescriptorHandle(index);
+    return m_sceneColorBufferRTVAllocations[index].GetDescriptorHandle();
 }
 
-DescriptorAllocation& FrameResource::GetSceneColorBufferSRVAllocationRef()
+DescriptorAllocation& FrameResource::GetSceneColorBufferSRVAllocationRef(UINT index)
 {
-    return m_sceneColorBufferSRVAllocation;
+    return m_sceneColorBufferSRVAllocations[index];
 }
 
 void FrameResource::ResetSceneColorBuffers()

@@ -42,7 +42,7 @@ public:
     void CreateSceneColorBuffers(UINT64 width, UINT height);
     ID3D12Resource* GetSceneColorBuffer(UINT index) const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetSceneColorBufferRTVHandle(UINT index) const;
-    DescriptorAllocation& GetSceneColorBufferSRVAllocationRef();
+    DescriptorAllocation& GetSceneColorBufferSRVAllocationRef(UINT index);
     void ResetSceneColorBuffers();
 
     // GBuffer
@@ -73,9 +73,9 @@ private:
     ComPtr<ID3D12Resource> m_backBuffer;
     DescriptorAllocation m_backBufferRTVAllocation;
     
-    std::array< ComPtr<ID3D12Resource>, SceneColorBufferCount> m_sceneColorBuffers;
-    DescriptorAllocation m_sceneColorBufferRTVAllocation;
-    DescriptorAllocation m_sceneColorBufferSRVAllocation;
+    std::array<ComPtr<ID3D12Resource>, SceneColorBufferCount> m_sceneColorBuffers;
+    std::array<DescriptorAllocation, SceneColorBufferCount> m_sceneColorBufferRTVAllocations;
+    std::array<DescriptorAllocation, SceneColorBufferCount> m_sceneColorBufferSRVAllocations;
 
     std::array<ComPtr<ID3D12Resource>, static_cast<std::size_t>(GBufferSlot::NUM_GBUFFER_SLOTS)> m_gBuffers;
     DescriptorAllocation m_gBufferRTVAllocation;

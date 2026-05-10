@@ -109,6 +109,7 @@ public:
         }
     }
 
+    // pResources must contains the per-frame resources for a single element
     void AddElement(RGBuffer buffer, std::vector<ID3D12Resource*> pResources)
     {
         AddElementHelper(buffer.index, pResources, m_bufferGroups);
@@ -191,7 +192,8 @@ public:
             PassType::DEFERRED_LIGHTING,
             PassType::FORWARD_COLORING,
             PassType::SELECTION_MASK,
-            PassType::OUTLINE_DRAWING };
+            PassType::OUTLINE_DRAWING,
+            PassType::TONEMAP };
 
         // Compile graph
         for (const PassType& passType : defaultOrder)

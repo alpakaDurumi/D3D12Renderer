@@ -14,6 +14,7 @@ enum class PassType
     DEFERRED_LIGHTING,
     SELECTION_MASK,
     OUTLINE_DRAWING,
+    TONEMAP,
     NUM_PASS_TYPES
 };
 

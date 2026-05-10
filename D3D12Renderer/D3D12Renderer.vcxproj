@@ -257,6 +257,7 @@
     <CustomBuild Include="FullScreenTriangleVS.hlsl" />
     <CustomBuild Include="DeferredLightingPS.hlsl" />
     <CustomBuild Include="OutlinePS.hlsl" />
+    <CustomBuild Include="ToneMapPS.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="ShaderCompile.targets" Condition="Exists('ShaderCompile.targets')" />

@@ -88,8 +88,8 @@ private:
     UINT32 m_numDescriptorsPerHeap;
     UINT32 m_descriptorHandleIncrementSize;
 
-    std::unique_ptr<D3D12_CPU_DESCRIPTOR_HANDLE[]> m_descriptorHandleCache;
-    DescriptorTableCache m_descriptorTableCache[MaxDescriptorTables];
+    std::unique_ptr<D3D12_CPU_DESCRIPTOR_HANDLE[]> m_descriptorHandleCache;     // Flat storage for all staged CPU descriptor handles
+    DescriptorTableCache m_descriptorTableCache[MaxDescriptorTables];           // Per-root-parameter metadata: start position and count within m_descriptorHandleCache
 
     UINT32 m_currentOffset;
 

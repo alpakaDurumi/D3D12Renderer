@@ -145,5 +145,22 @@
         $(ShaderOutDir)OutlinePS.cso;
       </Outputs>
     </CustomBuild>
+
+    <CustomBuild Update="ToneMapPS.hlsl">
+      <Message>DXC: ToneMapPS.hlsl</Message>
+
+      <PdbFlag Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)ToneMapPS.pdb"</PdbFlag>
+      <PdbFlag Condition="'$(Configuration)'=='Release'"></PdbFlag>
+
+      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)ToneMapPS.cso"</Command>
+
+      <Outputs Condition="'$(Configuration)'!='Release'">
+        $(ShaderOutDir)ToneMapPS.cso;
+        $(ShaderPdbDir)ToneMapPS.pdb;
+      </Outputs>
+      <Outputs Condition="'$(Configuration)'=='Release'">
+        $(ShaderOutDir)ToneMapPS.cso;
+      </Outputs>
+    </CustomBuild>
   </ItemGroup>
 </Project>
