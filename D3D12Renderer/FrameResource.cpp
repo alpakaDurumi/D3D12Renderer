@@ -106,9 +106,9 @@ D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetSceneColorBufferRTVHandle(UINT ind
     return m_sceneColorBufferRTVAllocations[index].GetDescriptorHandle();
 }
 
-DescriptorAllocation& FrameResource::GetSceneColorBufferSRVAllocationRef(UINT index)
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetSceneColorBufferSRVHandle(UINT index) const
 {
-    return m_sceneColorBufferSRVAllocations[index];
+    return m_sceneColorBufferSRVAllocations[index].GetDescriptorHandle();
 }
 
 void FrameResource::ResetSceneColorBuffers()
@@ -146,9 +146,9 @@ std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> FrameResource::GetGBufferRTVHandles() c
     return ret;
 }
 
-DescriptorAllocation& FrameResource::GetGBufferSRVAllocationRef()
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetGBufferSRVHandle() const
 {
-    return m_gBufferSRVAllocation;
+    return m_gBufferSRVAllocation.GetDescriptorHandle();
 }
 
 DXGI_FORMAT FrameResource::GetGBufferFormat(GBufferSlot slot)

@@ -1109,7 +1109,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT matIdx = 0;
     for (auto& mat : m_sceneManager.GetMaterials())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, matIdx, 1, mat.GetCBVAllocationRef(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, matIdx, 1, mat.GetCBVHandle(m_frameIndex));
         ++matIdx;
     }
 
@@ -1117,17 +1117,17 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT lightIdx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, lightIdx, 1, light.GetLightCBVAllocationRef(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, lightIdx, 1, light.GetLightCBVHandle(m_frameIndex));
         ++lightIdx;
     }
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, lightIdx, 1, light.GetLightCBVAllocationRef(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, lightIdx, 1, light.GetLightCBVHandle(m_frameIndex));
         ++lightIdx;
     }
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, lightIdx, 1, light.GetLightCBVAllocationRef(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, lightIdx, 1, light.GetLightCBVHandle(m_frameIndex));
         ++lightIdx;
     }
 
@@ -1135,7 +1135,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT textureIdx = 0;
     for (auto& texture : m_sceneManager.GetTextures())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, textureIdx, 1, texture.GetAllocationRef());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, textureIdx, 1, texture.GetSRVHandle());
         ++textureIdx;
     }
 
@@ -1143,26 +1143,26 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7, lightIdx, 1, light.GetSRVAllocationRef());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7, lightIdx, 1, light.GetSRVHandle());
         ++lightIdx;
     }
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(8, lightIdx, 1, light.GetSRVAllocationRef());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(8, lightIdx, 1, light.GetSRVHandle());
         ++lightIdx;
     }
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(9, lightIdx, 1, light.GetSRVAllocationRef());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(9, lightIdx, 1, light.GetSRVHandle());
         ++lightIdx;
     }
 
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, 0, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), frameResource.GetGBufferSRVAllocationRef());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), 1, m_depthSRVAllocation);
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS) + 1, 1, m_stencilSRVAllocation);
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS) + 2, 1, frameResource.GetSceneColorBufferSRVAllocationRef(0));
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, 0, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), frameResource.GetGBufferSRVHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS), 1, m_depthSRVAllocation.GetDescriptorHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS) + 1, 1, m_stencilSRVAllocation.GetDescriptorHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, static_cast<UINT32>(GBufferSlot::NUM_GBUFFER_SLOTS) + 2, 1, frameResource.GetSceneColorBufferSRVHandle(0));
 
     BindDescriptorTables(pCommandList);
 

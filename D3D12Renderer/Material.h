@@ -109,11 +109,6 @@ public:
         return m_cbvAllocations[frameIndex].GetDescriptorHandle();
     }
 
-    DescriptorAllocation& GetCBVAllocationRef(UINT frameIndex)
-    {
-        return m_cbvAllocations[frameIndex];
-    }
-
     void CopyDataFrom(const Material& src)
     {
         m_constantData = src.m_constantData;

@@ -32,8 +32,7 @@ public:
     ID3D12Resource* GetDepthBuffer() const;
     UINT16 GetArraySize() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle(UINT idx) const;
-
-    DescriptorAllocation& GetSRVAllocationRef();
+    D3D12_CPU_DESCRIPTOR_HANDLE GetSRVHandle() const;
 
     virtual XMVECTOR GetPosition() const;
     virtual XMVECTOR GetDirection() const;
@@ -57,7 +56,6 @@ public:
 
     LightConstantData* GetLightConstantDataPtr();
     D3D12_CPU_DESCRIPTOR_HANDLE GetLightCBVHandle(UINT frameIndex) const;
-    DescriptorAllocation& GetLightCBVAllocationRef(UINT frameIndex);
 
     UINT GetDepthBufferHandle() const;
     void SetDepthBufferHandle(UINT handle);

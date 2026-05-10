@@ -52,9 +52,9 @@ D3D12_CPU_DESCRIPTOR_HANDLE Light::GetDSVHandle(UINT idx) const
     return m_dsvAllocation.GetDescriptorHandle(idx);
 }
 
-DescriptorAllocation& Light::GetSRVAllocationRef()
+D3D12_CPU_DESCRIPTOR_HANDLE Light::GetSRVHandle() const
 {
-    return m_srvAllocation;
+    return m_srvAllocation.GetDescriptorHandle();
 }
 
 XMVECTOR Light::GetPosition() const
@@ -139,11 +139,6 @@ LightConstantData* Light::GetLightConstantDataPtr()
 D3D12_CPU_DESCRIPTOR_HANDLE Light::GetLightCBVHandle(UINT frameIndex) const
 {
     return m_lightCBVAllocations[frameIndex].GetDescriptorHandle();
-}
-
-DescriptorAllocation& Light::GetLightCBVAllocationRef(UINT frameIndex)
-{
-    return m_lightCBVAllocations[frameIndex];
 }
 
 UINT Light::GetDepthBufferHandle() const

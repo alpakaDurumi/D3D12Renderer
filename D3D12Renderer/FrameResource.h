@@ -42,14 +42,14 @@ public:
     void CreateSceneColorBuffers(UINT64 width, UINT height);
     ID3D12Resource* GetSceneColorBuffer(UINT index) const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetSceneColorBufferRTVHandle(UINT index) const;
-    DescriptorAllocation& GetSceneColorBufferSRVAllocationRef(UINT index);
+    D3D12_CPU_DESCRIPTOR_HANDLE GetSceneColorBufferSRVHandle(UINT index) const;
     void ResetSceneColorBuffers();
 
     // GBuffer
     void CreateGBuffers(UINT64 width, UINT height);
     ID3D12Resource* GetGBuffer(GBufferSlot slot) const;
     std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> GetGBufferRTVHandles() const;
-    DescriptorAllocation& GetGBufferSRVAllocationRef();
+    D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferSRVHandle() const;
     static DXGI_FORMAT GetGBufferFormat(GBufferSlot slot);
     void ResetGBuffers();
 

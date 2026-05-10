@@ -47,7 +47,7 @@ void DynamicDescriptorHeap::ParseRootSignature(const RootSignature& rootSignatur
 }
 
 // Staging new parameters MUST be done in ascending order of parameter index.
-void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 offsetInParameter, UINT32 numDescriptors, DescriptorAllocation& allocation, UINT32 offsetInAllocation)
+void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 offsetInParameter, UINT32 numDescriptors, D3D12_CPU_DESCRIPTOR_HANDLE baseCPUHandle)
 {
     if (rootParameterIndex >= MaxDescriptorTables)
         throw std::out_of_range("Root parameter index exceeds MaxDescriptorTables.");
@@ -95,15 +95,12 @@ void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 o
     // Copy descriptor handles
     for (UINT i = 0; i < numDescriptors; ++i)
     {
-        start[i] = allocation.GetDescriptorHandle(offsetInAllocation + i);
+        start[i] = GetCPUDescriptorHandle(baseCPUHandle, i, m_descriptorHandleIncrementSize);
     }
 
     // Set the root parameter index bit as 1 to make sure the descriptor table 
     // at that index is bound to the command list.
     m_staleDescriptorTableBitMask |= (1 << rootParameterIndex);
-
-    // Mark allocation as used.
-    m_usedAllocations.insert(&allocation);
 }
 
 // Compute number of descriptors that need to be committed to the GPU visible descriptor heap
@@ -268,13 +265,6 @@ void DynamicDescriptorHeap::QueueRetiredHeaps(UINT64 fenceValue)
         m_pendingHeaps.push({ fenceValue, pPage });
     }
     m_retiredHeaps.clear();
-
-    // Mark fenceValue to used allocations.
-    for (auto* pAlloc : m_usedAllocations)
-    {
-        pAlloc->SetFenceValue(fenceValue);
-    }
-    m_usedAllocations.clear();
 }
 
 void DynamicDescriptorHeap::Reset()
