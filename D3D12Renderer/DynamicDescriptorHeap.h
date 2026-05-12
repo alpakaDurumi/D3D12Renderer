@@ -64,21 +64,15 @@ private:
     static const UINT32 MaxDescriptorTables = 16;
 
     // A structure that represents a descriptor table entry in the root signature.
-    struct DescriptorTableCache
+    struct DescriptorTableEntry
     {
-        DescriptorTableCache()
-            : NumDescriptors(0), BaseDescriptor(nullptr)
+        bool IsEmpty() const
         {
+            return Offset == UINT_MAX;
         }
 
-        void Reset()
-        {
-            NumDescriptors = 0;
-            BaseDescriptor = nullptr;
-        }
-
-        UINT32 NumDescriptors;
-        D3D12_CPU_DESCRIPTOR_HANDLE* BaseDescriptor;
+        UINT Offset = UINT_MAX;
+        UINT32 NumDescriptors = 0;
     };
 
     D3D12_DESCRIPTOR_HEAP_TYPE m_heapType;
@@ -86,7 +80,7 @@ private:
     UINT32 m_descriptorHandleIncrementSize;
 
     std::unique_ptr<D3D12_CPU_DESCRIPTOR_HANDLE[]> m_descriptorHandleCache;     // Flat storage for all staged CPU descriptor handles
-    DescriptorTableCache m_descriptorTableCache[MaxDescriptorTables];           // Per-root-parameter metadata: start position and count within m_descriptorHandleCache
+    DescriptorTableEntry m_descriptorTableEntries[MaxDescriptorTables];         // Per-rootParameter metadata: start position and count within m_descriptorHandleCache
 
     UINT32 m_currentOffset;
 
@@ -94,8 +88,7 @@ private:
 
     // Represents the index in the root signature that contains a descriptor table
     UINT16 m_descriptorTableBitMask;
-    // Represents a descriptor table in the root signature that has changed since the last time the 
-    // descriptors were copied.
+    // Represents a descriptor table in the root signature that has changed since the last time the descriptors were copied
     UINT16 m_staleDescriptorTableBitMask;
 
     std::vector<ComPtr<ID3D12DescriptorHeap>> m_heapPool;
