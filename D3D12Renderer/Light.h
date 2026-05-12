@@ -67,7 +67,7 @@ protected:
     std::vector<UploadAllocation> m_cameraUploadAllocations;    // transient, for single frame
 
     LightConstantData m_lightConstantData;
-    std::vector<DescriptorAllocation> m_lightCBVAllocations;    // for each frame
+    DescriptorAllocation m_lightCBVAllocation;                  // for each frame
 
     LightType m_type;
 

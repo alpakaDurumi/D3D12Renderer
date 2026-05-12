@@ -74,8 +74,8 @@ private:
     DescriptorAllocation m_backBufferRTVAllocation;
     
     std::array<ComPtr<ID3D12Resource>, SceneColorBufferCount> m_sceneColorBuffers;
-    std::array<DescriptorAllocation, SceneColorBufferCount> m_sceneColorBufferRTVAllocations;
-    std::array<DescriptorAllocation, SceneColorBufferCount> m_sceneColorBufferSRVAllocations;
+    DescriptorAllocation m_sceneColorBufferRTVAllocation;
+    DescriptorAllocation m_sceneColorBufferSRVAllocation;
 
     std::array<ComPtr<ID3D12Resource>, static_cast<std::size_t>(GBufferSlot::NUM_GBUFFER_SLOTS)> m_gBuffers;
     DescriptorAllocation m_gBufferRTVAllocation;
