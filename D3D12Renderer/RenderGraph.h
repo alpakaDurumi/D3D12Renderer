@@ -205,6 +205,7 @@ public:
             for (auto& [buffer, usage] : node.bufferInputs)
             {
                 CompiledBufferBarrier barrier = { buffer, currentBufferUsages[buffer.index], usage };
+                currentBufferUsages[buffer.index] = usage;
                 node.bufferBarriers.push_back(barrier);
             }
 
@@ -224,6 +225,7 @@ public:
                         if (latestUsages[i] != usage)
                         {
                             CompiledTextureBarrier barrier = { texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0} };
+                            latestUsages[i] = usage;
                             node.textureBarriers.push_back(barrier);
                         }
                     }
@@ -243,6 +245,7 @@ public:
                                 if (latestUsages[subresourceIndex] != usage)
                                 {
                                     CompiledTextureBarrier barrier = { texture, latestUsages[subresourceIndex], usage, {subresourceIndex, 0, 0, 0, 0, 0} };
+                                    latestUsages[subresourceIndex] = usage;
                                     node.textureBarriers.push_back(barrier);
                                 }
                             }
