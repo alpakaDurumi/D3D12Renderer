@@ -17,7 +17,6 @@
 #include "GeometryGenerator.h"
 #include "InstanceData.h"
 #include "Mesh.h"
-#include "Texture.h"
 #include "Material.h"
 
 using namespace D3DHelper;
@@ -878,13 +877,13 @@ void Renderer::LoadAssets()
         auto allocations = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3).Split();
 
         // index 0: white albedo
-        CreateTexture(pCommandList, std::move(allocations[0]), uploadAllocator, { 255, 255, 255, 255 }, 1, 1);
+        CreateAssetTexture(pCommandList, std::move(allocations[0]), uploadAllocator, { 255, 255, 255, 255 }, 1, 1);
 
         // index 1: flat normal  (128, 128, 255) in linear space
-        CreateTexture(pCommandList, std::move(allocations[1]), uploadAllocator, { 128, 128, 255, 255 }, 1, 1);
+        CreateAssetTexture(pCommandList, std::move(allocations[1]), uploadAllocator, { 128, 128, 255, 255 }, 1, 1);
 
         // index 2: black height
-        CreateTexture(pCommandList, std::move(allocations[2]), uploadAllocator, { 0, 0, 0, 255 }, 1, 1);
+        CreateAssetTexture(pCommandList, std::move(allocations[2]), uploadAllocator, { 0, 0, 0, 255 }, 1, 1);
 
         auto hDefaultMat = CreateMaterial("builtin://material/default");
         auto* pDefaultMat = m_sceneManager.GetMaterial(hDefaultMat);
@@ -898,7 +897,7 @@ void Renderer::LoadAssets()
 
     auto allocations = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3).Split();
 
-    CreateTexture(
+    CreateAssetTexture(
         pCommandList,
         std::move(allocations[0]),
         uploadAllocator,
@@ -908,7 +907,7 @@ void Renderer::LoadAssets()
         false,
         false);
 
-    CreateTexture(
+    CreateAssetTexture(
         pCommandList,
         std::move(allocations[1]),
         uploadAllocator,
@@ -918,7 +917,7 @@ void Renderer::LoadAssets()
         false,
         false);
 
-    CreateTexture(
+    CreateAssetTexture(
         pCommandList,
         std::move(allocations[2]),
         uploadAllocator,
@@ -1188,7 +1187,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
     // Stage textures
     UINT textureIdx = 0;
-    for (auto& texture : m_sceneManager.GetTextures())
+    for (auto& texture : m_sceneManager.GetAssetTextures())
     {
         m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7, textureIdx, 1, texture.GetSRVHandle());
         ++textureIdx;
@@ -1862,7 +1861,7 @@ SpotLightHandle Renderer::CreateSpotLight()
         m_shadowMapResolution);
 }
 
-TextureHandle Renderer::CreateTexture(
+AssetTextureHandle Renderer::CreateAssetTexture(
     ID3D12GraphicsCommandList7* pCommandList,
     DescriptorAllocation&& allocation,
     TransientUploadAllocator& uploadAllocator,
@@ -1870,7 +1869,7 @@ TextureHandle Renderer::CreateTexture(
     UINT width,
     UINT height)
 {
-    return m_sceneManager.AddTexture(
+    return m_sceneManager.AddAssetTexture(
         m_device.Get(),
         pCommandList,
         std::move(allocation),
@@ -1880,7 +1879,7 @@ TextureHandle Renderer::CreateTexture(
         height);
 }
 
-TextureHandle Renderer::CreateTexture(
+AssetTextureHandle Renderer::CreateAssetTexture(
     ID3D12GraphicsCommandList7* pCommandList,
     DescriptorAllocation&& allocation,
     TransientUploadAllocator& uploadAllocator,
@@ -1890,7 +1889,7 @@ TextureHandle Renderer::CreateTexture(
     bool flipImage,
     bool isCubeMap)
 {
-    return m_sceneManager.AddTexture(
+    return m_sceneManager.AddAssetTexture(
         m_device.Get(),
         pCommandList,
         std::move(allocation),

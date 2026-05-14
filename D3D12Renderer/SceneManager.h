@@ -10,7 +10,7 @@
 #include "Mesh.h"
 #include "Material.h"
 #include "Light.h"
-#include "Texture.h"
+#include "AssetTexture.h"
 #include "Aliases.h"
 #include "InstanceData.h"
 #include "SceneHandles.h"
@@ -466,7 +466,7 @@ public:
         return m_directionalLights.GetCount() + m_pointLights.GetCount() + m_spotLights.GetCount();
     }
 
-    TextureHandle AddTexture(
+    AssetTextureHandle AddAssetTexture(
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& allocation,
@@ -475,7 +475,7 @@ public:
         UINT width,
         UINT height)
     {
-        return m_textures.Add(Texture(
+        return m_assetTextures.Add(AssetTexture(
             pDevice,
             pCommandList,
             std::move(allocation),
@@ -485,7 +485,7 @@ public:
             height));
     }
 
-    TextureHandle AddTexture(
+    AssetTextureHandle AddAssetTexture(
         ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& allocation,
@@ -496,7 +496,7 @@ public:
         bool flipImage,
         bool isCubeMap)
     {
-        return m_textures.Add(Texture(
+        return m_assetTextures.Add(AssetTexture(
             pDevice,
             pCommandList,
             std::move(allocation),
@@ -508,14 +508,14 @@ public:
             isCubeMap));
     }
 
-    const std::vector<Texture>& GetTextures() const
+    const std::vector<AssetTexture>& GetAssetTextures() const
     {
-        return m_textures.GetDense();
+        return m_assetTextures.GetDense();
     }
 
-    std::vector<Texture>& GetTextures()
+    std::vector<AssetTexture>& GetAssetTextures()
     {
-        return m_textures.GetDense();
+        return m_assetTextures.GetDense();
     }
 
     void QueueDeferredDeletions(UINT64 fenceValue, UINT64 completedFenceValue)
@@ -562,7 +562,7 @@ private:
     SlotMap<PointLight> m_pointLights;
     SlotMap<SpotLight> m_spotLights;
 
-    SlotMap<Texture> m_textures;
+    SlotMap<AssetTexture> m_assetTextures;
 
     SlotMap<Entity> m_entities;
 

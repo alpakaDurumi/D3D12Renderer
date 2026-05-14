@@ -134,6 +134,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AssetTexture.cpp" />
     <ClCompile Include="CacheKeys.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CommandQueue.cpp" />
@@ -206,6 +207,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Aliases.h" />
+    <ClInclude Include="AssetTexture.h" />
     <ClInclude Include="CacheKeys.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CommandQueue.h" />

@@ -31,6 +31,7 @@
 #include "TransientUploadAllocator.h"
 #include "Aliases.h"
 #include "SceneManager.h"
+#include "AssetTexture.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -187,7 +188,7 @@ private:
     PointLightHandle CreatePointLight();
     SpotLightHandle CreateSpotLight();
 
-    TextureHandle CreateTexture(
+    AssetTextureHandle CreateAssetTexture(
         ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& allocation,
         TransientUploadAllocator& uploadAllocator,
@@ -195,7 +196,7 @@ private:
         UINT width,
         UINT height);
 
-    TextureHandle CreateTexture(
+    AssetTextureHandle CreateAssetTexture(
         ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& allocation,
         TransientUploadAllocator& uploadAllocator,
