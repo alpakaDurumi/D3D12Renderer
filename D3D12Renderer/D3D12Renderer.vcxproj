@@ -149,6 +149,7 @@
     <ClCompile Include="DescriptorAllocatorPage.cpp" />
     <ClCompile Include="DynamicDescriptorHeap.cpp" />
     <ClCompile Include="FrameResource.cpp" />
+    <ClCompile Include="GpuResource.cpp" />
     <ClCompile Include="imgui\backends\imgui_impl_dx12.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -220,6 +221,7 @@
     <ClInclude Include="DynamicDescriptorHeap.h" />
     <ClInclude Include="FrameResource.h" />
     <ClInclude Include="GeometryData.h" />
+    <ClInclude Include="GpuResource.h" />
     <ClInclude Include="InstanceData.h" />
     <ClInclude Include="RenderGraph.h" />
     <ClInclude Include="SceneHandles.h" />
