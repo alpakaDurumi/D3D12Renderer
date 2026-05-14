@@ -225,6 +225,7 @@ private:
     void UpdateConstantBuffers(FrameResource& frameResource);
 
     void DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
+    void DrawEntity(ID3D12GraphicsCommandList7* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
 
     void ProcessInput();
     void BeginOrbit();

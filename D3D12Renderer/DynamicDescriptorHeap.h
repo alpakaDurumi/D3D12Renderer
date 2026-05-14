@@ -8,11 +8,8 @@
 #include <memory>
 #include <queue>
 #include <functional>
-#include <unordered_set>
 #include <vector>
 #include <utility>
-
-#include "DescriptorAllocation.h"
 
 class RootSignature;
 class CommandQueue;
@@ -35,7 +32,7 @@ public:
 
     void SetCommandQueue(const CommandQueue* pCommandQueue) { m_pCommandQueue = pCommandQueue; }
 
-    void StageDescriptors(UINT32 rootParameterIndex, UINT32 offsetInParameter, UINT32 numDescriptors, DescriptorAllocation& allocation, UINT32 offsetInAllocation = 0);
+    void StageDescriptors(UINT32 rootParameterIndex, UINT32 offsetInParameter, UINT32 numDescriptors, D3D12_CPU_DESCRIPTOR_HANDLE baseCPUHandle);
 
     // Copy all of the staged descriptors to the GPU visible descriptor heap and
     // bind the descriptor heap and the descriptor tables to the command list
@@ -67,29 +64,23 @@ private:
     static const UINT32 MaxDescriptorTables = 16;
 
     // A structure that represents a descriptor table entry in the root signature.
-    struct DescriptorTableCache
+    struct DescriptorTableEntry
     {
-        DescriptorTableCache()
-            : NumDescriptors(0), BaseDescriptor(nullptr)
+        bool IsEmpty() const
         {
+            return Offset == UINT_MAX;
         }
 
-        void Reset()
-        {
-            NumDescriptors = 0;
-            BaseDescriptor = nullptr;
-        }
-
-        UINT32 NumDescriptors;
-        D3D12_CPU_DESCRIPTOR_HANDLE* BaseDescriptor;
+        UINT Offset = UINT_MAX;
+        UINT32 NumDescriptors = 0;
     };
 
     D3D12_DESCRIPTOR_HEAP_TYPE m_heapType;
     UINT32 m_numDescriptorsPerHeap;
     UINT32 m_descriptorHandleIncrementSize;
 
-    std::unique_ptr<D3D12_CPU_DESCRIPTOR_HANDLE[]> m_descriptorHandleCache;
-    DescriptorTableCache m_descriptorTableCache[MaxDescriptorTables];
+    std::unique_ptr<D3D12_CPU_DESCRIPTOR_HANDLE[]> m_descriptorHandleCache;     // Flat storage for all staged CPU descriptor handles
+    DescriptorTableEntry m_descriptorTableEntries[MaxDescriptorTables];         // Per-rootParameter metadata: start position and count within m_descriptorHandleCache
 
     UINT32 m_currentOffset;
 
@@ -97,8 +88,7 @@ private:
 
     // Represents the index in the root signature that contains a descriptor table
     UINT16 m_descriptorTableBitMask;
-    // Represents a descriptor table in the root signature that has changed since the last time the 
-    // descriptors were copied.
+    // Represents a descriptor table in the root signature that has changed since the last time the descriptors were copied
     UINT16 m_staleDescriptorTableBitMask;
 
     std::vector<ComPtr<ID3D12DescriptorHeap>> m_heapPool;
@@ -111,8 +101,6 @@ private:
     D3D12_GPU_DESCRIPTOR_HANDLE m_currentGPUDescriptorHandle;
     D3D12_CPU_DESCRIPTOR_HANDLE m_currentCPUDescriptorHandle;
     UINT32 m_numFreeHandles;    // Number of free handles in current descriptor heap
-
-    std::unordered_set<DescriptorAllocation*> m_usedAllocations;
 
     ComPtr<ID3D12Device10> m_device;
     const CommandQueue* m_pCommandQueue;     // For IsFenceComplete

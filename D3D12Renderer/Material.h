@@ -34,9 +34,8 @@ public:
     Material(
         ID3D12Device10* pDevice,
         DescriptorAllocation&& allocation)
+        : m_cbvAllocation(std::move(allocation))
     {
-        m_cbvAllocations = allocation.Split();
-
         m_textureAddressingModes.fill(TextureAddressingMode::WRAP);
     }
 
@@ -106,12 +105,7 @@ public:
 
     D3D12_CPU_DESCRIPTOR_HANDLE GetCBVHandle(UINT frameIndex) const
     {
-        return m_cbvAllocations[frameIndex].GetDescriptorHandle();
-    }
-
-    DescriptorAllocation& GetCBVAllocationRef(UINT frameIndex)
-    {
-        return m_cbvAllocations[frameIndex];
+        return m_cbvAllocation.GetDescriptorHandle(frameIndex);
     }
 
     void CopyDataFrom(const Material& src)
@@ -138,7 +132,7 @@ private:
     }
 
     MaterialConstantData m_constantData;
-    std::vector<DescriptorAllocation> m_cbvAllocations;
+    DescriptorAllocation m_cbvAllocation;
 
     std::array<TextureAddressingMode, static_cast<std::size_t>(TextureSlot::NUM_TEXTURE_SLOTS)> m_textureAddressingModes;
 

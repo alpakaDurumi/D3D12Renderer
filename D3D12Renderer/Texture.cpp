@@ -214,12 +214,7 @@ Texture::Texture(
     m_height = static_cast<UINT>(desc.Height);
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE Texture::GetDescriptorHandle()
+D3D12_CPU_DESCRIPTOR_HANDLE Texture::GetSRVHandle() const
 {
     return m_allocation.GetDescriptorHandle();
-}
-
-DescriptorAllocation& Texture::GetAllocationRef()
-{
-    return m_allocation;
 }

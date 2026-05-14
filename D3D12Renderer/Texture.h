@@ -36,8 +36,7 @@ public:
         bool flipImage,
         bool isCubeMap);
 
-    D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandle();
-    DescriptorAllocation& GetAllocationRef();
+    D3D12_CPU_DESCRIPTOR_HANDLE GetSRVHandle() const;
 
 private:
     ComPtr<ID3D12Resource> m_texture;

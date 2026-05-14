@@ -250,12 +250,16 @@
     <ClInclude Include="Win32Application.h" />
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="vs.hlsl" />
-    <CustomBuild Include="ps.hlsl" />
+    <CustomBuild Include="MeshVS.hlsl" />
+    <CustomBuild Include="ForwardColoringPS.hlsl" />
     <CustomBuild Include="PointLightShadowPS.hlsl" />
     <CustomBuild Include="GBufferPS.hlsl" />
-    <CustomBuild Include="DeferredLightingVS.hlsl" />
+    <CustomBuild Include="FullScreenTriangleVS.hlsl" />
     <CustomBuild Include="DeferredLightingPS.hlsl" />
+    <CustomBuild Include="OutlinePS.hlsl" />
+    <CustomBuild Include="ToneMapPS.hlsl" />
+    <CustomBuild Include="SelectionMaskPS.hlsl" />
+    <CustomBuild Include="HorizontalDilatePS.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="ShaderCompile.targets" Condition="Exists('ShaderCompile.targets')" />

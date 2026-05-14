@@ -47,27 +47,29 @@ void DynamicDescriptorHeap::ParseRootSignature(const RootSignature& rootSignatur
 }
 
 // Staging new parameters MUST be done in ascending order of parameter index.
-void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 offsetInParameter, UINT32 numDescriptors, DescriptorAllocation& allocation, UINT32 offsetInAllocation)
+void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 offsetInParameter, UINT32 numDescriptors, D3D12_CPU_DESCRIPTOR_HANDLE baseCPUHandle)
 {
     if (rootParameterIndex >= MaxDescriptorTables)
         throw std::out_of_range("Root parameter index exceeds MaxDescriptorTables.");
 
-    DescriptorTableCache& descriptorTableCache = m_descriptorTableCache[rootParameterIndex];
+    DescriptorTableEntry& entry = m_descriptorTableEntries[rootParameterIndex];
 
-    bool isNewParameter = descriptorTableCache.BaseDescriptor == nullptr;
+    bool isNewParameter = entry.IsEmpty();
     bool isLastStaged = true;
 
-    D3D12_CPU_DESCRIPTOR_HANDLE* start = isNewParameter ? m_descriptorHandleCache.get() + m_currentOffset + offsetInParameter : descriptorTableCache.BaseDescriptor + offsetInParameter;
-    D3D12_CPU_DESCRIPTOR_HANDLE* upperLimit = m_descriptorHandleCache.get() + m_numDescriptorsPerHeap;
+    UINT start = isNewParameter ?
+        m_currentOffset + offsetInParameter :
+        entry.Offset + offsetInParameter;
+    UINT upperLimit = m_numDescriptorsPerHeap;
 
     // If given index is not last, check that next table is staged
     if (rootParameterIndex < m_numParameters - 1)
     {
         DWORD nextTableIndex;
         UINT16 nextTableMask = m_descriptorTableBitMask & ~((1 << (rootParameterIndex + 1)) - 1);
-        if (_BitScanForward(&nextTableIndex, nextTableMask) && m_descriptorTableCache[nextTableIndex].BaseDescriptor)
+        if (_BitScanForward(&nextTableIndex, nextTableMask) && !m_descriptorTableEntries[nextTableIndex].IsEmpty())
         {
-            upperLimit = m_descriptorTableCache[nextTableIndex].BaseDescriptor;
+            upperLimit = m_descriptorTableEntries[nextTableIndex].Offset;
             isLastStaged = false;
         }
     }
@@ -82,28 +84,23 @@ void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 o
 
     if (isNewParameter)
     {
-        descriptorTableCache.BaseDescriptor = m_descriptorHandleCache.get() + m_currentOffset;
-        descriptorTableCache.NumDescriptors = offsetInParameter + numDescriptors;
-        m_currentOffset += descriptorTableCache.NumDescriptors;
+        entry.Offset = m_currentOffset;
+        entry.NumDescriptors = offsetInParameter + numDescriptors;
+        m_currentOffset += entry.NumDescriptors;
     }
     else if (isLastStaged)
     {
-        descriptorTableCache.NumDescriptors = std::max(descriptorTableCache.NumDescriptors, offsetInParameter + numDescriptors);
-        m_currentOffset = static_cast<UINT32>(descriptorTableCache.BaseDescriptor - m_descriptorHandleCache.get()) + descriptorTableCache.NumDescriptors;
+        entry.NumDescriptors = std::max(entry.NumDescriptors, offsetInParameter + numDescriptors);
+        m_currentOffset = entry.Offset + entry.NumDescriptors;
     }
 
     // Copy descriptor handles
     for (UINT i = 0; i < numDescriptors; ++i)
-    {
-        start[i] = allocation.GetDescriptorHandle(offsetInAllocation + i);
-    }
+        *(m_descriptorHandleCache.get() + start + i) = GetCPUDescriptorHandle(baseCPUHandle, i, m_descriptorHandleIncrementSize);
 
     // Set the root parameter index bit as 1 to make sure the descriptor table 
     // at that index is bound to the command list.
     m_staleDescriptorTableBitMask |= (1 << rootParameterIndex);
-
-    // Mark allocation as used.
-    m_usedAllocations.insert(&allocation);
 }
 
 // Compute number of descriptors that need to be committed to the GPU visible descriptor heap
@@ -115,7 +112,7 @@ UINT32 DynamicDescriptorHeap::ComputeStaleDescriptorCount() const
 
     while (_BitScanForward(&i, staleDescriptorsBitMask))
     {
-        numStaleDescriptors += m_descriptorTableCache[i].NumDescriptors;
+        numStaleDescriptors += m_descriptorTableEntries[i].NumDescriptors;
         staleDescriptorsBitMask ^= (1 << i);
     }
 
@@ -191,8 +188,8 @@ void DynamicDescriptorHeap::CommitStagedDescriptors(ID3D12GraphicsCommandList7* 
     DWORD rootIndex;
     while (_BitScanForward(&rootIndex, m_staleDescriptorTableBitMask))
     {
-        UINT numSrcDescriptors = m_descriptorTableCache[rootIndex].NumDescriptors;
-        D3D12_CPU_DESCRIPTOR_HANDLE* pSrcDescriptorHandles = m_descriptorTableCache[rootIndex].BaseDescriptor;
+        UINT numSrcDescriptors = m_descriptorTableEntries[rootIndex].NumDescriptors;
+        D3D12_CPU_DESCRIPTOR_HANDLE* pSrcDescriptorHandles = m_descriptorHandleCache.get() + m_descriptorTableEntries[rootIndex].Offset;
 
         D3D12_CPU_DESCRIPTOR_HANDLE pDestDescriptorRangeStarts[] = { m_currentCPUDescriptorHandle };
         UINT pDestDescriptorRangeSizes[] = { numSrcDescriptors };
@@ -268,18 +265,14 @@ void DynamicDescriptorHeap::QueueRetiredHeaps(UINT64 fenceValue)
         m_pendingHeaps.push({ fenceValue, pPage });
     }
     m_retiredHeaps.clear();
-
-    // Mark fenceValue to used allocations.
-    for (auto* pAlloc : m_usedAllocations)
-    {
-        pAlloc->SetFenceValue(fenceValue);
-    }
-    m_usedAllocations.clear();
 }
 
 void DynamicDescriptorHeap::Reset()
 {
     m_currentOffset = 0;
-    for (auto& cache : m_descriptorTableCache)
-        cache.Reset();
+    for (auto& entry : m_descriptorTableEntries)
+    {
+        entry.Offset = UINT_MAX;
+        entry.NumDescriptors = 0;
+    }
 }

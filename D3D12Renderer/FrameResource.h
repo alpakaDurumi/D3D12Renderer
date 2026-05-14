@@ -26,54 +26,88 @@ public:
         IDXGISwapChain* pSwapChain,
         UINT frameIndex,
         DescriptorAllocation&& rtvAllocation,
+        DescriptorAllocation&& sceneBufferRTVAllocation,
+        DescriptorAllocation&& sceneBufferSRVAllocation,
         DescriptorAllocation&& gBufferRTVAllocation,
-        DescriptorAllocation&& gBufferSRVAllocation);
+        DescriptorAllocation&& gBufferSRVAllocation,
+        DescriptorAllocation&& selectionMaskRTVAllocation,
+        DescriptorAllocation&& selectionMaskSRVAllocation,
+        DescriptorAllocation&& horizontalDilatedMaskRTVAllocation,
+        DescriptorAllocation&& horizontalDilatedMaskSRVAllocation);
     ~FrameResource();
 
+    // Back buffer
+    void AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameIndex);
+    ID3D12Resource* GetBackBuffer() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetBackBufferRTVHandle() const;
+    void ResetBackBuffer();
+
+    // Scene color buffer
+    void CreateSceneColorBuffers(UINT64 width, UINT height);
+    ID3D12Resource* GetSceneColorBuffer(UINT index) const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetSceneColorBufferRTVHandle(UINT index) const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetSceneColorBufferSRVHandle(UINT index) const;
+    void ResetSceneColorBuffers();
+
+    // GBuffer
+    void CreateGBuffers(UINT64 width, UINT height);
+    ID3D12Resource* GetGBuffer(GBufferSlot slot) const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferRTVHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferSRVHandle() const;
+    static DXGI_FORMAT GetGBufferFormat(GBufferSlot slot);
+    void ResetGBuffers();
+
+    // Masks
+    void CreateMasks(UINT64 width, UINT height);
+    ID3D12Resource* GetSelectionMask() const;
+    ID3D12Resource* GetHorizontalDilatedMask() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetSelectionMaskRTVHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetSelectionMaskSRVHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetHorizontalDilatedMaskRTVHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetHorizontalDilatedMaskSRVHandle() const;
+    void ResetMasks();
+
+    // Instance data
     void ResetInstanceOffsetByte();
     void EnsureInstanceCapacity(UINT requiredSize);
-    void CreateGBuffers(UINT64 width, UINT height);
-    void AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameIndex);
-
-    // back buffers
-    ID3D12Resource* GetRenderTarget() const;
-    ID3D12Resource* GetGBuffer(GBufferSlot slot) const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetRTVHandle() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferRTVHandle(GBufferSlot slot) const;
-    std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> GetGBufferRTVHandles() const;
-    DescriptorAllocation& GetGBufferSRVAllocationRef();
-    UINT64 GetFenceValue() const;
-
-    // CB
-    UploadAllocation PushConstantData(void* src, std::size_t size);
-
-    // instance data
     void PushInstanceData(std::vector<InstanceData>& data);
     D3D12_GPU_VIRTUAL_ADDRESS GetInstanceBufferVirtualAddress() const;
 
-    void SetFenceValue(UINT64 fenceValue);
-
-    void ResetRenderTarget();
-    void ResetGBuffer(GBufferSlot slot);
-
-    static DXGI_FORMAT GetGBufferFormat(GBufferSlot slot);
-
+    // Transient upload
+    UploadAllocation PushConstantData(void* src, std::size_t size);
     void ResetUploadAllocator();
 
+    // Synchronization
+    UINT64 GetFenceValue() const;
+    void SetFenceValue(UINT64 fenceValue);
+
+    inline static constexpr UINT SceneColorBufferCount = 2;
+
 private:
-    ComPtr<ID3D12Resource> m_renderTarget;
-    DescriptorAllocation m_rtvAllocation;
+    ComPtr<ID3D12Resource> m_backBuffer;
+    DescriptorAllocation m_backBufferRTVAllocation;
+    
+    std::array<ComPtr<ID3D12Resource>, SceneColorBufferCount> m_sceneColorBuffers;
+    DescriptorAllocation m_sceneColorBufferRTVAllocation;
+    DescriptorAllocation m_sceneColorBufferSRVAllocation;
 
     std::array<ComPtr<ID3D12Resource>, static_cast<std::size_t>(GBufferSlot::NUM_GBUFFER_SLOTS)> m_gBuffers;
     DescriptorAllocation m_gBufferRTVAllocation;
     DescriptorAllocation m_gBufferSRVAllocation;
 
-    TransientUploadAllocator m_uploadAllocator;
+    ComPtr<ID3D12Resource> m_selectionMask;
+    ComPtr<ID3D12Resource> m_horizontalDilatedMask;
+    DescriptorAllocation m_selectionMaskRTVAllocation;
+    DescriptorAllocation m_selectionMaskSRVAllocation;
+    DescriptorAllocation m_horizontalDilatedMaskRTVAllocation;
+    DescriptorAllocation m_horizontalDilatedMaskSRVAllocation;
 
     ComPtr<ID3D12Resource> m_instanceUploadBuffer;
     UINT8* m_instanceBufferBegin = nullptr;
-    UINT m_instanceCapacity = 1024;
     UINT m_instanceOffsetByte = 0;
+    UINT m_instanceCapacity = 1024;
+
+    TransientUploadAllocator m_uploadAllocator;
 
     UINT64 m_fenceValue = 0;
 

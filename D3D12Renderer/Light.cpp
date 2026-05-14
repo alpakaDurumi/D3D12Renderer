@@ -15,7 +15,7 @@ Light::Light(
     LightType type)
     : m_dsvAllocation(std::move(dsvAllocation)),
     m_srvAllocation(std::move(srvAllocation)),
-    m_lightCBVAllocations(cbvAllocation.Split()),
+    m_lightCBVAllocation(std::move(cbvAllocation)),
     m_type(type)
 {
     const UINT16 arraySize = GetRequiredArraySize(m_type);
@@ -52,9 +52,9 @@ D3D12_CPU_DESCRIPTOR_HANDLE Light::GetDSVHandle(UINT idx) const
     return m_dsvAllocation.GetDescriptorHandle(idx);
 }
 
-DescriptorAllocation& Light::GetSRVAllocationRef()
+D3D12_CPU_DESCRIPTOR_HANDLE Light::GetSRVHandle() const
 {
-    return m_srvAllocation;
+    return m_srvAllocation.GetDescriptorHandle();
 }
 
 XMVECTOR Light::GetPosition() const
@@ -138,12 +138,7 @@ LightConstantData* Light::GetLightConstantDataPtr()
 
 D3D12_CPU_DESCRIPTOR_HANDLE Light::GetLightCBVHandle(UINT frameIndex) const
 {
-    return m_lightCBVAllocations[frameIndex].GetDescriptorHandle();
-}
-
-DescriptorAllocation& Light::GetLightCBVAllocationRef(UINT frameIndex)
-{
-    return m_lightCBVAllocations[frameIndex];
+    return m_lightCBVAllocation.GetDescriptorHandle(frameIndex);
 }
 
 UINT Light::GetDepthBufferHandle() const
