@@ -192,6 +192,7 @@ public:
             PassType::DEFERRED_LIGHTING,
             PassType::FORWARD_COLORING,
             PassType::SELECTION_MASK,
+            PassType::HORIZONTAL_DILATE,
             PassType::OUTLINE_DRAWING,
             PassType::TONEMAP };
 

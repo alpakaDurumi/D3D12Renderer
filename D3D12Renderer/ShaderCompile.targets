@@ -162,5 +162,39 @@
         $(ShaderOutDir)ToneMapPS.cso;
       </Outputs>
     </CustomBuild>
+
+    <CustomBuild Update="SelectionMaskPS.hlsl">
+      <Message>DXC: SelectionMaskPS.hlsl</Message>
+
+      <PdbFlag Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)SelectionMaskPS.pdb"</PdbFlag>
+      <PdbFlag Condition="'$(Configuration)'=='Release'"></PdbFlag>
+
+      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)SelectionMaskPS.cso"</Command>
+
+      <Outputs Condition="'$(Configuration)'!='Release'">
+        $(ShaderOutDir)SelectionMaskPS.cso;
+        $(ShaderPdbDir)SelectionMaskPS.pdb;
+      </Outputs>
+      <Outputs Condition="'$(Configuration)'=='Release'">
+        $(ShaderOutDir)SelectionMaskPS.cso;
+      </Outputs>
+    </CustomBuild>
+
+    <CustomBuild Update="HorizontalDilatePS.hlsl">
+      <Message>DXC: HorizontalDilatePS.hlsl</Message>
+
+      <PdbFlag Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)HorizontalDilatePS.pdb"</PdbFlag>
+      <PdbFlag Condition="'$(Configuration)'=='Release'"></PdbFlag>
+
+      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)HorizontalDilatePS.cso"</Command>
+
+      <Outputs Condition="'$(Configuration)'!='Release'">
+        $(ShaderOutDir)HorizontalDilatePS.cso;
+        $(ShaderPdbDir)HorizontalDilatePS.pdb;
+      </Outputs>
+      <Outputs Condition="'$(Configuration)'=='Release'">
+        $(ShaderOutDir)HorizontalDilatePS.cso;
+      </Outputs>
+    </CustomBuild>
   </ItemGroup>
 </Project>

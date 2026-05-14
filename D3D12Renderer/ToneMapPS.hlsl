@@ -1,6 +1,6 @@
 // Actual tone mapping is not performed yet
 
-Texture2D g_sceneColorBuffer : register(t0, space6);
+Texture2D g_sceneColorBuffer : register(t0, space7);
 
 struct PSInput
 {

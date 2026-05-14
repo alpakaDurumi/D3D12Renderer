@@ -362,6 +362,9 @@ void Renderer::OnResize(UINT width, UINT height)
         m_frameResources[i]->ResetGBuffers();
         m_frameResources[i]->CreateGBuffers(m_width, m_height);
 
+        m_frameResources[i]->ResetMasks();
+        m_frameResources[i]->CreateMasks(m_width, m_height);
+
         m_frameResources[i]->SetFenceValue(m_frameResources[m_frameIndex]->GetFenceValue());
     }
     m_depthStencilBuffer.Reset();
@@ -383,7 +386,6 @@ void Renderer::OnResize(UINT width, UINT height)
     CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(), true, false);
     CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_readOnlyDSVAllocation.GetDescriptorHandle(), true, true);
     CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R24_UNORM_X8_TYPELESS, m_depthSRVAllocation.GetDescriptorHandle(), 0);
-    CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_X24_TYPELESS_G8_UINT, m_stencilSRVAllocation.GetDescriptorHandle(), 1);
 
     // Update registered info of backbuffers
     std::vector<ID3D12Resource*> pBackBuffers;
@@ -426,6 +428,24 @@ void Renderer::OnResize(UINT width, UINT height)
         }
         m_renderGraph.UpdateElement(gBuffer, slot, pGBuffers);
     }
+
+    // Update registered info of selection mask
+    auto selectionMask = m_renderGraph.GetRGTexture("SelectionMask");
+    std::vector<ID3D12Resource*> pSelectionMasks;
+    for (UINT i = 0; i < FrameCount; ++i)
+    {
+        pSelectionMasks.push_back(m_frameResources[i]->GetSelectionMask());
+    }
+    m_renderGraph.UpdateElement(selectionMask, 0, pSelectionMasks);
+
+    // Update registered info of horizontal dilated mask
+    RGTexture horizontalDilatedMask = m_renderGraph.GetRGTexture("HorizontalDilatedMask");
+    std::vector<ID3D12Resource*> pHorizontalDilatedMasks;
+    for (UINT i = 0; i < FrameCount; ++i)
+    {
+        pHorizontalDilatedMasks.push_back(m_frameResources[i]->GetHorizontalDilatedMask());
+    }
+    m_renderGraph.UpdateElement(horizontalDilatedMask, 0, pHorizontalDilatedMasks);
 }
 
 void Renderer::OnDpiChanged(UINT dpi)
@@ -752,7 +772,11 @@ void Renderer::LoadPipeline()
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(FrameResource::SceneColorBufferCount),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameResource::SceneColorBufferCount),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)),
-            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)));
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
 
         m_frameResources.push_back(std::move(frameResource));
     }
@@ -776,6 +800,8 @@ void Renderer::LoadAssets()
         shaderNames.push_back(L"GBufferPS.cso");
         shaderNames.push_back(L"FullScreenTriangleVS.cso");
         shaderNames.push_back(L"DeferredLightingPS.cso");
+        shaderNames.push_back(L"SelectionMaskPS.cso");
+        shaderNames.push_back(L"HorizontalDilatePS.cso");
         shaderNames.push_back(L"OutlinePS.cso");
         shaderNames.push_back(L"ToneMapPS.cso");
 
@@ -818,14 +844,12 @@ void Renderer::LoadAssets()
     m_dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
     m_readOnlyDSVAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
     m_depthSRVAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-    m_stencilSRVAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
 
     CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer, true);
 
     CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(), true, false);
     CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_readOnlyDSVAllocation.GetDescriptorHandle(), true, true);
     CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R24_UNORM_X8_TYPELESS, m_depthSRVAllocation.GetDescriptorHandle(), 0);
-    CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_X24_TYPELESS_G8_UINT, m_stencilSRVAllocation.GetDescriptorHandle(), 1);
 
     // Set viewport and scissorRect for shadow mapping
     m_shadowMapViewport = { 0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f };
@@ -1045,6 +1069,32 @@ void Renderer::LoadAssets()
         m_renderGraph.AddElement(gBuffer, pGBuffers);
     }
 
+    // Selection mask
+    RGTexture selectionMask = m_renderGraph.RegisterTexture(
+        "SelectionMask",
+        true,
+        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET },
+        GetSubresourceCount(m_device.Get(), m_frameResources.front()->GetSelectionMask()));
+    std::vector<ID3D12Resource*> pSelectionMasks;
+    for (UINT i = 0; i < FrameCount; ++i)
+    {
+        pSelectionMasks.push_back(m_frameResources[i]->GetSelectionMask());
+    }
+    m_renderGraph.AddElement(selectionMask, pSelectionMasks);
+
+    // Horizontal dilated mask
+    RGTexture horizontalDilatedMask = m_renderGraph.RegisterTexture(
+        "HorizontalDilatedMask",
+        true,
+        { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET },
+        GetSubresourceCount(m_device.Get(), m_frameResources.front()->GetHorizontalDilatedMask()));
+    std::vector<ID3D12Resource*> pHorizontalDilatedMasks;
+    for (UINT i = 0; i < FrameCount; ++i)
+    {
+        pHorizontalDilatedMasks.push_back(m_frameResources[i]->GetHorizontalDilatedMask());
+    }
+    m_renderGraph.AddElement(horizontalDilatedMask, pHorizontalDilatedMasks);
+
     // Light
     m_renderGraph.RegisterTexture(
         "DirectionalLight",
@@ -1107,11 +1157,14 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT numLights = m_sceneManager.GetLightCount();
     pCommandList->SetGraphicsRoot32BitConstant(2, numLights, 0);
 
+    // Set outline thickness
+    pCommandList->SetGraphicsRoot32BitConstant(4, 4, 0);
+
     // Stage material CBVs
     UINT matIdx = 0;
     for (auto& mat : m_sceneManager.GetMaterials())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(4, matIdx, 1, mat.GetCBVHandle(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, matIdx, 1, mat.GetCBVHandle(m_frameIndex));
         ++matIdx;
     }
 
@@ -1119,17 +1172,17 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT lightIdx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, lightIdx, 1, light.GetLightCBVHandle(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCBVHandle(m_frameIndex));
         ++lightIdx;
     }
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, lightIdx, 1, light.GetLightCBVHandle(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCBVHandle(m_frameIndex));
         ++lightIdx;
     }
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, lightIdx, 1, light.GetLightCBVHandle(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCBVHandle(m_frameIndex));
         ++lightIdx;
     }
 
@@ -1137,7 +1190,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT textureIdx = 0;
     for (auto& texture : m_sceneManager.GetTextures())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, textureIdx, 1, texture.GetSRVHandle());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7, textureIdx, 1, texture.GetSRVHandle());
         ++textureIdx;
     }
 
@@ -1145,26 +1198,27 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7, lightIdx, 1, light.GetSRVHandle());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(8, lightIdx, 1, light.GetSRVHandle());
         ++lightIdx;
     }
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(8, lightIdx, 1, light.GetSRVHandle());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(9, lightIdx, 1, light.GetSRVHandle());
         ++lightIdx;
     }
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(9, lightIdx, 1, light.GetSRVHandle());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, lightIdx, 1, light.GetSRVHandle());
         ++lightIdx;
     }
 
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferSRVHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, NUM_GBUFFER_SLOTS, 1, m_depthSRVAllocation.GetDescriptorHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, NUM_GBUFFER_SLOTS + 1, 1, m_stencilSRVAllocation.GetDescriptorHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetSceneColorBufferSRVHandle(0));
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferSRVHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthSRVAllocation.GetDescriptorHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 1, 1, frameResource.GetSelectionMaskSRVHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetHorizontalDilatedMaskSRVHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 3, 1, frameResource.GetSceneColorBufferSRVHandle(0));
 
     BindDescriptorTables(pCommandList);
 
@@ -1435,18 +1489,51 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             // Pre-query PSOs
             m_currentPSOKey.passType = PassType::SELECTION_MASK;
             m_currentPSOKey.vsName = L"MeshVS.hlsl";
-            m_currentPSOKey.psName = L"";
+            m_currentPSOKey.psName = L"SelectionMaskPS.hlsl";
             auto* pso = GetPipelineState(m_currentPSOKey);
             pCommandList->SetPipelineState(pso);
 
-            D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
-            pCommandList->OMSetRenderTargets(0, nullptr, FALSE, &dsvHandle);
-            pCommandList->OMSetStencilRef(2);
+            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSelectionMaskRTVHandle();
+            pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+            XMVECTORF32 clearColor;
+            clearColor.v = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+            pCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
             pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.GPUPtr);
 
             // 선택된 Entity들에 대해서만 draw call을 호출해야 함 (나중에는 여러 Entity를 다중 선택할 수도 있어야 함)
             DrawEntity(pCommandList, m_selected, frameResource.GetInstanceBufferVirtualAddress());
+        }
+    }
+
+    // Horizontal dilate pass
+    {
+        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Horizontal dilate pass");
+
+        ApplyPassBarriers(m_renderGraph, PassType::HORIZONTAL_DILATE, pCommandList);
+
+        if (selectionExists)
+        {
+            pCommandList->RSSetViewports(1, &m_viewport);
+            pCommandList->RSSetScissorRects(1, &m_scissorRect);
+
+            // Pre-query PSOs
+            m_currentPSOKey.passType = PassType::HORIZONTAL_DILATE;
+            m_currentPSOKey.vsName = L"FullScreenTriangleVS.hlsl";
+            m_currentPSOKey.psName = L"HorizontalDilatePS.hlsl";
+            auto* pso = GetPipelineState(m_currentPSOKey);
+            pCommandList->SetPipelineState(pso);
+
+            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetHorizontalDilatedMaskRTVHandle();
+            pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+            XMVECTORF32 clearColor;
+            clearColor.v = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+            pCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+
+            pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            pCommandList->DrawInstanced(3, 1, 0, 0);
         }
     }
 
@@ -1474,6 +1561,34 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             pCommandList->DrawInstanced(3, 1, 0, 0);
         }
+
+        std::vector<D3D12_TEXTURE_BARRIER> barriers = {
+            {
+                D3D12_BARRIER_SYNC_PIXEL_SHADING,
+                D3D12_BARRIER_SYNC_NONE,
+                D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+                D3D12_BARRIER_ACCESS_NO_ACCESS,
+                D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+                D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+                frameResource.GetSelectionMask(),
+                {0xffff'ffff, 0, 0, 0, 0, 0},
+                D3D12_TEXTURE_BARRIER_FLAG_NONE
+            },
+            {
+                D3D12_BARRIER_SYNC_PIXEL_SHADING,
+                D3D12_BARRIER_SYNC_NONE,
+                D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+                D3D12_BARRIER_ACCESS_NO_ACCESS,
+                D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+                D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+                frameResource.GetHorizontalDilatedMask(),
+                {0xffff'ffff, 0, 0, 0, 0, 0},
+                D3D12_TEXTURE_BARRIER_FLAG_NONE
+            }
+        };
+
+        D3D12_BARRIER_GROUP barrierGroups[] = { TextureBarrierGroup(static_cast<UINT32>(barriers.size()), barriers.data()) };
+        pCommandList->Barrier(1, barrierGroups);
     }
 
     // Tone mapping pass
@@ -1499,17 +1614,6 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->DrawInstanced(3, 1, 0, 0);
 
         std::vector<D3D12_TEXTURE_BARRIER> barriers = {
-            {
-                D3D12_BARRIER_SYNC_PIXEL_SHADING,
-                D3D12_BARRIER_SYNC_DEPTH_STENCIL,
-                D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-                D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
-                D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
-                D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
-                m_depthStencilBuffer.Get(),
-                {0xffff'ffff, 0, 0, 0, 0, 0},
-                D3D12_TEXTURE_BARRIER_FLAG_NONE
-            },
             {
                 D3D12_BARRIER_SYNC_PIXEL_SHADING,
                 D3D12_BARRIER_SYNC_NONE,
@@ -1574,6 +1678,7 @@ void Renderer::PrepareRenderGraph()
     auto& deferredLightingPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::DEFERRED_LIGHTING)];
     auto& forwardColoringPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::FORWARD_COLORING)];
     auto& selectionMaskPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::SELECTION_MASK)];
+    auto& horizontalDilatePass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::HORIZONTAL_DILATE)];
     auto& outlineDrawingPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::OUTLINE_DRAWING)];
     auto& toneMapPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::TONEMAP)];
 
@@ -1583,6 +1688,8 @@ void Renderer::PrepareRenderGraph()
     auto sceneColorBuffer1 = m_renderGraph.GetRGTexture("SceneColorBuffer1");
     auto depthStencilBuffer = m_renderGraph.GetRGTexture("DepthStencilBuffer");
     auto gBuffer = m_renderGraph.GetRGTexture("GBuffer");
+    auto selectionMask = m_renderGraph.GetRGTexture("SelectionMask");
+    auto horizontalDilatedMask = m_renderGraph.GetRGTexture("HorizontalDilatedMask");
     auto directionalLightDepthBuffer = m_renderGraph.GetRGTexture("DirectionalLight");
     auto pointLightRenderTarget = m_renderGraph.GetRGTexture("PointLight");
     auto spotLightDepthBuffer = m_renderGraph.GetRGTexture("SpotLight");
@@ -1631,20 +1738,27 @@ void Renderer::PrepareRenderGraph()
     forwardColoringPass.AddTextureOutput(spotLightDepthBuffer, { D3D12_BARRIER_SYNC_NONE ,D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
 
     // Selection mask pass
-    selectionMaskPass.AddTextureInput(depthStencilBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
-    selectionMaskPass.AddTextureOutput(depthStencilBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
+    selectionMaskPass.AddTextureInput(selectionMask, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    selectionMaskPass.AddTextureOutput(selectionMask, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+
+    // Horizontal dilate pass
+    horizontalDilatePass.AddTextureInput(horizontalDilatedMask, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    horizontalDilatePass.AddTextureOutput(horizontalDilatedMask, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    horizontalDilatePass.AddTextureInput(selectionMask, { D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
+    horizontalDilatePass.AddTextureOutput(selectionMask, { D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
 
     // Outline drawing pass
     outlineDrawingPass.AddTextureInput(sceneColorBuffer0, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
     outlineDrawingPass.AddTextureOutput(sceneColorBuffer0, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    outlineDrawingPass.AddTextureInput(depthStencilBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
-    outlineDrawingPass.AddTextureOutput(depthStencilBuffer, { D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
+    outlineDrawingPass.AddTextureInput(selectionMask, { D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
+    outlineDrawingPass.AddTextureOutput(selectionMask, { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
+    outlineDrawingPass.AddTextureInput(horizontalDilatedMask, { D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
+    outlineDrawingPass.AddTextureOutput(horizontalDilatedMask, { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
 
     // Tone mapping pass
     toneMapPass.AddTextureInput(sceneColorBuffer0, { D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE });
     toneMapPass.AddTextureOutput(sceneColorBuffer0, { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
     toneMapPass.AddTextureInput(backBuffer, { D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET });
-    toneMapPass.AddTextureOutput(depthStencilBuffer, { D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE });
 }
 
 void Renderer::ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID3D12GraphicsCommandList7* pCommandList)
@@ -1828,12 +1942,12 @@ void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList)
     }
 
     m_dynamicDescriptorHeapForCBVSRVUAV->CommitStagedDescriptorsForDraw(pCommandList);
-    pCommandList->SetGraphicsRootDescriptorTable(11, m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart());    // Root parameter 11
+    pCommandList->SetGraphicsRootDescriptorTable(12, m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart());    // Root parameter 12
 }
 
 void Renderer::CreateRootSignature()
 {
-    m_rootSignature = std::make_unique<RootSignature>(12, 2);
+    m_rootSignature = std::make_unique<RootSignature>(13, 2);
     auto& rootSignature = *m_rootSignature;
 
     // Root descriptor for CameraCB and ShadowCB
@@ -1846,38 +1960,46 @@ void Renderer::CreateRootSignature()
     // Root constant for PointLightShadowPS
     rootSignature[3].InitAsConstant(3, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
+    // Root constant for outline
+    rootSignature[4].InitAsConstant(4, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+
     // Descriptor table for MaterialConstantBuffers[]
-    rootSignature[4].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[4].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+    rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[5].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for LightConstantBuffers[]
-    rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[5].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+    rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[6].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for textures (albedo, normal map, height map)
-    rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[6].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+    rootSignature[7].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[7].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for shadowMaps[]
     // Directional
-    rootSignature[7].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[7].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    // Point
     rootSignature[8].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[8].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    // Spot
+    rootSignature[8].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    // Point
     rootSignature[9].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[9].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    rootSignature[9].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    // Spot
+    rootSignature[10].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[10].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
 
-    // Descriptor table for GBuffers and SRV for depth/stencil and SRV for scene color buffer
-    rootSignature[10].InitAsTable(3, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[10].InitAsRange(0, 0, 4, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    rootSignature[10].InitAsRange(1, 0, 5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    rootSignature[10].InitAsRange(2, 0, 6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    // Descriptor table for
+    // SRV for GBuffers
+    // SRV for depth value
+    // SRV for selectionMask/horizontalDilatedMask
+    // SRV for scene color buffer
+    rootSignature[11].InitAsTable(4, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[11].InitAsRange(0, 0, 4, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    rootSignature[11].InitAsRange(1, 0, 5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    rootSignature[11].InitAsRange(2, 0, 6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    rootSignature[11].InitAsRange(3, 0, 7, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
 
     // Descriptor table for samplers
-    rootSignature[11].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[11].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
+    rootSignature[12].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    rootSignature[12].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
         static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS) * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES),
         D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
 
@@ -1973,17 +2095,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
             break;
         }
         case PassType::SELECTION_MASK:
-        {
-            depthStencilDesc.DepthEnable = FALSE;
-            depthStencilDesc.StencilEnable = TRUE;
-            depthStencilDesc.StencilReadMask = 0;
-            depthStencilDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-            const D3D12_DEPTH_STENCILOP_DESC stencilOp =
-            { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_REPLACE, D3D12_COMPARISON_FUNC_ALWAYS };
-            depthStencilDesc.FrontFace = stencilOp;
-            depthStencilDesc.BackFace = stencilOp;
-            break;
-        }
+        case PassType::HORIZONTAL_DILATE:
         case PassType::OUTLINE_DRAWING:
         case PassType::TONEMAP:
             depthStencilDesc.DepthEnable = FALSE;
@@ -1994,6 +2106,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
         // Describe and create the graphics pipeline state object (PSO).
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
         if (passType == PassType::DEFERRED_LIGHTING ||
+            passType == PassType::HORIZONTAL_DILATE ||
             passType == PassType::OUTLINE_DRAWING ||
             passType == PassType::TONEMAP)
             psoDesc.InputLayout = { nullptr, 0 };
@@ -2056,7 +2169,12 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
             psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
             break;
         case PassType::SELECTION_MASK:
-            psoDesc.NumRenderTargets = 0;
+            psoDesc.NumRenderTargets = 1;
+            psoDesc.RTVFormats[0] = DXGI_FORMAT_R8_UNORM;
+            break;
+        case PassType::HORIZONTAL_DILATE:
+            psoDesc.NumRenderTargets = 1;
+            psoDesc.RTVFormats[0] = DXGI_FORMAT_R8_UNORM;
             break;
         case PassType::OUTLINE_DRAWING:
             psoDesc.NumRenderTargets = 1;

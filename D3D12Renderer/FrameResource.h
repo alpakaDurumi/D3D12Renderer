@@ -29,7 +29,11 @@ public:
         DescriptorAllocation&& sceneBufferRTVAllocation,
         DescriptorAllocation&& sceneBufferSRVAllocation,
         DescriptorAllocation&& gBufferRTVAllocation,
-        DescriptorAllocation&& gBufferSRVAllocation);
+        DescriptorAllocation&& gBufferSRVAllocation,
+        DescriptorAllocation&& selectionMaskRTVAllocation,
+        DescriptorAllocation&& selectionMaskSRVAllocation,
+        DescriptorAllocation&& horizontalDilatedMaskRTVAllocation,
+        DescriptorAllocation&& horizontalDilatedMaskSRVAllocation);
     ~FrameResource();
 
     // Back buffer
@@ -52,6 +56,16 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferSRVHandle() const;
     static DXGI_FORMAT GetGBufferFormat(GBufferSlot slot);
     void ResetGBuffers();
+
+    // Masks
+    void CreateMasks(UINT64 width, UINT height);
+    ID3D12Resource* GetSelectionMask() const;
+    ID3D12Resource* GetHorizontalDilatedMask() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetSelectionMaskRTVHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetSelectionMaskSRVHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetHorizontalDilatedMaskRTVHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetHorizontalDilatedMaskSRVHandle() const;
+    void ResetMasks();
 
     // Instance data
     void ResetInstanceOffsetByte();
@@ -80,6 +94,13 @@ private:
     std::array<ComPtr<ID3D12Resource>, static_cast<std::size_t>(GBufferSlot::NUM_GBUFFER_SLOTS)> m_gBuffers;
     DescriptorAllocation m_gBufferRTVAllocation;
     DescriptorAllocation m_gBufferSRVAllocation;
+
+    ComPtr<ID3D12Resource> m_selectionMask;
+    ComPtr<ID3D12Resource> m_horizontalDilatedMask;
+    DescriptorAllocation m_selectionMaskRTVAllocation;
+    DescriptorAllocation m_selectionMaskSRVAllocation;
+    DescriptorAllocation m_horizontalDilatedMaskRTVAllocation;
+    DescriptorAllocation m_horizontalDilatedMaskSRVAllocation;
 
     ComPtr<ID3D12Resource> m_instanceUploadBuffer;
     UINT8* m_instanceBufferBegin = nullptr;

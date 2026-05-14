@@ -1,6 +1,5 @@
-Texture2D<uint2> g_stencilBuffer : register(t1, space5);
-
-static const float4 OutlineColor = float4(1.0f, 0.5f, 0.0f, 1.0f);  // Orange
+Texture2D<float> g_selectionMask : register(t0, space6);
+Texture2D<float> g_horizontalDilatedMask : register(t1, space6);
 
 struct PSInput
 {
@@ -8,20 +7,27 @@ struct PSInput
     float2 texCoord : TEXCOORD;
 };
 
+cbuffer OutlineConstantBuffer : register(b4, space0)
+{
+    int thickness;
+}
+
+static const float4 OutlineColor = float4(1.0f, 0.5f, 0.0f, 1.0f);      // Orange
+
 float4 main(PSInput input) : SV_TARGET
 {
     int2 coord = int2(input.pos.xy);
     
-    uint c = g_stencilBuffer.Load(int3(coord, 0)).g;
-    uint l = g_stencilBuffer.Load(int3(coord + int2(-1, 0), 0)).g;
-    uint r = g_stencilBuffer.Load(int3(coord + int2(1, 0), 0)).g;
-    uint u = g_stencilBuffer.Load(int3(coord + int2(0, -1), 0)).g;
-    uint d = g_stencilBuffer.Load(int3(coord + int2(0, 1), 0)).g;
-    
-    bool isEdge = (c != 2) && (l == 2 || r == 2 || u == 2 || d == 2);
-    
-    if (!isEdge)
+    if (g_selectionMask.Load(int3(coord, 0)).r > 0.5f)
         discard;
     
-    return OutlineColor;
+    for (int dy = -thickness; dy <= thickness; ++dy)
+    {
+        if (g_horizontalDilatedMask.Load(int3(coord + int2(0, dy), 0)).r > 0.5f)
+            return OutlineColor;
+    }
+    
+    discard;
+    
+    return float4(0.0f, 0.0f, 0.0f, 0.0f);
 }
