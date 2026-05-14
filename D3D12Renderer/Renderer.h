@@ -31,7 +31,7 @@
 #include "TransientUploadAllocator.h"
 #include "Aliases.h"
 #include "SceneManager.h"
-#include "AssetTexture.h"
+#include "DepthStencilBuffer.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -112,10 +112,7 @@ private:
     std::vector<D3D12_INPUT_ELEMENT_DESC> m_inputLayout;
     std::unordered_map<ShaderKey, std::vector<char>> m_shaderBlobs;
 
-    ComPtr<ID3D12Resource> m_depthStencilBuffer;
-    DescriptorAllocation m_dsvAllocation;
-    DescriptorAllocation m_readOnlyDSVAllocation;
-    DescriptorAllocation m_depthSRVAllocation;
+    std::unique_ptr<DepthStencilBuffer> m_depthStencilBuffer;
 
     // App resources
     // 

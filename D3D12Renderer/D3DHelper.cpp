@@ -297,7 +297,7 @@ namespace D3DHelper
             IID_PPV_ARGS(&renderTarget)));
     }
 
-    void CreateDepthStencilBuffer(ID3D12Device10* pDevice, UINT64 width, UINT height, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& depthStencilBuffer, bool useStencil, D3D12_CLEAR_VALUE* pClearValue)
+    void CreateDepthStencilBuffer(ID3D12Device10* pDevice, UINT64 width, UINT height, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& depthStencilBuffer, bool useStencil)
     {
         // reverse-z
         auto defaultClearValue = CreateClearValue(useStencil ? DXGI_FORMAT_D24_UNORM_S8_UINT : DXGI_FORMAT_D32_FLOAT, 0.0f, 0);
@@ -316,7 +316,7 @@ namespace D3DHelper
             D3D12_HEAP_FLAG_NONE,
             &resourceDesc,
             D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
-            pClearValue == nullptr ? &defaultClearValue : pClearValue,
+            &defaultClearValue,
             nullptr,
             0,
             nullptr,

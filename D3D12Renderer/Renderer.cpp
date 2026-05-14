@@ -366,7 +366,6 @@ void Renderer::OnResize(UINT width, UINT height)
 
         m_frameResources[i]->SetFenceValue(m_frameResources[m_frameIndex]->GetFenceValue());
     }
-    m_depthStencilBuffer.Reset();
 
     // Preserve existing format
     // Before calling ResizeBuffers, all backbuffer references should be released.
@@ -381,10 +380,8 @@ void Renderer::OnResize(UINT width, UINT height)
     }
 
     // Recreate depth-stencil buffer, DSV, and SRV
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer, true);
-    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(), true, false);
-    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_readOnlyDSVAllocation.GetDescriptorHandle(), true, true);
-    CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R24_UNORM_X8_TYPELESS, m_depthSRVAllocation.GetDescriptorHandle(), 0);
+    m_depthStencilBuffer->Reset();
+    m_depthStencilBuffer->Init(m_device.Get(), m_width, m_height, true);
 
     // Update registered info of backbuffers
     std::vector<ID3D12Resource*> pBackBuffers;
@@ -414,7 +411,7 @@ void Renderer::OnResize(UINT width, UINT height)
 
     // Update registered info of depth-stencil buffer
     auto depthStencilBuffer = m_renderGraph.GetRGTexture("DepthStencilBuffer");
-    m_renderGraph.UpdateElement(depthStencilBuffer, 0, { m_depthStencilBuffer.Get() });
+    m_renderGraph.UpdateElement(depthStencilBuffer, 0, { m_depthStencilBuffer->Get() });
 
     // Update registered info of GBuffers
     auto gBuffer = m_renderGraph.GetRGTexture("GBuffer");
@@ -840,15 +837,13 @@ void Renderer::LoadAssets()
     };
 
     // Create depth-stencil buffer, DSV, and SRV
-    m_dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
-    m_readOnlyDSVAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
-    m_depthSRVAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer, true);
-
-    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(), true, false);
-    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_readOnlyDSVAllocation.GetDescriptorHandle(), true, true);
-    CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R24_UNORM_X8_TYPELESS, m_depthSRVAllocation.GetDescriptorHandle(), 0);
+    m_depthStencilBuffer = std::make_unique<DepthStencilBuffer>(
+        m_device.Get(),
+        m_width,
+        m_height,
+        true,
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(2),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
 
     // Set viewport and scissorRect for shadow mapping
     m_shadowMapViewport = { 0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f };
@@ -1049,8 +1044,8 @@ void Renderer::LoadAssets()
         "DepthStencilBuffer",
         false,
         { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE },
-        GetSubresourceCount(m_device.Get(), m_depthStencilBuffer.Get()));
-    m_renderGraph.AddElement(depthStencilBuffer, { m_depthStencilBuffer.Get() });
+        GetSubresourceCount(m_device.Get(), m_depthStencilBuffer->Get()));
+    m_renderGraph.AddElement(depthStencilBuffer, { m_depthStencilBuffer->Get() });
 
     // GBuffer
     RGTexture gBuffer = m_renderGraph.RegisterTexture(
@@ -1214,7 +1209,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     }
 
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferSRVHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthSRVAllocation.GetDescriptorHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthStencilBuffer->GetSRVHandle());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 1, 1, frameResource.GetSelectionMaskSRVHandle());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetHorizontalDilatedMaskSRVHandle());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 3, 1, frameResource.GetSceneColorBufferSRVHandle(0));
@@ -1313,7 +1308,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
 
         D3D12_CPU_DESCRIPTOR_HANDLE baseRTVHandle = frameResource.GetGBufferRTVHandle();
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_depthStencilBuffer->GetDSVHandle();
         pCommandList->OMSetRenderTargets(NUM_GBUFFER_SLOTS, &baseRTVHandle, TRUE, &dsvHandle);
 
         XMVECTORF32 clearColor;
@@ -1353,7 +1348,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSceneColorBufferRTVHandle(0);
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_readOnlyDSVAllocation.GetDescriptorHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_depthStencilBuffer->GetReadOnlyDSVHandle();
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
         pCommandList->OMSetStencilRef(1);
 
@@ -1406,7 +1401,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSceneColorBufferRTVHandle(0);
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_depthStencilBuffer->GetDSVHandle();
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
         pCommandList->SetPipelineState(pso);
