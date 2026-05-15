@@ -7,6 +7,15 @@
 class GpuResource
 {
 public:
+    GpuResource() = default;
+
+    GpuResource(const GpuResource&) = delete;
+    GpuResource& operator=(const GpuResource&) = delete;
+    GpuResource(GpuResource&&) = default;
+    GpuResource& operator=(GpuResource&&) = default;
+
+    GpuResource(Microsoft::WRL::ComPtr<ID3D12Resource>&& existing);
+
     ID3D12Resource* Get() const;
     void Reset();
 

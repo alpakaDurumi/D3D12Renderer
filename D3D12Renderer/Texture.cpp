@@ -30,8 +30,3 @@ Texture::Texture(
         nullptr,
         IID_PPV_ARGS(&m_resource)));
 }
-
-Texture::Texture(ComPtr<ID3D12Resource>&& other)
-{
-    m_resource = std::move(other);
-}
