@@ -1,14 +1,24 @@
 #include "pch.h"
 #include "View.h"
 
+View::View(DescriptorAllocation&& alloc)
+    : m_alloc(std::move(alloc))
+{
+    assert(m_alloc.GetNumHandles() == 1);
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE View::GetHandle() const
+{
+    return m_alloc.GetDescriptorHandle();
+}
+
 ShaderResourceView::ShaderResourceView(
     ID3D12Device10* pDevice,
     ID3D12Resource* pResource,
     const D3D12_SHADER_RESOURCE_VIEW_DESC& desc,
     DescriptorAllocation&& alloc)
-    : m_alloc(std::move(alloc))
+    : View(std::move(alloc))
 {
-    assert(!m_alloc.IsNull());
     Init(pDevice, pResource, desc);
 }
 
@@ -22,9 +32,8 @@ RenderTargetView::RenderTargetView(
     ID3D12Resource* pResource,
     const D3D12_RENDER_TARGET_VIEW_DESC& desc,
     DescriptorAllocation&& alloc)
-    : m_alloc(std::move(alloc))
+    : View(std::move(alloc))
 {
-    assert(!m_alloc.IsNull());
     Init(pDevice, pResource, desc);
 }
 
@@ -38,9 +47,8 @@ DepthStencilView::DepthStencilView(
     ID3D12Resource* pResource,
     const D3D12_DEPTH_STENCIL_VIEW_DESC& desc,
     DescriptorAllocation&& alloc)
-    : m_alloc(std::move(alloc))
+    : View(std::move(alloc))
 {
-    assert(!m_alloc.IsNull());
     Init(pDevice, pResource, desc);
 }
 

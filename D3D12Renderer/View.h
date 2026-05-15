@@ -4,22 +4,34 @@
 
 #include "DescriptorAllocation.h"
 
-class ShaderResourceView
+class View
+{
+public:
+    View(DescriptorAllocation&& alloc);
+
+    View(const View&) = delete;
+    View& operator=(const View&) = delete;
+    View(View&&) = default;
+    View& operator=(View&&) = default;
+
+    D3D12_CPU_DESCRIPTOR_HANDLE GetHandle() const;
+
+protected:
+    DescriptorAllocation m_alloc;
+};
+
+class ShaderResourceView : public View
 {
 public:
     ShaderResourceView(ID3D12Device10* pDevice,
         ID3D12Resource* pResource,
         const D3D12_SHADER_RESOURCE_VIEW_DESC& desc,
         DescriptorAllocation&& alloc);
-    
-    void Init(ID3D12Device10* pDevice, ID3D12Resource* pResource, const D3D12_SHADER_RESOURCE_VIEW_DESC& desc);
-    D3D12_CPU_DESCRIPTOR_HANDLE GetHandle() const { return m_alloc.GetDescriptorHandle(); }
 
-private:
-    DescriptorAllocation m_alloc;
+    void Init(ID3D12Device10* pDevice, ID3D12Resource* pResource, const D3D12_SHADER_RESOURCE_VIEW_DESC& desc);
 };
 
-class RenderTargetView
+class RenderTargetView : public View
 {
 public:
     RenderTargetView(ID3D12Device10* pDevice,
@@ -28,13 +40,9 @@ public:
         DescriptorAllocation&& alloc);
 
     void Init(ID3D12Device10* pDevice, ID3D12Resource* pResource, const D3D12_RENDER_TARGET_VIEW_DESC& desc);
-    D3D12_CPU_DESCRIPTOR_HANDLE GetHandle() const { return m_alloc.GetDescriptorHandle(); }
-
-private:
-    DescriptorAllocation m_alloc;
 };
 
-class DepthStencilView
+class DepthStencilView : public View
 {
 public:
     DepthStencilView(ID3D12Device10* pDevice,
@@ -43,8 +51,4 @@ public:
         DescriptorAllocation&& alloc);
 
     void Init(ID3D12Device10* pDevice, ID3D12Resource* pResource, const D3D12_DEPTH_STENCIL_VIEW_DESC& desc);
-    D3D12_CPU_DESCRIPTOR_HANDLE GetHandle() const { return m_alloc.GetDescriptorHandle(); }
-
-private:
-    DescriptorAllocation m_alloc;
 };
