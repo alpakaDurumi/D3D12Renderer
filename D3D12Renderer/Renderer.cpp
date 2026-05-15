@@ -380,8 +380,15 @@ void Renderer::OnResize(UINT width, UINT height)
     }
 
     // Recreate depth-stencil buffer, DSV, and SRV
-    m_depthStencilBuffer->Reset();
-    m_depthStencilBuffer->Init(m_device.Get(), m_width, m_height, true);
+    auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
+    m_depthStencilBuffer = std::make_unique<Texture>(
+        m_device.Get(),
+        GetTexture2DDesc(m_width, m_height, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
+        &clearValue);
+    m_dsv->Init(m_device.Get(), m_depthStencilBuffer->Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT));
+    m_readOnlyDsv->Init(m_device.Get(), m_depthStencilBuffer->Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH));
+    m_depthSrv->Init(m_device.Get(), m_depthStencilBuffer->Get(), GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1));
 
     // Update registered info of backbuffers
     std::vector<ID3D12Resource*> pBackBuffers;
@@ -837,12 +844,26 @@ void Renderer::LoadAssets()
     };
 
     // Create depth-stencil buffer, DSV, and SRV
-    m_depthStencilBuffer = std::make_unique<DepthStencilBuffer>(
+    auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
+    m_depthStencilBuffer = std::make_unique<Texture>(
         m_device.Get(),
-        m_width,
-        m_height,
-        true,
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(2),
+        GetTexture2DDesc(m_width, m_height, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
+        &clearValue);
+    m_dsv = std::make_unique<DepthStencilView>(
+        m_device.Get(),
+        m_depthStencilBuffer->Get(),
+        GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
+    m_readOnlyDsv = std::make_unique<DepthStencilView>(
+        m_device.Get(),
+        m_depthStencilBuffer->Get(),
+        GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
+    m_depthSrv = std::make_unique<ShaderResourceView>(
+        m_device.Get(),
+        m_depthStencilBuffer->Get(),
+        GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
 
     // Set viewport and scissorRect for shadow mapping
@@ -1182,9 +1203,9 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
     // Stage textures
     UINT textureIdx = 0;
-    for (auto& texture : m_sceneManager.GetAssetTextures())
+    for (auto& [texture, srv] : m_sceneManager.GetAssetTextures())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7, textureIdx, 1, texture.GetSRVHandle());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7, textureIdx, 1, srv.GetHandle());
         ++textureIdx;
     }
 
@@ -1209,7 +1230,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     }
 
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferSRVHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthStencilBuffer->GetSRVHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthSrv->GetHandle());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 1, 1, frameResource.GetSelectionMaskSRVHandle());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetHorizontalDilatedMaskSRVHandle());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 3, 1, frameResource.GetSceneColorBufferSRVHandle(0));
@@ -1308,7 +1329,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
 
         D3D12_CPU_DESCRIPTOR_HANDLE baseRTVHandle = frameResource.GetGBufferRTVHandle();
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_depthStencilBuffer->GetDSVHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsv->GetHandle();
         pCommandList->OMSetRenderTargets(NUM_GBUFFER_SLOTS, &baseRTVHandle, TRUE, &dsvHandle);
 
         XMVECTORF32 clearColor;
@@ -1348,7 +1369,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSceneColorBufferRTVHandle(0);
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_depthStencilBuffer->GetReadOnlyDSVHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_readOnlyDsv->GetHandle();
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
         pCommandList->OMSetStencilRef(1);
 
@@ -1401,7 +1422,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSceneColorBufferRTVHandle(0);
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_depthStencilBuffer->GetDSVHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsv->GetHandle();
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
         pCommandList->SetPipelineState(pso);
@@ -1858,7 +1879,7 @@ SpotLightHandle Renderer::CreateSpotLight()
 
 AssetTextureHandle Renderer::CreateAssetTexture(
     ID3D12GraphicsCommandList7* pCommandList,
-    DescriptorAllocation&& allocation,
+    DescriptorAllocation&& srvAllocation,
     TransientUploadAllocator& uploadAllocator,
     const std::vector<UINT8>& textureSrc,
     UINT width,
@@ -1867,7 +1888,7 @@ AssetTextureHandle Renderer::CreateAssetTexture(
     return m_sceneManager.AddAssetTexture(
         m_device.Get(),
         pCommandList,
-        std::move(allocation),
+        std::move(srvAllocation),
         uploadAllocator,
         textureSrc,
         width,
@@ -1876,7 +1897,7 @@ AssetTextureHandle Renderer::CreateAssetTexture(
 
 AssetTextureHandle Renderer::CreateAssetTexture(
     ID3D12GraphicsCommandList7* pCommandList,
-    DescriptorAllocation&& allocation,
+    DescriptorAllocation&& srvAllocation,
     TransientUploadAllocator& uploadAllocator,
     const std::wstring& filePath,
     bool isSRGB,
@@ -1887,7 +1908,7 @@ AssetTextureHandle Renderer::CreateAssetTexture(
     return m_sceneManager.AddAssetTexture(
         m_device.Get(),
         pCommandList,
-        std::move(allocation),
+        std::move(srvAllocation),
         uploadAllocator,
         filePath,
         isSRGB,

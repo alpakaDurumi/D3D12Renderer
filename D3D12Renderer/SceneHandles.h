@@ -7,7 +7,7 @@ class Material;
 class DirectionalLight;
 class PointLight;
 class SpotLight;
-class AssetTexture;
+struct AssetTexture;
 struct Entity;
 
 using MeshHandle = SlotMap<Mesh>::Handle;

@@ -96,10 +96,10 @@
     <ClCompile Include="Texture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="AssetTexture.cpp">
+    <ClCompile Include="GpuResource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DepthStencilBuffer.cpp">
+    <ClCompile Include="View.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -237,10 +237,10 @@
     <ClInclude Include="Transform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="AssetTexture.h">
+    <ClInclude Include="GpuResource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DepthStencilBuffer.h">
+    <ClInclude Include="View.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

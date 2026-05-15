@@ -168,6 +168,161 @@ namespace D3DHelper
         }
     }
 
+    D3D12_RESOURCE_DESC1 GetBufferDesc(UINT64 width, D3D12_RESOURCE_FLAGS flags)
+    {
+        D3D12_RESOURCE_DESC1 desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        desc.Alignment = 0;
+        desc.Width = width;
+        desc.Height = 1;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.Format = DXGI_FORMAT_UNKNOWN;
+        desc.SampleDesc = { 1, 0 };
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        desc.Flags = flags;
+        desc.SamplerFeedbackMipRegion = {};
+
+        return desc;
+    }
+
+    D3D12_RESOURCE_DESC1 GetTexture2DDesc(UINT64 width, UINT height, UINT16 arraySize, UINT16 mipLevels, DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags)
+    {
+        D3D12_RESOURCE_DESC1 desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Alignment = 0;
+        desc.Width = width;
+        desc.Height = height;
+        desc.DepthOrArraySize = arraySize;
+        desc.MipLevels = mipLevels;
+        desc.Format = format;
+        desc.SampleDesc = { 1, 0 };
+        desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        desc.Flags = flags;
+        desc.SamplerFeedbackMipRegion = {};
+
+        return desc;
+    }
+
+    D3D12_RESOURCE_DESC1 GetTexture3DDesc(UINT64 width, UINT height, UINT16 depth, UINT16 mipLevels, DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags)
+    {
+        D3D12_RESOURCE_DESC1 desc = {};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+        desc.Alignment = 0;
+        desc.Width = width;
+        desc.Height = height;
+        desc.DepthOrArraySize = depth;
+        desc.MipLevels = mipLevels;
+        desc.Format = format;
+        desc.SampleDesc = { 1, 0 };
+        desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        desc.Flags = flags;
+        desc.SamplerFeedbackMipRegion = {};
+
+        return desc;
+    }
+
+    //typedef struct D3D12_SHADER_RESOURCE_VIEW_DESC
+    //{
+    //    DXGI_FORMAT Format;
+    //    D3D12_SRV_DIMENSION ViewDimension;
+    //    UINT Shader4ComponentMapping;
+    //    union
+    //    {
+    //        D3D12_BUFFER_SRV Buffer;
+    //        D3D12_TEX1D_SRV Texture1D;
+    //        D3D12_TEX1D_ARRAY_SRV Texture1DArray;
+    //        D3D12_TEX2D_SRV Texture2D;
+    //        D3D12_TEX2D_ARRAY_SRV Texture2DArray;
+    //        D3D12_TEX2DMS_SRV Texture2DMS;
+    //        D3D12_TEX2DMS_ARRAY_SRV Texture2DMSArray;
+    //        D3D12_TEX3D_SRV Texture3D;
+    //        D3D12_TEXCUBE_SRV TextureCube;
+    //        D3D12_TEXCUBE_ARRAY_SRV TextureCubeArray;
+    //        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_SRV RaytracingAccelerationStructure;
+    //    };
+    //} 	D3D12_SHADER_RESOURCE_VIEW_DESC;
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC GetSrvDesc(DXGI_FORMAT format, UINT mipLevels, UINT planeSlice)
+    {
+        D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+        desc.Format = format;
+        desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        desc.Texture2D.MostDetailedMip = 0;
+        desc.Texture2D.MipLevels = mipLevels;
+        desc.Texture2D.PlaneSlice = planeSlice;
+        desc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+        return desc;
+    }
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC GetSrvDesc2DArray(DXGI_FORMAT format, UINT mipLevels, UINT arraySize, UINT planeSlice)
+    {
+        D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+        desc.Format = format;
+        desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+        desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        desc.Texture2DArray.MostDetailedMip = 0;
+        desc.Texture2DArray.MipLevels = mipLevels;
+        desc.Texture2DArray.FirstArraySlice = 0;
+        desc.Texture2DArray.ArraySize = arraySize;
+        desc.Texture2DArray.PlaneSlice = planeSlice;
+        desc.Texture2DArray.ResourceMinLODClamp = 0.0f;
+
+        return desc;
+    }
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC GetSrvDesc3D(DXGI_FORMAT format, UINT mipLevels)
+    {
+        D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+        desc.Format = format;
+        desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+        desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        desc.Texture3D.MostDetailedMip = 0;
+        desc.Texture3D.MipLevels = mipLevels;
+        desc.Texture3D.ResourceMinLODClamp = 0.0f;
+
+        return desc;
+    }
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC GetSrvDescCube(DXGI_FORMAT format, UINT mipLevels)
+    {
+        D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+        desc.Format = format;
+        desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+        desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        desc.TextureCube.MostDetailedMip = 0;
+        desc.TextureCube.MipLevels = mipLevels;
+        desc.TextureCube.ResourceMinLODClamp = 0.0f;
+
+        return desc;
+    }
+
+    D3D12_DEPTH_STENCIL_VIEW_DESC GetDsvDesc(DXGI_FORMAT format, D3D12_DSV_FLAGS flags)
+    {
+        D3D12_DEPTH_STENCIL_VIEW_DESC desc = {};
+        desc.Format = format;
+        desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+        desc.Flags = flags;
+        desc.Texture2D.MipSlice = 0;
+
+        return desc;
+    }
+
+    D3D12_DEPTH_STENCIL_VIEW_DESC GetDsvDesc2DArray(DXGI_FORMAT format, UINT arraySlice, D3D12_DSV_FLAGS flags)
+    {
+        D3D12_DEPTH_STENCIL_VIEW_DESC desc = {};
+        desc.Format = format;
+        desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+        desc.Flags = flags;
+        desc.Texture2DArray.MipSlice = 0;
+        desc.Texture2DArray.FirstArraySlice = arraySlice;
+        desc.Texture2DArray.ArraySize = 1;
+
+        return desc;
+    }
+
     void CreateUploadBuffer(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadBuffer)
     {
         D3D12_HEAP_PROPERTIES heapProperties = {};
