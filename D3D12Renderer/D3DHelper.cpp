@@ -222,26 +222,29 @@ namespace D3DHelper
         return desc;
     }
 
-    //typedef struct D3D12_SHADER_RESOURCE_VIEW_DESC
-    //{
-    //    DXGI_FORMAT Format;
-    //    D3D12_SRV_DIMENSION ViewDimension;
-    //    UINT Shader4ComponentMapping;
-    //    union
-    //    {
-    //        D3D12_BUFFER_SRV Buffer;
-    //        D3D12_TEX1D_SRV Texture1D;
-    //        D3D12_TEX1D_ARRAY_SRV Texture1DArray;
-    //        D3D12_TEX2D_SRV Texture2D;
-    //        D3D12_TEX2D_ARRAY_SRV Texture2DArray;
-    //        D3D12_TEX2DMS_SRV Texture2DMS;
-    //        D3D12_TEX2DMS_ARRAY_SRV Texture2DMSArray;
-    //        D3D12_TEX3D_SRV Texture3D;
-    //        D3D12_TEXCUBE_SRV TextureCube;
-    //        D3D12_TEXCUBE_ARRAY_SRV TextureCubeArray;
-    //        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_SRV RaytracingAccelerationStructure;
-    //    };
-    //} 	D3D12_SHADER_RESOURCE_VIEW_DESC;
+    D3D12_RENDER_TARGET_VIEW_DESC GetRtvDesc(DXGI_FORMAT format, UINT mipSlice, UINT planeSlice)
+    {
+        D3D12_RENDER_TARGET_VIEW_DESC desc = {};
+        desc.Format = format;
+        desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+        desc.Texture2D.MipSlice = mipSlice;
+        desc.Texture2D.PlaneSlice = planeSlice;
+
+        return desc;
+    }
+
+    D3D12_RENDER_TARGET_VIEW_DESC GetRtvDesc2DArray(DXGI_FORMAT format, UINT mipSlice, UINT firstArraySlice, UINT arraySize, UINT planeSlice)
+    {
+        D3D12_RENDER_TARGET_VIEW_DESC desc = {};
+        desc.Format = format;
+        desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+        desc.Texture2DArray.MipSlice = mipSlice;
+        desc.Texture2DArray.FirstArraySlice = firstArraySlice;
+        desc.Texture2DArray.ArraySize = arraySize;
+        desc.Texture2DArray.PlaneSlice = planeSlice;
+
+        return desc;
+    }
 
     D3D12_SHADER_RESOURCE_VIEW_DESC GetSrvDesc(DXGI_FORMAT format, UINT mipLevels, UINT planeSlice)
     {

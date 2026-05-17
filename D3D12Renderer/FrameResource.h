@@ -10,6 +10,8 @@
 #include <array>
 #include <cstddef>
 
+#include "Texture.h"
+#include "View.h"
 #include "DescriptorAllocation.h"
 #include "SharedConfig.h"
 #include "TransientUploadAllocator.h"
@@ -39,7 +41,8 @@ public:
     // Back buffer
     void AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameIndex);
     ID3D12Resource* GetBackBuffer() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetBackBufferRTVHandle() const;
+    void InitBackBufferRtv();
+    D3D12_CPU_DESCRIPTOR_HANDLE GetBackBufferRtvHandle() const;
     void ResetBackBuffer();
 
     // Scene color buffer
@@ -84,8 +87,8 @@ public:
     inline static constexpr UINT SceneColorBufferCount = 2;
 
 private:
-    ComPtr<ID3D12Resource> m_backBuffer;
-    DescriptorAllocation m_backBufferRTVAllocation;
+    Texture m_backBuffer;
+    RenderTargetView m_backBufferRtv;
     
     std::array<ComPtr<ID3D12Resource>, SceneColorBufferCount> m_sceneColorBuffers;
     DescriptorAllocation m_sceneColorBufferRTVAllocation;

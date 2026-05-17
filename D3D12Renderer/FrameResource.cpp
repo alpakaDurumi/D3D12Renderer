@@ -4,6 +4,8 @@
 #include "D3DHelper.h"
 #include "Utility.h"
 
+using namespace D3DHelper;
+
 FrameResource::FrameResource(
     ID3D12Device10* pDevice,
     IDXGISwapChain* pSwapChain,
@@ -18,7 +20,7 @@ FrameResource::FrameResource(
     DescriptorAllocation&& horizontalDilatedMaskRTVAllocation,
     DescriptorAllocation&& horizontalDilatedMaskSRVAllocation)
     : m_pDevice(pDevice),
-    m_backBufferRTVAllocation(std::move(rtvAllocation)),
+    m_backBufferRtv(std::move(rtvAllocation)),
     m_sceneColorBufferRTVAllocation(std::move(sceneBufferRTVAllocation)),
     m_sceneColorBufferSRVAllocation(std::move(sceneBufferSRVAllocation)),
     m_gBufferRTVAllocation(std::move(gBufferRTVAllocation)),
@@ -29,22 +31,22 @@ FrameResource::FrameResource(
     m_horizontalDilatedMaskSRVAllocation(std::move(horizontalDilatedMaskSRVAllocation)),
     m_uploadAllocator(pDevice)
 {
-    assert(!m_backBufferRTVAllocation.IsNull() &&
+    assert(
         m_sceneColorBufferRTVAllocation.GetNumHandles() == SceneColorBufferCount &&
         m_sceneColorBufferSRVAllocation.GetNumHandles() == SceneColorBufferCount &&
         m_gBufferRTVAllocation.GetNumHandles() == static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS) &&
         m_gBufferSRVAllocation.GetNumHandles() == static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS) &&
-        !m_selectionMaskRTVAllocation.IsNull(),
-        !m_selectionMaskSRVAllocation.IsNull(),
-        !m_horizontalDilatedMaskRTVAllocation.IsNull(),
+        !m_selectionMaskRTVAllocation.IsNull() &&
+        !m_selectionMaskSRVAllocation.IsNull() &&
+        !m_horizontalDilatedMaskRTVAllocation.IsNull() &&
         !m_horizontalDilatedMaskSRVAllocation.IsNull());
 
     // Back buffer
     AcquireBackBuffer(pSwapChain, frameIndex);
-    D3DHelper::CreateRTV(m_pDevice, m_backBuffer.Get(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_backBufferRTVAllocation.GetDescriptorHandle());
+    InitBackBufferRtv();
 
     // Create GBuffers and SceneColorBuffers, and masks
-    auto rtDesc = m_backBuffer->GetDesc();
+    auto rtDesc = m_backBuffer.Get()->GetDesc();
     const UINT64 width = rtDesc.Width;
     const UINT height = rtDesc.Height;
 
@@ -66,7 +68,9 @@ FrameResource::~FrameResource()
 // Back buffer
 void FrameResource::AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameIndex)
 {
-    D3DHelper::ThrowIfFailed(pSwapChain->GetBuffer(frameIndex, IID_PPV_ARGS(&m_backBuffer)));
+    ComPtr<ID3D12Resource> backBuffer;
+    D3DHelper::ThrowIfFailed(pSwapChain->GetBuffer(frameIndex, IID_PPV_ARGS(&backBuffer)));
+    m_backBuffer = Texture(std::move(backBuffer));
 }
 
 ID3D12Resource* FrameResource::GetBackBuffer() const
@@ -74,9 +78,14 @@ ID3D12Resource* FrameResource::GetBackBuffer() const
     return m_backBuffer.Get();
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetBackBufferRTVHandle() const
+void FrameResource::InitBackBufferRtv()
 {
-    return m_backBufferRTVAllocation.GetDescriptorHandle();
+    m_backBufferRtv.Init(m_pDevice, m_backBuffer.Get(), GetRtvDesc(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, 0));
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetBackBufferRtvHandle() const
+{
+    return m_backBufferRtv.GetHandle();
 }
 
 void FrameResource::ResetBackBuffer()

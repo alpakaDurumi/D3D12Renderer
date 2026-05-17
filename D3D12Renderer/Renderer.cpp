@@ -376,7 +376,7 @@ void Renderer::OnResize(UINT width, UINT height)
     for (UINT i = 0; i < FrameCount; i++)
     {
         m_frameResources[i]->AcquireBackBuffer(m_swapChain.Get(), i);
-        CreateRTV(m_device.Get(), m_frameResources[i]->GetBackBuffer(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_frameResources[i]->GetBackBufferRTVHandle());
+        m_frameResources[i]->InitBackBufferRtv();
     }
 
     // Recreate depth-stencil buffer, DSV, and SRV
@@ -1622,7 +1622,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
         pCommandList->SetPipelineState(pso);
 
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetBackBufferRTVHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetBackBufferRtvHandle();
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
         pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

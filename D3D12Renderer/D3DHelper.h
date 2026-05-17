@@ -34,6 +34,9 @@ namespace D3DHelper
     D3D12_RESOURCE_DESC1 GetTexture2DDesc(UINT64 width, UINT height, UINT16 arraySize, UINT16 mipLevels, DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
     D3D12_RESOURCE_DESC1 GetTexture3DDesc(UINT64 width, UINT height, UINT16 arraySize, UINT16 mipLevels, DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
 
+    D3D12_RENDER_TARGET_VIEW_DESC GetRtvDesc(DXGI_FORMAT format, UINT mipSlice, UINT planeSlice = 0);
+    D3D12_RENDER_TARGET_VIEW_DESC GetRtvDesc2DArray(DXGI_FORMAT format, UINT mipSlice, UINT firstArraySlice, UINT arraySize, UINT planeSlice = 0);
+
     D3D12_SHADER_RESOURCE_VIEW_DESC GetSrvDesc(DXGI_FORMAT format, UINT mipLevels, UINT planeSlice = 0);
     D3D12_SHADER_RESOURCE_VIEW_DESC GetSrvDesc2DArray(DXGI_FORMAT format, UINT mipLevels, UINT arraySize, UINT planeSlice = 0);
     D3D12_SHADER_RESOURCE_VIEW_DESC GetSrvDesc3D(DXGI_FORMAT format, UINT mipLevels);
