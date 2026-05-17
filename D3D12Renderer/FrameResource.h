@@ -55,8 +55,8 @@ public:
     // GBuffer
     void CreateGBuffers(UINT64 width, UINT height);
     ID3D12Resource* GetGBuffer(GBufferSlot slot) const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferRTVHandle() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferSRVHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferBaseRtvHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferBaseSrvHandle() const;
     static DXGI_FORMAT GetGBufferFormat(GBufferSlot slot);
     void ResetGBuffers();
 
@@ -94,9 +94,9 @@ private:
     std::array<RenderTargetView, SceneColorBufferCount> m_sceneColorBufferRtvs;
     std::array<ShaderResourceView, SceneColorBufferCount> m_sceneColorBufferSrvs;
 
-    std::array<ComPtr<ID3D12Resource>, static_cast<std::size_t>(GBufferSlot::NUM_GBUFFER_SLOTS)> m_gBuffers;
-    DescriptorAllocation m_gBufferRTVAllocation;
-    DescriptorAllocation m_gBufferSRVAllocation;
+    std::array<Texture, static_cast<std::size_t>(GBufferSlot::NUM_GBUFFER_SLOTS)> m_gBuffers;
+    std::array<RenderTargetView, static_cast<std::size_t>(GBufferSlot::NUM_GBUFFER_SLOTS)> m_gBufferRtvs;
+    std::array<ShaderResourceView, static_cast<std::size_t>(GBufferSlot::NUM_GBUFFER_SLOTS)> m_gBufferSrvs;
 
     ComPtr<ID3D12Resource> m_selectionMask;
     ComPtr<ID3D12Resource> m_horizontalDilatedMask;

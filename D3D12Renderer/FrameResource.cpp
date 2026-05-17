@@ -21,8 +21,6 @@ FrameResource::FrameResource(
     DescriptorAllocation&& horizontalDilatedMaskSRVAllocation)
     : m_pDevice(pDevice),
     m_backBufferRtv(std::move(rtvAllocation)),
-    m_gBufferRTVAllocation(std::move(gBufferRTVAllocation)),
-    m_gBufferSRVAllocation(std::move(gBufferSRVAllocation)),
     m_selectionMaskRTVAllocation(std::move(selectionMaskRTVAllocation)),
     m_selectionMaskSRVAllocation(std::move(selectionMaskSRVAllocation)),
     m_horizontalDilatedMaskRTVAllocation(std::move(horizontalDilatedMaskRTVAllocation)),
@@ -30,8 +28,6 @@ FrameResource::FrameResource(
     m_uploadAllocator(pDevice)
 {
     assert(
-        m_gBufferRTVAllocation.GetNumHandles() == static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS) &&
-        m_gBufferSRVAllocation.GetNumHandles() == static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS) &&
         !m_selectionMaskRTVAllocation.IsNull() &&
         !m_selectionMaskSRVAllocation.IsNull() &&
         !m_horizontalDilatedMaskRTVAllocation.IsNull() &&
@@ -46,17 +42,30 @@ FrameResource::FrameResource(
     const UINT height = rtDesc.Height;
 
     // Scene color buffers
-    auto rtvAllocs = sceneBufferRTVAllocation.Split();
-    auto srvAllocs = sceneBufferSRVAllocation.Split();
-    for (UINT i = 0; i < SceneColorBufferCount; ++i)
     {
-        m_sceneColorBufferRtvs[i] = RenderTargetView(std::move(rtvAllocs[i]));
-        m_sceneColorBufferSrvs[i] = ShaderResourceView(std::move(srvAllocs[i]));
+        auto rtvAllocs = sceneBufferRTVAllocation.Split();
+        auto srvAllocs = sceneBufferSRVAllocation.Split();
+        for (UINT i = 0; i < SceneColorBufferCount; ++i)
+        {
+            m_sceneColorBufferRtvs[i] = RenderTargetView(std::move(rtvAllocs[i]));
+            m_sceneColorBufferSrvs[i] = ShaderResourceView(std::move(srvAllocs[i]));
+        }
+        CreateSceneColorBuffers(width, height);
     }
-    CreateSceneColorBuffers(width, height);
 
-    // Create GBuffers, masks
-    CreateGBuffers(width, height);
+    // GBuffers
+    {
+        auto rtvAllocs = gBufferRTVAllocation.Split();
+        auto srvAllocs = gBufferSRVAllocation.Split();
+        for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
+        {
+            m_gBufferRtvs[i] = RenderTargetView(std::move(rtvAllocs[i]));
+            m_gBufferSrvs[i] = ShaderResourceView(std::move(srvAllocs[i]));
+        }
+        CreateGBuffers(width, height);
+    }
+
+    // Create masks
     CreateMasks(width, height);
 
     // Create Upload buffer
@@ -107,7 +116,7 @@ void FrameResource::CreateSceneColorBuffers(UINT64 width, UINT height)
 
         DirectX::XMVECTORF32 color;
         color.v = DirectX::XMColorSRGBToRGB(DirectX::XMVectorSet(0.5f, 0.5f, 0.5f, 1.0f));
-        auto clearValue = CreateClearValue(format, color.f[0], color.f[1], color.f[2], color.f[3]);
+        const auto clearValue = CreateClearValue(format, color.f[0], color.f[1], color.f[2], color.f[3]);
 
         m_sceneColorBuffers[i] = Texture(
             m_pDevice,
@@ -146,12 +155,18 @@ void FrameResource::CreateGBuffers(UINT64 width, UINT height)
 {
     for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
     {
-        auto format = GetGBufferFormat(static_cast<GBufferSlot>(i));
+        const auto format = GetGBufferFormat(static_cast<GBufferSlot>(i));
 
-        D3DHelper::CreateRenderTarget(m_pDevice, width, height, format, format, 1, m_gBuffers[i]);
+        const auto clearValue = CreateClearValue(format, 0.0f, 0.0f, 0.0f, 0.0f);
 
-        D3DHelper::CreateRTV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferRTVAllocation.GetDescriptorHandle(i));
-        D3DHelper::CreateSRV(m_pDevice, m_gBuffers[i].Get(), format, m_gBufferSRVAllocation.GetDescriptorHandle(i));
+        m_gBuffers[i] = Texture(
+            m_pDevice,
+            GetTexture2DDesc(width, height, 1, 1, format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET),
+            D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+            &clearValue);
+
+        m_gBufferRtvs[i].Init(m_pDevice, m_gBuffers[i].Get(), GetRtvDesc(format, 0));
+        m_gBufferSrvs[i].Init(m_pDevice, m_gBuffers[i].Get(), GetSrvDesc(format, 1));
     }
 }
 
@@ -160,14 +175,14 @@ ID3D12Resource* FrameResource::GetGBuffer(GBufferSlot slot) const
     return m_gBuffers[static_cast<UINT>(slot)].Get();
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetGBufferRTVHandle() const
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetGBufferBaseRtvHandle() const
 {
-    return m_gBufferRTVAllocation.GetDescriptorHandle();
+    return m_gBufferRtvs[0].GetHandle();
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetGBufferSRVHandle() const
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetGBufferBaseSrvHandle() const
 {
-    return m_gBufferSRVAllocation.GetDescriptorHandle();
+    return m_gBufferSrvs[0].GetHandle();
 }
 
 DXGI_FORMAT FrameResource::GetGBufferFormat(GBufferSlot slot)

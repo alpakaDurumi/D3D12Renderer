@@ -1229,7 +1229,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         ++lightIdx;
     }
 
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferSRVHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferBaseSrvHandle());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthSrv.GetHandle());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 1, 1, frameResource.GetSelectionMaskSRVHandle());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetHorizontalDilatedMaskSRVHandle());
@@ -1328,7 +1328,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         m_currentPSOKey.psName = L"GBufferPS.hlsl";
         auto* pso = GetPipelineState(m_currentPSOKey);
 
-        D3D12_CPU_DESCRIPTOR_HANDLE baseRTVHandle = frameResource.GetGBufferRTVHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE baseRTVHandle = frameResource.GetGBufferBaseRtvHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsv.GetHandle();
         pCommandList->OMSetRenderTargets(NUM_GBUFFER_SLOTS, &baseRTVHandle, TRUE, &dsvHandle);
 
