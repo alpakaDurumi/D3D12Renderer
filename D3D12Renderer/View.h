@@ -9,7 +9,7 @@ class View
 public:
     View() = default;
 
-    View(DescriptorAllocation&& alloc);
+    explicit View(DescriptorAllocation&& alloc);
 
     View(const View&) = delete;
     View& operator=(const View&) = delete;
