@@ -381,14 +381,14 @@ void Renderer::OnResize(UINT width, UINT height)
 
     // Recreate depth-stencil buffer, DSV, and SRV
     auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
-    m_depthStencilBuffer = std::make_unique<Texture>(
+    m_depthStencilBuffer = Texture(
         m_device.Get(),
         GetTexture2DDesc(m_width, m_height, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
         D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
         &clearValue);
-    m_dsv->Init(m_device.Get(), m_depthStencilBuffer->Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT));
-    m_readOnlyDsv->Init(m_device.Get(), m_depthStencilBuffer->Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH));
-    m_depthSrv->Init(m_device.Get(), m_depthStencilBuffer->Get(), GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1));
+    m_dsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT));
+    m_readOnlyDsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH));
+    m_depthSrv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1));
 
     // Update registered info of backbuffers
     std::vector<ID3D12Resource*> pBackBuffers;
@@ -418,7 +418,7 @@ void Renderer::OnResize(UINT width, UINT height)
 
     // Update registered info of depth-stencil buffer
     auto depthStencilBuffer = m_renderGraph.GetRGTexture("DepthStencilBuffer");
-    m_renderGraph.UpdateElement(depthStencilBuffer, 0, { m_depthStencilBuffer->Get() });
+    m_renderGraph.UpdateElement(depthStencilBuffer, 0, { m_depthStencilBuffer.Get() });
 
     // Update registered info of GBuffers
     auto gBuffer = m_renderGraph.GetRGTexture("GBuffer");
@@ -845,24 +845,24 @@ void Renderer::LoadAssets()
 
     // Create depth-stencil buffer, DSV, and SRV
     auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
-    m_depthStencilBuffer = std::make_unique<Texture>(
+    m_depthStencilBuffer = Texture(
         m_device.Get(),
         GetTexture2DDesc(m_width, m_height, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
         D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
         &clearValue);
-    m_dsv = std::make_unique<DepthStencilView>(
+    m_dsv = DepthStencilView(
         m_device.Get(),
-        m_depthStencilBuffer->Get(),
+        m_depthStencilBuffer.Get(),
         GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
-    m_readOnlyDsv = std::make_unique<DepthStencilView>(
+    m_readOnlyDsv = DepthStencilView(
         m_device.Get(),
-        m_depthStencilBuffer->Get(),
+        m_depthStencilBuffer.Get(),
         GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
-    m_depthSrv = std::make_unique<ShaderResourceView>(
+    m_depthSrv = ShaderResourceView(
         m_device.Get(),
-        m_depthStencilBuffer->Get(),
+        m_depthStencilBuffer.Get(),
         GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
 
@@ -1065,8 +1065,8 @@ void Renderer::LoadAssets()
         "DepthStencilBuffer",
         false,
         { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE },
-        GetSubresourceCount(m_device.Get(), m_depthStencilBuffer->Get()));
-    m_renderGraph.AddElement(depthStencilBuffer, { m_depthStencilBuffer->Get() });
+        GetSubresourceCount(m_device.Get(), m_depthStencilBuffer.Get()));
+    m_renderGraph.AddElement(depthStencilBuffer, { m_depthStencilBuffer.Get() });
 
     // GBuffer
     RGTexture gBuffer = m_renderGraph.RegisterTexture(
@@ -1230,7 +1230,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     }
 
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferSRVHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthSrv->GetHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthSrv.GetHandle());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 1, 1, frameResource.GetSelectionMaskSRVHandle());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetHorizontalDilatedMaskSRVHandle());
     m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 3, 1, frameResource.GetSceneColorBufferSRVHandle(0));
@@ -1329,7 +1329,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
 
         D3D12_CPU_DESCRIPTOR_HANDLE baseRTVHandle = frameResource.GetGBufferRTVHandle();
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsv->GetHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsv.GetHandle();
         pCommandList->OMSetRenderTargets(NUM_GBUFFER_SLOTS, &baseRTVHandle, TRUE, &dsvHandle);
 
         XMVECTORF32 clearColor;
@@ -1369,7 +1369,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSceneColorBufferRTVHandle(0);
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_readOnlyDsv->GetHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_readOnlyDsv.GetHandle();
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
         pCommandList->OMSetStencilRef(1);
 
@@ -1422,7 +1422,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
 
         D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSceneColorBufferRTVHandle(0);
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsv->GetHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsv.GetHandle();
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
         pCommandList->SetPipelineState(pso);
