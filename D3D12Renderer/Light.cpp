@@ -237,16 +237,6 @@ D3D12_CPU_DESCRIPTOR_HANDLE PointLight::GetRTVHandle(UINT idx) const
     return m_rtvAllocation.GetDescriptorHandle(idx);
 }
 
-UINT PointLight::GetRenderTargetHandle() const
-{
-    return m_hRenderTarget;
-}
-
-void PointLight::SetRenderTargetHandle(UINT handle)
-{
-    m_hRenderTarget = handle;
-}
-
 std::vector<ComPtr<ID3D12Resource>> PointLight::TakeResources()
 {
     auto ret = Light::TakeResources();

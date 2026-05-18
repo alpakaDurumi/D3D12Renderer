@@ -111,16 +111,11 @@ public:
     ID3D12Resource* GetRenderTarget() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetRTVHandle(UINT idx) const;
 
-    UINT GetRenderTargetHandle() const;
-    void SetRenderTargetHandle(UINT handle);
-
     virtual std::vector<ComPtr<ID3D12Resource>> TakeResources() override;
 
 private:
     ComPtr<ID3D12Resource> m_renderTarget;
     DescriptorAllocation m_rtvAllocation;
-
-    UINT m_hRenderTarget;
 };
 
 class SpotLight : public Light
