@@ -1213,19 +1213,19 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(8, lightIdx, 1, light.GetSRVHandle());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(8, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(9, lightIdx, 1, light.GetSRVHandle());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(9, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, lightIdx, 1, light.GetSRVHandle());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
 
@@ -1267,15 +1267,15 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
                 UINT16 arraySize = pLight->GetArraySize();
                 for (UINT j = 0; j < arraySize; ++j)
                 {
-                    auto shadowMapDsvHandle = pLight->GetDSVHandle(j);
+                    auto shadowMapDsvHandle = pLight->GetDsvHandle(j);
 
                     if (isPointLight)
                     {
-                        auto rtvHandle = static_cast<PointLight*>(pLight)->GetRTVHandle(j);
+                        auto rtvHandle = static_cast<PointLight*>(pLight)->GetRtvHandle(j);
                         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &shadowMapDsvHandle);
 
                         XMVECTORF32 clearColor;
-                        clearColor.v = XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f);
+                        clearColor.v = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
                         pCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
                     }
                     else

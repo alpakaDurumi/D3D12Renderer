@@ -726,12 +726,12 @@ private:
 
     SlotMap<Entity> m_entities;
 
-    std::vector<ComPtr<ID3D12Resource>> m_deferred;     // List of resources requested to be removed
+    std::vector<GpuResource> m_deferred;     // List of resources requested to be removed
 
     struct DeferredResource
     {
         UINT64 fenceValue;
-        ComPtr<ID3D12Resource> resource;
+        GpuResource resource;
     };
     std::queue<DeferredResource> m_deletionQueue;
 };

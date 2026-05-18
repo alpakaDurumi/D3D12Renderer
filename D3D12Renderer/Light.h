@@ -12,6 +12,8 @@
 #include "DescriptorAllocation.h"
 #include "SharedConfig.h"
 #include "UploadAllocation.h"
+#include "Texture.h"
+#include "View.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -31,8 +33,8 @@ public:
     LightType GetType() const;
     ID3D12Resource* GetDepthBuffer() const;
     UINT16 GetArraySize() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetDSVHandle(UINT idx) const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetSRVHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetDsvHandle(UINT index) const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetSrvHandle() const;
 
     virtual XMVECTOR GetPosition() const;
     virtual XMVECTOR GetDirection() const;
@@ -57,7 +59,7 @@ public:
     LightConstantData* GetLightConstantDataPtr();
     D3D12_CPU_DESCRIPTOR_HANDLE GetLightCBVHandle(UINT frameIndex) const;
 
-    virtual std::vector<ComPtr<ID3D12Resource>> TakeResources();
+    virtual std::vector<GpuResource> TakeResources();
 
 protected:
     std::vector<CameraConstantData> m_cameraConstantData;
@@ -68,9 +70,9 @@ protected:
 
     LightType m_type;
 
-    ComPtr<ID3D12Resource> m_depthBuffer;
-    DescriptorAllocation m_dsvAllocation;
-    DescriptorAllocation m_srvAllocation;
+    Texture m_depthBuffer;
+    std::vector<DepthStencilView> m_dsvs;
+    ShaderResourceView m_srv;
 };
 
 class DirectionalLight : public Light
@@ -109,13 +111,13 @@ public:
     void SetDirection(XMVECTOR dir) override;
 
     ID3D12Resource* GetRenderTarget() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetRTVHandle(UINT idx) const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle(UINT index) const;
 
-    virtual std::vector<ComPtr<ID3D12Resource>> TakeResources() override;
+    virtual std::vector<GpuResource> TakeResources() override;
 
 private:
-    ComPtr<ID3D12Resource> m_renderTarget;
-    DescriptorAllocation m_rtvAllocation;
+    Texture m_renderTarget;
+    std::array<RenderTargetView, POINT_LIGHT_ARRAY_SIZE> m_rtvs;
 };
 
 class SpotLight : public Light
