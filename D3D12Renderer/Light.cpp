@@ -141,16 +141,6 @@ D3D12_CPU_DESCRIPTOR_HANDLE Light::GetLightCBVHandle(UINT frameIndex) const
     return m_lightCBVAllocation.GetDescriptorHandle(frameIndex);
 }
 
-UINT Light::GetDepthBufferHandle() const
-{
-    return m_hDepthBuffer;
-}
-
-void Light::SetDepthBufferHandle(UINT handle)
-{
-    m_hDepthBuffer = handle;
-}
-
 std::vector<ComPtr<ID3D12Resource>> Light::TakeResources()
 {
     std::vector<ComPtr<ID3D12Resource>> ret;

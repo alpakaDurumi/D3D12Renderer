@@ -57,9 +57,6 @@ public:
     LightConstantData* GetLightConstantDataPtr();
     D3D12_CPU_DESCRIPTOR_HANDLE GetLightCBVHandle(UINT frameIndex) const;
 
-    UINT GetDepthBufferHandle() const;
-    void SetDepthBufferHandle(UINT handle);
-
     virtual std::vector<ComPtr<ID3D12Resource>> TakeResources();
 
 protected:
@@ -74,8 +71,6 @@ protected:
     ComPtr<ID3D12Resource> m_depthBuffer;
     DescriptorAllocation m_dsvAllocation;
     DescriptorAllocation m_srvAllocation;
-
-    UINT m_hDepthBuffer;
 };
 
 class DirectionalLight : public Light
