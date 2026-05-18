@@ -682,7 +682,7 @@ public:
     {
         // 1. push resources to queue with fenceValue
         for (auto& res : m_deferred)
-            m_deletionQueue.push({ fenceValue, std::move(res) });
+            m_deletionQueue.emplace(fenceValue, std::move(res));
         m_deferred.clear();
 
         // 2. Delete resources that completed in GPU timeline
@@ -730,6 +730,11 @@ private:
 
     struct DeferredResource
     {
+        DeferredResource(UINT64 fenceValue, GpuResource&& resource)
+            : fenceValue(fenceValue), resource(std::move(resource))
+        {
+        }
+
         UINT64 fenceValue;
         GpuResource resource;
     };
