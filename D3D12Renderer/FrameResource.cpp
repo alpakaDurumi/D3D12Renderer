@@ -21,18 +21,12 @@ FrameResource::FrameResource(
     DescriptorAllocation&& horizontalDilatedMaskSRVAllocation)
     : m_pDevice(pDevice),
     m_backBufferRtv(std::move(rtvAllocation)),
-    m_selectionMaskRTVAllocation(std::move(selectionMaskRTVAllocation)),
-    m_selectionMaskSRVAllocation(std::move(selectionMaskSRVAllocation)),
-    m_horizontalDilatedMaskRTVAllocation(std::move(horizontalDilatedMaskRTVAllocation)),
-    m_horizontalDilatedMaskSRVAllocation(std::move(horizontalDilatedMaskSRVAllocation)),
+    m_selectionMaskRtv(std::move(selectionMaskRTVAllocation)),
+    m_selectionMaskSrv(std::move(selectionMaskSRVAllocation)),
+    m_horizontalDilatedMaskRtv(std::move(horizontalDilatedMaskRTVAllocation)),
+    m_horizontalDilatedMaskSrv(std::move(horizontalDilatedMaskSRVAllocation)),
     m_uploadAllocator(pDevice)
 {
-    assert(
-        !m_selectionMaskRTVAllocation.IsNull() &&
-        !m_selectionMaskSRVAllocation.IsNull() &&
-        !m_horizontalDilatedMaskRTVAllocation.IsNull() &&
-        !m_horizontalDilatedMaskSRVAllocation.IsNull());
-
     // Back buffer
     AcquireBackBuffer(pSwapChain, frameIndex);
     InitBackBufferRtv();
@@ -156,7 +150,6 @@ void FrameResource::CreateGBuffers(UINT64 width, UINT height)
     for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
     {
         const auto format = GetGBufferFormat(static_cast<GBufferSlot>(i));
-
         const auto clearValue = CreateClearValue(format, 0.0f, 0.0f, 0.0f, 0.0f);
 
         m_gBuffers[i] = Texture(
@@ -213,14 +206,25 @@ void FrameResource::ResetGBuffers()
 void FrameResource::CreateMasks(UINT64 width, UINT height)
 {
     const auto format = DXGI_FORMAT_R8_UNORM;
+    const auto clearValue = CreateClearValue(format, 0.0f, 0.0f, 0.0f, 0.0f);
 
-    D3DHelper::CreateRenderTarget(m_pDevice, width, height, format, format, 1, m_selectionMask);
-    D3DHelper::CreateRTV(m_pDevice, m_selectionMask.Get(), format, m_selectionMaskRTVAllocation.GetDescriptorHandle());
-    D3DHelper::CreateSRV(m_pDevice, m_selectionMask.Get(), format, m_selectionMaskSRVAllocation.GetDescriptorHandle());
+    m_selectionMask = Texture(
+        m_pDevice,
+        GetTexture2DDesc(width, height, 1, 1, format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET),
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+        &clearValue);
 
-    D3DHelper::CreateRenderTarget(m_pDevice, width, height, format, format, 1, m_horizontalDilatedMask);
-    D3DHelper::CreateRTV(m_pDevice, m_horizontalDilatedMask.Get(), format, m_horizontalDilatedMaskRTVAllocation.GetDescriptorHandle());
-    D3DHelper::CreateSRV(m_pDevice, m_horizontalDilatedMask.Get(), format, m_horizontalDilatedMaskSRVAllocation.GetDescriptorHandle());
+    m_selectionMaskRtv.Init(m_pDevice, m_selectionMask.Get(), GetRtvDesc(format, 0));
+    m_selectionMaskSrv.Init(m_pDevice, m_selectionMask.Get(), GetSrvDesc(format, 1));
+
+    m_horizontalDilatedMask = Texture(
+        m_pDevice,
+        GetTexture2DDesc(width, height, 1, 1, format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET),
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+        &clearValue);
+
+    m_horizontalDilatedMaskRtv.Init(m_pDevice, m_horizontalDilatedMask.Get(), GetRtvDesc(format, 0));
+    m_horizontalDilatedMaskSrv.Init(m_pDevice, m_horizontalDilatedMask.Get(), GetSrvDesc(format, 1));
 }
 
 ID3D12Resource* FrameResource::GetSelectionMask() const
@@ -233,24 +237,24 @@ ID3D12Resource* FrameResource::GetHorizontalDilatedMask() const
     return m_horizontalDilatedMask.Get();
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetSelectionMaskRTVHandle() const
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetSelectionMaskRtvHandle() const
 {
-    return m_selectionMaskRTVAllocation.GetDescriptorHandle();
+    return m_selectionMaskRtv.GetHandle();
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetSelectionMaskSRVHandle() const
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetSelectionMaskSrvHandle() const
 {
-    return m_selectionMaskSRVAllocation.GetDescriptorHandle();
+    return m_selectionMaskSrv.GetHandle();
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetHorizontalDilatedMaskRTVHandle() const
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetHorizontalDilatedMaskRtvHandle() const
 {
-    return m_horizontalDilatedMaskRTVAllocation.GetDescriptorHandle();
+    return m_horizontalDilatedMaskRtv.GetHandle();
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetHorizontalDilatedMaskSRVHandle() const
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetHorizontalDilatedMaskSrvHandle() const
 {
-    return m_horizontalDilatedMaskSRVAllocation.GetDescriptorHandle();
+    return m_horizontalDilatedMaskSrv.GetHandle();
 }
 
 void FrameResource::ResetMasks()

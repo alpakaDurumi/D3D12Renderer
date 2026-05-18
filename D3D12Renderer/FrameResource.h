@@ -64,10 +64,10 @@ public:
     void CreateMasks(UINT64 width, UINT height);
     ID3D12Resource* GetSelectionMask() const;
     ID3D12Resource* GetHorizontalDilatedMask() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetSelectionMaskRTVHandle() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetSelectionMaskSRVHandle() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetHorizontalDilatedMaskRTVHandle() const;
-    D3D12_CPU_DESCRIPTOR_HANDLE GetHorizontalDilatedMaskSRVHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetSelectionMaskRtvHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetSelectionMaskSrvHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetHorizontalDilatedMaskRtvHandle() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetHorizontalDilatedMaskSrvHandle() const;
     void ResetMasks();
 
     // Instance data
@@ -98,12 +98,13 @@ private:
     std::array<RenderTargetView, static_cast<std::size_t>(GBufferSlot::NUM_GBUFFER_SLOTS)> m_gBufferRtvs;
     std::array<ShaderResourceView, static_cast<std::size_t>(GBufferSlot::NUM_GBUFFER_SLOTS)> m_gBufferSrvs;
 
-    ComPtr<ID3D12Resource> m_selectionMask;
-    ComPtr<ID3D12Resource> m_horizontalDilatedMask;
-    DescriptorAllocation m_selectionMaskRTVAllocation;
-    DescriptorAllocation m_selectionMaskSRVAllocation;
-    DescriptorAllocation m_horizontalDilatedMaskRTVAllocation;
-    DescriptorAllocation m_horizontalDilatedMaskSRVAllocation;
+    Texture m_selectionMask;
+    RenderTargetView m_selectionMaskRtv;
+    ShaderResourceView m_selectionMaskSrv;
+
+    Texture m_horizontalDilatedMask;
+    RenderTargetView m_horizontalDilatedMaskRtv;
+    ShaderResourceView m_horizontalDilatedMaskSrv;
 
     ComPtr<ID3D12Resource> m_instanceUploadBuffer;
     UINT8* m_instanceBufferBegin = nullptr;
