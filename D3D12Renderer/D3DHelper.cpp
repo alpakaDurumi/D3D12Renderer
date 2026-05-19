@@ -168,24 +168,6 @@ namespace D3DHelper
         }
     }
 
-    D3D12_RESOURCE_DESC1 GetBufferDesc(UINT64 width, D3D12_RESOURCE_FLAGS flags)
-    {
-        D3D12_RESOURCE_DESC1 desc = {};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Alignment = 0;
-        desc.Width = width;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.Format = DXGI_FORMAT_UNKNOWN;
-        desc.SampleDesc = { 1, 0 };
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        desc.Flags = flags;
-        desc.SamplerFeedbackMipRegion = {};
-
-        return desc;
-    }
-
     D3D12_RESOURCE_DESC1 GetTexture2DDesc(UINT64 width, UINT height, UINT16 arraySize, UINT16 mipLevels, DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags)
     {
         D3D12_RESOURCE_DESC1 desc = {};

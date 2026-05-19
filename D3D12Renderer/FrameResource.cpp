@@ -63,14 +63,14 @@ FrameResource::FrameResource(
     CreateMasks(width, height);
 
     // Create Upload buffer
-    D3DHelper::CreateUploadBuffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, m_instanceUploadBuffer);
+    m_instanceUploadBuffer = Buffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, D3D12_HEAP_TYPE_UPLOAD);
     D3D12_RANGE readRange = { 0, 0 };
-    D3DHelper::ThrowIfFailed(m_instanceUploadBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
+    ThrowIfFailed(m_instanceUploadBuffer.Get()->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
 }
 
 FrameResource::~FrameResource()
 {
-    m_instanceUploadBuffer->Unmap(0, nullptr);
+    m_instanceUploadBuffer.Get()->Unmap(0, nullptr);
 }
 
 // Back buffer
@@ -273,13 +273,13 @@ void FrameResource::EnsureInstanceCapacity(UINT requiredSize)
 {
     if (m_instanceCapacity < requiredSize)
     {
-        m_instanceUploadBuffer->Unmap(0, nullptr);
+        m_instanceUploadBuffer.Get()->Unmap(0, nullptr);
 
         m_instanceCapacity = Utility::CeilPowerOfTwo(requiredSize);
 
-        D3DHelper::CreateUploadBuffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, m_instanceUploadBuffer);
+        m_instanceUploadBuffer = Buffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, D3D12_HEAP_TYPE_UPLOAD);
         D3D12_RANGE readRange = { 0, 0 };
-        D3DHelper::ThrowIfFailed(m_instanceUploadBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
+        ThrowIfFailed(m_instanceUploadBuffer.Get()->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
     }
 }
 
@@ -291,7 +291,7 @@ void FrameResource::PushInstanceData(std::vector<InstanceData>& data)
 
 D3D12_GPU_VIRTUAL_ADDRESS FrameResource::GetInstanceBufferVirtualAddress() const
 {
-    return m_instanceUploadBuffer->GetGPUVirtualAddress();
+    return m_instanceUploadBuffer.Get()->GetGPUVirtualAddress();
 }
 
 // Transient upload
