@@ -61,6 +61,8 @@ public:
 
     virtual std::vector<GpuResource> TakeResources();
 
+    static UINT16 GetRequiredArraySize(LightType type);
+
 protected:
     std::vector<CameraConstantData> m_cameraConstantData;
     std::vector<UploadAllocation> m_cameraUploadAllocations;    // transient, for single frame

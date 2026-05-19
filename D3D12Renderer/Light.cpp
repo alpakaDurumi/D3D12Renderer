@@ -156,6 +156,21 @@ std::vector<GpuResource> Light::TakeResources()
     return ret;
 }
 
+UINT16 Light::GetRequiredArraySize(LightType type)
+{
+    switch (type)
+    {
+    case LightType::DIRECTIONAL:
+        return MAX_CASCADES;
+    case LightType::POINT:
+        return POINT_LIGHT_ARRAY_SIZE;
+    case LightType::SPOT:
+        return SPOT_LIGHT_ARRAY_SIZE;
+    default:
+        return -1;
+    }
+}
+
 DirectionalLight::DirectionalLight(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,

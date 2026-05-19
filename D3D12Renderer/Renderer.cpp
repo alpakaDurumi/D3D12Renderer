@@ -1115,7 +1115,7 @@ void Renderer::LoadAssets()
         "DirectionalLight",
         false,
         { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE },
-        GetSubresourceCount(m_device.Get(), GetDepthStencilBufferDesc(m_shadowMapResolution, m_shadowMapResolution, MAX_CASCADES, false)),
+        GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, MAX_CASCADES, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
         [this]()
         {
             std::vector<ID3D12Resource*> pResources;
@@ -1129,7 +1129,7 @@ void Renderer::LoadAssets()
         "PointLight",
         false,
         { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET },
-        GetSubresourceCount(m_device.Get(), GetRenderTargetDesc(m_shadowMapResolution, m_shadowMapResolution, POINT_LIGHT_ARRAY_SIZE, DXGI_FORMAT_R32_TYPELESS)),
+        GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET)),
         [this]()
         {
             std::vector<ID3D12Resource*> pResources;
@@ -1143,7 +1143,7 @@ void Renderer::LoadAssets()
         "SpotLight",
         false,
         { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE },
-        GetSubresourceCount(m_device.Get(), GetDepthStencilBufferDesc(m_shadowMapResolution, m_shadowMapResolution, SPOT_LIGHT_ARRAY_SIZE, false)),
+        GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, SPOT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
         [this]()
         {
             std::vector<ID3D12Resource*> pResources;
@@ -2481,11 +2481,11 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
         };
 
     for (auto& light : m_sceneManager.GetDirectionalLights())
-        processLight(light, GetRequiredArraySize(LightType::DIRECTIONAL));
+        processLight(light, MAX_CASCADES);
     for (auto& light : m_sceneManager.GetPointLights())
-        processLight(light, GetRequiredArraySize(LightType::POINT));
+        processLight(light, POINT_LIGHT_ARRAY_SIZE);
     for (auto& light : m_sceneManager.GetSpotLights())
-        processLight(light, GetRequiredArraySize(LightType::SPOT));
+        processLight(light, SPOT_LIGHT_ARRAY_SIZE);
 }
 
 void Renderer::ProcessInput()

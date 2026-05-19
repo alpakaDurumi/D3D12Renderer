@@ -47,17 +47,8 @@ namespace D3DHelper
 
     void CreateUploadBuffer(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadBuffer);
     void CreateDefaultBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultBuffer);
-    void CreateDefaultTexture(ID3D12Device10* pDevice, UINT64 width, UINT height, ComPtr<ID3D12Resource>& defaultTexture);
-    void CreateRenderTarget(ID3D12Device10* pDevice, UINT64 width, UINT height, DXGI_FORMAT format, DXGI_FORMAT rtvFormat, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& renderTarget, D3D12_CLEAR_VALUE* pClearValue = nullptr);
-    void CreateDepthStencilBuffer(ID3D12Device10* pDevice, UINT64 width, UINT height, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& depthStencilBuffer, bool useStencil);
 
-    void CreateRTV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, bool isArray = false, UINT firstArraySlice = 0);
-    void CreateDSV(ID3D12Device10* pDevice, ID3D12Resource* pResource, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, bool useStencil, bool isReadOnly, bool isArray = false, UINT firstArraySlice = 0);
-    void CreateSRV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, UINT planeSlice = 0);
     void CreateCBV(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr, UINT size, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
-
-    D3D12_RESOURCE_DESC1 GetDepthStencilBufferDesc(UINT64 width, UINT height, UINT16 depthOrArraySize, bool useStencil);
-    D3D12_RESOURCE_DESC1 GetRenderTargetDesc(UINT64 width, UINT height, UINT16 depthOrArraySize, DXGI_FORMAT format);
 
     void UpdateSubresources(
         ID3D12Device* pDevice,
@@ -90,19 +81,11 @@ namespace D3DHelper
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
         const std::vector<UINT32>& indices);
 
-    void CreateSRVForShadow(
-        ID3D12Device10* pDevice,
-        ID3D12Resource* pResource,
-        D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle,
-        LightType type);
-
     void CreateSampler(
         ID3D12Device* pDevice,
         TextureFiltering filtering,
         TextureAddressingMode addressingMode,
         D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
-
-    UINT16 GetRequiredArraySize(LightType type);
 
     UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format);
 

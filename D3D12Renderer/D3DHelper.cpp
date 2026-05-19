@@ -395,151 +395,6 @@ namespace D3DHelper
             IID_PPV_ARGS(&defaultBuffer)));
     }
 
-    void CreateDefaultTexture(ID3D12Device10* pDevice, UINT64 width, UINT height, ComPtr<ID3D12Resource>& defaultTexture)
-    {
-        D3D12_HEAP_PROPERTIES heapProperties = {};
-        heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProperties.CreationNodeMask = 1;
-        heapProperties.VisibleNodeMask = 1;
-
-        D3D12_RESOURCE_DESC1 resourceDesc = {};
-        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        resourceDesc.Alignment = 0;
-        resourceDesc.Width = width;
-        resourceDesc.Height = height;
-        resourceDesc.DepthOrArraySize = 1;
-        resourceDesc.MipLevels = 1;
-        resourceDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        resourceDesc.SampleDesc = { 1, 0 };
-        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
-
-        ThrowIfFailed(pDevice->CreateCommittedResource3(
-            &heapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &resourceDesc,
-            D3D12_BARRIER_LAYOUT_COMMON,
-            nullptr,
-            nullptr,
-            0,
-            nullptr,
-            IID_PPV_ARGS(&defaultTexture)));
-    }
-
-    // If pClearValue is provided, rtvFormat parameter will be ignored.
-    void CreateRenderTarget(ID3D12Device10* pDevice, UINT64 width, UINT height, DXGI_FORMAT format, DXGI_FORMAT rtvFormat, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& renderTarget, D3D12_CLEAR_VALUE* pClearValue)
-    {
-        auto defaultClearValue = CreateClearValue(rtvFormat, 0.0f, 0.0f, 0.0f, 0.0f);
-
-        D3D12_HEAP_PROPERTIES heapProperties = {};
-        heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProperties.CreationNodeMask = 1;
-        heapProperties.VisibleNodeMask = 1;
-
-        auto resourceDesc = GetRenderTargetDesc(width, height, depthOrArraySize, format);
-
-        ThrowIfFailed(pDevice->CreateCommittedResource3(
-            &heapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &resourceDesc,
-            D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-            pClearValue == nullptr ? &defaultClearValue : pClearValue,
-            nullptr,
-            0,
-            nullptr,
-            IID_PPV_ARGS(&renderTarget)));
-    }
-
-    void CreateDepthStencilBuffer(ID3D12Device10* pDevice, UINT64 width, UINT height, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& depthStencilBuffer, bool useStencil)
-    {
-        // reverse-z
-        auto defaultClearValue = CreateClearValue(useStencil ? DXGI_FORMAT_D24_UNORM_S8_UINT : DXGI_FORMAT_D32_FLOAT, 0.0f, 0);
-
-        D3D12_HEAP_PROPERTIES heapProperties = {};
-        heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProperties.CreationNodeMask = 1;
-        heapProperties.VisibleNodeMask = 1;
-
-        auto resourceDesc = GetDepthStencilBufferDesc(width, height, depthOrArraySize, useStencil);
-
-        ThrowIfFailed(pDevice->CreateCommittedResource3(
-            &heapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &resourceDesc,
-            D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
-            &defaultClearValue,
-            nullptr,
-            0,
-            nullptr,
-            IID_PPV_ARGS(&depthStencilBuffer)));
-    }
-
-    void CreateRTV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, bool isArray, UINT firstArraySlice)
-    {
-        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
-        rtvDesc.Format = format;
-
-        if (isArray)
-        {
-            rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
-            rtvDesc.Texture2DArray.MipSlice = 0;
-            rtvDesc.Texture2DArray.FirstArraySlice = firstArraySlice;
-            rtvDesc.Texture2DArray.ArraySize = 1;
-            rtvDesc.Texture2DArray.PlaneSlice = 0;
-        }
-        else
-        {
-            rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-            rtvDesc.Texture2D.MipSlice = 0;
-            rtvDesc.Texture2D.PlaneSlice = 0;
-        }
-
-        pDevice->CreateRenderTargetView(pResource, &rtvDesc, cpuHandle);
-    }
-
-    void CreateDSV(ID3D12Device10* pDevice, ID3D12Resource* pResource, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, bool useStencil, bool isReadOnly, bool isArray, UINT firstArraySlice)
-    {
-        D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-        dsvDesc.Format = useStencil ? DXGI_FORMAT_D24_UNORM_S8_UINT : DXGI_FORMAT_D32_FLOAT;
-        dsvDesc.Flags = isReadOnly ? D3D12_DSV_FLAG_READ_ONLY_DEPTH | D3D12_DSV_FLAG_READ_ONLY_STENCIL : D3D12_DSV_FLAG_NONE;
-
-        if (isArray)
-        {
-            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
-            dsvDesc.Texture2DArray.MipSlice = 0;
-            dsvDesc.Texture2DArray.ArraySize = 1;
-            dsvDesc.Texture2DArray.FirstArraySlice = firstArraySlice;
-        }
-        else
-        {
-            dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-            dsvDesc.Texture2D.MipSlice = 0;
-        }
-
-        pDevice->CreateDepthStencilView(pResource, &dsvDesc, cpuHandle);
-    }
-
-    void CreateSRV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, UINT planeSlice)
-    {
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = format;
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2D.MostDetailedMip = 0;
-        srvDesc.Texture2D.MipLevels = 1;
-        srvDesc.Texture2D.PlaneSlice = planeSlice;
-        srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-
-        pDevice->CreateShaderResourceView(pResource, &srvDesc, cpuHandle);
-    }
-
     void CreateCBV(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr, UINT size, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
     {
         D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
@@ -547,40 +402,6 @@ namespace D3DHelper
         cbvDesc.SizeInBytes = size;
 
         pDevice->CreateConstantBufferView(&cbvDesc, cpuHandle);
-    }
-
-    D3D12_RESOURCE_DESC1 GetDepthStencilBufferDesc(UINT64 width, UINT height, UINT16 depthOrArraySize, bool useStencil)
-    {
-        D3D12_RESOURCE_DESC1 desc = {};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        desc.Alignment = 0;
-        desc.Width = width;
-        desc.Height = height;
-        desc.DepthOrArraySize = depthOrArraySize;
-        desc.MipLevels = 1;
-        desc.Format = useStencil ? DXGI_FORMAT_R24G8_TYPELESS : DXGI_FORMAT_R32_TYPELESS;
-        desc.SampleDesc = { 1, 0 };
-        desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        desc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
-        return desc;
-    }
-
-    D3D12_RESOURCE_DESC1 GetRenderTargetDesc(UINT64 width, UINT height, UINT16 depthOrArraySize, DXGI_FORMAT format)
-    {
-        D3D12_RESOURCE_DESC1 desc = {};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        desc.Alignment = 0;
-        desc.Width = width;
-        desc.Height = height;
-        desc.DepthOrArraySize = depthOrArraySize;
-        desc.MipLevels = 1;
-        desc.Format = format;
-        desc.SampleDesc = { 1, 0 };
-        desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-        desc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
-        return desc;
     }
 
     // Assume that intermediate resource is already mapped
@@ -779,50 +600,6 @@ namespace D3DHelper
         pindexBufferView->Format = DXGI_FORMAT_R32_UINT;
     }
 
-    void CreateSRVForShadow(
-        ID3D12Device10* pDevice,
-        ID3D12Resource* pResource,
-        D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle,
-        LightType type)
-    {
-        // Create only one SRV.
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        switch (type)
-        {
-        case LightType::DIRECTIONAL:
-        {
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-            srvDesc.Texture2DArray.MostDetailedMip = 0;
-            srvDesc.Texture2DArray.MipLevels = 1;
-            srvDesc.Texture2DArray.FirstArraySlice = 0;
-            srvDesc.Texture2DArray.ArraySize = MAX_CASCADES;
-            srvDesc.Texture2DArray.PlaneSlice = 0;
-            srvDesc.Texture2DArray.ResourceMinLODClamp = 0.0f;
-            break;
-        }
-        case LightType::POINT:
-        {
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-            srvDesc.TextureCube.MostDetailedMip = 0;
-            srvDesc.TextureCube.MipLevels = 1;
-            srvDesc.TextureCube.ResourceMinLODClamp = 0.0f;
-            break;
-        }
-        case LightType::SPOT:
-        {
-            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            srvDesc.Texture2D.MostDetailedMip = 0;
-            srvDesc.Texture2D.MipLevels = 1;
-            srvDesc.Texture2D.PlaneSlice = 0;
-            srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-            break;
-        }
-        }
-        pDevice->CreateShaderResourceView(pResource, &srvDesc, srvCpuHandle);
-    }
-
     void CreateSampler(
         ID3D12Device* pDevice,
         TextureFiltering filtering,
@@ -898,21 +675,6 @@ namespace D3DHelper
         samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
 
         pDevice->CreateSampler(&samplerDesc, cpuHandle);
-    }
-
-    UINT16 GetRequiredArraySize(LightType type)
-    {
-        switch (type)
-        {
-        case LightType::DIRECTIONAL:
-            return MAX_CASCADES;
-        case LightType::POINT:
-            return POINT_LIGHT_ARRAY_SIZE;
-        case LightType::SPOT:
-            return SPOT_LIGHT_ARRAY_SIZE;
-        default:
-            return -1;
-        }
     }
 
     UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format)
