@@ -1179,7 +1179,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT matIdx = 0;
     for (auto& mat : m_sceneManager.GetMaterials())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, matIdx, 1, mat.GetCBVHandle(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, matIdx, 1, mat.GetCbvHandle(m_frameIndex));
         ++matIdx;
     }
 
@@ -2466,7 +2466,7 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
     for (auto& mat : m_sceneManager.GetMaterials())
     {
         auto alloc = frameResource.PushConstantData(mat.GetConstantDataPtr(), sizeof(MaterialConstantData));
-        CreateCBV(m_device.Get(), alloc.GPUPtr, sizeof(MaterialConstantData), mat.GetCBVHandle(m_frameIndex));
+        mat.InitCbv(m_device.Get(), m_frameIndex, alloc.GPUPtr);
     }
 
     auto processLight = [&](Light& light, UINT arraySize)

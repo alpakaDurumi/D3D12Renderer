@@ -12,6 +12,7 @@
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
 #include "SharedConfig.h"
+#include "View.h"
 
 enum class TextureSlot
 {
@@ -34,8 +35,10 @@ public:
     Material(
         ID3D12Device10* pDevice,
         DescriptorAllocation&& allocation)
-        : m_cbvAllocation(std::move(allocation))
     {
+        for (auto& alloc : allocation.Split())
+            m_cbvs.emplace_back(std::move(alloc));
+
         m_textureAddressingModes.fill(TextureAddressingMode::WRAP);
     }
 
@@ -103,9 +106,14 @@ public:
         return &m_constantData;
     }
 
-    D3D12_CPU_DESCRIPTOR_HANDLE GetCBVHandle(UINT frameIndex) const
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCbvHandle(UINT frameIndex) const
     {
-        return m_cbvAllocation.GetDescriptorHandle(frameIndex);
+        return m_cbvs[frameIndex].GetHandle();
+    }
+
+    void InitCbv(ID3D12Device10* pDevice, UINT frameIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr)
+    {
+        m_cbvs[frameIndex].Init(pDevice, gpuPtr, sizeof(MaterialConstantData));
     }
 
     void CopyDataFrom(const Material& src)
@@ -132,7 +140,7 @@ private:
     }
 
     MaterialConstantData m_constantData;
-    DescriptorAllocation m_cbvAllocation;
+    std::vector<ConstantBufferView> m_cbvs;
 
     std::array<TextureAddressingMode, static_cast<std::size_t>(TextureSlot::NUM_TEXTURE_SLOTS)> m_textureAddressingModes;
 

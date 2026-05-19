@@ -56,3 +56,22 @@ void DepthStencilView::Init(ID3D12Device10* pDevice, ID3D12Resource* pResource, 
 {
     pDevice->CreateDepthStencilView(pResource, &desc, m_alloc.GetDescriptorHandle());
 }
+
+ConstantBufferView::ConstantBufferView(
+    ID3D12Device10* pDevice,
+    D3D12_GPU_VIRTUAL_ADDRESS gpuPtr,
+    UINT size,
+    DescriptorAllocation&& alloc)
+    : View(std::move(alloc))
+{
+    Init(pDevice, gpuPtr, size);
+}
+
+void ConstantBufferView::Init(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr, UINT size)
+{
+    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+    cbvDesc.BufferLocation = gpuPtr;
+    cbvDesc.SizeInBytes = size;
+
+    pDevice->CreateConstantBufferView(&cbvDesc, m_alloc.GetDescriptorHandle());
+}
