@@ -13,19 +13,27 @@ Light::Light(
     DescriptorAllocation&& cbvAllocation,
     UINT shadowMapResolution,
     LightType type)
-    : m_dsvAllocation(std::move(dsvAllocation)),
-    m_srvAllocation(std::move(srvAllocation)),
+    : m_srv(std::move(srvAllocation)),
     m_lightCBVAllocation(std::move(cbvAllocation)),
     m_type(type)
 {
     const UINT16 arraySize = GetRequiredArraySize(m_type);
-    assert(m_dsvAllocation.GetNumHandles() == arraySize && !m_srvAllocation.IsNull());
 
-    CreateDepthStencilBuffer(pDevice, shadowMapResolution, shadowMapResolution, arraySize, m_depthBuffer, false);
+    m_dsvs.resize(arraySize);
+    auto dsvAllocs = dsvAllocation.Split();
     for (UINT i = 0; i < arraySize; ++i)
-    {
-        CreateDSV(pDevice, m_depthBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(i), false, false, true, i);
-    }
+        m_dsvs[i] = DepthStencilView(std::move(dsvAllocs[i]));
+
+    const auto clearValue = CreateClearValue(DXGI_FORMAT_D32_FLOAT, 0.0f, 0);
+
+    // Create depth buffer, init DSVs
+    m_depthBuffer = Texture(
+        pDevice,
+        GetTexture2DDesc(shadowMapResolution, shadowMapResolution, arraySize, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
+        &clearValue);
+    for (UINT i = 0; i < arraySize; ++i)
+        m_dsvs[i].Init(pDevice, m_depthBuffer.Get(), GetDsvDesc2DArray(DXGI_FORMAT_D32_FLOAT, i));
 
     m_cameraConstantData.resize(arraySize);
     m_cameraUploadAllocations.resize(arraySize);
@@ -47,14 +55,14 @@ UINT16 Light::GetArraySize() const
     return GetRequiredArraySize(m_type);
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE Light::GetDSVHandle(UINT idx) const
+D3D12_CPU_DESCRIPTOR_HANDLE Light::GetDsvHandle(UINT index) const
 {
-    return m_dsvAllocation.GetDescriptorHandle(idx);
+    return m_dsvs[index].GetHandle();
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE Light::GetSRVHandle() const
+D3D12_CPU_DESCRIPTOR_HANDLE Light::GetSrvHandle() const
 {
-    return m_srvAllocation.GetDescriptorHandle();
+    return m_srv.GetHandle();
 }
 
 XMVECTOR Light::GetPosition() const
@@ -141,21 +149,26 @@ D3D12_CPU_DESCRIPTOR_HANDLE Light::GetLightCBVHandle(UINT frameIndex) const
     return m_lightCBVAllocation.GetDescriptorHandle(frameIndex);
 }
 
-UINT Light::GetDepthBufferHandle() const
+std::vector<GpuResource> Light::TakeResources()
 {
-    return m_hDepthBuffer;
-}
-
-void Light::SetDepthBufferHandle(UINT handle)
-{
-    m_hDepthBuffer = handle;
-}
-
-std::vector<ComPtr<ID3D12Resource>> Light::TakeResources()
-{
-    std::vector<ComPtr<ID3D12Resource>> ret;
+    std::vector<GpuResource> ret;
     ret.push_back(std::move(m_depthBuffer));
     return ret;
+}
+
+UINT16 Light::GetRequiredArraySize(LightType type)
+{
+    switch (type)
+    {
+    case LightType::DIRECTIONAL:
+        return MAX_CASCADES;
+    case LightType::POINT:
+        return POINT_LIGHT_ARRAY_SIZE;
+    case LightType::SPOT:
+        return SPOT_LIGHT_ARRAY_SIZE;
+    default:
+        return -1;
+    }
 }
 
 DirectionalLight::DirectionalLight(
@@ -166,7 +179,7 @@ DirectionalLight::DirectionalLight(
     UINT shadowMapResolution)
     : Light(pDevice, std::move(dsvAllocation), std::move(srvAllocation), std::move(cbvAllocation), shadowMapResolution, LightType::DIRECTIONAL)
 {
-    CreateSRVForShadow(pDevice, m_depthBuffer.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
+    m_srv.Init(pDevice, m_depthBuffer.Get(), GetSrvDesc2DArray(DXGI_FORMAT_R32_FLOAT, 1, MAX_CASCADES));
 }
 
 XMVECTOR DirectionalLight::GetPosition() const
@@ -203,22 +216,25 @@ PointLight::PointLight(
     DescriptorAllocation&& cbvAllocation,
     DescriptorAllocation&& rtvAllocation,
     UINT shadowMapResolution)
-    : Light(pDevice, std::move(dsvAllocation), std::move(srvAllocation), std::move(cbvAllocation), shadowMapResolution, LightType::POINT),
-    m_rtvAllocation(std::move(rtvAllocation))
+    : Light(pDevice, std::move(dsvAllocation), std::move(srvAllocation), std::move(cbvAllocation), shadowMapResolution, LightType::POINT)
 {
-    assert(POINT_LIGHT_ARRAY_SIZE == m_rtvAllocation.GetNumHandles());
-
-    auto clearValue = CreateClearValue(DXGI_FORMAT_R32_FLOAT, 1.0f, 1.0f, 1.0f, 1.0f);
-    CreateRenderTarget(pDevice, shadowMapResolution, shadowMapResolution, DXGI_FORMAT_R32_TYPELESS, DXGI_FORMAT_R32_FLOAT, POINT_LIGHT_ARRAY_SIZE, m_renderTarget, &clearValue);
-
-    // Create RTVs.
+    auto rtvAllocs = rtvAllocation.Split();
     for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
-    {
-        CreateRTV(pDevice, m_renderTarget.Get(), DXGI_FORMAT_R32_FLOAT, m_rtvAllocation.GetDescriptorHandle(i), true, i);
-    }
+        m_rtvs[i] = RenderTargetView(std::move(rtvAllocs[i]));
 
-    // Create SRV for render target we've created just before. NOT for depth buffer!
-    CreateSRVForShadow(pDevice, m_renderTarget.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
+    auto clearValue = CreateClearValue(DXGI_FORMAT_R32_FLOAT, 1.0f, 0.0f, 0.0f, 0.0f);
+
+    // Create render target, init RTVs
+    m_renderTarget = Texture(
+        pDevice,
+        GetTexture2DDesc(shadowMapResolution, shadowMapResolution, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET),
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+        &clearValue);
+    for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
+        m_rtvs[i].Init(pDevice, m_renderTarget.Get(), GetRtvDesc2DArray(DXGI_FORMAT_R32_FLOAT, 0, i, 1));
+
+    // Init SRV for render target we've created just before. NOT for depth buffer!
+    m_srv.Init(pDevice, m_renderTarget.Get(), GetSrvDescCube(DXGI_FORMAT_R32_FLOAT, 1));
 }
 
 XMVECTOR PointLight::GetDirection() const
@@ -242,22 +258,12 @@ ID3D12Resource* PointLight::GetRenderTarget() const
     return m_renderTarget.Get();
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE PointLight::GetRTVHandle(UINT idx) const
+D3D12_CPU_DESCRIPTOR_HANDLE PointLight::GetRtvHandle(UINT index) const
 {
-    return m_rtvAllocation.GetDescriptorHandle(idx);
+    return m_rtvs[index].GetHandle();
 }
 
-UINT PointLight::GetRenderTargetHandle() const
-{
-    return m_hRenderTarget;
-}
-
-void PointLight::SetRenderTargetHandle(UINT handle)
-{
-    m_hRenderTarget = handle;
-}
-
-std::vector<ComPtr<ID3D12Resource>> PointLight::TakeResources()
+std::vector<GpuResource> PointLight::TakeResources()
 {
     auto ret = Light::TakeResources();
     ret.push_back(std::move(m_renderTarget));
@@ -272,7 +278,7 @@ SpotLight::SpotLight(
     UINT shadowMapResolution)
     : Light(pDevice, std::move(dsvAllocation), std::move(srvAllocation), std::move(cbvAllocation), shadowMapResolution, LightType::SPOT)
 {
-    CreateSRVForShadow(pDevice, m_depthBuffer.Get(), m_srvAllocation.GetDescriptorHandle(), m_type);
+    m_srv.Init(pDevice, m_depthBuffer.Get(), GetSrvDesc(DXGI_FORMAT_R32_FLOAT, 1));
     SetAngles(45.0f, 20.0f);    // Set default angle
 }
 

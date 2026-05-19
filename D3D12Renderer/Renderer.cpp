@@ -17,7 +17,6 @@
 #include "GeometryGenerator.h"
 #include "InstanceData.h"
 #include "Mesh.h"
-#include "Texture.h"
 #include "Material.h"
 
 using namespace D3DHelper;
@@ -367,7 +366,6 @@ void Renderer::OnResize(UINT width, UINT height)
 
         m_frameResources[i]->SetFenceValue(m_frameResources[m_frameIndex]->GetFenceValue());
     }
-    m_depthStencilBuffer.Reset();
 
     // Preserve existing format
     // Before calling ResizeBuffers, all backbuffer references should be released.
@@ -378,14 +376,19 @@ void Renderer::OnResize(UINT width, UINT height)
     for (UINT i = 0; i < FrameCount; i++)
     {
         m_frameResources[i]->AcquireBackBuffer(m_swapChain.Get(), i);
-        CreateRTV(m_device.Get(), m_frameResources[i]->GetBackBuffer(), DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, m_frameResources[i]->GetBackBufferRTVHandle());
+        m_frameResources[i]->InitBackBufferRtv();
     }
 
     // Recreate depth-stencil buffer, DSV, and SRV
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer, true);
-    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(), true, false);
-    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_readOnlyDSVAllocation.GetDescriptorHandle(), true, true);
-    CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R24_UNORM_X8_TYPELESS, m_depthSRVAllocation.GetDescriptorHandle(), 0);
+    auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
+    m_depthStencilBuffer = Texture(
+        m_device.Get(),
+        GetTexture2DDesc(m_width, m_height, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
+        &clearValue);
+    m_dsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT));
+    m_readOnlyDsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH));
+    m_depthSrv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1));
 
     // Update registered info of backbuffers
     std::vector<ID3D12Resource*> pBackBuffers;
@@ -841,15 +844,27 @@ void Renderer::LoadAssets()
     };
 
     // Create depth-stencil buffer, DSV, and SRV
-    m_dsvAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
-    m_readOnlyDSVAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate();
-    m_depthSRVAllocation = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate();
-
-    CreateDepthStencilBuffer(m_device.Get(), m_width, m_height, 1, m_depthStencilBuffer, true);
-
-    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_dsvAllocation.GetDescriptorHandle(), true, false);
-    CreateDSV(m_device.Get(), m_depthStencilBuffer.Get(), m_readOnlyDSVAllocation.GetDescriptorHandle(), true, true);
-    CreateSRV(m_device.Get(), m_depthStencilBuffer.Get(), DXGI_FORMAT_R24_UNORM_X8_TYPELESS, m_depthSRVAllocation.GetDescriptorHandle(), 0);
+    auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
+    m_depthStencilBuffer = Texture(
+        m_device.Get(),
+        GetTexture2DDesc(m_width, m_height, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
+        &clearValue);
+    m_dsv = DepthStencilView(
+        m_device.Get(),
+        m_depthStencilBuffer.Get(),
+        GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
+    m_readOnlyDsv = DepthStencilView(
+        m_device.Get(),
+        m_depthStencilBuffer.Get(),
+        GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
+    m_depthSrv = ShaderResourceView(
+        m_device.Get(),
+        m_depthStencilBuffer.Get(),
+        GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
 
     // Set viewport and scissorRect for shadow mapping
     m_shadowMapViewport = { 0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f };
@@ -878,13 +893,13 @@ void Renderer::LoadAssets()
         auto allocations = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3).Split();
 
         // index 0: white albedo
-        CreateTexture(pCommandList, std::move(allocations[0]), uploadAllocator, { 255, 255, 255, 255 }, 1, 1);
+        CreateAssetTexture(pCommandList, std::move(allocations[0]), uploadAllocator, { 255, 255, 255, 255 }, 1, 1);
 
         // index 1: flat normal  (128, 128, 255) in linear space
-        CreateTexture(pCommandList, std::move(allocations[1]), uploadAllocator, { 128, 128, 255, 255 }, 1, 1);
+        CreateAssetTexture(pCommandList, std::move(allocations[1]), uploadAllocator, { 128, 128, 255, 255 }, 1, 1);
 
         // index 2: black height
-        CreateTexture(pCommandList, std::move(allocations[2]), uploadAllocator, { 0, 0, 0, 255 }, 1, 1);
+        CreateAssetTexture(pCommandList, std::move(allocations[2]), uploadAllocator, { 0, 0, 0, 255 }, 1, 1);
 
         auto hDefaultMat = CreateMaterial("builtin://material/default");
         auto* pDefaultMat = m_sceneManager.GetMaterial(hDefaultMat);
@@ -898,7 +913,7 @@ void Renderer::LoadAssets()
 
     auto allocations = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3).Split();
 
-    CreateTexture(
+    CreateAssetTexture(
         pCommandList,
         std::move(allocations[0]),
         uploadAllocator,
@@ -908,7 +923,7 @@ void Renderer::LoadAssets()
         false,
         false);
 
-    CreateTexture(
+    CreateAssetTexture(
         pCommandList,
         std::move(allocations[1]),
         uploadAllocator,
@@ -918,7 +933,7 @@ void Renderer::LoadAssets()
         false,
         false);
 
-    CreateTexture(
+    CreateAssetTexture(
         pCommandList,
         std::move(allocations[2]),
         uploadAllocator,
@@ -1100,7 +1115,7 @@ void Renderer::LoadAssets()
         "DirectionalLight",
         false,
         { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE },
-        GetSubresourceCount(m_device.Get(), GetDepthStencilBufferDesc(m_shadowMapResolution, m_shadowMapResolution, MAX_CASCADES, false)),
+        GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, MAX_CASCADES, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
         [this]()
         {
             std::vector<ID3D12Resource*> pResources;
@@ -1114,7 +1129,7 @@ void Renderer::LoadAssets()
         "PointLight",
         false,
         { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET },
-        GetSubresourceCount(m_device.Get(), GetRenderTargetDesc(m_shadowMapResolution, m_shadowMapResolution, POINT_LIGHT_ARRAY_SIZE, DXGI_FORMAT_R32_TYPELESS)),
+        GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET)),
         [this]()
         {
             std::vector<ID3D12Resource*> pResources;
@@ -1128,7 +1143,7 @@ void Renderer::LoadAssets()
         "SpotLight",
         false,
         { D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE },
-        GetSubresourceCount(m_device.Get(), GetDepthStencilBufferDesc(m_shadowMapResolution, m_shadowMapResolution, SPOT_LIGHT_ARRAY_SIZE, false)),
+        GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, SPOT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
         [this]()
         {
             std::vector<ID3D12Resource*> pResources;
@@ -1188,9 +1203,9 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
     // Stage textures
     UINT textureIdx = 0;
-    for (auto& texture : m_sceneManager.GetTextures())
+    for (auto& [texture, srv] : m_sceneManager.GetAssetTextures())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7, textureIdx, 1, texture.GetSRVHandle());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7, textureIdx, 1, srv.GetHandle());
         ++textureIdx;
     }
 
@@ -1198,27 +1213,27 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(8, lightIdx, 1, light.GetSRVHandle());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(8, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(9, lightIdx, 1, light.GetSRVHandle());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(9, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, lightIdx, 1, light.GetSRVHandle());
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
 
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferSRVHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthSRVAllocation.GetDescriptorHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 1, 1, frameResource.GetSelectionMaskSRVHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetHorizontalDilatedMaskSRVHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 3, 1, frameResource.GetSceneColorBufferSRVHandle(0));
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferBaseSrvHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthSrv.GetHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 1, 1, frameResource.GetSelectionMaskSrvHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetHorizontalDilatedMaskSrvHandle());
+    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 3, 1, frameResource.GetSceneColorBufferSrvHandle(0));
 
     BindDescriptorTables(pCommandList);
 
@@ -1252,15 +1267,15 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
                 UINT16 arraySize = pLight->GetArraySize();
                 for (UINT j = 0; j < arraySize; ++j)
                 {
-                    auto shadowMapDsvHandle = pLight->GetDSVHandle(j);
+                    auto shadowMapDsvHandle = pLight->GetDsvHandle(j);
 
                     if (isPointLight)
                     {
-                        auto rtvHandle = static_cast<PointLight*>(pLight)->GetRTVHandle(j);
+                        auto rtvHandle = static_cast<PointLight*>(pLight)->GetRtvHandle(j);
                         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &shadowMapDsvHandle);
 
                         XMVECTORF32 clearColor;
-                        clearColor.v = XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f);
+                        clearColor.v = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
                         pCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
                     }
                     else
@@ -1313,8 +1328,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         m_currentPSOKey.psName = L"GBufferPS.hlsl";
         auto* pso = GetPipelineState(m_currentPSOKey);
 
-        D3D12_CPU_DESCRIPTOR_HANDLE baseRTVHandle = frameResource.GetGBufferRTVHandle();
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE baseRTVHandle = frameResource.GetGBufferBaseRtvHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsv.GetHandle();
         pCommandList->OMSetRenderTargets(NUM_GBUFFER_SLOTS, &baseRTVHandle, TRUE, &dsvHandle);
 
         XMVECTORF32 clearColor;
@@ -1353,8 +1368,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         m_currentPSOKey.psName = L"DeferredLightingPS.hlsl";
         auto* pso = GetPipelineState(m_currentPSOKey);
 
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSceneColorBufferRTVHandle(0);
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_readOnlyDSVAllocation.GetDescriptorHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSceneColorBufferRtvHandle(0);
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_readOnlyDsv.GetHandle();
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
         pCommandList->OMSetStencilRef(1);
 
@@ -1406,8 +1421,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         m_currentPSOKey.psName = L"ForwardColoringPS.hlsl";
         auto* pso = GetPipelineState(m_currentPSOKey);
 
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSceneColorBufferRTVHandle(0);
-        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsvAllocation.GetDescriptorHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSceneColorBufferRtvHandle(0);
+        D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = m_dsv.GetHandle();
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
         pCommandList->SetPipelineState(pso);
@@ -1493,7 +1508,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             auto* pso = GetPipelineState(m_currentPSOKey);
             pCommandList->SetPipelineState(pso);
 
-            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSelectionMaskRTVHandle();
+            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSelectionMaskRtvHandle();
             pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
             XMVECTORF32 clearColor;
@@ -1525,7 +1540,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             auto* pso = GetPipelineState(m_currentPSOKey);
             pCommandList->SetPipelineState(pso);
 
-            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetHorizontalDilatedMaskRTVHandle();
+            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetHorizontalDilatedMaskRtvHandle();
             pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
             XMVECTORF32 clearColor;
@@ -1555,7 +1570,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             auto* pso = GetPipelineState(m_currentPSOKey);
             pCommandList->SetPipelineState(pso);
 
-            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSceneColorBufferRTVHandle(0);
+            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetSceneColorBufferRtvHandle(0);
             pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
             pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -1607,7 +1622,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
         pCommandList->SetPipelineState(pso);
 
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetBackBufferRTVHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetBackBufferRtvHandle();
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
         pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -1862,27 +1877,27 @@ SpotLightHandle Renderer::CreateSpotLight()
         m_shadowMapResolution);
 }
 
-TextureHandle Renderer::CreateTexture(
+AssetTextureHandle Renderer::CreateAssetTexture(
     ID3D12GraphicsCommandList7* pCommandList,
-    DescriptorAllocation&& allocation,
+    DescriptorAllocation&& srvAllocation,
     TransientUploadAllocator& uploadAllocator,
     const std::vector<UINT8>& textureSrc,
     UINT width,
     UINT height)
 {
-    return m_sceneManager.AddTexture(
+    return m_sceneManager.AddAssetTexture(
         m_device.Get(),
         pCommandList,
-        std::move(allocation),
+        std::move(srvAllocation),
         uploadAllocator,
         textureSrc,
         width,
         height);
 }
 
-TextureHandle Renderer::CreateTexture(
+AssetTextureHandle Renderer::CreateAssetTexture(
     ID3D12GraphicsCommandList7* pCommandList,
-    DescriptorAllocation&& allocation,
+    DescriptorAllocation&& srvAllocation,
     TransientUploadAllocator& uploadAllocator,
     const std::wstring& filePath,
     bool isSRGB,
@@ -1890,10 +1905,10 @@ TextureHandle Renderer::CreateTexture(
     bool flipImage,
     bool isCubeMap)
 {
-    return m_sceneManager.AddTexture(
+    return m_sceneManager.AddAssetTexture(
         m_device.Get(),
         pCommandList,
-        std::move(allocation),
+        std::move(srvAllocation),
         uploadAllocator,
         filePath,
         isSRGB,
@@ -2466,11 +2481,11 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
         };
 
     for (auto& light : m_sceneManager.GetDirectionalLights())
-        processLight(light, GetRequiredArraySize(LightType::DIRECTIONAL));
+        processLight(light, MAX_CASCADES);
     for (auto& light : m_sceneManager.GetPointLights())
-        processLight(light, GetRequiredArraySize(LightType::POINT));
+        processLight(light, POINT_LIGHT_ARRAY_SIZE);
     for (auto& light : m_sceneManager.GetSpotLights())
-        processLight(light, GetRequiredArraySize(LightType::SPOT));
+        processLight(light, SPOT_LIGHT_ARRAY_SIZE);
 }
 
 void Renderer::ProcessInput()

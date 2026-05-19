@@ -30,19 +30,25 @@ namespace D3DHelper
     void DowngradeRootDescriptor(const D3D12_ROOT_DESCRIPTOR1* src, D3D12_ROOT_DESCRIPTOR* dst);
     void DowngradeRootParameters(const D3D12_ROOT_PARAMETER1* src, UINT numParameters, D3D12_ROOT_PARAMETER* dst, std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges, UINT& offset);
 
+    D3D12_RESOURCE_DESC1 GetBufferDesc(UINT64 width, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
+    D3D12_RESOURCE_DESC1 GetTexture2DDesc(UINT64 width, UINT height, UINT16 arraySize, UINT16 mipLevels, DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
+    D3D12_RESOURCE_DESC1 GetTexture3DDesc(UINT64 width, UINT height, UINT16 arraySize, UINT16 mipLevels, DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
+
+    D3D12_RENDER_TARGET_VIEW_DESC GetRtvDesc(DXGI_FORMAT format, UINT mipSlice, UINT planeSlice = 0);
+    D3D12_RENDER_TARGET_VIEW_DESC GetRtvDesc2DArray(DXGI_FORMAT format, UINT mipSlice, UINT firstArraySlice, UINT arraySize, UINT planeSlice = 0);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC GetSrvDesc(DXGI_FORMAT format, UINT mipLevels, UINT planeSlice = 0);
+    D3D12_SHADER_RESOURCE_VIEW_DESC GetSrvDesc2DArray(DXGI_FORMAT format, UINT mipLevels, UINT arraySize, UINT planeSlice = 0);
+    D3D12_SHADER_RESOURCE_VIEW_DESC GetSrvDesc3D(DXGI_FORMAT format, UINT mipLevels);
+    D3D12_SHADER_RESOURCE_VIEW_DESC GetSrvDescCube(DXGI_FORMAT format, UINT mipLevels);
+
+    D3D12_DEPTH_STENCIL_VIEW_DESC GetDsvDesc(DXGI_FORMAT format, D3D12_DSV_FLAGS flags = D3D12_DSV_FLAG_NONE);
+    D3D12_DEPTH_STENCIL_VIEW_DESC GetDsvDesc2DArray(DXGI_FORMAT format, UINT arraySlice, D3D12_DSV_FLAGS flags = D3D12_DSV_FLAG_NONE);
+
     void CreateUploadBuffer(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadBuffer);
     void CreateDefaultBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultBuffer);
-    void CreateDefaultTexture(ID3D12Device10* pDevice, UINT64 width, UINT height, ComPtr<ID3D12Resource>& defaultTexture);
-    void CreateRenderTarget(ID3D12Device10* pDevice, UINT64 width, UINT height, DXGI_FORMAT format, DXGI_FORMAT rtvFormat, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& renderTarget, D3D12_CLEAR_VALUE* pClearValue = nullptr);
-    void CreateDepthStencilBuffer(ID3D12Device10* pDevice, UINT64 width, UINT height, UINT16 depthOrArraySize, ComPtr<ID3D12Resource>& depthStencilBuffer, bool useStencil, D3D12_CLEAR_VALUE* pClearValue = nullptr);
 
-    void CreateRTV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, bool isArray = false, UINT firstArraySlice = 0);
-    void CreateDSV(ID3D12Device10* pDevice, ID3D12Resource* pResource, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, bool useStencil, bool isReadOnly, bool isArray = false, UINT firstArraySlice = 0);
-    void CreateSRV(ID3D12Device10* pDevice, ID3D12Resource* pResource, DXGI_FORMAT format, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, UINT planeSlice = 0);
     void CreateCBV(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr, UINT size, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
-
-    D3D12_RESOURCE_DESC1 GetDepthStencilBufferDesc(UINT64 width, UINT height, UINT16 depthOrArraySize, bool useStencil);
-    D3D12_RESOURCE_DESC1 GetRenderTargetDesc(UINT64 width, UINT height, UINT16 depthOrArraySize, DXGI_FORMAT format);
 
     void UpdateSubresources(
         ID3D12Device* pDevice,
@@ -75,19 +81,11 @@ namespace D3DHelper
         D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
         const std::vector<UINT32>& indices);
 
-    void CreateSRVForShadow(
-        ID3D12Device10* pDevice,
-        ID3D12Resource* pResource,
-        D3D12_CPU_DESCRIPTOR_HANDLE srvCpuHandle,
-        LightType type);
-
     void CreateSampler(
         ID3D12Device* pDevice,
         TextureFiltering filtering,
         TextureAddressingMode addressingMode,
         D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
-
-    UINT16 GetRequiredArraySize(LightType type);
 
     UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format);
 
