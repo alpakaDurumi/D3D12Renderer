@@ -1,7 +1,5 @@
 #pragma once
 
-#include <d3d12.h>
-
 #include "GpuResource.h"
 
 class Texture : public GpuResource
