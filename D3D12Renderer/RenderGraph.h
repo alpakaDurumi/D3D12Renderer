@@ -11,18 +11,19 @@
 #include <tuple>
 #include <unordered_map>
 #include <functional>
+#include <string>
 
 #include "RenderGraphNode.h"
 #include "CacheKeys.h"
 #include "D3DHelper.h"
+#include "RendererConfig.h"
 
 class RenderGraph
 {
 public:
-    void Init(ID3D12Device10* pDevice, UINT frameCount)
+    void Init(ID3D12Device10* pDevice)
     {
         m_pDevice = pDevice;
-        SetFrameCount(frameCount);
     }
 
     // Each register functions have two versions: Static list vs Dynamic list
@@ -145,11 +146,6 @@ public:
         auto desc = m_textureGroups[texture.index].pResources.front()->GetDesc();
         UINT8 planeCount = D3DHelper::GetFormatPlaneCount(pDevice, desc.Format);
         return { desc.MipLevels, desc.DepthOrArraySize, planeCount };
-    }
-
-    void SetFrameCount(UINT frameCount)
-    {
-        m_frameCount = frameCount;
     }
 
     UINT GetElementCount(RGBuffer buffer) const
@@ -364,7 +360,7 @@ private:
         std::vector<ResourceGroup>& groups)
     {
         auto& group = groups[index];
-        UINT offset = group.isPerFrame ? elementIndex * m_frameCount : elementIndex;
+        UINT offset = group.isPerFrame ? elementIndex * FrameCount : elementIndex;
         std::copy(pResources.begin(), pResources.end(), group.pResources.begin() + offset);
     }
 
@@ -374,10 +370,10 @@ private:
         UINT frameIndex,
         const std::vector<ResourceGroup>& groups) const
     {
-        assert(elementIndex < groups[index].elementCount && frameIndex < m_frameCount);
+        assert(elementIndex < groups[index].elementCount && frameIndex < FrameCount);
 
         bool isPerFrame = groups[index].isPerFrame;
-        UINT idx = isPerFrame ? elementIndex * m_frameCount + frameIndex : elementIndex;
+        UINT idx = isPerFrame ? elementIndex * FrameCount + frameIndex : elementIndex;
 
         return groups[index].pResources[idx];
     }
@@ -386,7 +382,6 @@ private:
     std::vector<ResourceGroup> m_textureGroups;
     std::unordered_map<std::string, UINT> m_bufferMap;
     std::unordered_map<std::string, UINT> m_textureMap;
-    UINT m_frameCount;
 
     ID3D12Device10* m_pDevice;
 };

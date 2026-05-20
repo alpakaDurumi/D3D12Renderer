@@ -1019,7 +1019,7 @@ void Renderer::LoadAssets()
     WaitForGPU();
 
     // Render Graph
-    m_renderGraph.Init(m_device.Get(), FrameCount);
+    m_renderGraph.Init(m_device.Get());
 
     // Back buffer
     RGTexture backBuffer = m_renderGraph.RegisterTexture(

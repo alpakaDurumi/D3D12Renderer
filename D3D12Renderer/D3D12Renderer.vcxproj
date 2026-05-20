@@ -224,6 +224,7 @@
     <ClInclude Include="GeometryData.h" />
     <ClInclude Include="GpuResource.h" />
     <ClInclude Include="InstanceData.h" />
+    <ClInclude Include="RendererConfig.h" />
     <ClInclude Include="RenderGraph.h" />
     <ClInclude Include="SceneHandles.h" />
     <ClInclude Include="SceneManager.h" />

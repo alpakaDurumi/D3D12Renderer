@@ -7,12 +7,13 @@
 
 #include <array>
 #include <cstddef>
-#include <vector>
+#include <utility>
 
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
 #include "SharedConfig.h"
 #include "View.h"
+#include "RendererConfig.h"
 
 enum class TextureSlot
 {
@@ -36,8 +37,9 @@ public:
         ID3D12Device10* pDevice,
         DescriptorAllocation&& allocation)
     {
-        for (auto& alloc : allocation.Split())
-            m_cbvs.emplace_back(std::move(alloc));
+        auto cbvAllocs = allocation.Split();
+        for (UINT i = 0; i < FrameCount; ++i)
+            m_cbvs[i] = ConstantBufferView(std::move(cbvAllocs[i]));
 
         m_textureAddressingModes.fill(TextureAddressingMode::WRAP);
     }
@@ -140,7 +142,7 @@ private:
     }
 
     MaterialConstantData m_constantData;
-    std::vector<ConstantBufferView> m_cbvs;
+    std::array<ConstantBufferView, FrameCount> m_cbvs;
 
     std::array<TextureAddressingMode, static_cast<std::size_t>(TextureSlot::NUM_TEXTURE_SLOTS)> m_textureAddressingModes;
 
