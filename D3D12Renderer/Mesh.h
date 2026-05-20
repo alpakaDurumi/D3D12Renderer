@@ -1,15 +1,13 @@
 #pragma once
 
 #include <Windows.h>
-#include <wrl/client.h>
 
 #include <d3d12.h>
 
 #include "GeometryData.h"
 #include "TransientUploadAllocator.h"
 #include "SceneHandles.h"
-
-using Microsoft::WRL::ComPtr;
+#include "Buffer.h"
 
 class Mesh
 {
@@ -28,11 +26,11 @@ public:
     void SetMaterial(MaterialHandle handle);
 
 private:
-    ComPtr<ID3D12Resource> m_vertexBuffer;
-    D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+    Buffer m_vertexBuffer;
+    D3D12_VERTEX_BUFFER_VIEW m_vbv;
 
-    ComPtr<ID3D12Resource> m_indexBuffer;
-    D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
+    Buffer m_indexBuffer;
+    D3D12_INDEX_BUFFER_VIEW m_ibv;
     UINT m_numIndices = 0;
 
     MaterialHandle m_material;

@@ -11,7 +11,6 @@
 
 #include "RendererConfig.h"
 #include "UploadAllocation.h"
-#include "GeometryData.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -44,8 +43,6 @@ namespace D3DHelper
     D3D12_DEPTH_STENCIL_VIEW_DESC GetDsvDesc(DXGI_FORMAT format, D3D12_DSV_FLAGS flags = D3D12_DSV_FLAG_NONE);
     D3D12_DEPTH_STENCIL_VIEW_DESC GetDsvDesc2DArray(DXGI_FORMAT format, UINT arraySlice, D3D12_DSV_FLAGS flags = D3D12_DSV_FLAG_NONE);
 
-    void CreateDefaultBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultBuffer);
-
     void UpdateSubresources(
         ID3D12Device* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
@@ -60,22 +57,6 @@ namespace D3DHelper
     D3D12_BARRIER_GROUP BufferBarrierGroup(UINT32 numBarriers, D3D12_BUFFER_BARRIER* pBarriers);
     D3D12_BARRIER_GROUP TextureBarrierGroup(UINT32 numBarriers, D3D12_TEXTURE_BARRIER* pBarriers);
     D3D12_BARRIER_GROUP GlobalBarrierGroup(UINT32 numBarriers, D3D12_GLOBAL_BARRIER* pBarriers);
-
-    void CreateVertexBuffer(
-        ID3D12Device10* pDevice,
-        ID3D12GraphicsCommandList7* pCommandList,
-        UploadAllocation intermediate,
-        ComPtr<ID3D12Resource>& vertexBuffer,
-        D3D12_VERTEX_BUFFER_VIEW* pVertexBufferView,
-        const std::vector<Vertex>& vertices);
-
-    void CreateIndexBuffer(
-        ID3D12Device10* pDevice,
-        ID3D12GraphicsCommandList7* pCommandList,
-        UploadAllocation intermediate,
-        ComPtr<ID3D12Resource>& indexBuffer,
-        D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
-        const std::vector<UINT32>& indices);
 
     void CreateSampler(
         ID3D12Device* pDevice,
