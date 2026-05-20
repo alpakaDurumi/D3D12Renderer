@@ -1179,7 +1179,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT matIdx = 0;
     for (auto& mat : m_sceneManager.GetMaterials())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, matIdx, 1, mat.GetCbvHandle(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, matIdx, 1, mat.GetCbvHandle());
         ++matIdx;
     }
 
@@ -1187,17 +1187,17 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT lightIdx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
         ++lightIdx;
     }
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
         ++lightIdx;
     }
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
         ++lightIdx;
     }
 
@@ -1823,13 +1823,13 @@ void Renderer::SetTextureFiltering(TextureFiltering filtering)
 // Allocate Material
 MaterialHandle Renderer::CreateMaterial()
 {
-    return m_sceneManager.AddMaterial(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount));
+    return m_sceneManager.AddMaterial(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
 }
 
 // Allocate & register Material
 MaterialHandle Renderer::CreateMaterial(const AssetID& id)
 {
-    return m_sceneManager.AddMaterial(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount), id);
+    return m_sceneManager.AddMaterial(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(), id);
 }
 
 MaterialHandle Renderer::CloneMaterial(MaterialHandle src)
@@ -1852,7 +1852,7 @@ DirectionalLightHandle Renderer::CreateDirectionalLight()
         m_device.Get(),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(MAX_CASCADES),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
         m_shadowMapResolution);
 }
 
@@ -1862,7 +1862,7 @@ PointLightHandle Renderer::CreatePointLight()
         m_device.Get(),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(POINT_LIGHT_ARRAY_SIZE),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(POINT_LIGHT_ARRAY_SIZE),
         m_shadowMapResolution);
 }
@@ -1873,7 +1873,7 @@ SpotLightHandle Renderer::CreateSpotLight()
         m_device.Get(),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(SPOT_LIGHT_ARRAY_SIZE),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameCount),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
         m_shadowMapResolution);
 }
 
@@ -2466,7 +2466,7 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
     for (auto& mat : m_sceneManager.GetMaterials())
     {
         auto alloc = frameResource.PushConstantData(mat.GetConstantDataPtr(), sizeof(MaterialConstantData));
-        mat.InitCbv(m_device.Get(), m_frameIndex, alloc.GPUPtr);
+        mat.InitCbv(m_device.Get(), alloc.GPUPtr);
     }
 
     auto processLight = [&](Light& light, UINT arraySize)
@@ -2477,7 +2477,7 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
                 light.SetCameraUploadAllocation(i, alloc);
             }
             auto alloc = frameResource.PushConstantData(light.GetLightConstantDataPtr(), sizeof(LightConstantData));
-            light.InitLightCbv(m_device.Get(), m_frameIndex, alloc.GPUPtr);
+            light.InitLightCbv(m_device.Get(), alloc.GPUPtr);
         };
 
     for (auto& light : m_sceneManager.GetDirectionalLights())

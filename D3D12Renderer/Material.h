@@ -35,11 +35,8 @@ public:
     Material(
         ID3D12Device10* pDevice,
         DescriptorAllocation&& allocation)
+        : m_cbv(std::move(allocation))
     {
-        auto cbvAllocs = allocation.Split();
-        for (UINT i = 0; i < FrameCount; ++i)
-            m_cbvs[i] = ConstantBufferView(std::move(cbvAllocs[i]));
-
         m_textureAddressingModes.fill(TextureAddressingMode::WRAP);
     }
 
@@ -107,14 +104,14 @@ public:
         return &m_constantData;
     }
 
-    D3D12_CPU_DESCRIPTOR_HANDLE GetCbvHandle(UINT frameIndex) const
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCbvHandle() const
     {
-        return m_cbvs[frameIndex].GetHandle();
+        return m_cbv.GetHandle();
     }
 
-    void InitCbv(ID3D12Device10* pDevice, UINT frameIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr)
+    void InitCbv(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr)
     {
-        m_cbvs[frameIndex].Init(pDevice, gpuPtr, sizeof(MaterialConstantData));
+        m_cbv.Init(pDevice, gpuPtr, sizeof(MaterialConstantData));
     }
 
     void CopyDataFrom(const Material& src)
@@ -141,7 +138,7 @@ private:
     }
 
     MaterialConstantData m_constantData;
-    std::array<ConstantBufferView, FrameCount> m_cbvs;
+    ConstantBufferView m_cbv;
 
     std::array<TextureAddressingMode, static_cast<std::size_t>(TextureSlot::NUM_TEXTURE_SLOTS)> m_textureAddressingModes;
 

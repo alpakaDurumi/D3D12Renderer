@@ -11,7 +11,6 @@
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
 #include "SharedConfig.h"
-#include "RendererConfig.h"
 #include "UploadAllocation.h"
 #include "Texture.h"
 #include "View.h"
@@ -58,8 +57,8 @@ public:
     UploadAllocation GetCameraUploadAllocation(UINT arrayIndex);
 
     LightConstantData* GetLightConstantDataPtr();
-    D3D12_CPU_DESCRIPTOR_HANDLE GetLightCbvHandle(UINT frameIndex) const;
-    void InitLightCbv(ID3D12Device10* pDevice, UINT frameIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr);
+    D3D12_CPU_DESCRIPTOR_HANDLE GetLightCbvHandle() const;
+    void InitLightCbv(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr);
 
     virtual std::vector<GpuResource> TakeResources();
 
@@ -70,7 +69,7 @@ protected:
     std::vector<UploadAllocation> m_cameraUploadAllocations;    // transient, for single frame
 
     LightConstantData m_lightConstantData;
-    std::array<ConstantBufferView, FrameCount> m_lightCbvs;
+    ConstantBufferView m_lightCbv;
 
     LightType m_type;
 
