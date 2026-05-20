@@ -1823,13 +1823,13 @@ void Renderer::SetTextureFiltering(TextureFiltering filtering)
 // Allocate Material
 MaterialHandle Renderer::CreateMaterial()
 {
-    return m_sceneManager.AddMaterial(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
+    return m_sceneManager.AddMaterial(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
 }
 
 // Allocate & register Material
 MaterialHandle Renderer::CreateMaterial(const AssetID& id)
 {
-    return m_sceneManager.AddMaterial(m_device.Get(), m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(), id);
+    return m_sceneManager.AddMaterial(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(), id);
 }
 
 MaterialHandle Renderer::CloneMaterial(MaterialHandle src)

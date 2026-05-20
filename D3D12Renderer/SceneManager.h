@@ -234,14 +234,14 @@ public:
     }
 
     // Material
-    MaterialHandle AddMaterial(ID3D12Device10* pDevice, DescriptorAllocation&& allocation)
+    MaterialHandle AddMaterial(DescriptorAllocation&& allocation)
     {
-        return m_materials.Add(Material(pDevice, std::move(allocation)));
+        return m_materials.Add(Material(std::move(allocation)));
     }
 
-    MaterialHandle AddMaterial(ID3D12Device10* pDevice, DescriptorAllocation&& allocation, const AssetID& id)
+    MaterialHandle AddMaterial(DescriptorAllocation&& allocation, const AssetID& id)
     {
-        auto handle = m_materials.Add(Material(pDevice, std::move(allocation)));
+        auto handle = m_materials.Add(Material(std::move(allocation)));
         m_materialRegistry[id] = handle;
         return handle;
     }

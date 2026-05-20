@@ -32,9 +32,7 @@ enum class RenderingPath
 class Material
 {
 public:
-    Material(
-        ID3D12Device10* pDevice,
-        DescriptorAllocation&& allocation)
+    Material(DescriptorAllocation&& allocation)
         : m_cbv(std::move(allocation))
     {
         m_textureAddressingModes.fill(TextureAddressingMode::WRAP);
