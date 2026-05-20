@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "D3DHelper.h"
-#include "SharedConfig.h"
+#include "RendererConfig.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;

@@ -9,7 +9,7 @@
 #include <vector>
 #include <string>
 
-#include "SharedConfig.h"
+#include "RendererConfig.h"
 #include "UploadAllocation.h"
 #include "GeometryData.h"
 

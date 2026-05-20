@@ -26,7 +26,6 @@
 #include "ImGuiDescriptorAllocator.h"
 #include "CacheKeys.h"
 #include "Light.h"
-#include "SharedConfig.h"
 #include "RenderGraph.h"
 #include "TransientUploadAllocator.h"
 #include "Aliases.h"

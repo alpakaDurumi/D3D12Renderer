@@ -2,7 +2,6 @@
 #include "Light.h"
 
 #include "D3DHelper.h"
-#include "SharedConfig.h"
 
 using namespace D3DHelper;
 

@@ -11,7 +11,6 @@
 
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
-#include "SharedConfig.h"
 #include "View.h"
 #include "RendererConfig.h"
 
