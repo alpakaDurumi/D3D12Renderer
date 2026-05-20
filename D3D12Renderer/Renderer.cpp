@@ -91,6 +91,81 @@ static std::wstring GetLatestWinPixGpuCapturerPath_Cpp17()
     return pixInstallationPath / newestVersionFound / L"WinPixGpuCapturer.dll";
 }
 
+static D3D12_SAMPLER_DESC GetSamplerDesc(
+    TextureFiltering filtering,
+    TextureAddressingMode addressingMode)
+{
+    D3D12_SAMPLER_DESC desc = {};
+
+    switch (filtering)
+    {
+    case TextureFiltering::POINT:
+        desc.Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
+        desc.MaxAnisotropy = 0;
+        break;
+    case TextureFiltering::BILINEAR:
+        desc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+        desc.MaxAnisotropy = 0;
+        break;
+    case TextureFiltering::ANISOTROPIC_X2:
+        desc.Filter = D3D12_FILTER_ANISOTROPIC;
+        desc.MaxAnisotropy = 2;
+        break;
+    case TextureFiltering::ANISOTROPIC_X4:
+        desc.Filter = D3D12_FILTER_ANISOTROPIC;
+        desc.MaxAnisotropy = 4;
+        break;
+    case TextureFiltering::ANISOTROPIC_X8:
+        desc.Filter = D3D12_FILTER_ANISOTROPIC;
+        desc.MaxAnisotropy = 8;
+        break;
+    case TextureFiltering::ANISOTROPIC_X16:
+        desc.Filter = D3D12_FILTER_ANISOTROPIC;
+        desc.MaxAnisotropy = 16;
+        break;
+    }
+
+    switch (addressingMode)
+    {
+    case TextureAddressingMode::WRAP:
+        desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        break;
+    case TextureAddressingMode::MIRROR:
+        desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+        desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+        desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+        break;
+    case TextureAddressingMode::CLAMP:
+        desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+        break;
+    case TextureAddressingMode::BORDER:
+        desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+        break;
+    case TextureAddressingMode::MIRROR_ONCE:
+        desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
+        desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
+        desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
+        break;
+    }
+
+    desc.MipLODBias = 0;
+    desc.ComparisonFunc = D3D12_COMPARISON_FUNC_NONE;
+    desc.BorderColor[0] = 0.0f;
+    desc.BorderColor[1] = 0.0f;
+    desc.BorderColor[2] = 0.0f;
+    desc.BorderColor[3] = 0.0f;
+    desc.MinLOD = 0.0f;
+    desc.MaxLOD = D3D12_FLOAT32_MAX;
+
+    return desc;
+}
+
 // Wrappers of callback functions for ImGui SRV descriptor
 void Renderer::ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
 {
@@ -882,8 +957,9 @@ void Renderer::LoadAssets()
         for (UINT j = 0; j < static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES); ++j)
         {
             UINT idx = i * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES) + j;
-            auto cpuHandle = GetCPUDescriptorHandle(baseCPUHandle, idx, incrementSize);
-            CreateSampler(m_device.Get(), static_cast<TextureFiltering>(i), static_cast<TextureAddressingMode>(j), cpuHandle);
+            const auto cpuHandle = GetCPUDescriptorHandle(baseCPUHandle, idx, incrementSize);
+            const auto samplerDesc = GetSamplerDesc(static_cast<TextureFiltering>(i), static_cast<TextureAddressingMode>(j));
+            m_device->CreateSampler(&samplerDesc, cpuHandle);
         }
     }
 

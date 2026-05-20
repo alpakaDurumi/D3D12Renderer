@@ -8,8 +8,6 @@
 #include <vector>
 #include <string>
 
-#include "RendererConfig.h"
-
 namespace D3DHelper
 {
     void ThrowIfFailed(HRESULT hr);
@@ -53,12 +51,6 @@ namespace D3DHelper
     D3D12_BARRIER_GROUP BufferBarrierGroup(UINT32 numBarriers, D3D12_BUFFER_BARRIER* pBarriers);
     D3D12_BARRIER_GROUP TextureBarrierGroup(UINT32 numBarriers, D3D12_TEXTURE_BARRIER* pBarriers);
     D3D12_BARRIER_GROUP GlobalBarrierGroup(UINT32 numBarriers, D3D12_GLOBAL_BARRIER* pBarriers);
-
-    void CreateSampler(
-        ID3D12Device* pDevice,
-        TextureFiltering filtering,
-        TextureAddressingMode addressingMode,
-        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
 
     UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format);
 
