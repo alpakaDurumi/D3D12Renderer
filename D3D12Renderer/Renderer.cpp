@@ -1187,17 +1187,17 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT lightIdx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCBVHandle(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle(m_frameIndex));
         ++lightIdx;
     }
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCBVHandle(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle(m_frameIndex));
         ++lightIdx;
     }
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCBVHandle(m_frameIndex));
+        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle(m_frameIndex));
         ++lightIdx;
     }
 
@@ -2477,7 +2477,7 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
                 light.SetCameraUploadAllocation(i, alloc);
             }
             auto alloc = frameResource.PushConstantData(light.GetLightConstantDataPtr(), sizeof(LightConstantData));
-            CreateCBV(m_device.Get(), alloc.GPUPtr, sizeof(LightConstantData), light.GetLightCBVHandle(m_frameIndex));
+            light.InitLightCbv(m_device.Get(), m_frameIndex, alloc.GPUPtr);
         };
 
     for (auto& light : m_sceneManager.GetDirectionalLights())

@@ -13,7 +13,6 @@ Light::Light(
     UINT shadowMapResolution,
     LightType type)
     : m_srv(std::move(srvAllocation)),
-    m_lightCBVAllocation(std::move(cbvAllocation)),
     m_type(type)
 {
     const UINT16 arraySize = GetRequiredArraySize(m_type);
@@ -22,6 +21,10 @@ Light::Light(
     auto dsvAllocs = dsvAllocation.Split();
     for (UINT i = 0; i < arraySize; ++i)
         m_dsvs[i] = DepthStencilView(std::move(dsvAllocs[i]));
+
+    auto cbvAllocs = cbvAllocation.Split();
+    for (UINT i = 0; i < FrameCount; ++i)
+        m_lightCbvs[i] = ConstantBufferView(std::move(cbvAllocs[i]));
 
     const auto clearValue = CreateClearValue(DXGI_FORMAT_D32_FLOAT, 0.0f, 0);
 
@@ -143,9 +146,14 @@ LightConstantData* Light::GetLightConstantDataPtr()
     return &m_lightConstantData;
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE Light::GetLightCBVHandle(UINT frameIndex) const
+D3D12_CPU_DESCRIPTOR_HANDLE Light::GetLightCbvHandle(UINT frameIndex) const
 {
-    return m_lightCBVAllocation.GetDescriptorHandle(frameIndex);
+    return m_lightCbvs[frameIndex].GetHandle();
+}
+
+void Light::InitLightCbv(ID3D12Device10* pDevice, UINT frameIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr)
+{
+    m_lightCbvs[frameIndex].Init(pDevice, gpuPtr, sizeof(LightConstantData));
 }
 
 std::vector<GpuResource> Light::TakeResources()

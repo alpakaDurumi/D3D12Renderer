@@ -46,8 +46,6 @@ namespace D3DHelper
 
     void CreateDefaultBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultBuffer);
 
-    void CreateCBV(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr, UINT size, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
-
     void UpdateSubresources(
         ID3D12Device* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,

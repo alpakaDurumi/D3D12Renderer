@@ -343,15 +343,6 @@ namespace D3DHelper
             IID_PPV_ARGS(&defaultBuffer)));
     }
 
-    void CreateCBV(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr, UINT size, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
-    {
-        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-        cbvDesc.BufferLocation = gpuPtr;
-        cbvDesc.SizeInBytes = size;
-
-        pDevice->CreateConstantBufferView(&cbvDesc, cpuHandle);
-    }
-
     // Assume that intermediate resource is already mapped
     void UpdateSubresources(
         ID3D12Device* pDevice,
