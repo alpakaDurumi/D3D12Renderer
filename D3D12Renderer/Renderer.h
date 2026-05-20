@@ -26,12 +26,12 @@
 #include "ImGuiDescriptorAllocator.h"
 #include "CacheKeys.h"
 #include "Light.h"
-#include "SharedConfig.h"
 #include "RenderGraph.h"
 #include "TransientUploadAllocator.h"
 #include "Aliases.h"
 #include "SceneManager.h"
 #include "View.h"
+#include "RendererConfig.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -88,8 +88,6 @@ private:
     RECT m_windowRect;
     D3D12_VIEWPORT m_viewport;
     D3D12_RECT m_scissorRect;
-
-    inline static constexpr UINT FrameCount = 2;
 
     // Adapter info
     bool m_useWarpDevice = false;

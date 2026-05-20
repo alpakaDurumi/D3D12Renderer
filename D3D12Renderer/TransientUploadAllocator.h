@@ -9,9 +9,9 @@
 #include <memory>
 #include <cstddef>
 
-#include "D3DHelper.h"
 #include "Utility.h"
 #include "UploadAllocation.h"
+#include "Buffer.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -55,7 +55,7 @@ public:
         auto& currentPage = m_pages[m_currentPageIndex];
 
         UploadAllocation alloc = {
-            currentPage->Resource.Get(),
+            currentPage->UploadBuffer.Get(),
             m_currentOffset,
             static_cast<UINT8*>(currentPage->CPUBasePtr) + m_currentOffset,
             currentPage->GPUBasePtr + m_currentOffset
@@ -94,19 +94,19 @@ private:
     {
         Page(ID3D12Device10* pDevice)
         {
-            D3DHelper::CreateUploadBuffer(pDevice, PAGE_SIZE, Resource);
+            UploadBuffer = Buffer(pDevice, PAGE_SIZE, D3D12_HEAP_TYPE_UPLOAD);
 
             D3D12_RANGE readRange = { 0, 0 };
-            Resource->Map(0, &readRange, &CPUBasePtr);
-            GPUBasePtr = Resource->GetGPUVirtualAddress();
+            UploadBuffer.Get()->Map(0, &readRange, &CPUBasePtr);
+            GPUBasePtr = UploadBuffer.Get()->GetGPUVirtualAddress();
         }
 
         ~Page()
         {
-            Resource->Unmap(0, nullptr);
+            UploadBuffer.Get()->Unmap(0, nullptr);
         }
 
-        ComPtr<ID3D12Resource> Resource;
+        Buffer UploadBuffer;
         void* CPUBasePtr;
         D3D12_GPU_VIRTUAL_ADDRESS GPUBasePtr;
     };

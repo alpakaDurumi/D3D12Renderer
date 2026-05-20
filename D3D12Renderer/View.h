@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Windows.h>
+
 #include <d3d12.h>
 
 #include "DescriptorAllocation.h"
@@ -59,4 +61,18 @@ public:
         DescriptorAllocation&& alloc);
 
     void Init(ID3D12Device10* pDevice, ID3D12Resource* pResource, const D3D12_DEPTH_STENCIL_VIEW_DESC& desc);
+};
+
+class ConstantBufferView : public View
+{
+public:
+    using View::View;
+
+    ConstantBufferView(
+        ID3D12Device10* pDevice,
+        D3D12_GPU_VIRTUAL_ADDRESS gpuPtr,
+        UINT size,
+        DescriptorAllocation&& alloc);
+
+    void Init(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr, UINT size);
 };

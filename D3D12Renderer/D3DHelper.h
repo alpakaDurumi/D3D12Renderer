@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Windows.h>
-#include <wrl/client.h>
 
 #include <d3d12.h>
 #include <dxgi1_6.h>    // DXGI 1.6
@@ -9,11 +8,7 @@
 #include <vector>
 #include <string>
 
-#include "SharedConfig.h"
-#include "UploadAllocation.h"
-#include "GeometryData.h"
-
-using Microsoft::WRL::ComPtr;
+#include "RendererConfig.h"
 
 namespace D3DHelper
 {
@@ -30,7 +25,6 @@ namespace D3DHelper
     void DowngradeRootDescriptor(const D3D12_ROOT_DESCRIPTOR1* src, D3D12_ROOT_DESCRIPTOR* dst);
     void DowngradeRootParameters(const D3D12_ROOT_PARAMETER1* src, UINT numParameters, D3D12_ROOT_PARAMETER* dst, std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges, UINT& offset);
 
-    D3D12_RESOURCE_DESC1 GetBufferDesc(UINT64 width, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
     D3D12_RESOURCE_DESC1 GetTexture2DDesc(UINT64 width, UINT height, UINT16 arraySize, UINT16 mipLevels, DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
     D3D12_RESOURCE_DESC1 GetTexture3DDesc(UINT64 width, UINT height, UINT16 arraySize, UINT16 mipLevels, DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE);
 
@@ -45,41 +39,20 @@ namespace D3DHelper
     D3D12_DEPTH_STENCIL_VIEW_DESC GetDsvDesc(DXGI_FORMAT format, D3D12_DSV_FLAGS flags = D3D12_DSV_FLAG_NONE);
     D3D12_DEPTH_STENCIL_VIEW_DESC GetDsvDesc2DArray(DXGI_FORMAT format, UINT arraySlice, D3D12_DSV_FLAGS flags = D3D12_DSV_FLAG_NONE);
 
-    void CreateUploadBuffer(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadBuffer);
-    void CreateDefaultBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultBuffer);
-
-    void CreateCBV(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr, UINT size, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle);
-
     void UpdateSubresources(
         ID3D12Device* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         ID3D12Resource* pDest,
-        UploadAllocation intermediate,
+        ID3D12Resource* pIntermediate,
+        UINT64 offsetInIntermediate,
+        void* intermediateCpuPtr,
         UINT firstSubresource,
         UINT numSubresources,
         D3D12_SUBRESOURCE_DATA* pSrcData);
 
-    D3D12_RESOURCE_BARRIER GetTransitionBarrier(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after);
-
     D3D12_BARRIER_GROUP BufferBarrierGroup(UINT32 numBarriers, D3D12_BUFFER_BARRIER* pBarriers);
     D3D12_BARRIER_GROUP TextureBarrierGroup(UINT32 numBarriers, D3D12_TEXTURE_BARRIER* pBarriers);
     D3D12_BARRIER_GROUP GlobalBarrierGroup(UINT32 numBarriers, D3D12_GLOBAL_BARRIER* pBarriers);
-
-    void CreateVertexBuffer(
-        ID3D12Device10* pDevice,
-        ID3D12GraphicsCommandList7* pCommandList,
-        UploadAllocation intermediate,
-        ComPtr<ID3D12Resource>& vertexBuffer,
-        D3D12_VERTEX_BUFFER_VIEW* pVertexBufferView,
-        const std::vector<Vertex>& vertices);
-
-    void CreateIndexBuffer(
-        ID3D12Device10* pDevice,
-        ID3D12GraphicsCommandList7* pCommandList,
-        UploadAllocation intermediate,
-        ComPtr<ID3D12Resource>& indexBuffer,
-        D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
-        const std::vector<UINT32>& indices);
 
     void CreateSampler(
         ID3D12Device* pDevice,

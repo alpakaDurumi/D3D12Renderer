@@ -2,7 +2,6 @@
 #include "Light.h"
 
 #include "D3DHelper.h"
-#include "SharedConfig.h"
 
 using namespace D3DHelper;
 
@@ -14,7 +13,7 @@ Light::Light(
     UINT shadowMapResolution,
     LightType type)
     : m_srv(std::move(srvAllocation)),
-    m_lightCBVAllocation(std::move(cbvAllocation)),
+    m_lightCbv(std::move(cbvAllocation)),
     m_type(type)
 {
     const UINT16 arraySize = GetRequiredArraySize(m_type);
@@ -144,9 +143,14 @@ LightConstantData* Light::GetLightConstantDataPtr()
     return &m_lightConstantData;
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE Light::GetLightCBVHandle(UINT frameIndex) const
+D3D12_CPU_DESCRIPTOR_HANDLE Light::GetLightCbvHandle() const
 {
-    return m_lightCBVAllocation.GetDescriptorHandle(frameIndex);
+    return m_lightCbv.GetHandle();
+}
+
+void Light::InitLightCbv(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr)
+{
+    m_lightCbv.Init(pDevice, gpuPtr, sizeof(LightConstantData));
 }
 
 std::vector<GpuResource> Light::TakeResources()

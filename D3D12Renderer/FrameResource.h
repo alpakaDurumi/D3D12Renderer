@@ -12,6 +12,7 @@
 
 #include "Texture.h"
 #include "View.h"
+#include "Buffer.h"
 #include "DescriptorAllocation.h"
 #include "SharedConfig.h"
 #include "TransientUploadAllocator.h"
@@ -106,7 +107,7 @@ private:
     RenderTargetView m_horizontalDilatedMaskRtv;
     ShaderResourceView m_horizontalDilatedMaskSrv;
 
-    ComPtr<ID3D12Resource> m_instanceUploadBuffer;
+    Buffer m_instanceUploadBuffer;
     UINT8* m_instanceBufferBegin = nullptr;
     UINT m_instanceOffsetByte = 0;
     UINT m_instanceCapacity = 1024;

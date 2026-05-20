@@ -4,6 +4,7 @@
 #include "Utility.h"
 #include "DirectXTex.h"
 
+using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
 namespace D3DHelper
@@ -168,24 +169,6 @@ namespace D3DHelper
         }
     }
 
-    D3D12_RESOURCE_DESC1 GetBufferDesc(UINT64 width, D3D12_RESOURCE_FLAGS flags)
-    {
-        D3D12_RESOURCE_DESC1 desc = {};
-        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        desc.Alignment = 0;
-        desc.Width = width;
-        desc.Height = 1;
-        desc.DepthOrArraySize = 1;
-        desc.MipLevels = 1;
-        desc.Format = DXGI_FORMAT_UNKNOWN;
-        desc.SampleDesc = { 1, 0 };
-        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        desc.Flags = flags;
-        desc.SamplerFeedbackMipRegion = {};
-
-        return desc;
-    }
-
     D3D12_RESOURCE_DESC1 GetTexture2DDesc(UINT64 width, UINT height, UINT16 arraySize, UINT16 mipLevels, DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags)
     {
         D3D12_RESOURCE_DESC1 desc = {};
@@ -326,90 +309,14 @@ namespace D3DHelper
         return desc;
     }
 
-    void CreateUploadBuffer(ID3D12Device10* pDevice, UINT64 requiredSize, ComPtr<ID3D12Resource>& uploadBuffer)
-    {
-        D3D12_HEAP_PROPERTIES heapProperties = {};
-        heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
-        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProperties.CreationNodeMask = 1;
-        heapProperties.VisibleNodeMask = 1;
-
-        D3D12_RESOURCE_DESC1 resourceDesc = {};
-        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        resourceDesc.Alignment = 0;
-        resourceDesc.Width = requiredSize;
-        resourceDesc.Height = 1;
-        resourceDesc.DepthOrArraySize = 1;
-        resourceDesc.MipLevels = 1;
-        resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-        resourceDesc.SampleDesc = { 1, 0 };
-        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
-
-        ThrowIfFailed(pDevice->CreateCommittedResource3(
-            &heapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &resourceDesc,
-            D3D12_BARRIER_LAYOUT_UNDEFINED,
-            nullptr,
-            nullptr,
-            0,
-            nullptr,
-            IID_PPV_ARGS(&uploadBuffer)));
-    }
-
-    // For vertex buffer and index buffer
-    void CreateDefaultBuffer(ID3D12Device10* pDevice, UINT64 size, ComPtr<ID3D12Resource>& defaultBuffer)
-    {
-        D3D12_HEAP_PROPERTIES heapProperties = {};
-        heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-        heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProperties.CreationNodeMask = 1;
-        heapProperties.VisibleNodeMask = 1;
-
-        D3D12_RESOURCE_DESC1 resourceDesc = {};
-        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        resourceDesc.Alignment = 0;
-        resourceDesc.Width = size;
-        resourceDesc.Height = 1;
-        resourceDesc.DepthOrArraySize = 1;
-        resourceDesc.MipLevels = 1;
-        resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-        resourceDesc.SampleDesc = { 1, 0 };
-        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-        resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-        resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
-
-        ThrowIfFailed(pDevice->CreateCommittedResource3(
-            &heapProperties,
-            D3D12_HEAP_FLAG_NONE,
-            &resourceDesc,
-            D3D12_BARRIER_LAYOUT_UNDEFINED,
-            nullptr,
-            nullptr,
-            0,
-            nullptr,
-            IID_PPV_ARGS(&defaultBuffer)));
-    }
-
-    void CreateCBV(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr, UINT size, D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle)
-    {
-        D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-        cbvDesc.BufferLocation = gpuPtr;
-        cbvDesc.SizeInBytes = size;
-
-        pDevice->CreateConstantBufferView(&cbvDesc, cpuHandle);
-    }
-
     // Assume that intermediate resource is already mapped
     void UpdateSubresources(
         ID3D12Device* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         ID3D12Resource* pDest,
-        UploadAllocation intermediate,
+        ID3D12Resource* pIntermediate,
+        UINT64 offsetInIntermediate,
+        void* intermediateCpuPtr,
         UINT firstSubresource,
         UINT numSubresources,
         D3D12_SUBRESOURCE_DATA* pSrcData)
@@ -436,8 +343,7 @@ namespace D3DHelper
         // Each subresource
         for (UINT i = 0; i < numSubresources; i++)
         {
-            //D3D12_MEMCPY_DEST DestData = { pData + pLayouts[i].Offset, pLayouts[i].Footprint.RowPitch, SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]) };
-            auto pIntermediateStart = static_cast<UINT8*>(intermediate.CPUPtr) + pLayouts[i].Offset;
+            auto pIntermediateStart = static_cast<UINT8*>(intermediateCpuPtr) + pLayouts[i].Offset;
             auto rowPitch = pLayouts[i].Footprint.RowPitch;
             auto slicePitch = SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]);
             // Each depth (slice)
@@ -459,7 +365,7 @@ namespace D3DHelper
         // Buffer has only one subresource
         if (desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
         {
-            pCommandList->CopyBufferRegion(pDest, 0, intermediate.pResource, intermediate.Offset + pLayouts[0].Offset, pLayouts[0].Footprint.Width);
+            pCommandList->CopyBufferRegion(pDest, 0, pIntermediate, offsetInIntermediate + pLayouts[0].Offset, pLayouts[0].Footprint.Width);
         }
         // Texture has one or more subresources
         else
@@ -472,29 +378,16 @@ namespace D3DHelper
                 dst.SubresourceIndex = i + firstSubresource;
 
                 D3D12_TEXTURE_COPY_LOCATION src = {};
-                src.pResource = intermediate.pResource;
+                src.pResource = pIntermediate;
                 src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
                 src.PlacedFootprint = pLayouts[i];
-                src.PlacedFootprint.Offset += intermediate.Offset;
+                src.PlacedFootprint.Offset += offsetInIntermediate;
 
                 pCommandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
             }
         }
 
         HeapFree(GetProcessHeap(), 0, pMem);
-    }
-
-    // Legacy barrier. Not use
-    D3D12_RESOURCE_BARRIER GetTransitionBarrier(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after)
-    {
-        D3D12_RESOURCE_BARRIER barrier = {};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-        barrier.Transition.pResource = resource.Get();
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        barrier.Transition.StateBefore = before;
-        barrier.Transition.StateAfter = after;
-        return barrier;
     }
 
     D3D12_BARRIER_GROUP BufferBarrierGroup(UINT32 numBarriers, D3D12_BUFFER_BARRIER* pBarriers)
@@ -522,82 +415,6 @@ namespace D3DHelper
         group.NumBarriers = numBarriers;
         group.pGlobalBarriers = pBarriers;
         return group;
-    }
-
-    void CreateVertexBuffer(
-        ID3D12Device10* pDevice,
-        ID3D12GraphicsCommandList7* pCommandList,
-        UploadAllocation intermediate,
-        ComPtr<ID3D12Resource>& vertexBuffer,
-        D3D12_VERTEX_BUFFER_VIEW* pVertexBufferView,
-        const std::vector<Vertex>& vertices)
-    {
-        const UINT vertexBufferSize = UINT(vertices.size()) * UINT(sizeof(Vertex));
-
-        CreateDefaultBuffer(pDevice, vertexBufferSize, vertexBuffer);
-
-        D3D12_SUBRESOURCE_DATA vertexData = {};
-        vertexData.pData = vertices.data();
-        vertexData.RowPitch = vertexBufferSize;
-        vertexData.SlicePitch = vertexData.RowPitch;
-
-        UpdateSubresources(pDevice, pCommandList, vertexBuffer.Get(), intermediate, 0, 1, &vertexData);
-
-        D3D12_BUFFER_BARRIER b = {
-            D3D12_BARRIER_SYNC_COPY,
-            D3D12_BARRIER_SYNC_VERTEX_SHADING,
-            D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_ACCESS_VERTEX_BUFFER,
-            vertexBuffer.Get(),
-            0,
-            UINT64_MAX
-        };
-
-        D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(1, &b) };
-        pCommandList->Barrier(1, barrierGroups);
-
-        // Initialize the vertex buffer view
-        pVertexBufferView->BufferLocation = vertexBuffer->GetGPUVirtualAddress();
-        pVertexBufferView->StrideInBytes = static_cast<UINT>(sizeof(Vertex));
-        pVertexBufferView->SizeInBytes = vertexBufferSize;
-    }
-
-    void CreateIndexBuffer(
-        ID3D12Device10* pDevice,
-        ID3D12GraphicsCommandList7* pCommandList,
-        UploadAllocation intermediate,
-        ComPtr<ID3D12Resource>& indexBuffer,
-        D3D12_INDEX_BUFFER_VIEW* pindexBufferView,
-        const std::vector<UINT32>& indices)
-    {
-        const UINT indexBufferSize = UINT(indices.size()) * UINT(sizeof(UINT32));
-
-        CreateDefaultBuffer(pDevice, indexBufferSize, indexBuffer);
-
-        D3D12_SUBRESOURCE_DATA indexData = {};
-        indexData.pData = indices.data();
-        indexData.RowPitch = indexBufferSize;
-        indexData.SlicePitch = indexData.RowPitch;
-
-        UpdateSubresources(pDevice, pCommandList, indexBuffer.Get(), intermediate, 0, 1, &indexData);
-
-        D3D12_BUFFER_BARRIER b = {
-            D3D12_BARRIER_SYNC_COPY,
-            D3D12_BARRIER_SYNC_INDEX_INPUT,
-            D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_ACCESS_INDEX_BUFFER,
-            indexBuffer.Get(),
-            0,
-            UINT64_MAX
-        };
-
-        D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(1, &b) };
-        pCommandList->Barrier(1, barrierGroups);
-
-        // Initialize the index buffer view
-        pindexBufferView->BufferLocation = indexBuffer->GetGPUVirtualAddress();
-        pindexBufferView->SizeInBytes = indexBufferSize;
-        pindexBufferView->Format = DXGI_FORMAT_R32_UINT;
     }
 
     void CreateSampler(
