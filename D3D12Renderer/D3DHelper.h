@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Windows.h>
-#include <wrl/client.h>
 
 #include <d3d12.h>
 #include <dxgi1_6.h>    // DXGI 1.6
@@ -10,8 +9,6 @@
 #include <string>
 
 #include "RendererConfig.h"
-
-using Microsoft::WRL::ComPtr;
 
 namespace D3DHelper
 {
@@ -52,8 +49,6 @@ namespace D3DHelper
         UINT firstSubresource,
         UINT numSubresources,
         D3D12_SUBRESOURCE_DATA* pSrcData);
-
-    D3D12_RESOURCE_BARRIER GetTransitionBarrier(ComPtr<ID3D12Resource>& resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after);
 
     D3D12_BARRIER_GROUP BufferBarrierGroup(UINT32 numBarriers, D3D12_BUFFER_BARRIER* pBarriers);
     D3D12_BARRIER_GROUP TextureBarrierGroup(UINT32 numBarriers, D3D12_TEXTURE_BARRIER* pBarriers);
