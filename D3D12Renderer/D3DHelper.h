@@ -10,7 +10,6 @@
 #include <string>
 
 #include "RendererConfig.h"
-#include "UploadAllocation.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -47,7 +46,9 @@ namespace D3DHelper
         ID3D12Device* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         ID3D12Resource* pDest,
-        UploadAllocation intermediate,
+        ID3D12Resource* pIntermediate,
+        UINT64 offsetInIntermediate,
+        void* intermediateCpuPtr,
         UINT firstSubresource,
         UINT numSubresources,
         D3D12_SUBRESOURCE_DATA* pSrcData);

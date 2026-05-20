@@ -313,7 +313,9 @@ namespace D3DHelper
         ID3D12Device* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         ID3D12Resource* pDest,
-        UploadAllocation intermediate,
+        ID3D12Resource* pIntermediate,
+        UINT64 offsetInIntermediate,
+        void* intermediateCpuPtr,
         UINT firstSubresource,
         UINT numSubresources,
         D3D12_SUBRESOURCE_DATA* pSrcData)
@@ -340,8 +342,7 @@ namespace D3DHelper
         // Each subresource
         for (UINT i = 0; i < numSubresources; i++)
         {
-            //D3D12_MEMCPY_DEST DestData = { pData + pLayouts[i].Offset, pLayouts[i].Footprint.RowPitch, SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]) };
-            auto pIntermediateStart = static_cast<UINT8*>(intermediate.CPUPtr) + pLayouts[i].Offset;
+            auto pIntermediateStart = static_cast<UINT8*>(intermediateCpuPtr) + pLayouts[i].Offset;
             auto rowPitch = pLayouts[i].Footprint.RowPitch;
             auto slicePitch = SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]);
             // Each depth (slice)
@@ -363,7 +364,7 @@ namespace D3DHelper
         // Buffer has only one subresource
         if (desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
         {
-            pCommandList->CopyBufferRegion(pDest, 0, intermediate.pResource, intermediate.Offset + pLayouts[0].Offset, pLayouts[0].Footprint.Width);
+            pCommandList->CopyBufferRegion(pDest, 0, pIntermediate, offsetInIntermediate + pLayouts[0].Offset, pLayouts[0].Footprint.Width);
         }
         // Texture has one or more subresources
         else
@@ -376,10 +377,10 @@ namespace D3DHelper
                 dst.SubresourceIndex = i + firstSubresource;
 
                 D3D12_TEXTURE_COPY_LOCATION src = {};
-                src.pResource = intermediate.pResource;
+                src.pResource = pIntermediate;
                 src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
                 src.PlacedFootprint = pLayouts[i];
-                src.PlacedFootprint.Offset += intermediate.Offset;
+                src.PlacedFootprint.Offset += offsetInIntermediate;
 
                 pCommandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
             }
