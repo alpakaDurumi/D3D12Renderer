@@ -38,12 +38,12 @@ public:
         m_textureAddressingModes.fill(TextureAddressingMode::WRAP);
     }
 
-    void SetAmbient(XMFLOAT4 ambient)
+    void SetAmbient(DirectX::XMFLOAT4 ambient)
     {
         m_constantData.SetAmbient(ambient);
     }
 
-    void SetSpecular(XMFLOAT4 specular)
+    void SetSpecular(DirectX::XMFLOAT4 specular)
     {
         m_constantData.SetSpecular(specular);
     }

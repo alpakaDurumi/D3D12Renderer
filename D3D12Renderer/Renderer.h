@@ -5,6 +5,7 @@
 
 #include <d3d12.h>
 #include <dxgi1_6.h>    // DXGI 1.6
+#include <DirectXMath.h>
 #include <DirectXCollision.h>
 
 #include <string>
@@ -32,9 +33,6 @@
 #include "SceneManager.h"
 #include "View.h"
 #include "RendererConfig.h"
-
-using Microsoft::WRL::ComPtr;
-using namespace DirectX;
 
 class Renderer
 {
@@ -93,17 +91,17 @@ private:
     bool m_useWarpDevice = false;
 
     // Pipeline objects
-    ComPtr<ID3D12Device10> m_device;
-    ComPtr<IDXGISwapChain3> m_swapChain;
+    Microsoft::WRL::ComPtr<ID3D12Device10> m_device;
+    Microsoft::WRL::ComPtr<IDXGISwapChain3> m_swapChain;
 
     std::unique_ptr<DynamicDescriptorHeap> m_dynamicDescriptorHeapForCbvSrvUav;
-    ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
     std::unique_ptr<CommandQueue> m_commandQueue;
     std::array<std::unique_ptr<DescriptorAllocator>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
     std::vector<std::unique_ptr<FrameResource>> m_frameResources;
 
     std::unique_ptr<RootSignature> m_rootSignature;
-    std::unordered_map<PSOKey, ComPtr<ID3D12PipelineState>> m_pipelineStates;
+    std::unordered_map<PSOKey, Microsoft::WRL::ComPtr<ID3D12PipelineState>> m_pipelineStates;
 
     PSOKey m_currentPSOKey = { PassType::FORWARD_COLORING };
 
@@ -133,7 +131,7 @@ private:
 
     bool m_cameraControl = false;
     bool m_orbiting = false;
-    XMFLOAT3 m_orbitPivot;
+    DirectX::XMFLOAT3 m_orbitPivot;
     float m_orbitDistance = DEFAULT_FOCUS_DIST;
     bool m_panning = false;
 
@@ -215,9 +213,9 @@ private:
     void FixedUpdate(double fixedDt);
 
     void PrepareConstantData(float alpha);
-    void PrepareTransform(Entity& entity, XMMATRIX& accumulated, float alpha);
-    std::vector<BoundingSphere> CalcCascadeSpheres();
-    void PrepareDirectionalLight(DirectionalLight& light, const std::vector<BoundingSphere>& cascadeSpheres);
+    void PrepareTransform(Entity& entity, DirectX::XMMATRIX& accumulated, float alpha);
+    std::vector<DirectX::BoundingSphere> CalcCascadeSpheres();
+    void PrepareDirectionalLight(DirectionalLight& light, const std::vector<DirectX::BoundingSphere>& cascadeSpheres);
     void PreparePointLight(PointLight& light);
     void PrepareSpotLight(SpotLight& light);
 

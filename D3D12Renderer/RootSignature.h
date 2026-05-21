@@ -12,9 +12,6 @@
 #include "D3DHelper.h"
 #include "RendererConfig.h"
 
-using Microsoft::WRL::ComPtr;
-using namespace D3DHelper;
-
 class RootParameter
 {
     friend class RootSignature;
@@ -289,7 +286,7 @@ public:
         else
         {
             UINT offset = 0;
-            DowngradeRootParameters(pParameters, m_numParameters, pDowngradedRootParameters, convertedRanges, offset);
+            D3DHelper::DowngradeRootParameters(pParameters, m_numParameters, pDowngradedRootParameters, convertedRanges, offset);
 
             rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_0;
             rootSignatureDesc.Desc_1_0.NumParameters = m_numParameters;
@@ -299,16 +296,16 @@ public:
             rootSignatureDesc.Desc_1_0.Flags = flag;
         }
 
-        ComPtr<ID3DBlob> signature;
-        ComPtr<ID3DBlob> error;
-        ThrowIfFailed(D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error));
-        ThrowIfFailed(pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+        Microsoft::WRL::ComPtr<ID3DBlob> signature;
+        Microsoft::WRL::ComPtr<ID3DBlob> error;
+        D3DHelper::ThrowIfFailed(D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error));
+        D3DHelper::ThrowIfFailed(pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 
         delete[] pDowngradedRootParameters;
     }
 
 private:
-    ComPtr<ID3D12RootSignature> m_rootSignature;
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
 
     UINT m_numParameters;
     UINT m_numStaticSamplers;

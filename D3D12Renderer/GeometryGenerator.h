@@ -8,8 +8,6 @@
 
 #include "GeometryData.h"
 
-using namespace DirectX;
-
 class GeometryGenerator
 {
 public:
@@ -74,18 +72,18 @@ public:
         const UINT numSectors = 30;
 
         std::vector<Vertex> vertices;
-        const float dPhi = XM_PI / float(numStacks);
-        const float dTheta = XM_2PI / float(numSectors);
+        const float dPhi = DirectX::XM_PI / float(numStacks);
+        const float dTheta = DirectX::XM_2PI / float(numSectors);
         for (UINT i = 0; i <= numStacks; i++)
         {
             float sinPhi, cosPhi;
-            XMScalarSinCos(&sinPhi, &cosPhi, i * dPhi);
+            DirectX::XMScalarSinCos(&sinPhi, &cosPhi, i * dPhi);
             // Detect north pole and set to 0.0f for eliminating floating point error
-            XMFLOAT3 stackStart(0.0f, -radius * cosPhi, i == numStacks ? 0.0f : -radius * sinPhi);
+            DirectX::XMFLOAT3 stackStart(0.0f, -radius * cosPhi, i == numStacks ? 0.0f : -radius * sinPhi);
             for (UINT j = 0; j <= numSectors; j++)
             {
                 float sinTheta, cosTheta;
-                XMScalarSinCos(&sinTheta, &cosTheta, j * dTheta);
+                DirectX::XMScalarSinCos(&sinTheta, &cosTheta, j * dTheta);
 
                 Vertex v;
                 v.position.x = -stackStart.z * sinTheta;
@@ -98,10 +96,10 @@ public:
                 }
                 else
                 {
-                    XMStoreFloat4(&v.tangent, XMVector3Normalize(XMVectorSet(-stackStart.z * cosTheta, 0.0f, -stackStart.z * sinTheta, 0.0f)));
+                    DirectX::XMStoreFloat4(&v.tangent, DirectX::XMVector3Normalize(DirectX::XMVectorSet(-stackStart.z * cosTheta, 0.0f, -stackStart.z * sinTheta, 0.0f)));
                     v.tangent.w = 1.0f;
                 }
-                XMStoreFloat3(&v.normal, XMVector3Normalize(XMLoadFloat3(&v.position)));
+                DirectX::XMStoreFloat3(&v.normal, DirectX::XMVector3Normalize(DirectX::XMLoadFloat3(&v.position)));
 
                 vertices.push_back(v);
             }

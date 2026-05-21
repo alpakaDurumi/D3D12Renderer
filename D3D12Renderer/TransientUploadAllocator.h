@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Windows.h>
-#include <wrl/client.h>
 
 #include <d3d12.h>
 
@@ -12,8 +11,6 @@
 #include "Utility.h"
 #include "UploadAllocation.h"
 #include "Buffer.h"
-
-using Microsoft::WRL::ComPtr;
 
 // Linear allocator using upload heap for transient usage.
 // Fence of CommandQueue ensures the safety of transient allocations,

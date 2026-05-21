@@ -4,6 +4,7 @@
 #include "D3DHelper.h"
 #include "Utility.h"
 
+using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
 
 FrameResource::FrameResource(

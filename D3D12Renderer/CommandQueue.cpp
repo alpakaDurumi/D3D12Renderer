@@ -4,6 +4,7 @@
 #include "D3DHelper.h"
 #include "DynamicDescriptorHeap.h"
 
+using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
 
 CommandQueue::CommandQueue(const ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type)

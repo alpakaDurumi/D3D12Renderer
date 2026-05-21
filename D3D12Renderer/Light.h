@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Windows.h>
-#include <wrl/client.h>
 
 #include <d3d12.h>
 #include <DirectXMath.h>
@@ -14,9 +13,6 @@
 #include "UploadAllocation.h"
 #include "Texture.h"
 #include "View.h"
-
-using Microsoft::WRL::ComPtr;
-using namespace DirectX;
 
 class Light
 {
@@ -36,19 +32,19 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetDsvHandle(UINT index) const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetSrvHandle() const;
 
-    virtual XMVECTOR GetPosition() const;
-    virtual XMVECTOR GetDirection() const;
+    virtual DirectX::XMVECTOR GetPosition() const;
+    virtual DirectX::XMVECTOR GetDirection() const;
     virtual float GetRange() const;
 
     UINT GetIdxInArray() const;
 
-    virtual void SetPosition(XMFLOAT3 pos);
-    virtual void SetPosition(XMVECTOR pos);
-    virtual void SetDirection(XMFLOAT3 dir);
-    virtual void SetDirection(XMVECTOR dir);
+    virtual void SetPosition(DirectX::XMFLOAT3 pos);
+    virtual void SetPosition(DirectX::XMVECTOR pos);
+    virtual void SetDirection(DirectX::XMFLOAT3 dir);
+    virtual void SetDirection(DirectX::XMVECTOR dir);
     virtual void SetRange(float range);
 
-    void SetViewProjection(XMMATRIX view, XMMATRIX projection, UINT idx);
+    void SetViewProjection(DirectX::XMMATRIX view, DirectX::XMMATRIX projection, UINT idx);
 
     void SetIdxInArray(UINT idxInArray);
 
@@ -88,11 +84,11 @@ public:
         DescriptorAllocation&& cbvAllocation,
         UINT shadowMapResolution);
 
-    virtual XMVECTOR GetPosition() const override;
+    virtual DirectX::XMVECTOR GetPosition() const override;
     virtual float GetRange() const override;
 
-    void SetPosition(XMFLOAT3 pos) override;
-    void SetPosition(XMVECTOR pos) override;
+    void SetPosition(DirectX::XMFLOAT3 pos) override;
+    void SetPosition(DirectX::XMVECTOR pos) override;
 
     virtual void SetRange(float range) override;
 };
@@ -108,10 +104,10 @@ public:
         DescriptorAllocation&& rtvAllocation,
         UINT shadowMapResolution);
 
-    XMVECTOR GetDirection() const override;
+    DirectX::XMVECTOR GetDirection() const override;
 
-    void SetDirection(XMFLOAT3 dir) override;
-    void SetDirection(XMVECTOR dir) override;
+    void SetDirection(DirectX::XMFLOAT3 dir) override;
+    void SetDirection(DirectX::XMVECTOR dir) override;
 
     ID3D12Resource* GetRenderTarget() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle(UINT index) const;

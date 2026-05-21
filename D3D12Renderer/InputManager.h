@@ -65,9 +65,9 @@ public:
         m_mousePos = { cx, cy };
     }
 
-    XMINT2 GetAndResetMouseMove()
+    DirectX::XMINT2 GetAndResetMouseMove()
     {
-        XMINT2 delta = m_mouseMove;
+        DirectX::XMINT2 delta = m_mouseMove;
         m_mouseMove = { 0, 0 };
         return delta;
     }

@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "Camera.h"
 
+using namespace DirectX;
+
 Camera::Camera(XMFLOAT3 initialPosition)
 {
     m_prevPosition = initialPosition;

@@ -15,8 +15,6 @@
 
 class CommandQueue;
 
-using Microsoft::WRL::ComPtr;
-
 // DescriptorAllocator class is used to allocate descriptors to the application when loading new resources
 class DescriptorAllocator
 {
@@ -27,7 +25,7 @@ public:
     DescriptorAllocator(DescriptorAllocator&&) = delete;
     DescriptorAllocator& operator=(DescriptorAllocator&&) = delete;
 
-    DescriptorAllocator(const ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap = 256);
+    DescriptorAllocator(const Microsoft::WRL::ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap = 256);
 
     DescriptorAllocation Allocate(UINT32 numDescriptors = 1);
 
@@ -47,6 +45,6 @@ private:
 
     std::mutex m_allocationMutex;
 
-    ComPtr<ID3D12Device10> m_device;
+    Microsoft::WRL::ComPtr<ID3D12Device10> m_device;
     const CommandQueue* m_pCommandQueue;
 };

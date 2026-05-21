@@ -18,8 +18,6 @@
 #include "TransientUploadAllocator.h"
 #include "InstanceData.h"
 
-using Microsoft::WRL::ComPtr;
-
 // Dynamic Data for each frame
 class FrameResource
 {

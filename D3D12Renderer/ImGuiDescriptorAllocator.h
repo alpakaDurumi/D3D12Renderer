@@ -10,8 +10,6 @@
 
 #include "D3DHelper.h"
 
-using namespace D3DHelper;
-
 class ImGuiDescriptorAllocator
 {
 public:
@@ -23,7 +21,7 @@ public:
         heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         heapDesc.NumDescriptors = ImGuiHeapSize;
         heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        ThrowIfFailed(pDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_heap)));
+        D3DHelper::ThrowIfFailed(pDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_heap)));
 
         heapStartCpu = m_heap->GetCPUDescriptorHandleForHeapStart();
         heapStartGpu = m_heap->GetGPUDescriptorHandleForHeapStart();
@@ -53,7 +51,7 @@ public:
     ID3D12DescriptorHeap* GetDescriptorHeap() { return m_heap.Get(); }
 
 private:
-    ComPtr<ID3D12DescriptorHeap> m_heap;
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_heap;
     D3D12_CPU_DESCRIPTOR_HANDLE heapStartCpu;
     D3D12_GPU_DESCRIPTOR_HANDLE heapStartGpu;
     UINT                        heapHandleIncrement;

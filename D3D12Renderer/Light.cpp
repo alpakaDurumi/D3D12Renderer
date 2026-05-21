@@ -3,6 +3,7 @@
 
 #include "D3DHelper.h"
 
+using namespace DirectX;
 using namespace D3DHelper;
 
 Light::Light(

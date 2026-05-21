@@ -12,8 +12,6 @@
 
 class DescriptorAllocation;
 
-using Microsoft::WRL::ComPtr;
-
 // Wrapper for ID3D12DescriptorHeap and provides free list management
 class DescriptorAllocatorPage
 {
@@ -91,7 +89,7 @@ private:
 
     D3D12_DESCRIPTOR_HEAP_TYPE m_heapType;
     UINT32 m_numDescriptorsInHeap;
-    ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
     D3D12_CPU_DESCRIPTOR_HANDLE m_baseDescriptor;
     UINT32 m_descriptorHandleIncrementSize;
     UINT32 m_numFreeHandles;

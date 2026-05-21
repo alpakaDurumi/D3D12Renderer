@@ -1,5 +1,9 @@
 #pragma once
 
+#include <wrl/client.h>
+
+#include <DirectXMath.h>
+
 #include <unordered_map>
 #include <variant>
 #include <cassert>
@@ -147,7 +151,7 @@ public:
         pEntity->transform.emplace();
     }
 
-    void AddTransform(EntityHandle eh, const XMFLOAT3& s, const XMFLOAT3& eulerRad, const XMFLOAT3& t)
+    void AddTransform(EntityHandle eh, const DirectX::XMFLOAT3& s, const DirectX::XMFLOAT3& eulerRad, const DirectX::XMFLOAT3& t)
     {
         auto* pEntity = m_entities.Get(eh);
         if (pEntity->transform.has_value()) assert(false);
@@ -155,7 +159,7 @@ public:
         pEntity->transform.emplace(s, eulerRad, t);
     }
 
-    void ApplyTransform(EntityHandle eh, const XMFLOAT3& s, const XMFLOAT3& eulerRad, const XMFLOAT3& t)
+    void ApplyTransform(EntityHandle eh, const DirectX::XMFLOAT3& s, const DirectX::XMFLOAT3& eulerRad, const DirectX::XMFLOAT3& t)
     {
         auto* pEntity = m_entities.Get(eh);
         if (!pEntity->transform.has_value()) assert(false);
@@ -271,16 +275,16 @@ public:
         return m_materials.GetDense();
     }
 
-    InstanceData BuildInstanceData(const XMFLOAT4X4& transform, UINT matIdx) const
+    InstanceData BuildInstanceData(const DirectX::XMFLOAT4X4& transform, UINT matIdx) const
     {
         InstanceData ret;
 
-        auto world = XMLoadFloat4x4(&transform);
+        auto world = DirectX::XMLoadFloat4x4(&transform);
 
-        XMStoreFloat4x4(&ret.world, XMMatrixTranspose(world));
+        DirectX::XMStoreFloat4x4(&ret.world, DirectX::XMMatrixTranspose(world));
 
-        world.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        XMStoreFloat4x4(&ret.inverseTranspose, XMMatrixInverse(nullptr, world));
+        world.r[3] = DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+        DirectX::XMStoreFloat4x4(&ret.inverseTranspose, DirectX::XMMatrixInverse(nullptr, world));
 
         ret.materialIndex = matIdx;
 
@@ -484,7 +488,7 @@ public:
         UINT width,
         UINT height)
     {
-        auto resourceDesc = GetTexture2DDesc(width, height, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
+        auto resourceDesc = D3DHelper::GetTexture2DDesc(width, height, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
         Texture texture(pDevice, resourceDesc, D3D12_BARRIER_LAYOUT_COPY_DEST, nullptr, D3D12_HEAP_TYPE_DEFAULT);
 
         // Calculate required size for data upload
@@ -558,7 +562,7 @@ public:
             D3DHelper::ConvertToDDS(filePath, isSRGB, useBlockCompress, flipImage);
         }
 
-        ComPtr<ID3D12Resource> resource;
+        Microsoft::WRL::ComPtr<ID3D12Resource> resource;
         std::unique_ptr<uint8_t[]> ddsData;
         std::vector<D3D12_SUBRESOURCE_DATA> subresources;
 

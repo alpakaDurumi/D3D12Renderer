@@ -2,27 +2,25 @@
 
 #include <DirectXMath.h>
 
-using namespace DirectX;
-
 // Scene Editor Camera
 // Position uses fixed timestep interpolation for smoothness.
 // Rotation uses immediate input response for low latency.
 class Camera
 {
 public:
-    Camera(XMFLOAT3 initialPosition = { 0.0f, 0.0f, 0.0f });
+    Camera(DirectX::XMFLOAT3 initialPosition = { 0.0f, 0.0f, 0.0f });
 
     void UpdateRenderState(float alpha);
 
-    XMVECTOR GetCurrentPosition() const;
-    XMVECTOR GetRenderPosition() const;
-    XMVECTOR GetForward() const;
+    DirectX::XMVECTOR GetCurrentPosition() const;
+    DirectX::XMVECTOR GetRenderPosition() const;
+    DirectX::XMVECTOR GetForward() const;
     float GetNearPlane() const;
     float GetFarPlane() const;
-    XMMATRIX GetViewMatrix() const;
-    XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection = true) const;
+    DirectX::XMMATRIX GetViewMatrix() const;
+    DirectX::XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection = true) const;
 
-    void SetCurrentPosition(const XMVECTOR& pos);
+    void SetCurrentPosition(const DirectX::XMVECTOR& pos);
     void SetAspectRatio(float aspectRatio);
     void SetHorizontalFov(float horizontalFov);
 
@@ -30,20 +28,20 @@ public:
     void MoveForward(float speedScale);
     void MoveRight(float speedScale);
     void MoveUp(float speedScale);
-    void Rotate(XMINT2 mouseMove);
-    void Orbit(XMVECTOR pivot, float distance, XMINT2 mouseMove);
-    void Pan(XMINT2 mouseMove);
+    void Rotate(DirectX::XMINT2 mouseMove);
+    void Orbit(DirectX::XMVECTOR pivot, float distance, DirectX::XMINT2 mouseMove);
+    void Pan(DirectX::XMINT2 mouseMove);
 
 private:
     float CalcVerticalFov(float horizontalFov);
 
-    XMFLOAT3 m_prevPosition;
-    XMFLOAT3 m_currPosition;
-    XMFLOAT3 m_renderPosition;
+    DirectX::XMFLOAT3 m_prevPosition;
+    DirectX::XMFLOAT3 m_currPosition;
+    DirectX::XMFLOAT3 m_renderPosition;
 
     float m_yaw;
     float m_pitch;
-    XMFLOAT4 m_rotation = { 0.0f, 0.0f, 0.0f, 1.0f };    // quaternion
+    DirectX::XMFLOAT4 m_rotation = { 0.0f, 0.0f, 0.0f, 1.0f };    // quaternion
 
     float m_verticalFov;
     float m_horizontalFov;

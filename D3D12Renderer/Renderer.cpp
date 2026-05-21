@@ -19,6 +19,8 @@
 #include "Mesh.h"
 #include "Material.h"
 
+using Microsoft::WRL::ComPtr;
+using namespace DirectX;
 using namespace D3DHelper;
 
 // Definition for static member

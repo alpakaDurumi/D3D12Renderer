@@ -138,6 +138,7 @@
     <ClCompile Include="CacheKeys.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CommandQueue.cpp" />
+    <ClCompile Include="ConstantData.cpp" />
     <ClCompile Include="D3DHelper.cpp" />
     <ClCompile Include="DDSTextureLoader12.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>

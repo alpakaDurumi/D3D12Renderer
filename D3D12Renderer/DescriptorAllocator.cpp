@@ -3,6 +3,8 @@
 
 #include "CommandQueue.h"
 
+using Microsoft::WRL::ComPtr;
+
 DescriptorAllocator::DescriptorAllocator(const ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap)
     : m_device(device), m_heapType(type), m_numDescriptorsPerHeap(numDescriptorsPerHeap)
 {

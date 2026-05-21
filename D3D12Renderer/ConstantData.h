@@ -7,8 +7,6 @@
 
 #include "SharedConfig.h"
 
-using namespace DirectX;
-
 // CRTP for 256-byte alignment
 template<typename T>
 struct ConstantData
@@ -23,89 +21,56 @@ struct ConstantData
 
 struct CameraConstantData : public ConstantData<CameraConstantData>
 {
-    XMFLOAT3 cameraPos;
+    DirectX::XMFLOAT3 cameraPos;
     float padding0;
-    XMFLOAT4X4 view;
-    XMFLOAT4X4 projection;
-    XMFLOAT4X4 invView;
-    XMFLOAT4X4 invProj;
+    DirectX::XMFLOAT4X4 view;
+    DirectX::XMFLOAT4X4 projection;
+    DirectX::XMFLOAT4X4 invView;
+    DirectX::XMFLOAT4X4 invProj;
     float padding1[60];
 
-    void SetPos(XMVECTOR pos)
-    {
-        XMStoreFloat3(&this->cameraPos, pos);
-    }
-
-    void SetView(XMMATRIX view)
-    {
-        XMStoreFloat4x4(&this->view, XMMatrixTranspose(view));
-        XMStoreFloat4x4(&this->invView, XMMatrixTranspose(XMMatrixInverse(nullptr, view)));
-    }
-
-    void SetProjection(XMMATRIX projection)
-    {
-        XMStoreFloat4x4(&this->projection, XMMatrixTranspose(projection));
-        XMStoreFloat4x4(&this->invProj, XMMatrixTranspose(XMMatrixInverse(nullptr, projection)));
-    }
+    void SetPos(DirectX::XMVECTOR pos);
+    void SetView(DirectX::XMMATRIX view);
+    void SetProjection(DirectX::XMMATRIX projection);
 };
 
 struct LightConstantData : public ConstantData<LightConstantData>
 {
-    XMFLOAT3 lightPos = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    DirectX::XMFLOAT3 lightPos = DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f);
     float range = 50.0f;
-    XMFLOAT3 lightDir = XMFLOAT3(0.0f, 0.0f, 1.0f);
+    DirectX::XMFLOAT3 lightDir = DirectX::XMFLOAT3(0.0f, 0.0f, 1.0f);
     float cosOuterAngle;
-    XMFLOAT3 lightColor = XMFLOAT3(1.0f, 1.0f, 1.0f);
+    DirectX::XMFLOAT3 lightColor = DirectX::XMFLOAT3(1.0f, 1.0f, 1.0f);
     float cosInnerAngle;
-    XMFLOAT4X4 viewProjection[POINT_LIGHT_ARRAY_SIZE];
+    DirectX::XMFLOAT4X4 viewProjection[POINT_LIGHT_ARRAY_SIZE];
     UINT type;
     UINT idxInArray;
     float lightIntensity = 1.0f;
     float padding[17];
 
-    void SetPos(XMVECTOR pos)
-    {
-        XMStoreFloat3(&this->lightPos, pos);
-    }
-
-    void SetLightDir(XMVECTOR lightDir)
-    {
-        lightDir = XMVector3Normalize(lightDir);
-        XMStoreFloat3(&this->lightDir, lightDir);
-    }
-
-    void SetViewProjection(XMMATRIX viewProjection, UINT idx)
-    {
-        XMStoreFloat4x4(&this->viewProjection[idx], XMMatrixTranspose(viewProjection));
-    }
+    void SetPos(DirectX::XMVECTOR pos);
+    void SetLightDir(DirectX::XMVECTOR lightDir);
+    void SetViewProjection(DirectX::XMMATRIX viewProjection, UINT idx);
 };
 
 struct MaterialConstantData : public ConstantData<MaterialConstantData>
 {
-    XMFLOAT3 materialAmbient;
+    DirectX::XMFLOAT3 materialAmbient;
     float padding0;
-    XMFLOAT3 materialSpecular;
+    DirectX::XMFLOAT3 materialSpecular;
     float shininess;
     UINT textureIndices[4];
     UINT samplerIndices[4];
     float textureTileScales[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
     float padding1[44];
 
-    // Use linear color for gamma-correct rendering
-    void SetAmbient(XMFLOAT4 ambient)
-    {
-        XMStoreFloat3(&this->materialAmbient, XMColorSRGBToRGB(XMLoadFloat4(&ambient)));
-    }
-
-    void SetSpecular(XMFLOAT4 specular)
-    {
-        XMStoreFloat3(&this->materialSpecular, XMColorSRGBToRGB(XMLoadFloat4(&specular)));
-    }
+    void SetAmbient(DirectX::XMFLOAT4 ambient);
+    void SetSpecular(DirectX::XMFLOAT4 specular);
 };
 
 struct ShadowConstantData : public ConstantData<ShadowConstantData>
 {
     // Each cascade split should be stored in x component. Use XMFLOAT4 because of HLSL alignment rule.
-    XMFLOAT4 cascadeSplits[MAX_CASCADES];
+    DirectX::XMFLOAT4 cascadeSplits[MAX_CASCADES];
     float padding[48];
 };

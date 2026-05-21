@@ -236,7 +236,7 @@ public:
                         {
                             for (UINT mip = IndexOrFirstMipLevel; mip < IndexOrFirstMipLevel + NumMipLevels; ++mip)
                             {
-                                UINT subresourceIndex = CalcSubresourceIndex(mip, array, plane, mipLevels, depthOrArraySize);
+                                UINT subresourceIndex = D3DHelper::CalcSubresourceIndex(mip, array, plane, mipLevels, depthOrArraySize);
 
                                 if (latestUsages[subresourceIndex] != usage)
                                 {
@@ -282,7 +282,7 @@ public:
                         {
                             for (UINT mip = IndexOrFirstMipLevel; mip < IndexOrFirstMipLevel + NumMipLevels; ++mip)
                             {
-                                UINT subresourceIndex = CalcSubresourceIndex(mip, array, plane, mipLevels, depthOrArraySize);
+                                UINT subresourceIndex = D3DHelper::CalcSubresourceIndex(mip, array, plane, mipLevels, depthOrArraySize);
 
                                 if (latestUsages[subresourceIndex] != usage)
                                 {
