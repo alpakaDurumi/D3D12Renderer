@@ -22,7 +22,7 @@ Mesh::Mesh(
     vertexData.RowPitch = vertexBufferSize;
     vertexData.SlicePitch = vertexData.RowPitch;
 
-    UpdateSubresources(pDevice, pCommandList, m_vertexBuffer.Get(), vbAlloc.pResource, vbAlloc.Offset, vbAlloc.CPUPtr, 0, 1, &vertexData);
+    UpdateSubresources(pDevice, pCommandList, m_vertexBuffer.Get(), vbAlloc.pResource, vbAlloc.offset, vbAlloc.cpuPtr, 0, 1, &vertexData);
 
     // Index Buffer
     m_numIndices = UINT(geometryData.indices.size());
@@ -36,7 +36,7 @@ Mesh::Mesh(
     indexData.RowPitch = indexBufferSize;
     indexData.SlicePitch = indexData.RowPitch;
 
-    UpdateSubresources(pDevice, pCommandList, m_indexBuffer.Get(), ibAlloc.pResource, ibAlloc.Offset, ibAlloc.CPUPtr, 0, 1, &indexData);
+    UpdateSubresources(pDevice, pCommandList, m_indexBuffer.Get(), ibAlloc.pResource, ibAlloc.offset, ibAlloc.cpuPtr, 0, 1, &indexData);
 
     // Barrier
     D3D12_BUFFER_BARRIER barriers[2] = {
@@ -72,12 +72,12 @@ Mesh::Mesh(
     m_ibv.Format = DXGI_FORMAT_R32_UINT;
 }
 
-const D3D12_VERTEX_BUFFER_VIEW& Mesh::GetVBV() const
+const D3D12_VERTEX_BUFFER_VIEW& Mesh::GetVbv() const
 {
     return m_vbv;
 }
 
-const D3D12_INDEX_BUFFER_VIEW& Mesh::GetIBV() const
+const D3D12_INDEX_BUFFER_VIEW& Mesh::GetIbv() const
 {
     return m_ibv;
 }

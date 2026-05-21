@@ -499,7 +499,7 @@ public:
         textureData.RowPitch = width * 4;   // 4 bytes per pixel (RGBA)
         textureData.SlicePitch = textureData.RowPitch * height;
 
-        D3DHelper::UpdateSubresources(pDevice, pCommandList, texture.Get(), uploadAllocation.pResource, uploadAllocation.Offset, uploadAllocation.CPUPtr, 0, 1, &textureData);
+        D3DHelper::UpdateSubresources(pDevice, pCommandList, texture.Get(), uploadAllocation.pResource, uploadAllocation.offset, uploadAllocation.cpuPtr, 0, 1, &textureData);
 
         D3D12_TEXTURE_BARRIER barrier1 = {
             D3D12_BARRIER_SYNC_COPY,
@@ -597,7 +597,7 @@ public:
 
         auto uploadAllocation = uploadAllocator.Allocate(requiredSize, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
 
-        D3DHelper::UpdateSubresources(pDevice, pCommandList, texture.Get(), uploadAllocation.pResource, uploadAllocation.Offset, uploadAllocation.CPUPtr, 0, numSubresources, subresources.data());
+        D3DHelper::UpdateSubresources(pDevice, pCommandList, texture.Get(), uploadAllocation.pResource, uploadAllocation.offset, uploadAllocation.cpuPtr, 0, numSubresources, subresources.data());
 
         D3D12_TEXTURE_BARRIER barrier1 = {
             D3D12_BARRIER_SYNC_COPY,

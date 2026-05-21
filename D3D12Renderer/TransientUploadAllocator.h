@@ -55,10 +55,10 @@ public:
         auto& currentPage = m_pages[m_currentPageIndex];
 
         UploadAllocation alloc = {
-            currentPage->UploadBuffer.Get(),
+            currentPage->uploadBuffer.Get(),
             m_currentOffset,
-            static_cast<UINT8*>(currentPage->CPUBasePtr) + m_currentOffset,
-            currentPage->GPUBasePtr + m_currentOffset
+            static_cast<UINT8*>(currentPage->cpuBasePtr) + m_currentOffset,
+            currentPage->gpuBasePtr + m_currentOffset
         };
 
         m_currentOffset += size;
@@ -70,7 +70,7 @@ public:
     UploadAllocation Push(void* src, std::size_t size, std::size_t alignment)
     {
         auto alloc = Allocate(size, alignment);
-        if (src) memcpy(alloc.CPUPtr, src, size);
+        if (src) memcpy(alloc.cpuPtr, src, size);
         return alloc;
     }
 
@@ -94,21 +94,21 @@ private:
     {
         Page(ID3D12Device10* pDevice)
         {
-            UploadBuffer = Buffer(pDevice, PAGE_SIZE, D3D12_HEAP_TYPE_UPLOAD);
+            uploadBuffer = Buffer(pDevice, PAGE_SIZE, D3D12_HEAP_TYPE_UPLOAD);
 
             D3D12_RANGE readRange = { 0, 0 };
-            UploadBuffer.Get()->Map(0, &readRange, &CPUBasePtr);
-            GPUBasePtr = UploadBuffer.Get()->GetGPUVirtualAddress();
+            uploadBuffer.Get()->Map(0, &readRange, &cpuBasePtr);
+            gpuBasePtr = uploadBuffer.Get()->GetGPUVirtualAddress();
         }
 
         ~Page()
         {
-            UploadBuffer.Get()->Unmap(0, nullptr);
+            uploadBuffer.Get()->Unmap(0, nullptr);
         }
 
-        Buffer UploadBuffer;
-        void* CPUBasePtr;
-        D3D12_GPU_VIRTUAL_ADDRESS GPUBasePtr;
+        Buffer uploadBuffer;
+        void* cpuBasePtr;
+        D3D12_GPU_VIRTUAL_ADDRESS gpuBasePtr;
     };
 
     ID3D12Device10* m_pDevice;

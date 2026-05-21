@@ -96,7 +96,7 @@ private:
     ComPtr<ID3D12Device10> m_device;
     ComPtr<IDXGISwapChain3> m_swapChain;
 
-    std::unique_ptr<DynamicDescriptorHeap> m_dynamicDescriptorHeapForCBVSRVUAV;
+    std::unique_ptr<DynamicDescriptorHeap> m_dynamicDescriptorHeapForCbvSrvUav;
     ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
     std::unique_ptr<CommandQueue> m_commandQueue;
     std::array<std::unique_ptr<DescriptorAllocator>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
@@ -165,7 +165,7 @@ private:
     void LoadPipeline();
     void LoadAssets();
     void PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList);
-    void WaitForGPU();
+    void WaitForGpu();
     void MoveToNextFrame();
 
     void InitImGui();

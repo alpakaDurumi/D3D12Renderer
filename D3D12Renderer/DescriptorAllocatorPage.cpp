@@ -27,7 +27,7 @@ void DescriptorAllocatorPage::AddNewBlock(UINT32 offset, UINT32 numDescriptors)
 {
     auto offsetIt = m_freeListByOffset.insert({ offset, numDescriptors });
     auto sizeIt = m_freeListBySize.insert({ numDescriptors, offsetIt.first });
-    offsetIt.first->second.FreeListBySizeIt = sizeIt;
+    offsetIt.first->second.freeListBySizeIt = sizeIt;
 }
 
 bool DescriptorAllocatorPage::HasSpace(UINT32 numDescriptors) const
@@ -91,14 +91,14 @@ void DescriptorAllocatorPage::ReleaseStaleDescriptors(UINT64 completedFenceValue
 {
     std::lock_guard<std::mutex> lock(m_allocationMutex);
 
-    while (!m_staleDescriptors.empty() && m_staleDescriptors.front().FenceValue <= completedFenceValue)
+    while (!m_staleDescriptors.empty() && m_staleDescriptors.front().fenceValue <= completedFenceValue)
     {
         auto& staleDescriptor = m_staleDescriptors.front();
 
         // The offset of the descriptor in the heap.
-        auto offset = staleDescriptor.Offset;
+        auto offset = staleDescriptor.offset;
         // The number of descriptors that were allocated.
-        auto numDescriptors = staleDescriptor.Size;
+        auto numDescriptors = staleDescriptor.size;
 
         FreeBlock(offset, numDescriptors);
 
@@ -126,22 +126,22 @@ void DescriptorAllocatorPage::FreeBlock(UINT32 offset, UINT32 numDescriptors)
 
     // Coalesce with prev block
     if (prevBlockIt != m_freeListByOffset.end() &&
-        offset == prevBlockIt->first + prevBlockIt->second.Size)
+        offset == prevBlockIt->first + prevBlockIt->second.size)
     {
         // The previous block is exactly behind the block that is to be freed
         //
-        // PrevBlock.Offset           Offset
+        // PrevBlock.offset           offset
         // |                          |
-        // |<-----PrevBlock.Size----->|<------Size-------->|
+        // |<-----PrevBlock.size----->|<------size-------->|
         //
 
         offset = prevBlockIt->first;
         // Increase the block size by the size of merging with the previous block
-        numDescriptors += prevBlockIt->second.Size;
+        numDescriptors += prevBlockIt->second.size;
 
         // Remove the previous block from the free list
         // Erase iterator that pointed by prevBlockIt
-        m_freeListBySize.erase(prevBlockIt->second.FreeListBySizeIt);
+        m_freeListBySize.erase(prevBlockIt->second.freeListBySizeIt);
         // Erase prevBlockIt itself
         m_freeListByOffset.erase(prevBlockIt);
     }
@@ -152,15 +152,15 @@ void DescriptorAllocatorPage::FreeBlock(UINT32 offset, UINT32 numDescriptors)
     {
         // The next block is exactly in front of the block that is to be freed
         //
-        // Offset               NextBlock.Offset 
+        // offset               NextBlock.offset 
         // |                    |
-        // |<------Size-------->|<-----NextBlock.Size----->|
+        // |<------size-------->|<-----NextBlock.size----->|
 
         // Increase the block size by the size of merging with the next block
-        numDescriptors += nextBlockIt->second.Size;
+        numDescriptors += nextBlockIt->second.size;
 
         // Remove the next block from the free list
-        m_freeListBySize.erase(nextBlockIt->second.FreeListBySizeIt);
+        m_freeListBySize.erase(nextBlockIt->second.freeListBySizeIt);
         m_freeListByOffset.erase(nextBlockIt);
     }
 

@@ -7,7 +7,7 @@
 struct UploadAllocation
 {
     ID3D12Resource* pResource;
-    UINT64 Offset;                      // Offset in resource
-    void* CPUPtr;                       // Ptr that offset from resource's mapped ptr
-    D3D12_GPU_VIRTUAL_ADDRESS GPUPtr;
+    UINT64 offset;                      // Offset in resource
+    void* cpuPtr;                       // Ptr that offset from resource's mapped ptr
+    D3D12_GPU_VIRTUAL_ADDRESS gpuPtr;
 };

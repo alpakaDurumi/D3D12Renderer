@@ -57,28 +57,28 @@ private:
     struct FreeBlockInfo
     {
         FreeBlockInfo(SizeType size)
-            : Size(size)
+            : size(size)
         {
         }
 
-        SizeType Size;
-        FreeListBySize::iterator FreeListBySizeIt;
+        SizeType size;
+        FreeListBySize::iterator freeListBySizeIt;
     };
 
 
     struct StaleDescriptorInfo
     {
         StaleDescriptorInfo(OffsetType offset, SizeType size, UINT64 fenceValue)
-            : Offset(offset), Size(size), FenceValue(fenceValue)
+            : offset(offset), size(size), fenceValue(fenceValue)
         {
         }
 
         // The offset within the descriptor heap.
-        OffsetType Offset;
+        OffsetType offset;
         // The number of descriptors
-        SizeType Size;
+        SizeType size;
         // The fence value that GPU execution using this descriptor ends
-        UINT64 FenceValue;
+        UINT64 fenceValue;
     };
 
     using StaleDescriptorQueue = std::queue<StaleDescriptorInfo>;

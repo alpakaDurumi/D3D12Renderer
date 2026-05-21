@@ -62,7 +62,7 @@ DescriptorAllocation::DescriptorAllocation(
     UINT32 numHandles,
     UINT32 descriptorSize,
     DescriptorAllocatorPage* pPage)
-    : m_descriptor(GetCPUDescriptorHandle(baseDescriptor, offsetInHeap, descriptorSize)),
+    : m_descriptor(GetCpuDescriptorHandle(baseDescriptor, offsetInHeap, descriptorSize)),
     m_offsetInHeap(offsetInHeap),
     m_numHandles(numHandles),
     m_descriptorSize(descriptorSize),
@@ -102,7 +102,7 @@ std::vector<DescriptorAllocation> DescriptorAllocation::Split()
 
     for (UINT i = 0; i < m_numHandles; ++i)
     {
-        auto descriptor = GetCPUDescriptorHandle(m_descriptor, i, m_descriptorSize);
+        auto descriptor = GetCpuDescriptorHandle(m_descriptor, i, m_descriptorSize);
 
         // Can't use emplace_back here :
         // Required constructor is private and emplace_back delegates construction to std::allocator class,

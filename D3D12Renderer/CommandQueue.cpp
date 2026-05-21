@@ -7,7 +7,7 @@
 using namespace D3DHelper;
 
 CommandQueue::CommandQueue(const ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type)
-    : m_type(type), m_fenceValue(0), m_device(device), m_pDynamicDescriptorHeapForCBVSRVUAV(nullptr), m_pSamplerDescriptorHeap(nullptr)
+    : m_type(type), m_fenceValue(0), m_device(device), m_pDynamicDescriptorHeapForCbvSrvUav(nullptr), m_pSamplerDescriptorHeap(nullptr)
 {
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
     queueDesc.Type = type;
@@ -80,7 +80,7 @@ std::pair<ID3D12CommandAllocator*, ID3D12GraphicsCommandList7*> CommandQueue::Ge
     }
 
     // Bind with DescriptorHeaps
-    ID3D12DescriptorHeap* ppHeaps[] = { m_pDynamicDescriptorHeapForCBVSRVUAV->GetCurrentDescriptorHeap(), m_pSamplerDescriptorHeap };
+    ID3D12DescriptorHeap* ppHeaps[] = { m_pDynamicDescriptorHeapForCbvSrvUav->GetCurrentDescriptorHeap(), m_pSamplerDescriptorHeap };
     pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     return { pCommandAllocator, pCommandList };

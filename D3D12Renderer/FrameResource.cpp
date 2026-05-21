@@ -11,20 +11,20 @@ FrameResource::FrameResource(
     IDXGISwapChain* pSwapChain,
     UINT frameIndex,
     DescriptorAllocation&& rtvAllocation,
-    DescriptorAllocation&& sceneBufferRTVAllocation,
-    DescriptorAllocation&& sceneBufferSRVAllocation,
-    DescriptorAllocation&& gBufferRTVAllocation,
-    DescriptorAllocation&& gBufferSRVAllocation,
-    DescriptorAllocation&& selectionMaskRTVAllocation,
-    DescriptorAllocation&& selectionMaskSRVAllocation,
-    DescriptorAllocation&& horizontalDilatedMaskRTVAllocation,
-    DescriptorAllocation&& horizontalDilatedMaskSRVAllocation)
+    DescriptorAllocation&& sceneBufferRtvAllocation,
+    DescriptorAllocation&& sceneBufferSrvAllocation,
+    DescriptorAllocation&& gBufferRtvAllocation,
+    DescriptorAllocation&& gBufferSrvAllocation,
+    DescriptorAllocation&& selectionMaskRtvAllocation,
+    DescriptorAllocation&& selectionMaskSrvAllocation,
+    DescriptorAllocation&& horizontalDilatedMaskRtvAllocation,
+    DescriptorAllocation&& horizontalDilatedMaskSrvAllocation)
     : m_pDevice(pDevice),
     m_backBufferRtv(std::move(rtvAllocation)),
-    m_selectionMaskRtv(std::move(selectionMaskRTVAllocation)),
-    m_selectionMaskSrv(std::move(selectionMaskSRVAllocation)),
-    m_horizontalDilatedMaskRtv(std::move(horizontalDilatedMaskRTVAllocation)),
-    m_horizontalDilatedMaskSrv(std::move(horizontalDilatedMaskSRVAllocation)),
+    m_selectionMaskRtv(std::move(selectionMaskRtvAllocation)),
+    m_selectionMaskSrv(std::move(selectionMaskSrvAllocation)),
+    m_horizontalDilatedMaskRtv(std::move(horizontalDilatedMaskRtvAllocation)),
+    m_horizontalDilatedMaskSrv(std::move(horizontalDilatedMaskSrvAllocation)),
     m_uploadAllocator(pDevice)
 {
     // Back buffer
@@ -37,8 +37,8 @@ FrameResource::FrameResource(
 
     // Scene color buffers
     {
-        auto rtvAllocs = sceneBufferRTVAllocation.Split();
-        auto srvAllocs = sceneBufferSRVAllocation.Split();
+        auto rtvAllocs = sceneBufferRtvAllocation.Split();
+        auto srvAllocs = sceneBufferSrvAllocation.Split();
         for (UINT i = 0; i < SceneColorBufferCount; ++i)
         {
             m_sceneColorBufferRtvs[i] = RenderTargetView(std::move(rtvAllocs[i]));
@@ -49,8 +49,8 @@ FrameResource::FrameResource(
 
     // GBuffers
     {
-        auto rtvAllocs = gBufferRTVAllocation.Split();
-        auto srvAllocs = gBufferSRVAllocation.Split();
+        auto rtvAllocs = gBufferRtvAllocation.Split();
+        auto srvAllocs = gBufferSrvAllocation.Split();
         for (UINT i = 0; i < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++i)
         {
             m_gBufferRtvs[i] = RenderTargetView(std::move(rtvAllocs[i]));

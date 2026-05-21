@@ -322,7 +322,7 @@ void Renderer::OnRender()
 
     PopulateCommandList(pCommandList);
 
-    m_dynamicDescriptorHeapForCBVSRVUAV->Reset();
+    m_dynamicDescriptorHeapForCbvSrvUav->Reset();
 
     // Populate commands for ImGui
     // Is it OK to call SetDescriptorHeaps? (Does it affect performance?)
@@ -353,7 +353,7 @@ void Renderer::OnRender()
     // Execute the command lists and store the fence value
     UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(pCommandAllocator, pCommandList);
     m_frameResources[m_frameIndex]->SetFenceValue(fenceValue);
-    m_dynamicDescriptorHeapForCBVSRVUAV->QueueRetiredHeaps(fenceValue);
+    m_dynamicDescriptorHeapForCbvSrvUav->QueueRetiredHeaps(fenceValue);
     m_sceneManager.QueueDeferredDeletions(fenceValue, m_commandQueue->GetCompletedFenceValue());
 
     // Present the frame.
@@ -368,7 +368,7 @@ void Renderer::OnDestroy()
 {
     // Ensure that the GPU is no longer referencing resources that are about to be
     // cleaned up by the destructor.
-    WaitForGPU();
+    WaitForGpu();
 
     // Shutdown ImGui
     ImGui_ImplDX12_Shutdown();
@@ -416,7 +416,7 @@ void Renderer::OnResize(UINT width, UINT height)
     if (width == m_width && height == m_height) return;
 
     // Wait till GPU complete currently queued works
-    WaitForGPU();
+    WaitForGpu();
 
     // Size 0 is not allowed
     m_width = std::max(1u, width);
@@ -781,7 +781,7 @@ void Renderer::LoadPipeline()
     // Passing a temporary object like `std::make_unique<T>(T(...))` will fail to compile
     // Instead, pass the constructor arguments directly to std::make_unique<T>()
     m_commandQueue = std::make_unique<CommandQueue>(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
-    m_dynamicDescriptorHeapForCBVSRVUAV = std::make_unique<DynamicDescriptorHeap>(m_device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_dynamicDescriptorHeapForCbvSrvUav = std::make_unique<DynamicDescriptorHeap>(m_device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     for (UINT i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
     {
         D3D12_DESCRIPTOR_HEAP_TYPE type = static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(i);
@@ -800,8 +800,8 @@ void Renderer::LoadPipeline()
     ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_samplerDescriptorHeap)));
 
     // Dependency injections
-    m_commandQueue->SetDescriptorHeaps(m_dynamicDescriptorHeapForCBVSRVUAV.get(), m_samplerDescriptorHeap.Get());
-    m_dynamicDescriptorHeapForCBVSRVUAV->SetCommandQueue(m_commandQueue.get());
+    m_commandQueue->SetDescriptorHeaps(m_dynamicDescriptorHeapForCbvSrvUav.get(), m_samplerDescriptorHeap.Get());
+    m_dynamicDescriptorHeapForCbvSrvUav->SetCommandQueue(m_commandQueue.get());
 
     // For ImGui
     m_imguiDescriptorAllocator = std::make_unique<ImGuiDescriptorAllocator>(m_device.Get());
@@ -860,7 +860,7 @@ void Renderer::LoadPipeline()
     }
 
     CreateRootSignature();
-    m_dynamicDescriptorHeapForCBVSRVUAV->ParseRootSignature(*m_rootSignature);
+    m_dynamicDescriptorHeapForCbvSrvUav->ParseRootSignature(*m_rootSignature);
 }
 
 // Load the sample assets.
@@ -949,7 +949,7 @@ void Renderer::LoadAssets()
     auto [pCommandAllocator, pCommandList] = m_commandQueue->GetAvailableCommandList();
 
     // Add samplers
-    auto baseCPUHandle = m_samplerDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+    auto baseCpuHandle = m_samplerDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
     auto incrementSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 
     for (UINT i = 0; i < static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS); ++i)
@@ -957,7 +957,7 @@ void Renderer::LoadAssets()
         for (UINT j = 0; j < static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES); ++j)
         {
             UINT idx = i * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES) + j;
-            const auto cpuHandle = GetCPUDescriptorHandle(baseCPUHandle, idx, incrementSize);
+            const auto cpuHandle = GetCpuDescriptorHandle(baseCpuHandle, idx, incrementSize);
             const auto samplerDesc = GetSamplerDesc(static_cast<TextureFiltering>(i), static_cast<TextureAddressingMode>(j));
             m_device->CreateSampler(&samplerDesc, cpuHandle);
         }
@@ -1092,7 +1092,7 @@ void Renderer::LoadAssets()
     m_frameResources[m_frameIndex]->SetFenceValue(m_commandQueue->ExecuteCommandLists(pCommandAllocator, pCommandList));
 
     // Wait until assets have been uploaded to the GPU
-    WaitForGPU();
+    WaitForGpu();
 
     // Render Graph
     m_renderGraph.Init(m_device.Get());
@@ -1255,7 +1255,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT matIdx = 0;
     for (auto& mat : m_sceneManager.GetMaterials())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(5, matIdx, 1, mat.GetCbvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(5, matIdx, 1, mat.GetCbvHandle());
         ++matIdx;
     }
 
@@ -1263,17 +1263,17 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT lightIdx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
         ++lightIdx;
     }
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
         ++lightIdx;
     }
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
         ++lightIdx;
     }
 
@@ -1281,7 +1281,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT textureIdx = 0;
     for (auto& [texture, srv] : m_sceneManager.GetAssetTextures())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(7, textureIdx, 1, srv.GetHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(7, textureIdx, 1, srv.GetHandle());
         ++textureIdx;
     }
 
@@ -1289,27 +1289,27 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(8, lightIdx, 1, light.GetSrvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(8, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(9, lightIdx, 1, light.GetSrvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(9, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(10, lightIdx, 1, light.GetSrvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(10, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
 
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferBaseSrvHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthSrv.GetHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 1, 1, frameResource.GetSelectionMaskSrvHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetHorizontalDilatedMaskSrvHandle());
-    m_dynamicDescriptorHeapForCBVSRVUAV->StageDescriptors(11, NUM_GBUFFER_SLOTS + 3, 1, frameResource.GetSceneColorBufferSrvHandle(0));
+    m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(11, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferBaseSrvHandle());
+    m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthSrv.GetHandle());
+    m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(11, NUM_GBUFFER_SLOTS + 1, 1, frameResource.GetSelectionMaskSrvHandle());
+    m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(11, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetHorizontalDilatedMaskSrvHandle());
+    m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(11, NUM_GBUFFER_SLOTS + 3, 1, frameResource.GetSceneColorBufferSrvHandle(0));
 
     BindDescriptorTables(pCommandList);
 
@@ -1363,7 +1363,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
                     pCommandList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
 
-                    pCommandList->SetGraphicsRootConstantBufferView(0, pLight->GetCameraUploadAllocation(j).GPUPtr);
+                    pCommandList->SetGraphicsRootConstantBufferView(0, pLight->GetCameraUploadAllocation(j).gpuPtr);
 
                     for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
                     {
@@ -1413,7 +1413,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         static UINT rtvHandleIncrementSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
         for (UINT i = 0; i < NUM_GBUFFER_SLOTS; ++i)
         {
-            auto rtvHandle = GetCPUDescriptorHandle(baseRTVHandle, i, rtvHandleIncrementSize);
+            auto rtvHandle = GetCpuDescriptorHandle(baseRTVHandle, i, rtvHandleIncrementSize);
             pCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
         }
         pCommandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 0.0f, 0, 0, nullptr);
@@ -1421,7 +1421,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         pCommandList->SetPipelineState(pso);
 
-        pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.GPUPtr);
+        pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.gpuPtr);
 
         for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
         {
@@ -1456,8 +1456,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         pCommandList->SetPipelineState(pso);
 
-        pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.GPUPtr);
-        pCommandList->SetGraphicsRootConstantBufferView(1, m_shadowUploadAllocation.GPUPtr);
+        pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.gpuPtr);
+        pCommandList->SetGraphicsRootConstantBufferView(1, m_shadowUploadAllocation.gpuPtr);
 
         pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         pCommandList->DrawInstanced(3, 1, 0, 0);
@@ -1503,8 +1503,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         pCommandList->SetPipelineState(pso);
 
-        pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.GPUPtr);
-        pCommandList->SetGraphicsRootConstantBufferView(1, m_shadowUploadAllocation.GPUPtr);
+        pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.gpuPtr);
+        pCommandList->SetGraphicsRootConstantBufferView(1, m_shadowUploadAllocation.gpuPtr);
 
         for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
         {
@@ -1591,7 +1591,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             clearColor.v = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
             pCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-            pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.GPUPtr);
+            pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.gpuPtr);
 
             // 선택된 Entity들에 대해서만 draw call을 호출해야 함 (나중에는 여러 Entity를 다중 선택할 수도 있어야 함)
             DrawEntity(pCommandList, m_selected, frameResource.GetInstanceBufferVirtualAddress());
@@ -1724,7 +1724,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 }
 
 // Wait for pending GPU work to complete
-void Renderer::WaitForGPU()
+void Renderer::WaitForGpu()
 {
     m_commandQueue->Flush();
 }
@@ -2008,15 +2008,15 @@ void Renderer::SetFpsCap(std::string fps)
 
 void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList)
 {
-    bool CBVSRVUAVHeapChanged = m_dynamicDescriptorHeapForCBVSRVUAV->CheckHeapChanged();
+    bool cbvSrvUavHeapChanged = m_dynamicDescriptorHeapForCbvSrvUav->CheckHeapChanged();
 
-    if (CBVSRVUAVHeapChanged)
+    if (cbvSrvUavHeapChanged)
     {
-        ID3D12DescriptorHeap* ppHeaps[] = { m_dynamicDescriptorHeapForCBVSRVUAV->GetCurrentDescriptorHeap(), m_samplerDescriptorHeap.Get() };
+        ID3D12DescriptorHeap* ppHeaps[] = { m_dynamicDescriptorHeapForCbvSrvUav->GetCurrentDescriptorHeap(), m_samplerDescriptorHeap.Get() };
         pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
     }
 
-    m_dynamicDescriptorHeapForCBVSRVUAV->CommitStagedDescriptorsForDraw(pCommandList);
+    m_dynamicDescriptorHeapForCbvSrvUav->CommitStagedDescriptorsForDraw(pCommandList);
     pCommandList->SetGraphicsRootDescriptorTable(12, m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart());    // Root parameter 12
 }
 
@@ -2542,7 +2542,7 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
     for (auto& mat : m_sceneManager.GetMaterials())
     {
         auto alloc = frameResource.PushConstantData(mat.GetConstantDataPtr(), sizeof(MaterialConstantData));
-        mat.InitCbv(m_device.Get(), alloc.GPUPtr);
+        mat.InitCbv(m_device.Get(), alloc.gpuPtr);
     }
 
     auto processLight = [&](Light& light, UINT arraySize)
@@ -2553,7 +2553,7 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
                 light.SetCameraUploadAllocation(i, alloc);
             }
             auto alloc = frameResource.PushConstantData(light.GetLightConstantDataPtr(), sizeof(LightConstantData));
-            light.InitLightCbv(m_device.Get(), alloc.GPUPtr);
+            light.InitLightCbv(m_device.Get(), alloc.gpuPtr);
         };
 
     for (auto& light : m_sceneManager.GetDirectionalLights())
@@ -2712,9 +2712,9 @@ void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle mes
 
     auto* pMesh = m_sceneManager.GetMesh(meshhandle);
 
-    D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->GetVBV(), instanceBufferView };
+    D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->GetVbv(), instanceBufferView };
     pCommandList->IASetVertexBuffers(0, 2, pVertexBufferViews);
-    pCommandList->IASetIndexBuffer(&pMesh->GetIBV());
+    pCommandList->IASetIndexBuffer(&pMesh->GetIbv());
     pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     pCommandList->DrawIndexedInstanced(pMesh->GetNumIndices(), instanceCount, 0, 0, 0);
@@ -2739,9 +2739,9 @@ void Renderer::DrawEntity(ID3D12GraphicsCommandList7* pCommandList, EntityHandle
     instanceBufferView.StrideInBytes = instanceDataSize;
     instanceBufferView.SizeInBytes = instanceDataSize;
 
-    D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->GetVBV(), instanceBufferView };
+    D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = { pMesh->GetVbv(), instanceBufferView };
     pCommandList->IASetVertexBuffers(0, 2, pVertexBufferViews);
-    pCommandList->IASetIndexBuffer(&pMesh->GetIBV());
+    pCommandList->IASetIndexBuffer(&pMesh->GetIbv());
     pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     pCommandList->DrawIndexedInstanced(pMesh->GetNumIndices(), 1, 0, 0, 0);

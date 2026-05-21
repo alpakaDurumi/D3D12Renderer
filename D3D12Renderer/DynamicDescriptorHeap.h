@@ -32,7 +32,7 @@ public:
 
     void SetCommandQueue(const CommandQueue* pCommandQueue) { m_pCommandQueue = pCommandQueue; }
 
-    void StageDescriptors(UINT32 rootParameterIndex, UINT32 offsetInParameter, UINT32 numDescriptors, D3D12_CPU_DESCRIPTOR_HANDLE baseCPUHandle);
+    void StageDescriptors(UINT32 rootParameterIndex, UINT32 offsetInParameter, UINT32 numDescriptors, D3D12_CPU_DESCRIPTOR_HANDLE baseCpuHandle);
 
     // Copy all of the staged descriptors to the GPU visible descriptor heap and
     // bind the descriptor heap and the descriptor tables to the command list
@@ -98,8 +98,8 @@ private:
     std::queue<std::pair<UINT64, ID3D12DescriptorHeap*>> m_pendingHeaps;
 
     ID3D12DescriptorHeap* m_currentHeap;
-    D3D12_GPU_DESCRIPTOR_HANDLE m_currentGPUDescriptorHandle;
-    D3D12_CPU_DESCRIPTOR_HANDLE m_currentCPUDescriptorHandle;
+    D3D12_GPU_DESCRIPTOR_HANDLE m_currentGpuDescriptorHandle;
+    D3D12_CPU_DESCRIPTOR_HANDLE m_currentCpuDescriptorHandle;
     UINT32 m_numFreeHandles;    // Number of free handles in current descriptor heap
 
     ComPtr<ID3D12Device10> m_device;

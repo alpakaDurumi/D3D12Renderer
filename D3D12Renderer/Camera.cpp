@@ -10,7 +10,7 @@ Camera::Camera(XMFLOAT3 initialPosition)
     m_pitch = 0.0f;
 
     m_aspectRatio = 16.0f / 9.0f;
-    SetHorizontalFOV(XMConvertToRadians(90.0f));
+    SetHorizontalFov(XMConvertToRadians(90.0f));
     m_nearPlane = 0.1f;
     m_farPlane = 1000.0f;
 }
@@ -64,7 +64,7 @@ XMMATRIX Camera::GetViewMatrix() const
 XMMATRIX Camera::GetProjectionMatrix(bool usePerspectiveProjection) const
 {
     return usePerspectiveProjection ?
-        XMMatrixPerspectiveFovLH(m_verticalFOV, m_aspectRatio, m_farPlane, m_nearPlane) :
+        XMMatrixPerspectiveFovLH(m_verticalFov, m_aspectRatio, m_farPlane, m_nearPlane) :
         XMMatrixOrthographicLH(2 * m_aspectRatio, 2.0f, m_farPlane, m_nearPlane);
 }
 
@@ -76,13 +76,13 @@ void Camera::SetCurrentPosition(const XMVECTOR& pos)
 void Camera::SetAspectRatio(float aspectRatio)
 {
     m_aspectRatio = aspectRatio;
-    m_verticalFOV = CalcVerticalFOV(m_horizontalFOV);
+    m_verticalFov = CalcVerticalFov(m_horizontalFov);
 }
 
-void Camera::SetHorizontalFOV(float horizontalFOV)
+void Camera::SetHorizontalFov(float horizontalFov)
 {
-    m_horizontalFOV = horizontalFOV;
-    m_verticalFOV = CalcVerticalFOV(horizontalFOV);
+    m_horizontalFov = horizontalFov;
+    m_verticalFov = CalcVerticalFov(horizontalFov);
 }
 
 void Camera::SnapshotState()
@@ -158,9 +158,9 @@ void Camera::Pan(XMINT2 mouseMove)
     XMStoreFloat3(&m_currPosition, pos);
 }
 
-float Camera::CalcVerticalFOV(float horizontalFOV)
+float Camera::CalcVerticalFov(float horizontalFov)
 {
     assert(m_aspectRatio > 0.0f);
 
-    return 2.0f * std::atan2(std::tan(horizontalFOV * 0.5f), m_aspectRatio);
+    return 2.0f * std::atan2(std::tan(horizontalFov * 0.5f), m_aspectRatio);
 }

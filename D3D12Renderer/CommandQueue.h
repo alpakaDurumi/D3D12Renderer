@@ -26,8 +26,8 @@ public:
 
     ~CommandQueue();
 
-    void SetDescriptorHeaps(const DynamicDescriptorHeap* pHeapForCBVSRVUAV, ID3D12DescriptorHeap* pHeapForSampler) {
-        m_pDynamicDescriptorHeapForCBVSRVUAV = pHeapForCBVSRVUAV;
+    void SetDescriptorHeaps(const DynamicDescriptorHeap* pHeapForCbvSrvUav, ID3D12DescriptorHeap* pHeapForSampler) {
+        m_pDynamicDescriptorHeapForCbvSrvUav = pHeapForCbvSrvUav;
         m_pSamplerDescriptorHeap = pHeapForSampler;
     }
 
@@ -71,6 +71,6 @@ private:
     HANDLE m_fenceEvent;
     UINT64 m_fenceValue;
 
-    const DynamicDescriptorHeap* m_pDynamicDescriptorHeapForCBVSRVUAV;
+    const DynamicDescriptorHeap* m_pDynamicDescriptorHeapForCbvSrvUav;
     ID3D12DescriptorHeap* m_pSamplerDescriptorHeap;
 };

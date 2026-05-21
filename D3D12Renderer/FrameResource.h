@@ -29,14 +29,14 @@ public:
         IDXGISwapChain* pSwapChain,
         UINT frameIndex,
         DescriptorAllocation&& rtvAllocation,
-        DescriptorAllocation&& sceneBufferRTVAllocation,
-        DescriptorAllocation&& sceneBufferSRVAllocation,
-        DescriptorAllocation&& gBufferRTVAllocation,
-        DescriptorAllocation&& gBufferSRVAllocation,
-        DescriptorAllocation&& selectionMaskRTVAllocation,
-        DescriptorAllocation&& selectionMaskSRVAllocation,
-        DescriptorAllocation&& horizontalDilatedMaskRTVAllocation,
-        DescriptorAllocation&& horizontalDilatedMaskSRVAllocation);
+        DescriptorAllocation&& sceneBufferRtvAllocation,
+        DescriptorAllocation&& sceneBufferSrvAllocation,
+        DescriptorAllocation&& gBufferRtvAllocation,
+        DescriptorAllocation&& gBufferSrvAllocation,
+        DescriptorAllocation&& selectionMaskRtvAllocation,
+        DescriptorAllocation&& selectionMaskSrvAllocation,
+        DescriptorAllocation&& horizontalDilatedMaskRtvAllocation,
+        DescriptorAllocation&& horizontalDilatedMaskSrvAllocation);
     ~FrameResource();
 
     // Back buffer

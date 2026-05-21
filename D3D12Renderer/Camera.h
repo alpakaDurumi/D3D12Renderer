@@ -24,7 +24,7 @@ public:
 
     void SetCurrentPosition(const XMVECTOR& pos);
     void SetAspectRatio(float aspectRatio);
-    void SetHorizontalFOV(float horizontalFOV);
+    void SetHorizontalFov(float horizontalFov);
 
     void SnapshotState();
     void MoveForward(float speedScale);
@@ -35,7 +35,7 @@ public:
     void Pan(XMINT2 mouseMove);
 
 private:
-    float CalcVerticalFOV(float horizontalFOV);
+    float CalcVerticalFov(float horizontalFov);
 
     XMFLOAT3 m_prevPosition;
     XMFLOAT3 m_currPosition;
@@ -45,8 +45,8 @@ private:
     float m_pitch;
     XMFLOAT4 m_rotation = { 0.0f, 0.0f, 0.0f, 1.0f };    // quaternion
 
-    float m_verticalFOV;
-    float m_horizontalFOV;
+    float m_verticalFov;
+    float m_horizontalFov;
     float m_aspectRatio;
     float m_nearPlane;
     float m_farPlane;
