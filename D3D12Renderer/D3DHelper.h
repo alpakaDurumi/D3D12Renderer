@@ -1,6 +1,8 @@
 #pragma once
 
-#include <Windows.h>
+#include <minwindef.h>
+#include <basetsd.h>
+#include <sal.h>
 
 #include <d3d12.h>
 #include <dxgi1_6.h>    // DXGI 1.6

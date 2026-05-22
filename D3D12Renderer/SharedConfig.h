@@ -5,7 +5,7 @@
 
 #ifdef __cplusplus
 // For CPP
-#include <Windows.h>
+#include <minwindef.h>
 
 constexpr UINT MAX_CASCADES = 4;
 constexpr UINT POINT_LIGHT_ARRAY_SIZE = 6;

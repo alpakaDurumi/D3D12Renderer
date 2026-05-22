@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Windows.h>
+#include <minwindef.h>
 
 inline constexpr UINT FrameCount = 2;
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Windows.h>
+#include <minwindef.h>
 
 #include <string>
 #include <cstddef>

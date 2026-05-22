@@ -1,5 +1,7 @@
 #pragma once
 
+#include <basetsd.h>
+
 #include "GpuResource.h"
 
 class Buffer : public GpuResource

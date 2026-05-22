@@ -1,5 +1,8 @@
 #pragma once
 
+#include <minwindef.h>
+#include <basetsd.h>
+
 #include <wrl/client.h>
 
 #include <DirectXMath.h>

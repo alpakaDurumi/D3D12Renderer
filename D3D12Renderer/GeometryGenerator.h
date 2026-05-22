@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Windows.h"
+#include <minwindef.h>
+#include <basetsd.h>
 
 #include <DirectXMath.h>
 

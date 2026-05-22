@@ -1,5 +1,7 @@
 #pragma once
 
+#include <basetsd.h>
+
 #include <string>
 
 using AssetID = std::string;
