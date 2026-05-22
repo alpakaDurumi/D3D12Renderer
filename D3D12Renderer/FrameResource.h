@@ -13,10 +13,12 @@
 #include "Texture.h"
 #include "View.h"
 #include "Buffer.h"
-#include "DescriptorAllocation.h"
 #include "SharedConfig.h"
 #include "TransientUploadAllocator.h"
-#include "InstanceData.h"
+
+class DescriptorAllocation;
+struct InstanceData;
+struct UploadAllocation;
 
 // Dynamic Data for each frame
 class FrameResource

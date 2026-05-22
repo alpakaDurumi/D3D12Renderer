@@ -10,10 +10,9 @@
 #include <set>
 #include <vector>
 
-#include "DescriptorAllocatorPage.h"
-#include "DescriptorAllocation.h"
-
 class CommandQueue;
+class DescriptorAllocatorPage;
+class DescriptorAllocation;
 
 // DescriptorAllocator class is used to allocate descriptors to the application when loading new resources
 class DescriptorAllocator
@@ -26,6 +25,7 @@ public:
     DescriptorAllocator& operator=(DescriptorAllocator&&) = delete;
 
     DescriptorAllocator(const Microsoft::WRL::ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap = 256);
+    ~DescriptorAllocator();
 
     DescriptorAllocation Allocate(UINT32 numDescriptors = 1);
 

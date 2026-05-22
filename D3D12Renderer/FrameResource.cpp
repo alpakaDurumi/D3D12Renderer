@@ -3,6 +3,9 @@
 
 #include "D3DHelper.h"
 #include "Utility.h"
+#include "DescriptorAllocation.h"
+#include "InstanceData.h"
+#include "UploadAllocation.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;

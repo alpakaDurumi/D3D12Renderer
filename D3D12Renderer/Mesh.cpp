@@ -2,6 +2,8 @@
 #include "Mesh.h"
 
 #include "D3DHelper.h"
+#include "GeometryData.h"
+#include "TransientUploadAllocator.h"
 
 using namespace D3DHelper;
 

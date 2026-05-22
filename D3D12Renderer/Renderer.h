@@ -21,16 +21,8 @@
 #include "Camera.h"
 #include "InputManager.h"
 #include "ConstantData.h"
-#include "CommandQueue.h"
-#include "FrameResource.h"
-#include "DescriptorAllocator.h"
-#include "DynamicDescriptorHeap.h"
-#include "RootSignature.h"
-#include "ImGuiDescriptorAllocator.h"
 #include "CacheKeys.h"
-#include "Light.h"
 #include "RenderGraph.h"
-#include "TransientUploadAllocator.h"
 #include "Aliases.h"
 #include "SceneManager.h"
 #include "View.h"
@@ -39,10 +31,29 @@
 #include "UploadAllocation.h"
 #include "SceneHandles.h"
 
+struct GeometryData;
+class DescriptorAllocation;
+class CommandQueue;
+class FrameResource;
+class DescriptorAllocator;
+class DynamicDescriptorHeap;
+class RootSignature;
+class ImGuiDescriptorAllocator;
+class DirectionalLight;
+class PointLight;
+class SpotLight;
+class TransientUploadAllocator;
+
 class Renderer
 {
 public:
+    Renderer(const Renderer&) = delete;
+    Renderer& operator=(const Renderer&) = delete;
+    Renderer(Renderer&&) = delete;
+    Renderer& operator=(Renderer&&) = delete;
+
     Renderer(std::wstring name);
+    ~Renderer();
 
     UINT GetWidth() const { return m_width; }
     UINT GetHeight() const { return m_height; }

@@ -15,6 +15,7 @@ public:
     GpuResource& operator=(GpuResource&&) = default;
 
     explicit GpuResource(Microsoft::WRL::ComPtr<ID3D12Resource>&& existing);
+    ~GpuResource() = default;
 
     ID3D12Resource* Get() const;
     void Reset();

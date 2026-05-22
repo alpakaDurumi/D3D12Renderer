@@ -10,11 +10,13 @@
 #include <vector>
 
 #include "ConstantData.h"
-#include "DescriptorAllocation.h"
 #include "SharedConfig.h"
 #include "UploadAllocation.h"
 #include "Texture.h"
 #include "View.h"
+
+class DescriptorAllocation;
+class GpuResource;
 
 class Light
 {

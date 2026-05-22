@@ -574,7 +574,7 @@ public:
         }
 
         Microsoft::WRL::ComPtr<ID3D12Resource> resource;
-        std::unique_ptr<uint8_t[]> ddsData;
+        std::unique_ptr<UINT8[]> ddsData;
         std::vector<D3D12_SUBRESOURCE_DATA> subresources;
 
         // LoadDDSTextureFromFile creates a resource with an initial state of D3D12_RESOURCE_STATE_COMMON

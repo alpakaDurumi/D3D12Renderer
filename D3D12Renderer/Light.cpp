@@ -2,6 +2,8 @@
 #include "Light.h"
 
 #include "D3DHelper.h"
+#include "DescriptorAllocation.h"
+#include "GpuResource.h"
 
 using namespace DirectX;
 using namespace D3DHelper;

@@ -9,7 +9,6 @@
 #include <cstddef>
 
 #include "ConstantData.h"
-#include "DescriptorAllocation.h"
 #include "View.h"
 #include "RendererConfig.h"
 
@@ -27,6 +26,8 @@ enum class RenderingPath
     DEFERRED,
     NUM_RENDERING_PATHS
 };
+
+class DescriptorAllocation;
 
 class Material
 {

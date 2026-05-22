@@ -18,6 +18,16 @@
 #include "InstanceData.h"
 #include "Mesh.h"
 #include "Material.h"
+#include "CommandQueue.h"
+#include "GeometryData.h"
+#include "DescriptorAllocation.h"
+#include "FrameResource.h"
+#include "DescriptorAllocator.h"
+#include "DynamicDescriptorHeap.h"
+#include "RootSignature.h"
+#include "ImGuiDescriptorAllocator.h"
+#include "Light.h"
+#include "TransientUploadAllocator.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -185,6 +195,8 @@ Renderer::Renderer(std::wstring name)
     // Set instance pointer
     sm_instance = this;
 }
+
+Renderer::~Renderer() = default;
 
 void Renderer::SetPix()
 {

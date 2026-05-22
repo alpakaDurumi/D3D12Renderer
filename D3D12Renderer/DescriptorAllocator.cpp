@@ -2,6 +2,8 @@
 #include "DescriptorAllocator.h"
 
 #include "CommandQueue.h"
+#include "DescriptorAllocatorPage.h"
+#include "DescriptorAllocation.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -9,6 +11,8 @@ DescriptorAllocator::DescriptorAllocator(const ComPtr<ID3D12Device10>& device, D
     : m_device(device), m_heapType(type), m_numDescriptorsPerHeap(numDescriptorsPerHeap)
 {
 }
+
+DescriptorAllocator::~DescriptorAllocator() = default;
 
 // Allocate contiguous block of descriptors from heap
 DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)

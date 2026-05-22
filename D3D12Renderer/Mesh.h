@@ -4,10 +4,11 @@
 
 #include <d3d12.h>
 
-#include "GeometryData.h"
-#include "TransientUploadAllocator.h"
 #include "SceneHandles.h"
 #include "Buffer.h"
+
+struct GeometryData;
+class TransientUploadAllocator;
 
 class Mesh
 {
