@@ -108,6 +108,9 @@
     <ClCompile Include="ConstantData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Material.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

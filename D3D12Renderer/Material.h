@@ -7,7 +7,6 @@
 
 #include <array>
 #include <cstddef>
-#include <utility>
 
 #include "ConstantData.h"
 #include "DescriptorAllocation.h"
@@ -32,108 +31,37 @@ enum class RenderingPath
 class Material
 {
 public:
-    Material(DescriptorAllocation&& allocation)
-        : m_cbv(std::move(allocation))
-    {
-        m_textureAddressingModes.fill(TextureAddressingMode::WRAP);
-    }
+    Material(DescriptorAllocation&& allocation);
 
-    void SetAmbient(DirectX::XMFLOAT4 ambient)
-    {
-        m_constantData.SetAmbient(ambient);
-    }
+    void SetAmbient(DirectX::XMFLOAT4 ambient);
+    void SetSpecular(DirectX::XMFLOAT4 specular);
+    void SetShininess(float shininess);
 
-    void SetSpecular(DirectX::XMFLOAT4 specular)
-    {
-        m_constantData.SetSpecular(specular);
-    }
+    void SetTextureIndex(TextureSlot textureSlot, UINT index);
+    void SetTextureIndices(UINT albedoIdx, UINT normalMapIdx, UINT heightMapIdx);
 
-    void SetShininess(float shininess)
-    {
-        m_constantData.shininess = shininess;
-    }
+    void SetTextureAddressingMode(TextureSlot textureSlot, TextureAddressingMode addressingMode);
+    void SetTextureAddressingModes(TextureAddressingMode albedoAddressingMode, TextureAddressingMode normalMapAddressingMode, TextureAddressingMode heightMapAddressingMode);
 
-    void SetTextureIndex(TextureSlot textureSlot, UINT index)
-    {
-        m_constantData.textureIndices[static_cast<UINT>(textureSlot)] = index;
-    }
+    void BuildSamplerIndices(TextureFiltering filtering);
 
-    void SetTextureIndices(UINT albedoIdx, UINT normalMapIdx, UINT heightMapIdx)
-    {
-        SetTextureIndex(TextureSlot::ALBEDO, albedoIdx);
-        SetTextureIndex(TextureSlot::NORMALMAP, normalMapIdx);
-        SetTextureIndex(TextureSlot::HEIGHTMAP, heightMapIdx);
-    }
+    void SetTextureTileScale(TextureSlot textureSlot, float tileScale);
+    void SetTextureTileScales(float albedo, float normal, float height);
 
-    void SetTextureAddressingMode(TextureSlot textureSlot, TextureAddressingMode addressingMode)
-    {
-        m_textureAddressingModes[static_cast<UINT>(textureSlot)] = addressingMode;
-    }
+    MaterialConstantData* GetConstantDataPtr();
 
-    void SetTextureAddressingModes(TextureAddressingMode albedoAddressingMode, TextureAddressingMode normalMapAddressingMode, TextureAddressingMode heightMapAddressingMode)
-    {
-        SetTextureAddressingMode(TextureSlot::ALBEDO, albedoAddressingMode);
-        SetTextureAddressingMode(TextureSlot::NORMALMAP, normalMapAddressingMode);
-        SetTextureAddressingMode(TextureSlot::HEIGHTMAP, heightMapAddressingMode);
-    }
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCbvHandle() const;
 
-    void BuildSamplerIndices(TextureFiltering filtering)
-    {
-        for (UINT i = 0; i < static_cast<UINT>(TextureSlot::NUM_TEXTURE_SLOTS); ++i)
-        {
-            m_constantData.samplerIndices[i] = CalcSamplerIndex(filtering, m_textureAddressingModes[i]);
-        }
-    }
+    void InitCbv(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr);
 
-    void SetTextureTileScale(TextureSlot textureSlot, float tileScale)
-    {
-        m_constantData.textureTileScales[static_cast<UINT>(textureSlot)] = tileScale;
-    }
+    void CopyDataFrom(const Material& src);
 
-    void SetTextureTileScales(float albedo, float normal, float height)
-    {
-        SetTextureTileScale(TextureSlot::ALBEDO, albedo);
-        SetTextureTileScale(TextureSlot::NORMALMAP, normal);
-        SetTextureTileScale(TextureSlot::HEIGHTMAP, height);
-    }
+    RenderingPath GetRenderingPath() const;
 
-    MaterialConstantData* GetConstantDataPtr()
-    {
-        return &m_constantData;
-    }
-
-    D3D12_CPU_DESCRIPTOR_HANDLE GetCbvHandle() const
-    {
-        return m_cbv.GetHandle();
-    }
-
-    void InitCbv(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr)
-    {
-        m_cbv.Init(pDevice, gpuPtr, sizeof(MaterialConstantData));
-    }
-
-    void CopyDataFrom(const Material& src)
-    {
-        m_constantData = src.m_constantData;
-        m_textureAddressingModes = src.m_textureAddressingModes;
-        m_renderingPath = src.m_renderingPath;
-    }
-
-    RenderingPath GetRenderingPath() const
-    {
-        return m_renderingPath;
-    }
-
-    void SetRenderingPath(RenderingPath path)
-    {
-        m_renderingPath = path;
-    }
+    void SetRenderingPath(RenderingPath path);
 
 private:
-    UINT CalcSamplerIndex(TextureFiltering filtering, TextureAddressingMode addressingMode)
-    {
-        return static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES) * static_cast<UINT>(filtering) + static_cast<UINT>(addressingMode);
-    }
+    UINT CalcSamplerIndex(TextureFiltering filtering, TextureAddressingMode addressingMode);
 
     MaterialConstantData m_constantData;
     ConstantBufferView m_cbv;

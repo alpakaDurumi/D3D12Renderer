@@ -93,6 +93,24 @@ D3D12_CPU_DESCRIPTOR_HANDLE DescriptorAllocation::GetDescriptorHandle(UINT32 off
     return { m_descriptor.ptr + (m_descriptorSize * offsetInBlock) };
 }
 
+UINT32 DescriptorAllocation::GetOffset() const
+{
+    assert(!IsNull());
+    return m_offsetInHeap;
+}
+
+UINT32 DescriptorAllocation::GetNumHandles() const
+{
+    assert(!IsNull());
+    return m_numHandles;
+}
+
+UINT64 DescriptorAllocation::GetFenceValue() const
+{
+    assert(!IsNull());
+    return m_fenceValue;
+}
+
 std::vector<DescriptorAllocation> DescriptorAllocation::Split()
 {
     assert(!IsNull());

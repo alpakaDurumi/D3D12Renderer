@@ -5,7 +5,6 @@
 #include <d3d12.h>
 
 #include <vector>
-#include <cassert>
 
 class DescriptorAllocatorPage;
 
@@ -38,9 +37,9 @@ public:
     // Get a descriptor at a particular offset in the allocation
     D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandle(UINT32 offsetInBlock = 0) const;
 
-    UINT32 GetOffset() const { assert(!IsNull()); return m_offsetInHeap; }
-    UINT32 GetNumHandles() const { assert(!IsNull()); return m_numHandles; }
-    UINT64 GetFenceValue() const { assert(!IsNull()); return m_fenceValue; }
+    UINT32 GetOffset() const;
+    UINT32 GetNumHandles() const;
+    UINT64 GetFenceValue() const;
 
     void SetFenceValue(UINT64 fenceValue) { m_fenceValue = fenceValue; }
 
