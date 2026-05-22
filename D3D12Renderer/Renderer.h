@@ -15,6 +15,7 @@
 #include <array>
 #include <chrono>
 #include <unordered_map>
+#include <ratio>
 #include <cstddef>
 
 #include "Camera.h"
@@ -34,6 +35,9 @@
 #include "SceneManager.h"
 #include "View.h"
 #include "RendererConfig.h"
+#include "Texture.h"
+#include "UploadAllocation.h"
+#include "SceneHandles.h"
 
 class Renderer
 {

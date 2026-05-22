@@ -1,4 +1,5 @@
 #include <Windows.h>
+#include <sal.h>
 
 #include "Win32Application.h"
 #include "Renderer.h"

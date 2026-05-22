@@ -2,6 +2,8 @@
 
 #include <basetsd.h>
 
+#include <d3d12.h>
+
 #include "GpuResource.h"
 
 class Buffer : public GpuResource

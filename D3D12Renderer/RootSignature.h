@@ -3,6 +3,7 @@
 #include <minwindef.h>
 #include <basetsd.h>
 #include <wrl/client.h>
+#include <winerror.h>
 
 #include <d3d12.h>
 

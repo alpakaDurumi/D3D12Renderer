@@ -2,7 +2,6 @@
 
 #include <minwindef.h>
 #include <basetsd.h>
-#include <wrl/client.h>
 
 #include <d3d12.h>
 #include <dxgi1_6.h>    // DXGI 1.6

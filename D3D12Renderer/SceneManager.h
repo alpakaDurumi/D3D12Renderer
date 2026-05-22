@@ -5,6 +5,7 @@
 
 #include <wrl/client.h>
 
+#include <d3d12.h>
 #include <DirectXMath.h>
 
 #include <unordered_map>
@@ -12,6 +13,11 @@
 #include <cassert>
 #include <queue>
 #include <functional>
+#include <optional>
+#include <vector>
+#include <utility>
+#include <string>
+#include <memory>
 
 #include "SlotMap.h"
 #include "Mesh.h"
@@ -25,6 +31,8 @@
 #include "View.h"
 #include "Utility.h"
 #include "DDSTextureLoader12.h"
+#include "TransientUploadAllocator.h"
+#include "GeometryData.h"
 
 template<>
 struct std::hash<MeshHandle>

@@ -8,6 +8,8 @@
 #include <vector>
 #include <memory>
 #include <cstddef>
+#include <utility>
+#include <cstring>
 
 #include "Utility.h"
 #include "UploadAllocation.h"
@@ -68,7 +70,7 @@ public:
     UploadAllocation Push(void* src, std::size_t size, std::size_t alignment)
     {
         auto alloc = Allocate(size, alignment);
-        if (src) memcpy(alloc.cpuPtr, src, size);
+        if (src) std::memcpy(alloc.cpuPtr, src, size);
         return alloc;
     }
 

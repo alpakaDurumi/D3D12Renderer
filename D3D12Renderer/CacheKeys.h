@@ -54,9 +54,9 @@ struct std::hash<PSOKey>
 {
     std::size_t operator()(const PSOKey& key) const
     {
-        size_t seed = 0;
+        std::size_t seed = 0;
 
-        Utility::HashCombine(seed, static_cast<size_t>(key.passType));
+        Utility::HashCombine(seed, static_cast<std::size_t>(key.passType));
         Utility::HashCombine(seed, key.vsName);
         Utility::HashCombine(seed, key.psName);
 

@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "D3DHelper.h"
 
+#include <winerror.h>
+
 #include "Utility.h"
 #include "DirectXTex.h"
 
