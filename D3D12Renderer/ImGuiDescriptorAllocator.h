@@ -36,8 +36,8 @@ public:
         assert(!freeIndices.empty());
         int idx = freeIndices.back();
         freeIndices.pop_back();
-        out_cpu_desc_handle->ptr = heapStartCpu.ptr + (idx * heapHandleIncrement);
-        out_gpu_desc_handle->ptr = heapStartGpu.ptr + (idx * heapHandleIncrement);
+        *out_cpu_desc_handle = D3DHelper::GetCpuDescriptorHandle(heapStartCpu, idx, heapHandleIncrement);
+        *out_gpu_desc_handle = D3DHelper::GetGpuDescriptorHandle(heapStartGpu, idx, heapHandleIncrement);
     }
 
     void Free(D3D12_CPU_DESCRIPTOR_HANDLE out_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE out_gpu_desc_handle)
