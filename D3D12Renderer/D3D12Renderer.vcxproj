@@ -200,6 +200,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_PIX|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="RootSignature.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="TransientUploadAllocator.cpp" />
     <ClCompile Include="Utility.cpp" />
