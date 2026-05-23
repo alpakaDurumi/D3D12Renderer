@@ -32,6 +32,17 @@ CommandQueue::~CommandQueue()
     CloseHandle(m_fenceEvent);
 }
 
+void CommandQueue::SetDescriptorHeaps(const DynamicDescriptorHeap* pHeapForCbvSrvUav, ID3D12DescriptorHeap* pHeapForSampler)
+{
+    m_pDynamicDescriptorHeapForCbvSrvUav = pHeapForCbvSrvUav;
+    m_pSamplerDescriptorHeap = pHeapForSampler;
+}
+
+ID3D12CommandQueue* CommandQueue::GetCommandQueue() const
+{
+    return m_commandQueue.Get();
+}
+
 ID3D12CommandAllocator* CommandQueue::CreateCommandAllocator()
 {
     ComPtr<ID3D12CommandAllocator> commandAllocator;

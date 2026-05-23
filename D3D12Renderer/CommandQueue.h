@@ -21,15 +21,11 @@ public:
     CommandQueue& operator=(CommandQueue&&) = delete;
 
     CommandQueue(const Microsoft::WRL::ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type);
-
     ~CommandQueue();
 
-    void SetDescriptorHeaps(const DynamicDescriptorHeap* pHeapForCbvSrvUav, ID3D12DescriptorHeap* pHeapForSampler) {
-        m_pDynamicDescriptorHeapForCbvSrvUav = pHeapForCbvSrvUav;
-        m_pSamplerDescriptorHeap = pHeapForSampler;
-    }
+    void SetDescriptorHeaps(const DynamicDescriptorHeap* pHeapForCbvSrvUav, ID3D12DescriptorHeap* pHeapForSampler);
 
-    ID3D12CommandQueue* GetCommandQueue() const { return m_commandQueue.Get(); }
+    ID3D12CommandQueue* GetCommandQueue() const;
 
     ID3D12CommandAllocator* CreateCommandAllocator();
     ID3D12GraphicsCommandList7* CreateCommandList(ID3D12CommandAllocator* pCommandAllocator);
