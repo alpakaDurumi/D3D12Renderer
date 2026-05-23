@@ -201,6 +201,7 @@
     </ClCompile>
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="Texture.cpp" />
+    <ClCompile Include="TransientUploadAllocator.cpp" />
     <ClCompile Include="Utility.cpp" />
     <ClCompile Include="View.cpp" />
     <ClCompile Include="Win32Application.cpp" />

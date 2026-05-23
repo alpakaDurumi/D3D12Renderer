@@ -4,6 +4,7 @@
 #include "D3DHelper.h"
 #include "GeometryData.h"
 #include "TransientUploadAllocator.h"
+#include "UploadAllocation.h"
 
 using namespace D3DHelper;
 

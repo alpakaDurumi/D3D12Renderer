@@ -8,12 +8,10 @@
 #include <vector>
 #include <memory>
 #include <cstddef>
-#include <utility>
-#include <cstring>
 
-#include "Utility.h"
-#include "UploadAllocation.h"
 #include "Buffer.h"
+
+struct UploadAllocation;
 
 // Linear allocator using upload heap for transient usage.
 // Fence of CommandQueue ensures the safety of transient allocations,
@@ -22,89 +20,28 @@
 class TransientUploadAllocator
 {
 public:
-    // Disable copy and move
     TransientUploadAllocator(const TransientUploadAllocator&) = delete;
     TransientUploadAllocator& operator=(const TransientUploadAllocator&) = delete;
     TransientUploadAllocator(TransientUploadAllocator&&) = delete;
     TransientUploadAllocator& operator=(TransientUploadAllocator&&) = delete;
 
-    TransientUploadAllocator(ID3D12Device10* pDevice)
-        : m_pDevice(pDevice)
-    {
-        AllocatePage();
-        m_currentPageIndex = 0;
-        m_currentOffset = 0;
-    }
+    TransientUploadAllocator(ID3D12Device10* pDevice);
+    ~TransientUploadAllocator();
 
-    // Only allocate space
-    UploadAllocation Allocate(std::size_t size, std::size_t alignment)
-    {
-        m_currentOffset = Utility::Align(m_currentOffset, alignment);
+    UploadAllocation Allocate(std::size_t size, std::size_t alignment);
+    UploadAllocation Push(void* src, std::size_t size, std::size_t alignment);
 
-        // If current page has not enough space
-        if (m_currentOffset + size > PAGE_SIZE)
-        {
-            // If there is no spare page
-            if (m_currentPageIndex + 1 == m_pages.size())
-                AllocatePage();
-
-            ++m_currentPageIndex;
-            m_currentOffset = 0;
-        }
-
-        auto& currentPage = m_pages[m_currentPageIndex];
-
-        UploadAllocation alloc = {
-            currentPage->uploadBuffer.Get(),
-            m_currentOffset,
-            static_cast<UINT8*>(currentPage->cpuBasePtr) + m_currentOffset,
-            currentPage->gpuBasePtr + m_currentOffset
-        };
-
-        m_currentOffset += size;
-
-        return alloc;
-    }
-
-    // Allocate and copy data from src to currentOffset, returns Allocation
-    UploadAllocation Push(void* src, std::size_t size, std::size_t alignment)
-    {
-        auto alloc = Allocate(size, alignment);
-        if (src) std::memcpy(alloc.cpuPtr, src, size);
-        return alloc;
-    }
-
-    // Should be called at each frame start
-    void Reset()
-    {
-        m_currentPageIndex = 0;
-        m_currentOffset = 0;
-    }
+    void Reset();
 
 private:
     static const UINT64 PAGE_SIZE = 16 * 1024 * 1024;     // 16MB
 
-    void AllocatePage()
-    {
-        auto page = std::make_unique<Page>(m_pDevice);
-        m_pages.push_back(std::move(page));
-    }
+    void AllocatePage();
 
     struct Page
     {
-        Page(ID3D12Device10* pDevice)
-        {
-            uploadBuffer = Buffer(pDevice, PAGE_SIZE, D3D12_HEAP_TYPE_UPLOAD);
-
-            D3D12_RANGE readRange = { 0, 0 };
-            uploadBuffer.Get()->Map(0, &readRange, &cpuBasePtr);
-            gpuBasePtr = uploadBuffer.Get()->GetGPUVirtualAddress();
-        }
-
-        ~Page()
-        {
-            uploadBuffer.Get()->Unmap(0, nullptr);
-        }
+        Page(ID3D12Device10* pDevice);
+        ~Page();
 
         Buffer uploadBuffer;
         void* cpuBasePtr;
