@@ -6,27 +6,8 @@
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
 
-RootParameter::RootParameter(RootParameter&& other) noexcept
-{
-    m_parameter = other.m_parameter;
-    other.m_parameter = {};
-}
-
-RootParameter& RootParameter::operator=(RootParameter&& other) noexcept
-{
-    if (this != &other)
-    {
-        if (m_parameter.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
-        {
-            delete[] m_parameter.DescriptorTable.pDescriptorRanges;
-        }
-        m_parameter = other.m_parameter;
-
-        other.m_parameter = {};
-    }
-
-    return *this;
-}
+RootParameter::RootParameter(RootParameter&& other) noexcept = default;
+RootParameter& RootParameter::operator=(RootParameter&& other) noexcept = default;
 
 // Explicitly initialize with 0
 // Since m_paramter is POD, it could be garbage value and desctructor may occurs undefined behaviour
@@ -35,13 +16,7 @@ RootParameter::RootParameter()
 {
 }
 
-RootParameter::~RootParameter()
-{
-    if (m_parameter.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
-    {
-        delete[] m_parameter.DescriptorTable.pDescriptorRanges;
-    }
-}
+RootParameter::~RootParameter() = default;
 
 void RootParameter::InitAsConstant(UINT reg, UINT space, UINT num, D3D12_SHADER_VISIBILITY visibility)
 {
@@ -63,21 +38,22 @@ void RootParameter::InitAsDescriptor(UINT reg, UINT space, D3D12_SHADER_VISIBILI
 
 void RootParameter::InitAsTable(UINT numRanges, D3D12_SHADER_VISIBILITY visibility)
 {
+    m_ranges.resize(numRanges);
     m_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     m_parameter.DescriptorTable.NumDescriptorRanges = numRanges;
-    m_parameter.DescriptorTable.pDescriptorRanges = new D3D12_DESCRIPTOR_RANGE1[numRanges];
+    m_parameter.DescriptorTable.pDescriptorRanges = m_ranges.data();
     m_parameter.ShaderVisibility = visibility;
 }
 
 void RootParameter::InitAsRange(UINT rangeIndex, UINT reg, UINT space, D3D12_DESCRIPTOR_RANGE_TYPE type, UINT numDescriptors, D3D12_DESCRIPTOR_RANGE_FLAGS flags)
 {
-    D3D12_DESCRIPTOR_RANGE1* pRange = const_cast<D3D12_DESCRIPTOR_RANGE1*>(m_parameter.DescriptorTable.pDescriptorRanges + rangeIndex);
-    pRange->RangeType = type;
-    pRange->NumDescriptors = numDescriptors;
-    pRange->BaseShaderRegister = reg;
-    pRange->RegisterSpace = space;
-    pRange->OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-    pRange->Flags = flags;
+    auto& range = m_ranges[rangeIndex];
+    range.RangeType = type;
+    range.NumDescriptors = numDescriptors;
+    range.BaseShaderRegister = reg;
+    range.RegisterSpace = space;
+    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+    range.Flags = flags;
 }
 
 RootSignature::RootSignature(UINT numParameters, UINT numStaticSamplers)
@@ -258,28 +234,32 @@ void RootSignature::Finalize(ID3D12Device10* pDevice)
 
     // Downgraded objects must not be destroyed until CreateRootSignature
     D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-    D3D12_ROOT_PARAMETER* pDowngradedRootParameters = new D3D12_ROOT_PARAMETER[m_numParameters];
+    std::vector<D3D12_ROOT_PARAMETER> downgradedParameters;
     std::vector<D3D12_DESCRIPTOR_RANGE> convertedRanges;
 
-    const D3D12_ROOT_PARAMETER1* pParameters = (m_numParameters == 0) ? nullptr : &m_parameters.get()[0].m_parameter;
+    std::vector<D3D12_ROOT_PARAMETER1> parameters(m_numParameters);
+    for (UINT i = 0; i < m_numParameters; ++i)
+        parameters[i] = m_parameters[i].m_parameter;
 
     if (featureData.HighestVersion == D3D_ROOT_SIGNATURE_VERSION_1_1)
     {
         rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
         rootSignatureDesc.Desc_1_1.NumParameters = m_numParameters;
-        rootSignatureDesc.Desc_1_1.pParameters = pParameters;
+        rootSignatureDesc.Desc_1_1.pParameters = m_numParameters == 0 ? nullptr : parameters.data();
         rootSignatureDesc.Desc_1_1.NumStaticSamplers = m_numStaticSamplers;
         rootSignatureDesc.Desc_1_1.pStaticSamplers = m_staticSamplers.get();
         rootSignatureDesc.Desc_1_1.Flags = flag;
     }
     else
     {
+        downgradedParameters.resize(m_numParameters);
+
         UINT offset = 0;
-        DowngradeRootParameters(pParameters, m_numParameters, pDowngradedRootParameters, convertedRanges, offset);
+        DowngradeRootParameters(parameters.data(), m_numParameters, downgradedParameters.data(), convertedRanges, offset);
 
         rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_0;
         rootSignatureDesc.Desc_1_0.NumParameters = m_numParameters;
-        rootSignatureDesc.Desc_1_0.pParameters = pDowngradedRootParameters;
+        rootSignatureDesc.Desc_1_0.pParameters = m_numParameters == 0 ? nullptr : downgradedParameters.data();
         rootSignatureDesc.Desc_1_0.NumStaticSamplers = m_numStaticSamplers;
         rootSignatureDesc.Desc_1_0.pStaticSamplers = m_staticSamplers.get();
         rootSignatureDesc.Desc_1_0.Flags = flag;
@@ -289,6 +269,4 @@ void RootSignature::Finalize(ID3D12Device10* pDevice)
     ComPtr<ID3DBlob> error;
     ThrowIfFailed(D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &signature, &error));
     ThrowIfFailed(pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
-
-    delete[] pDowngradedRootParameters;
 }

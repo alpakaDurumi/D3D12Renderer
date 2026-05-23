@@ -7,6 +7,7 @@
 #include <d3d12.h>
 
 #include <memory>
+#include <vector>
 
 #include "RendererConfig.h"
 
@@ -30,6 +31,7 @@ public:
 
 private:
     D3D12_ROOT_PARAMETER1 m_parameter;
+    std::vector<D3D12_DESCRIPTOR_RANGE1> m_ranges;
 };
 
 class RootSignature
