@@ -6,7 +6,6 @@
 
 #include <d3d12.h>
 
-#include <memory>
 #include <vector>
 
 #include "RendererConfig.h"
@@ -68,6 +67,6 @@ private:
     UINT32 m_samplerTableBitMask = 0;
     UINT32 m_descriptorTableSize[16] = {};  // Maximum number of tables is limited to 16
 
-    std::unique_ptr<RootParameter[]> m_parameters;
-    std::unique_ptr<D3D12_STATIC_SAMPLER_DESC[]> m_staticSamplers;
+    std::vector<RootParameter> m_parameters;
+    std::vector<D3D12_STATIC_SAMPLER_DESC> m_staticSamplers;
 };

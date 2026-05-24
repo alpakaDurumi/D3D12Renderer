@@ -57,19 +57,12 @@ void RootParameter::InitAsRange(UINT rangeIndex, UINT reg, UINT space, D3D12_DES
 }
 
 RootSignature::RootSignature(UINT numParameters, UINT numStaticSamplers)
-    : m_numParameters(numParameters), m_numStaticSamplers(numStaticSamplers)
+    : m_numParameters(numParameters),
+    m_numStaticSamplers(numStaticSamplers),
+    m_parameters(numParameters),
+    m_staticSamplers(numStaticSamplers)
 {
     assert(numParameters <= 16);    // Maximum number of parameters is limited to 16
-
-    if (m_numParameters > 0)
-        m_parameters.reset(new RootParameter[m_numParameters]);
-    else
-        m_parameters = nullptr;
-
-    if (m_numStaticSamplers > 0)
-        m_staticSamplers.reset(new D3D12_STATIC_SAMPLER_DESC[m_numStaticSamplers]);
-    else
-        m_staticSamplers = nullptr;
 }
 
 ID3D12RootSignature* RootSignature::GetRootSignature() const
@@ -100,7 +93,7 @@ UINT32 RootSignature::GetTableSize(UINT parameterIndex) const
 RootParameter& RootSignature::operator[](SIZE_T parameterIndex)
 {
     assert(parameterIndex < m_numParameters);
-    return m_parameters.get()[parameterIndex];
+    return m_parameters[parameterIndex];
 }
 
 // filtering argument ignored if comparisonFunc set.
@@ -251,7 +244,7 @@ void RootSignature::Finalize(ID3D12Device10* pDevice)
         rootSignatureDesc.Desc_1_1.NumParameters = m_numParameters;
         rootSignatureDesc.Desc_1_1.pParameters = m_numParameters == 0 ? nullptr : parameters.data();
         rootSignatureDesc.Desc_1_1.NumStaticSamplers = m_numStaticSamplers;
-        rootSignatureDesc.Desc_1_1.pStaticSamplers = m_staticSamplers.get();
+        rootSignatureDesc.Desc_1_1.pStaticSamplers = m_staticSamplers.data();
         rootSignatureDesc.Desc_1_1.Flags = flag;
     }
     else
@@ -265,7 +258,7 @@ void RootSignature::Finalize(ID3D12Device10* pDevice)
         rootSignatureDesc.Desc_1_0.NumParameters = m_numParameters;
         rootSignatureDesc.Desc_1_0.pParameters = m_numParameters == 0 ? nullptr : downgradedParameters.data();
         rootSignatureDesc.Desc_1_0.NumStaticSamplers = m_numStaticSamplers;
-        rootSignatureDesc.Desc_1_0.pStaticSamplers = m_staticSamplers.get();
+        rootSignatureDesc.Desc_1_0.pStaticSamplers = m_staticSamplers.data();
         rootSignatureDesc.Desc_1_0.Flags = flag;
     }
 
