@@ -1,4 +1,5 @@
 #include "pch.h"
+
 #include "DescriptorAllocation.h"
 
 #include "D3DHelper.h"
@@ -7,22 +8,22 @@
 using namespace D3DHelper;
 
 DescriptorAllocation::DescriptorAllocation()
-    : m_descriptor{ 0 },
-    m_offsetInHeap(0),
-    m_numHandles(0),
-    m_descriptorSize(0),
-    m_fenceValue(0),
-    m_pPage(nullptr)
+    : m_descriptor{0}
+    , m_offsetInHeap(0)
+    , m_numHandles(0)
+    , m_descriptorSize(0)
+    , m_fenceValue(0)
+    , m_pPage(nullptr)
 {
 }
 
 DescriptorAllocation::DescriptorAllocation(DescriptorAllocation&& other) noexcept
-    : m_descriptor(other.m_descriptor),
-    m_offsetInHeap(other.m_offsetInHeap),
-    m_numHandles(other.m_numHandles),
-    m_descriptorSize(other.m_descriptorSize),
-    m_fenceValue(other.m_fenceValue),
-    m_pPage(other.m_pPage)
+    : m_descriptor(other.m_descriptor)
+    , m_offsetInHeap(other.m_offsetInHeap)
+    , m_numHandles(other.m_numHandles)
+    , m_descriptorSize(other.m_descriptorSize)
+    , m_fenceValue(other.m_fenceValue)
+    , m_pPage(other.m_pPage)
 {
     other.m_descriptor.ptr = 0;
     other.m_offsetInHeap = 0;
@@ -62,12 +63,12 @@ DescriptorAllocation::DescriptorAllocation(
     UINT32 numHandles,
     UINT32 descriptorSize,
     DescriptorAllocatorPage* pPage)
-    : m_descriptor(GetCpuDescriptorHandle(baseDescriptor, offsetInHeap, descriptorSize)),
-    m_offsetInHeap(offsetInHeap),
-    m_numHandles(numHandles),
-    m_descriptorSize(descriptorSize),
-    m_fenceValue(0),
-    m_pPage(pPage)
+    : m_descriptor(GetCpuDescriptorHandle(baseDescriptor, offsetInHeap, descriptorSize))
+    , m_offsetInHeap(offsetInHeap)
+    , m_numHandles(numHandles)
+    , m_descriptorSize(descriptorSize)
+    , m_fenceValue(0)
+    , m_pPage(pPage)
 {
 }
 
@@ -90,7 +91,7 @@ void DescriptorAllocation::Free()
 D3D12_CPU_DESCRIPTOR_HANDLE DescriptorAllocation::GetDescriptorHandle(UINT32 offsetInBlock) const
 {
     assert(offsetInBlock < m_numHandles);
-    return { m_descriptor.ptr + (m_descriptorSize * offsetInBlock) };
+    return {m_descriptor.ptr + (m_descriptorSize * offsetInBlock)};
 }
 
 UINT32 DescriptorAllocation::GetOffset() const
@@ -152,11 +153,11 @@ DescriptorAllocation::DescriptorAllocation(
     UINT32 descriptorSize,
     UINT64 fenceValue,
     DescriptorAllocatorPage* pPage)
-    : m_descriptor(descriptor),
-    m_offsetInHeap(offsetInHeap),
-    m_numHandles(numHandles),
-    m_descriptorSize(descriptorSize),
-    m_fenceValue(fenceValue),
-    m_pPage(pPage)
+    : m_descriptor(descriptor)
+    , m_offsetInHeap(offsetInHeap)
+    , m_numHandles(numHandles)
+    , m_descriptorSize(descriptorSize)
+    , m_fenceValue(fenceValue)
+    , m_pPage(pPage)
 {
 }

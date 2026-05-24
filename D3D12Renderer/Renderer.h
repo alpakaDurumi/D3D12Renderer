@@ -1,35 +1,35 @@
 #pragma once
 
-#include <minwindef.h>
 #include <basetsd.h>
-#include <wrl/client.h>
+#include <minwindef.h>
 
-#include <d3d12.h>
-#include <dxgi1_6.h>    // DXGI 1.6
-#include <DirectXMath.h>
-#include <DirectXCollision.h>
-
-#include <string>
-#include <vector>
-#include <memory>
 #include <array>
 #include <chrono>
-#include <unordered_map>
-#include <ratio>
 #include <cstddef>
+#include <memory>
+#include <ratio>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
-#include "Camera.h"
-#include "InputManager.h"
-#include "ConstantData.h"
-#include "CacheKeys.h"
-#include "RenderGraph.h"
+#include <DirectXCollision.h>
+#include <DirectXMath.h>
+#include <d3d12.h>
+#include <dxgi1_6.h>
+#include <wrl/client.h>
+
 #include "Aliases.h"
-#include "SceneManager.h"
-#include "View.h"
+#include "CacheKeys.h"
+#include "Camera.h"
+#include "ConstantData.h"
+#include "InputManager.h"
+#include "RenderGraph.h"
 #include "RendererConfig.h"
+#include "SceneHandles.h"
+#include "SceneManager.h"
 #include "Texture.h"
 #include "UploadAllocation.h"
-#include "SceneHandles.h"
+#include "View.h"
 
 struct GeometryData;
 class DescriptorAllocation;
@@ -55,14 +55,35 @@ public:
     Renderer(std::wstring name);
     ~Renderer();
 
-    UINT GetWidth() const { return m_width; }
-    UINT GetHeight() const { return m_height; }
-    const WCHAR* GetTitle() const { return m_title.c_str(); }
-    static Renderer* GetInstance() { return sm_instance; }
+    UINT GetWidth() const
+    {
+        return m_width;
+    }
+    UINT GetHeight() const
+    {
+        return m_height;
+    }
+    const WCHAR* GetTitle() const
+    {
+        return m_title.c_str();
+    }
+    static Renderer* GetInstance()
+    {
+        return sm_instance;
+    }
 
-    void SetWidth(UINT width) { m_width = width; }
-    void SetHeight(UINT height) { m_height = height; }
-    void SetWarp(bool value) { m_useWarpDevice = value; }
+    void SetWidth(UINT width)
+    {
+        m_width = width;
+    }
+    void SetHeight(UINT height)
+    {
+        m_height = height;
+    }
+    void SetWarp(bool value)
+    {
+        m_useWarpDevice = value;
+    }
     void SetPix();
     void UpdateWidthHeight();
     void ToggleFullScreen();
@@ -119,7 +140,7 @@ private:
     std::unique_ptr<RootSignature> m_rootSignature;
     std::unordered_map<PSOKey, Microsoft::WRL::ComPtr<ID3D12PipelineState>> m_pipelineStates;
 
-    PSOKey m_currentPSOKey = { PassType::FORWARD_COLORING };
+    PSOKey m_currentPSOKey = {PassType::FORWARD_COLORING};
 
     std::vector<D3D12_INPUT_ELEMENT_DESC> m_inputLayout;
     std::unordered_map<ShaderKey, std::vector<char>> m_shaderBlobs;
@@ -130,7 +151,7 @@ private:
     ShaderResourceView m_depthSrv;
 
     // App resources
-    // 
+    //
     // Main Camera
     Camera m_camera;
     CameraConstantData m_cameraConstantData;

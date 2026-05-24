@@ -1,14 +1,14 @@
 #pragma once
 
 #include <basetsd.h>
-#include <wrl/client.h>
-
-#include <d3d12.h>
 
 #include <memory>
 #include <mutex>
 #include <set>
 #include <vector>
+
+#include <d3d12.h>
+#include <wrl/client.h>
 
 class CommandQueue;
 class DescriptorAllocatorPage;
@@ -29,7 +29,10 @@ public:
 
     DescriptorAllocation Allocate(UINT32 numDescriptors = 1);
 
-    void SetCommandQueue(const CommandQueue* pCommandQueue) { m_pCommandQueue = pCommandQueue; }
+    void SetCommandQueue(const CommandQueue* pCommandQueue)
+    {
+        m_pCommandQueue = pCommandQueue;
+    }
 
 private:
     // These functions not use mutex since they assume that mutex already locked on caller's side.
@@ -41,7 +44,7 @@ private:
     UINT32 m_numDescriptorsPerHeap;
 
     std::vector<std::unique_ptr<DescriptorAllocatorPage>> m_heapPool;
-    std::set<SIZE_T> m_availableHeaps;      // Indices of available heaps in the heap pool.
+    std::set<SIZE_T> m_availableHeaps; // Indices of available heaps in the heap pool.
 
     std::mutex m_allocationMutex;
 

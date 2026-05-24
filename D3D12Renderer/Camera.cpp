@@ -1,4 +1,5 @@
 #include "pch.h"
+
 #include "Camera.h"
 
 using namespace DirectX;
@@ -65,9 +66,7 @@ XMMATRIX Camera::GetViewMatrix() const
 
 XMMATRIX Camera::GetProjectionMatrix(bool usePerspectiveProjection) const
 {
-    return usePerspectiveProjection ?
-        XMMatrixPerspectiveFovLH(m_verticalFov, m_aspectRatio, m_farPlane, m_nearPlane) :
-        XMMatrixOrthographicLH(2 * m_aspectRatio, 2.0f, m_farPlane, m_nearPlane);
+    return usePerspectiveProjection ? XMMatrixPerspectiveFovLH(m_verticalFov, m_aspectRatio, m_farPlane, m_nearPlane) : XMMatrixOrthographicLH(2 * m_aspectRatio, 2.0f, m_farPlane, m_nearPlane);
 }
 
 void Camera::SetCurrentPosition(const XMVECTOR& pos)

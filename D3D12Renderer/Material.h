@@ -2,15 +2,15 @@
 
 #include <minwindef.h>
 
-#include <d3d12.h>
-#include <DirectXMath.h>
-
 #include <array>
 #include <cstddef>
 
+#include <DirectXMath.h>
+#include <d3d12.h>
+
 #include "ConstantData.h"
-#include "View.h"
 #include "RendererConfig.h"
+#include "View.h"
 
 enum class TextureSlot
 {

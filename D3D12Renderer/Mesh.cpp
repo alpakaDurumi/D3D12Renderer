@@ -1,4 +1,5 @@
 #include "pch.h"
+
 #include "Mesh.h"
 
 #include "D3DHelper.h"
@@ -43,26 +44,21 @@ Mesh::Mesh(
 
     // Barrier
     D3D12_BUFFER_BARRIER barriers[2] = {
-        {
-            D3D12_BARRIER_SYNC_COPY,
-            D3D12_BARRIER_SYNC_VERTEX_SHADING,
-            D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_ACCESS_VERTEX_BUFFER,
-            m_vertexBuffer.Get(),
-            0,
-            UINT64_MAX
-        },
-        {
-            D3D12_BARRIER_SYNC_COPY,
-            D3D12_BARRIER_SYNC_INDEX_INPUT,
-            D3D12_BARRIER_ACCESS_COPY_DEST,
-            D3D12_BARRIER_ACCESS_INDEX_BUFFER,
-            m_indexBuffer.Get(),
-            0,
-            UINT64_MAX
-        }
-    };
-    D3D12_BARRIER_GROUP barrierGroups[] = { BufferBarrierGroup(2, barriers) };
+        {D3D12_BARRIER_SYNC_COPY,
+         D3D12_BARRIER_SYNC_VERTEX_SHADING,
+         D3D12_BARRIER_ACCESS_COPY_DEST,
+         D3D12_BARRIER_ACCESS_VERTEX_BUFFER,
+         m_vertexBuffer.Get(),
+         0,
+         UINT64_MAX},
+        {D3D12_BARRIER_SYNC_COPY,
+         D3D12_BARRIER_SYNC_INDEX_INPUT,
+         D3D12_BARRIER_ACCESS_COPY_DEST,
+         D3D12_BARRIER_ACCESS_INDEX_BUFFER,
+         m_indexBuffer.Get(),
+         0,
+         UINT64_MAX}};
+    D3D12_BARRIER_GROUP barrierGroups[] = {BufferBarrierGroup(2, barriers)};
     pCommandList->Barrier(1, barrierGroups);
 
     // Initialize VBV, IBV

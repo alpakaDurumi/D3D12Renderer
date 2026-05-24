@@ -1,20 +1,20 @@
 #pragma once
 
-#include <minwindef.h>
 #include <basetsd.h>
+#include <minwindef.h>
 
-#include <d3d12.h>
-#include <dxgi1_6.h>    // DXGI 1.6
-
-#include <vector>
 #include <array>
 #include <cstddef>
+#include <vector>
 
-#include "Texture.h"
-#include "View.h"
+#include <d3d12.h>
+#include <dxgi1_6.h>
+
 #include "Buffer.h"
 #include "SharedConfig.h"
+#include "Texture.h"
 #include "TransientUploadAllocator.h"
+#include "View.h"
 
 class DescriptorAllocation;
 struct InstanceData;
@@ -90,7 +90,7 @@ public:
 private:
     Texture m_backBuffer;
     RenderTargetView m_backBufferRtv;
-    
+
     std::array<Texture, SceneColorBufferCount> m_sceneColorBuffers;
     std::array<RenderTargetView, SceneColorBufferCount> m_sceneColorBufferRtvs;
     std::array<ShaderResourceView, SceneColorBufferCount> m_sceneColorBufferSrvs;

@@ -1,11 +1,12 @@
 #include "pch.h"
+
 #include "FrameResource.h"
 
 #include "D3DHelper.h"
-#include "Utility.h"
 #include "DescriptorAllocation.h"
 #include "InstanceData.h"
 #include "UploadAllocation.h"
+#include "Utility.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
@@ -23,13 +24,13 @@ FrameResource::FrameResource(
     DescriptorAllocation&& selectionMaskSrvAllocation,
     DescriptorAllocation&& horizontalDilatedMaskRtvAllocation,
     DescriptorAllocation&& horizontalDilatedMaskSrvAllocation)
-    : m_pDevice(pDevice),
-    m_backBufferRtv(std::move(rtvAllocation)),
-    m_selectionMaskRtv(std::move(selectionMaskRtvAllocation)),
-    m_selectionMaskSrv(std::move(selectionMaskSrvAllocation)),
-    m_horizontalDilatedMaskRtv(std::move(horizontalDilatedMaskRtvAllocation)),
-    m_horizontalDilatedMaskSrv(std::move(horizontalDilatedMaskSrvAllocation)),
-    m_uploadAllocator(pDevice)
+    : m_pDevice(pDevice)
+    , m_backBufferRtv(std::move(rtvAllocation))
+    , m_selectionMaskRtv(std::move(selectionMaskRtvAllocation))
+    , m_selectionMaskSrv(std::move(selectionMaskSrvAllocation))
+    , m_horizontalDilatedMaskRtv(std::move(horizontalDilatedMaskRtvAllocation))
+    , m_horizontalDilatedMaskSrv(std::move(horizontalDilatedMaskSrvAllocation))
+    , m_uploadAllocator(pDevice)
 {
     // Back buffer
     AcquireBackBuffer(pSwapChain, frameIndex);
@@ -68,7 +69,7 @@ FrameResource::FrameResource(
 
     // Create Upload buffer
     m_instanceUploadBuffer = Buffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, D3D12_HEAP_TYPE_UPLOAD);
-    D3D12_RANGE readRange = { 0, 0 };
+    D3D12_RANGE readRange = {0, 0};
     ThrowIfFailed(m_instanceUploadBuffer.Get()->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
 }
 
@@ -282,7 +283,7 @@ void FrameResource::EnsureInstanceCapacity(UINT requiredSize)
         m_instanceCapacity = Utility::CeilPowerOfTwo(requiredSize);
 
         m_instanceUploadBuffer = Buffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, D3D12_HEAP_TYPE_UPLOAD);
-        D3D12_RANGE readRange = { 0, 0 };
+        D3D12_RANGE readRange = {0, 0};
         ThrowIfFailed(m_instanceUploadBuffer.Get()->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
     }
 }

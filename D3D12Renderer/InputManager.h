@@ -2,9 +2,9 @@
 
 #include <minwindef.h>
 
-#include <DirectXMath.h>
-
 #include <cstring>
+
+#include <DirectXMath.h>
 
 #include "Aliases.h"
 
@@ -22,7 +22,8 @@ public:
 
     void SetKeyUp(VKCode key)
     {
-        if (key < 256) m_keyDown[key] = false;
+        if (key < 256)
+            m_keyDown[key] = false;
     }
 
     bool IsKeyDown(VKCode key) const
@@ -62,13 +63,13 @@ public:
         m_mouseMove.x += dx;
         m_mouseMove.y += dy;
 
-        m_mousePos = { cx, cy };
+        m_mousePos = {cx, cy};
     }
 
     DirectX::XMINT2 GetAndResetMouseMove()
     {
         DirectX::XMINT2 delta = m_mouseMove;
-        m_mouseMove = { 0, 0 };
+        m_mouseMove = {0, 0};
         return delta;
     }
 
@@ -95,21 +96,21 @@ public:
         memset(m_keyDown, false, sizeof(m_keyDown));
         memset(m_mouseButtonDown, false, sizeof(m_mouseButtonDown));
         ResetPressedFlags();
-        m_mouseMove = { 0, 0 };
-        m_mousePos = { 0, 0 };
+        m_mouseMove = {0, 0};
+        m_mousePos = {0, 0};
         m_accumulatedMouseWheelStep = 0.0f;
     }
 
 private:
     // Keyboard
-    bool m_keyDown[256] = { false };
-    bool m_keyPressed[256] = { false };
+    bool m_keyDown[256] = {false};
+    bool m_keyPressed[256] = {false};
 
     // Mouse
     // 0 = LMB, 1 = RMB, 2 = MMB
-    bool m_mouseButtonDown[3] = { false };
-    bool m_mouseButtonPressed[3] = { false };
-    DirectX::XMINT2 m_mouseMove = { 0, 0 };
-    DirectX::XMINT2 m_mousePos = { 0, 0 };
+    bool m_mouseButtonDown[3] = {false};
+    bool m_mouseButtonPressed[3] = {false};
+    DirectX::XMINT2 m_mouseMove = {0, 0};
+    DirectX::XMINT2 m_mousePos = {0, 0};
     float m_accumulatedMouseWheelStep = 0.0f;
 };

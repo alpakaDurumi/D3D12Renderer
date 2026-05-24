@@ -1,4 +1,5 @@
 #include "pch.h"
+
 #include "CommandQueue.h"
 
 #include "D3DHelper.h"
@@ -8,7 +9,11 @@ using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
 
 CommandQueue::CommandQueue(const ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type)
-    : m_type(type), m_fenceValue(0), m_device(device), m_pDynamicDescriptorHeapForCbvSrvUav(nullptr), m_pSamplerDescriptorHeap(nullptr)
+    : m_type(type)
+    , m_fenceValue(0)
+    , m_device(device)
+    , m_pDynamicDescriptorHeapForCbvSrvUav(nullptr)
+    , m_pSamplerDescriptorHeap(nullptr)
 {
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
     queueDesc.Type = type;
@@ -92,21 +97,21 @@ std::pair<ID3D12CommandAllocator*, ID3D12GraphicsCommandList7*> CommandQueue::Ge
     }
 
     // Bind with DescriptorHeaps
-    ID3D12DescriptorHeap* ppHeaps[] = { m_pDynamicDescriptorHeapForCbvSrvUav->GetCurrentDescriptorHeap(), m_pSamplerDescriptorHeap };
+    ID3D12DescriptorHeap* ppHeaps[] = {m_pDynamicDescriptorHeapForCbvSrvUav->GetCurrentDescriptorHeap(), m_pSamplerDescriptorHeap};
     pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-    return { pCommandAllocator, pCommandList };
+    return {pCommandAllocator, pCommandList};
 }
 
 UINT64 CommandQueue::ExecuteCommandLists(ID3D12CommandAllocator* pCommandAllocator, ID3D12GraphicsCommandList7* pCommandList)
 {
     pCommandList->Close();
 
-    ID3D12CommandList* ppCommandLists[] = { pCommandList };
+    ID3D12CommandList* ppCommandLists[] = {pCommandList};
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
     UINT64 fenceValue = Signal();
-    m_commandAllocatorQueue.push({ fenceValue, pCommandAllocator });
+    m_commandAllocatorQueue.push({fenceValue, pCommandAllocator});
     m_commandListQueue.push(pCommandList);
 
     return fenceValue;

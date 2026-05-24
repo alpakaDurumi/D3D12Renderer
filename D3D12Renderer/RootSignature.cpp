@@ -1,4 +1,5 @@
 #include "pch.h"
+
 #include "RootSignature.h"
 
 #include "D3DHelper.h"
@@ -57,12 +58,12 @@ void RootParameter::InitAsRange(UINT rangeIndex, UINT reg, UINT space, D3D12_DES
 }
 
 RootSignature::RootSignature(UINT numParameters, UINT numStaticSamplers)
-    : m_numParameters(numParameters),
-    m_numStaticSamplers(numStaticSamplers),
-    m_parameters(numParameters),
-    m_staticSamplers(numStaticSamplers)
+    : m_numParameters(numParameters)
+    , m_numStaticSamplers(numStaticSamplers)
+    , m_parameters(numParameters)
+    , m_staticSamplers(numStaticSamplers)
 {
-    assert(numParameters <= 16);    // Maximum number of parameters is limited to 16
+    assert(numParameters <= 16); // Maximum number of parameters is limited to 16
 }
 
 ID3D12RootSignature* RootSignature::GetRootSignature() const

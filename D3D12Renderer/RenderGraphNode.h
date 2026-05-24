@@ -2,14 +2,21 @@
 
 #include <minwindef.h>
 
+#include <tuple>
+#include <utility>
+#include <vector>
+
 #include <d3d12.h>
 
-#include <vector>
-#include <utility>
-#include <tuple>
+struct RGBuffer
+{
+    UINT index;
+};
 
-struct RGBuffer { UINT index; };
-struct RGTexture { UINT index; };
+struct RGTexture
+{
+    UINT index;
+};
 
 struct BufferResourceUsage
 {
@@ -19,7 +26,7 @@ struct BufferResourceUsage
     bool operator==(const BufferResourceUsage& other) const
     {
         return this->sync == other.sync &&
-            this->access == other.access;
+               this->access == other.access;
     }
 
     bool operator!=(const BufferResourceUsage& other) const
@@ -37,8 +44,8 @@ struct TextureResourceUsage
     bool operator==(const TextureResourceUsage& other) const
     {
         return this->sync == other.sync &&
-            this->access == other.access &&
-            this->layout == other.layout;
+               this->access == other.access &&
+               this->layout == other.layout;
     }
 
     bool operator!=(const TextureResourceUsage& other) const
@@ -75,12 +82,12 @@ public:
         bufferOutputs.emplace_back(buffer, usage);
     }
 
-    void AddTextureInput(RGTexture texture, TextureResourceUsage usage, D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 })
+    void AddTextureInput(RGTexture texture, TextureResourceUsage usage, D3D12_BARRIER_SUBRESOURCE_RANGE range = {0xffff'ffff, 0, 0, 0, 0, 0})
     {
         textureInputs.emplace_back(texture, usage, range);
     }
 
-    void AddTextureOutput(RGTexture texture, TextureResourceUsage usage, D3D12_BARRIER_SUBRESOURCE_RANGE range = { 0xffff'ffff, 0, 0, 0, 0, 0 })
+    void AddTextureOutput(RGTexture texture, TextureResourceUsage usage, D3D12_BARRIER_SUBRESOURCE_RANGE range = {0xffff'ffff, 0, 0, 0, 0, 0})
     {
         textureOutputs.emplace_back(texture, usage, range);
     }

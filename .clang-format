@@ -1,0 +1,34 @@
+# Using clang-format 22.1.5
+BasedOnStyle: Microsoft
+
+Language: Cpp
+Standard: c++17
+IndentWidth: 4
+UseTab: Never
+ColumnLimit: 0
+
+PointerAlignment: Left
+BreakBeforeBraces: Allman
+AccessModifierOffset: -4
+
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex:        '^"pch\.h"$'
+    Priority:     1
+    SortPriority: -1
+  - Regex:        '^<(d3d|dxgi|wrl|[Dd]irect).*>$'
+    Priority:     5
+  - Regex:        '^<(imgui|DirectXTex).*>$'
+    Priority:     6
+  - Regex:        '^<.*\.h>$'
+    Priority:     3
+  - Regex:        '^<.*>$'
+    Priority:     4
+  - Regex:        '^".*"$'
+    Priority:     7
+
+BreakConstructorInitializers: BeforeComma
+InsertNewlineAtEOF: true
+
+LambdaBodyIndentation: Signature
+AllowShortLambdasOnASingleLine: All

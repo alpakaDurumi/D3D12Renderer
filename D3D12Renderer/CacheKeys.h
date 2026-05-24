@@ -1,8 +1,8 @@
 #pragma once
 
-#include <functional>   // for std::hash
-#include <string>
 #include <cstddef>
+#include <functional> // for std::hash
+#include <string>
 
 #include "Utility.h"
 
@@ -28,7 +28,7 @@ struct ShaderKey
 };
 
 // Specialization for hashing ShaderKey (required for std::unordered_map)
-template<>
+template <>
 struct std::hash<ShaderKey>
 {
     std::size_t operator()(const ShaderKey& key) const
@@ -41,7 +41,7 @@ struct std::hash<ShaderKey>
 // Key that identify unique PSO.
 struct PSOKey
 {
-    PassType passType;  // 1
+    PassType passType; // 1
 
     std::wstring vsName;
     std::wstring psName;
@@ -49,7 +49,7 @@ struct PSOKey
     bool operator==(const PSOKey& other) const;
 };
 
-template<>
+template <>
 struct std::hash<PSOKey>
 {
     std::size_t operator()(const PSOKey& key) const

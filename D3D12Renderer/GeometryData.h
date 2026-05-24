@@ -2,10 +2,10 @@
 
 #include <basetsd.h>
 
-#include <DirectXMath.h>
-
-#include <vector>
 #include <string>
+#include <vector>
+
+#include <DirectXMath.h>
 
 struct Vertex
 {

@@ -1,73 +1,75 @@
 #include "pch.h"
+
 #include "Utility.h"
 
 #include <stdlib.h>
 
 namespace Utility
 {
-    std::wstring GetFileExtension(const std::wstring& filePath)
-    {
-        size_t lastSlash = filePath.find_last_of(L"/\\");
-        size_t lastDot = filePath.rfind(L'.');
+std::wstring GetFileExtension(const std::wstring& filePath)
+{
+    size_t lastSlash = filePath.find_last_of(L"/\\");
+    size_t lastDot = filePath.rfind(L'.');
 
-        if (lastDot != std::wstring::npos && (lastSlash == std::wstring::npos || lastSlash < lastDot))
-        {
-            return filePath.substr(lastDot + 1);
-        }
-        else
-        {
-            return L"";
-        }
+    if (lastDot != std::wstring::npos && (lastSlash == std::wstring::npos || lastSlash < lastDot))
+    {
+        return filePath.substr(lastDot + 1);
     }
-
-    std::wstring RemoveFileExtension(const std::wstring& filePath)
+    else
     {
-        return filePath.substr(0, filePath.rfind(L"."));
-    }
-
-    unsigned long Djb2Hash(const std::wstring str)
-    {
-        unsigned long hash = 5381;
-
-        for (wchar_t c : str)
-            hash = ((hash << 5) + hash) + c;    // hash * 33 + c
-
-        return hash;
-    }
-
-    std::wstring MultiByteToWideChar(const std::string& str)
-    {
-        std::wstring converted;
-
-        // Calculate required length and resize dest buffer
-        size_t requiredSize;
-        mbstowcs_s(&requiredSize, nullptr, 0, str.data(), 0);
-        converted.resize(requiredSize);
-
-        // Convert
-        mbstowcs_s(nullptr, converted.data(), requiredSize, str.data(), requiredSize - 1);
-
-        // Truncate null character
-        converted.resize(requiredSize - 1);
-
-        return converted;
-    }
-
-    UINT CeilPowerOfTwo(UINT x)
-    {
-        if (x <= 1) return 1;
-        --x;
-        x |= x >> 1;
-        x |= x >> 2;
-        x |= x >> 4;
-        x |= x >> 8;
-        x |= x >> 16;
-
-        return x + 1;
-    }
-
-    std::size_t Align(std::size_t value, std::size_t alignment)
-    {
-        return (value + (alignment - 1)) & ~(alignment - 1);
+        return L"";
     }
 }
+
+std::wstring RemoveFileExtension(const std::wstring& filePath)
+{
+    return filePath.substr(0, filePath.rfind(L"."));
+}
+
+unsigned long Djb2Hash(const std::wstring str)
+{
+    unsigned long hash = 5381;
+
+    for (wchar_t c : str)
+        hash = ((hash << 5) + hash) + c; // hash * 33 + c
+
+    return hash;
+}
+
+std::wstring MultiByteToWideChar(const std::string& str)
+{
+    std::wstring converted;
+
+    // Calculate required length and resize dest buffer
+    size_t requiredSize;
+    mbstowcs_s(&requiredSize, nullptr, 0, str.data(), 0);
+    converted.resize(requiredSize);
+
+    // Convert
+    mbstowcs_s(nullptr, converted.data(), requiredSize, str.data(), requiredSize - 1);
+
+    // Truncate null character
+    converted.resize(requiredSize - 1);
+
+    return converted;
+}
+
+UINT CeilPowerOfTwo(UINT x)
+{
+    if (x <= 1)
+        return 1;
+    --x;
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+
+    return x + 1;
+}
+
+std::size_t Align(std::size_t value, std::size_t alignment)
+{
+    return (value + (alignment - 1)) & ~(alignment - 1);
+}
+} // namespace Utility

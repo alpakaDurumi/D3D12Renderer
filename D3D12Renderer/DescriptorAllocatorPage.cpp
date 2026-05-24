@@ -1,4 +1,5 @@
 #include "pch.h"
+
 #include "DescriptorAllocatorPage.h"
 
 #include "D3DHelper.h"
@@ -7,12 +8,13 @@
 using namespace D3DHelper;
 
 DescriptorAllocatorPage::DescriptorAllocatorPage(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptors)
-    : m_heapType(type), m_numDescriptorsInHeap(numDescriptors)
+    : m_heapType(type)
+    , m_numDescriptorsInHeap(numDescriptors)
 {
     D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
     heapDesc.Type = m_heapType;
     heapDesc.NumDescriptors = m_numDescriptorsInHeap;
-    heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;   // CPU visible descriptor heap does not need to set SHADER_VISIBLE flag
+    heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE; // CPU visible descriptor heap does not need to set SHADER_VISIBLE flag
     ThrowIfFailed(pDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_descriptorHeap)));
 
     m_baseDescriptor = m_descriptorHeap->GetCPUDescriptorHandleForHeapStart();
@@ -25,8 +27,8 @@ DescriptorAllocatorPage::DescriptorAllocatorPage(ID3D12Device10* pDevice, D3D12_
 
 void DescriptorAllocatorPage::AddNewBlock(UINT32 offset, UINT32 numDescriptors)
 {
-    auto offsetIt = m_freeListByOffset.insert({ offset, numDescriptors });
-    auto sizeIt = m_freeListBySize.insert({ numDescriptors, offsetIt.first });
+    auto offsetIt = m_freeListByOffset.insert({offset, numDescriptors});
+    auto sizeIt = m_freeListBySize.insert({numDescriptors, offsetIt.first});
     offsetIt.first->second.freeListBySizeIt = sizeIt;
 }
 
@@ -152,7 +154,7 @@ void DescriptorAllocatorPage::FreeBlock(UINT32 offset, UINT32 numDescriptors)
     {
         // The next block is exactly in front of the block that is to be freed
         //
-        // offset               NextBlock.offset 
+        // offset               NextBlock.offset
         // |                    |
         // |<------size-------->|<-----NextBlock.size----->|
 

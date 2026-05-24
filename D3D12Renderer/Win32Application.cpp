@@ -1,17 +1,17 @@
 #include "pch.h"
+
 #include "Win32Application.h"
 
-#include <windowsx.h>
 #include <hidusage.h>
+#include <timeapi.h>
+#include <windowsx.h>
 
 #include <locale>
 
-#include "imgui_impl_win32.h"
-#include "imgui_impl_dx12.h"
-#include <timeapi.h>
-
-#include "Renderer.h"
 #include "Aliases.h"
+#include "Renderer.h"
+#include "imgui_impl_dx12.h"
+#include "imgui_impl_win32.h"
 
 int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
@@ -22,7 +22,7 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     std::setlocale(LC_ALL, ".UTF8");
 
     // Register the window class
-    WNDCLASSEXW windowClass = { 0 };
+    WNDCLASSEXW windowClass = {0};
     windowClass.cbSize = sizeof(WNDCLASSEXW);
     windowClass.style = CS_HREDRAW | CS_VREDRAW;
     windowClass.lpfnWndProc = WndProc;
@@ -44,8 +44,8 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     // Make application DPI-aware before adjusting window.
     SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-    RECT windowRect = { 0, 0, static_cast<LONG>(pRenderer->GetWidth()), static_cast<LONG>(pRenderer->GetHeight()) };
-    sm_dpi = GetDpiForSystem();       // Before creating window, get DPI from system
+    RECT windowRect = {0, 0, static_cast<LONG>(pRenderer->GetWidth()), static_cast<LONG>(pRenderer->GetHeight())};
+    sm_dpi = GetDpiForSystem(); // Before creating window, get DPI from system
     AdjustWindowRectExForDpi(&windowRect, WS_OVERLAPPEDWINDOW, FALSE, 0, sm_dpi);
 
     // Create the window and store a handle to it.
@@ -58,8 +58,8 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
         CW_USEDEFAULT,
         windowRect.right - windowRect.left,
         windowRect.bottom - windowRect.top,
-        nullptr,        // We have no parent window.
-        nullptr,        // We aren't using menus.
+        nullptr, // We have no parent window.
+        nullptr, // We aren't using menus.
         hInstance,
         pRenderer);
     if (sm_hwnd == 0)
@@ -115,7 +115,8 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
             DispatchMessageW(&msg);
         }
 
-        if (!running) break;
+        if (!running)
+            break;
 
         // Start the Dear ImGui frame
         ImGui_ImplDX12_NewFrame();
@@ -167,14 +168,15 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
     }
 
     Renderer* renderer = reinterpret_cast<Renderer*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
-    if (!renderer) return DefWindowProcW(hWnd, message, wParam, lParam);
+    if (!renderer)
+        return DefWindowProcW(hWnd, message, wParam, lParam);
 
     switch (message)
     {
     case WM_INPUT:
     {
         HandleRawInput(renderer, lParam);
-        break;      // To call DefWindowProcW so the system can perform cleanup
+        break; // To call DefWindowProcW so the system can perform cleanup
     }
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN:
@@ -234,11 +236,11 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
 
         RECT* const newRect = reinterpret_cast<RECT*>(lParam);
         SetWindowPos(hWnd, HWND_TOP,
-            newRect->left,
-            newRect->top,
-            newRect->right - newRect->left,
-            newRect->bottom - newRect->top,
-            SWP_NOZORDER | SWP_NOACTIVATE);
+                     newRect->left,
+                     newRect->top,
+                     newRect->right - newRect->left,
+                     newRect->bottom - newRect->top,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
         renderer->OnDpiChanged(sm_dpi);
         return 0;
     }
@@ -269,7 +271,8 @@ void Win32Application::ParseCommandLineArgs(Renderer* pRenderer, LPWSTR lpCmdLin
 
 void Win32Application::HideCursor()
 {
-    if (sm_isCursorHidden) return;
+    if (sm_isCursorHidden)
+        return;
 
     ShowCursor(FALSE);
     GetCursorPos(&sm_savedCursorPos);
@@ -278,7 +281,8 @@ void Win32Application::HideCursor()
 
 void Win32Application::RestoreCursor()
 {
-    if (!sm_isCursorHidden) return;
+    if (!sm_isCursorHidden)
+        return;
 
     SetCursorPos(sm_savedCursorPos.x, sm_savedCursorPos.y);
     ShowCursor(TRUE);
@@ -349,7 +353,7 @@ void Win32Application::HandleRawInput(Renderer* pRenderer, LPARAM lParam)
             pRenderer->OnMouseWheel(stepDelta);
         }
     }
-    else    // TODO: Keyboard
+    else // TODO: Keyboard
     {
     }
 }

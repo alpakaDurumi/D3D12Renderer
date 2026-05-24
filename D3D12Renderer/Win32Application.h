@@ -8,10 +8,14 @@ class Win32Application
 {
 public:
     static int Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmdLine, int nCmdShow);
-    static HWND GetHwnd() { return sm_hwnd; }
+    static HWND GetHwnd()
+    {
+        return sm_hwnd;
+    }
 
     static void HideCursor();
     static void RestoreCursor();
+
 private:
     static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
     static void ParseCommandLineArgs(Renderer* pRenderer, LPWSTR lpCmdLine);

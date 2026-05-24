@@ -29,7 +29,8 @@ class ShaderResourceView : public View
 public:
     using View::View;
 
-    ShaderResourceView(ID3D12Device10* pDevice,
+    ShaderResourceView(
+        ID3D12Device10* pDevice,
         ID3D12Resource* pResource,
         const D3D12_SHADER_RESOURCE_VIEW_DESC& desc,
         DescriptorAllocation&& alloc);
@@ -42,7 +43,8 @@ class RenderTargetView : public View
 public:
     using View::View;
 
-    RenderTargetView(ID3D12Device10* pDevice,
+    RenderTargetView(
+        ID3D12Device10* pDevice,
         ID3D12Resource* pResource,
         const D3D12_RENDER_TARGET_VIEW_DESC& desc,
         DescriptorAllocation&& alloc);
@@ -55,7 +57,8 @@ class DepthStencilView : public View
 public:
     using View::View;
 
-    DepthStencilView(ID3D12Device10* pDevice,
+    DepthStencilView(
+        ID3D12Device10* pDevice,
         ID3D12Resource* pResource,
         const D3D12_DEPTH_STENCIL_VIEW_DESC& desc,
         DescriptorAllocation&& alloc);

@@ -1,14 +1,17 @@
 #include "pch.h"
+
 #include "DescriptorAllocator.h"
 
 #include "CommandQueue.h"
-#include "DescriptorAllocatorPage.h"
 #include "DescriptorAllocation.h"
+#include "DescriptorAllocatorPage.h"
 
 using Microsoft::WRL::ComPtr;
 
 DescriptorAllocator::DescriptorAllocator(const ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap)
-    : m_device(device), m_heapType(type), m_numDescriptorsPerHeap(numDescriptorsPerHeap)
+    : m_device(device)
+    , m_heapType(type)
+    , m_numDescriptorsPerHeap(numDescriptorsPerHeap)
 {
 }
 
@@ -36,7 +39,7 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
         {
             // In DescriptorAllocatorPage::Allocate, m_numFreeHandles is already checked,
             // but here it's checked again with GetNumFreeHandles. This could be redundant.
-            
+
             // Check if page has free handles only when allocation succeeded
             if (allocatorPage->GetNumFreeHandles() == 0)
             {
@@ -69,7 +72,7 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
 DescriptorAllocatorPage* DescriptorAllocator::CreateAllocatorPage()
 {
     m_heapPool.emplace_back(std::make_unique<DescriptorAllocatorPage>(m_device.Get(), m_heapType, m_numDescriptorsPerHeap));
-    m_availableHeaps.insert(m_heapPool.size() - 1);     // Index of the page added
+    m_availableHeaps.insert(m_heapPool.size() - 1); // Index of the page added
     return m_heapPool.back().get();
 }
 

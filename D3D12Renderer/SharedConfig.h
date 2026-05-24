@@ -27,7 +27,7 @@ enum class GBufferSlot
     MATERIAL_SPECULAR,
     NUM_GBUFFER_SLOTS
 };
-#else   // __cplusplus
+#else  // __cplusplus
 // For HLSL
 static const uint MAX_CASCADES = 4;
 static const uint POINT_LIGHT_ARRAY_SIZE = 6;
@@ -42,6 +42,6 @@ static const uint GBUFFER_SLOT_NORMAL = 1;
 static const uint GBUFFER_SLOT_MAT_AMBIENT = 2;
 static const uint GBUFFER_SLOT_MAT_SPECULAR = 3;
 static const uint NUM_GBUFFER_SLOTS = 4;
-#endif  // __cplusplus
+#endif // __cplusplus
 
-#endif  // SHARED_CONFIG
+#endif // SHARED_CONFIG

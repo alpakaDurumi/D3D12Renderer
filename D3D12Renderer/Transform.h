@@ -1,8 +1,8 @@
 #pragma once
 
-#include <DirectXMath.h>
-
 #include <cmath>
+
+#include <DirectXMath.h>
 
 class Transform
 {
@@ -140,21 +140,21 @@ public:
     DirectX::XMFLOAT3 QuaternionToEuler(const DirectX::XMFLOAT4& q) const
     {
         // pitch φ (X): M_32 = -sinφ
-        float sinPhi = 2.0f * (q.w * q.x - q.y * q.z);  // 2(wx - yz)
+        float sinPhi = 2.0f * (q.w * q.x - q.y * q.z); // 2(wx - yz)
         float pitch = DirectX::XMConvertToDegrees(
             std::fabsf(sinPhi) >= 1.0f ? std::copysignf(DirectX::XM_PIDIV2, sinPhi) : std::asinf(sinPhi));
 
         // yaw θ (Y): atan2(M_31, M_33)
         float yaw = DirectX::XMConvertToDegrees(
             std::atan2f(2.0f * (q.x * q.z + q.w * q.y),
-                1.0f - 2.0f * (q.x * q.x + q.y * q.y)));
+                        1.0f - 2.0f * (q.x * q.x + q.y * q.y)));
 
         // roll ψ (Z): atan2(M_12, M_22)
         float roll = DirectX::XMConvertToDegrees(
             std::atan2f(2.0f * (q.x * q.y + q.w * q.z),
-                1.0f - 2.0f * (q.x * q.x + q.z * q.z)));
+                        1.0f - 2.0f * (q.x * q.x + q.z * q.z)));
 
-        return { pitch, yaw, roll };
+        return {pitch, yaw, roll};
     }
 
 private:

@@ -1,4 +1,5 @@
 #include "pch.h"
+
 #include "Light.h"
 
 #include "D3DHelper.h"
@@ -15,9 +16,9 @@ Light::Light(
     DescriptorAllocation&& cbvAllocation,
     UINT shadowMapResolution,
     LightType type)
-    : m_srv(std::move(srvAllocation)),
-    m_lightCbv(std::move(cbvAllocation)),
-    m_type(type)
+    : m_srv(std::move(srvAllocation))
+    , m_lightCbv(std::move(cbvAllocation))
+    , m_type(type)
 {
     const UINT16 arraySize = GetRequiredArraySize(m_type);
 
@@ -286,7 +287,7 @@ SpotLight::SpotLight(
     : Light(pDevice, std::move(dsvAllocation), std::move(srvAllocation), std::move(cbvAllocation), shadowMapResolution, LightType::SPOT)
 {
     m_srv.Init(pDevice, m_depthBuffer.Get(), GetSrvDesc(DXGI_FORMAT_R32_FLOAT, 1));
-    SetAngles(45.0f, 20.0f);    // Set default angle
+    SetAngles(45.0f, 20.0f); // Set default angle
 }
 
 float SpotLight::GetOuterAngle() const

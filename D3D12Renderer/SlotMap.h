@@ -2,11 +2,11 @@
 
 #include <minwindef.h>
 
-#include <vector>
-#include <utility>
 #include <cassert>
+#include <utility>
+#include <vector>
 
-template<typename T>
+template <typename T>
 class SlotMap
 {
 public:
@@ -18,7 +18,7 @@ public:
         bool operator==(const Handle& other) const
         {
             return this->index == other.index &&
-                this->generation == other.generation;
+                   this->generation == other.generation;
         }
 
         bool operator!=(const Handle& other) const
@@ -47,7 +47,7 @@ public:
 
         m_slots[slotIdx].denseIndex = denseIdx;
 
-        return { slotIdx, m_slots[slotIdx].generation };
+        return {slotIdx, m_slots[slotIdx].generation};
     }
 
     void Remove(Handle handle)
@@ -74,18 +74,24 @@ public:
 
     T* Get(Handle handle)
     {
-        if (!IsValid(handle)) return nullptr;
+        if (!IsValid(handle))
+            return nullptr;
         return &m_dense[m_slots[handle.index].denseIndex];
     }
 
     bool IsValid(Handle handle) const
     {
-        return handle.index < m_slots.size()
-            && m_slots[handle.index].generation == handle.generation;
+        return handle.index < m_slots.size() && m_slots[handle.index].generation == handle.generation;
     }
 
-    std::vector<T>& GetDense() { return m_dense; }
-    const std::vector<T>& GetDense() const { return m_dense; }
+    std::vector<T>& GetDense()
+    {
+        return m_dense;
+    }
+    const std::vector<T>& GetDense() const
+    {
+        return m_dense;
+    }
 
     UINT GetCount() const
     {
@@ -106,7 +112,7 @@ private:
     };
 
     std::vector<T> m_dense;
-    std::vector<UINT> m_reverseMap;  // denseIdx → slotIdx
+    std::vector<UINT> m_reverseMap; // denseIdx → slotIdx
     std::vector<Slot> m_slots;
     std::vector<UINT> m_freeList;
 };

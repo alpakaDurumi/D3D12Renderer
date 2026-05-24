@@ -2,13 +2,13 @@
 
 #include <minwindef.h>
 
-#include <d3d12.h>
 #include <DirectXMath.h>
+#include <d3d12.h>
 
 #include "SharedConfig.h"
 
 // CRTP for 256-byte alignment
-template<typename T>
+template <typename T>
 struct ConstantData
 {
     // static_assert must be in a member function (like the constructor)
@@ -61,7 +61,7 @@ struct MaterialConstantData : public ConstantData<MaterialConstantData>
     float shininess;
     UINT textureIndices[4];
     UINT samplerIndices[4];
-    float textureTileScales[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    float textureTileScales[4] = {1.0f, 1.0f, 1.0f, 1.0f};
     float padding1[44];
 
     void SetAmbient(DirectX::XMFLOAT4 ambient);

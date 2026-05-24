@@ -1,8 +1,9 @@
 #include "pch.h"
+
 #include "TransientUploadAllocator.h"
 
-#include "Utility.h"
 #include "UploadAllocation.h"
+#include "Utility.h"
 
 TransientUploadAllocator::TransientUploadAllocator(ID3D12Device10* pDevice)
     : m_pDevice(pDevice)
@@ -36,8 +37,7 @@ UploadAllocation TransientUploadAllocator::Allocate(std::size_t size, std::size_
         currentPage->uploadBuffer.Get(),
         m_currentOffset,
         static_cast<UINT8*>(currentPage->cpuBasePtr) + m_currentOffset,
-        currentPage->gpuBasePtr + m_currentOffset
-    };
+        currentPage->gpuBasePtr + m_currentOffset};
 
     m_currentOffset += size;
 
@@ -48,7 +48,8 @@ UploadAllocation TransientUploadAllocator::Allocate(std::size_t size, std::size_
 UploadAllocation TransientUploadAllocator::Push(void* src, std::size_t size, std::size_t alignment)
 {
     auto alloc = Allocate(size, alignment);
-    if (src) std::memcpy(alloc.cpuPtr, src, size);
+    if (src)
+        std::memcpy(alloc.cpuPtr, src, size);
     return alloc;
 }
 
@@ -69,7 +70,7 @@ TransientUploadAllocator::Page::Page(ID3D12Device10* pDevice)
 {
     uploadBuffer = Buffer(pDevice, PAGE_SIZE, D3D12_HEAP_TYPE_UPLOAD);
 
-    D3D12_RANGE readRange = { 0, 0 };
+    D3D12_RANGE readRange = {0, 0};
     uploadBuffer.Get()->Map(0, &readRange, &cpuBasePtr);
     gpuBasePtr = uploadBuffer.Get()->GetGPUVirtualAddress();
 }

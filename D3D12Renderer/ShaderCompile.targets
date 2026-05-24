@@ -39,7 +39,7 @@
       </Outputs>
       <AdditionalInputs>SharedConfig.h</AdditionalInputs>
     </CustomBuild>
-    
+
     <CustomBuild Update="FullScreenTriangleVS.hlsl">
       <Message>DXC: FullScreenTriangleVS.hlsl (all variants)</Message>
 

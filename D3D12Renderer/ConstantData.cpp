@@ -1,4 +1,5 @@
 #include "pch.h"
+
 #include "ConstantData.h"
 
 using namespace DirectX;

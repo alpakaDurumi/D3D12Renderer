@@ -1,13 +1,13 @@
 #pragma once
 
 #include <basetsd.h>
-#include <wrl/client.h>
-
-#include <d3d12.h>
 
 #include <queue>
-#include <utility>  // for std::pair
+#include <utility> // for std::pair
 #include <vector>
+
+#include <d3d12.h>
+#include <wrl/client.h>
 
 class DynamicDescriptorHeap;
 

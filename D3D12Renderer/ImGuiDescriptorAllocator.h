@@ -1,12 +1,12 @@
 #pragma once
 
 #include <minwindef.h>
-#include <wrl/client.h>
-
-#include <d3d12.h>
 
 #include <cassert>
 #include <vector>
+
+#include <d3d12.h>
+#include <wrl/client.h>
 
 #include "D3DHelper.h"
 
@@ -48,12 +48,15 @@ public:
         freeIndices.push_back(cpu_idx);
     }
 
-    ID3D12DescriptorHeap* GetDescriptorHeap() { return m_heap.Get(); }
+    ID3D12DescriptorHeap* GetDescriptorHeap()
+    {
+        return m_heap.Get();
+    }
 
 private:
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_heap;
     D3D12_CPU_DESCRIPTOR_HANDLE heapStartCpu;
     D3D12_GPU_DESCRIPTOR_HANDLE heapStartGpu;
-    UINT                        heapHandleIncrement;
-    std::vector<UINT>           freeIndices;
+    UINT heapHandleIncrement;
+    std::vector<UINT> freeIndices;
 };

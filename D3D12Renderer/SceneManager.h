@@ -1,40 +1,39 @@
 #pragma once
 
-#include <minwindef.h>
 #include <basetsd.h>
+#include <minwindef.h>
 
+#include <cassert>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <queue>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <DirectXMath.h>
+#include <d3d12.h>
 #include <wrl/client.h>
 
-#include <d3d12.h>
-#include <DirectXMath.h>
-
-#include <unordered_map>
-#include <variant>
-#include <cassert>
-#include <queue>
-#include <functional>
-#include <optional>
-#include <vector>
-#include <utility>
-#include <string>
-#include <memory>
-
-#include "SlotMap.h"
-#include "Mesh.h"
-#include "Material.h"
-#include "Light.h"
 #include "Aliases.h"
-#include "InstanceData.h"
-#include "SceneHandles.h"
-#include "Transform.h"
-#include "Texture.h"
-#include "View.h"
-#include "Utility.h"
 #include "DDSTextureLoader12.h"
-#include "TransientUploadAllocator.h"
 #include "GeometryData.h"
+#include "InstanceData.h"
+#include "Light.h"
+#include "Material.h"
+#include "Mesh.h"
+#include "SceneHandles.h"
+#include "SlotMap.h"
+#include "Texture.h"
+#include "Transform.h"
+#include "TransientUploadAllocator.h"
+#include "Utility.h"
+#include "View.h"
 
-template<>
+template <>
 struct std::hash<MeshHandle>
 {
     std::size_t operator()(const MeshHandle& h) const
@@ -43,7 +42,7 @@ struct std::hash<MeshHandle>
     }
 };
 
-template<>
+template <>
 struct std::hash<EntityHandle>
 {
     std::size_t operator()(const EntityHandle& h) const
@@ -54,7 +53,7 @@ struct std::hash<EntityHandle>
 
 struct InstanceRange
 {
-    UINT offset;            // offset in instance buffer
+    UINT offset; // offset in instance buffer
     UINT forwardCount;
     UINT deferredCount;
 };
@@ -111,7 +110,8 @@ public:
 
     void Remove(EntityHandle handle)
     {
-        if (!m_entities.IsValid(handle)) return;
+        if (!m_entities.IsValid(handle))
+            return;
 
         auto* pEntity = m_entities.Get(handle);
 
@@ -121,12 +121,22 @@ public:
         {
             auto lightHandle = pEntity->light.value();
 
-            auto resources = std::visit([&](auto&& handle) { return Get(handle)->TakeResources(); }, lightHandle);
+            auto resources = std::visit(
+                [&](auto&& handle)
+                {
+                    return Get(handle)->TakeResources();
+                },
+                lightHandle);
             for (auto& res : resources)
                 m_deferred.push_back(std::move(res));
 
             // It is valid to Remove Light after moving resources
-            std::visit([&](auto&& handle) { Remove(handle); }, lightHandle);
+            std::visit(
+                [&](auto&& handle)
+                {
+                    Remove(handle);
+                },
+                lightHandle);
         }
 
         // Recursively Remove children entities
@@ -157,7 +167,8 @@ public:
     void AddTransform(EntityHandle eh)
     {
         auto* pEntity = m_entities.Get(eh);
-        if (pEntity->transform.has_value()) assert(false);
+        if (pEntity->transform.has_value())
+            assert(false);
 
         pEntity->transform.emplace();
     }
@@ -165,7 +176,8 @@ public:
     void AddTransform(EntityHandle eh, const DirectX::XMFLOAT3& s, const DirectX::XMFLOAT3& eulerRad, const DirectX::XMFLOAT3& t)
     {
         auto* pEntity = m_entities.Get(eh);
-        if (pEntity->transform.has_value()) assert(false);
+        if (pEntity->transform.has_value())
+            assert(false);
 
         pEntity->transform.emplace(s, eulerRad, t);
     }
@@ -173,7 +185,8 @@ public:
     void ApplyTransform(EntityHandle eh, const DirectX::XMFLOAT3& s, const DirectX::XMFLOAT3& eulerRad, const DirectX::XMFLOAT3& t)
     {
         auto* pEntity = m_entities.Get(eh);
-        if (!pEntity->transform.has_value()) assert(false);
+        if (!pEntity->transform.has_value())
+            assert(false);
         pEntity->transform->Apply(s, eulerRad, t);
     }
 
@@ -187,7 +200,7 @@ public:
         }
         else
         {
-            pEntity->meshRenderer = { mh, GetMaterialHandle("builtin://material/default") };
+            pEntity->meshRenderer = {mh, GetMaterialHandle("builtin://material/default")};
         }
     }
 
@@ -310,11 +323,12 @@ public:
             bucket.deferred.clear();
         }
         m_instanceRanges.clear();
-        m_entityIndexInBucket.clear();      // 실제로 entity dense array에 변화가 있을 때만 clear하거나, 구조를 개선하기.
+        m_entityIndexInBucket.clear(); // 실제로 entity dense array에 변화가 있을 때만 clear하거나, 구조를 개선하기.
 
         for (const auto& entity : m_entities.GetDense())
         {
-            if (!entity.meshRenderer.has_value()) continue;
+            if (!entity.meshRenderer.has_value())
+                continue;
 
             auto meshHandle = entity.meshRenderer->mesh;
             auto matHandle = entity.meshRenderer->material;
@@ -338,7 +352,8 @@ public:
 
         for (const auto& entity : m_entities.GetDense())
         {
-            if (!entity.meshRenderer.has_value()) continue;
+            if (!entity.meshRenderer.has_value())
+                continue;
 
             auto meshHandle = entity.meshRenderer->mesh;
             auto matHandle = entity.meshRenderer->material;
@@ -511,7 +526,7 @@ public:
 
         D3D12_SUBRESOURCE_DATA textureData = {};
         textureData.pData = textureSrc.data();
-        textureData.RowPitch = width * 4;   // 4 bytes per pixel (RGBA)
+        textureData.RowPitch = width * 4; // 4 bytes per pixel (RGBA)
         textureData.SlicePitch = textureData.RowPitch * height;
 
         D3DHelper::UpdateSubresources(pDevice, pCommandList, texture.Get(), uploadAllocation.pResource, uploadAllocation.offset, uploadAllocation.cpuPtr, 0, 1, &textureData);
@@ -525,10 +540,9 @@ public:
             D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
             texture.Get(),
             {0xffff'ffff, 0, 0, 0, 0, 0},
-            D3D12_TEXTURE_BARRIER_FLAG_NONE
-        };
+            D3D12_TEXTURE_BARRIER_FLAG_NONE};
 
-        D3D12_BARRIER_GROUP barrierGroups1[] = { D3DHelper::TextureBarrierGroup(1, &barrier1) };
+        D3D12_BARRIER_GROUP barrierGroups1[] = {D3DHelper::TextureBarrierGroup(1, &barrier1)};
         pCommandList->Barrier(1, barrierGroups1);
 
         // Describe and create a SRV for the texture.
@@ -540,7 +554,7 @@ public:
 
         ShaderResourceView srv(pDevice, texture.Get(), srvDesc, std::move(srvAllocation));
 
-        return m_assetTextures.Add(AssetTexture{ std::move(texture), std::move(srv) });
+        return m_assetTextures.Add(AssetTexture{std::move(texture), std::move(srv)});
     }
 
     AssetTextureHandle AddAssetTexture(
@@ -600,10 +614,9 @@ public:
             D3D12_BARRIER_LAYOUT_COPY_DEST,
             texture.Get(),
             {0xffff'ffff, 0, 0, 0, 0, 0},
-            D3D12_TEXTURE_BARRIER_FLAG_NONE
-        };
+            D3D12_TEXTURE_BARRIER_FLAG_NONE};
 
-        D3D12_BARRIER_GROUP barrierGroups0[] = { D3DHelper::TextureBarrierGroup(1, &barrier0) };
+        D3D12_BARRIER_GROUP barrierGroups0[] = {D3DHelper::TextureBarrierGroup(1, &barrier0)};
         pCommandList->Barrier(1, barrierGroups0);
 
         // Calculate required size for data upload
@@ -623,10 +636,9 @@ public:
             D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
             texture.Get(),
             {0xffff'ffff, 0, 0, 0, 0, 0},
-            D3D12_TEXTURE_BARRIER_FLAG_NONE
-        };
+            D3D12_TEXTURE_BARRIER_FLAG_NONE};
 
-        D3D12_BARRIER_GROUP barrierGroups1[] = { D3DHelper::TextureBarrierGroup(1, &barrier1) };
+        D3D12_BARRIER_GROUP barrierGroups1[] = {D3DHelper::TextureBarrierGroup(1, &barrier1)};
         pCommandList->Barrier(1, barrierGroups1);
 
         // Describe and create a SRV for the texture.
@@ -672,7 +684,7 @@ public:
                 srvDesc.Texture2DArray.MipLevels = desc.MipLevels;
             }
         }
-        else    // TEXTURE3D
+        else // TEXTURE3D
         {
             srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
             srvDesc.Texture3D.MipLevels = desc.MipLevels;
@@ -680,7 +692,7 @@ public:
 
         ShaderResourceView srv(pDevice, texture.Get(), srvDesc, std::move(srvAllocation));
 
-        return m_assetTextures.Add(AssetTexture{ std::move(texture), std::move(srv) });
+        return m_assetTextures.Add(AssetTexture{std::move(texture), std::move(srv)});
     }
 
     const std::vector<AssetTexture>& GetAssetTextures() const
@@ -741,12 +753,13 @@ private:
 
     SlotMap<Entity> m_entities;
 
-    std::vector<GpuResource> m_deferred;     // List of resources requested to be removed
+    std::vector<GpuResource> m_deferred; // List of resources requested to be removed
 
     struct DeferredResource
     {
         DeferredResource(UINT64 fenceValue, GpuResource&& resource)
-            : fenceValue(fenceValue), resource(std::move(resource))
+            : fenceValue(fenceValue)
+            , resource(std::move(resource))
         {
         }
 

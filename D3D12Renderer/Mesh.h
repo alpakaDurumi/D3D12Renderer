@@ -4,8 +4,8 @@
 
 #include <d3d12.h>
 
-#include "SceneHandles.h"
 #include "Buffer.h"
+#include "SceneHandles.h"
 
 struct GeometryData;
 class TransientUploadAllocator;

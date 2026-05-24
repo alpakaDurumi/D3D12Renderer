@@ -1,4 +1,5 @@
 #include "pch.h"
+
 #include "GpuResource.h"
 
 GpuResource::GpuResource(Microsoft::WRL::ComPtr<ID3D12Resource>&& existing)

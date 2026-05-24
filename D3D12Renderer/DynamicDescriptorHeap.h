@@ -1,16 +1,16 @@
 #pragma once
 
-#include <minwindef.h>
 #include <basetsd.h>
-#include <wrl/client.h>
+#include <minwindef.h>
 
-#include <d3d12.h>
-
+#include <functional>
 #include <memory>
 #include <queue>
-#include <functional>
-#include <vector>
 #include <utility>
+#include <vector>
+
+#include <d3d12.h>
+#include <wrl/client.h>
 
 class RootSignature;
 class CommandQueue;
@@ -29,13 +29,13 @@ public:
 
     DynamicDescriptorHeap(const Microsoft::WRL::ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT32 numDescriptorsPerHeap = 1024);
 
-    void SetCommandQueue(const CommandQueue* pCommandQueue) { m_pCommandQueue = pCommandQueue; }
+    void SetCommandQueue(const CommandQueue* pCommandQueue)
+    {
+        m_pCommandQueue = pCommandQueue;
+    }
 
     void StageDescriptors(UINT32 rootParameterIndex, UINT32 offsetInParameter, UINT32 numDescriptors, D3D12_CPU_DESCRIPTOR_HANDLE baseCpuHandle);
 
-    // Copy all of the staged descriptors to the GPU visible descriptor heap and
-    // bind the descriptor heap and the descriptor tables to the command list
-    
     bool CheckHeapChanged();
 
     void CommitStagedDescriptorsForDraw(ID3D12GraphicsCommandList7* pCommandList);
@@ -78,8 +78,8 @@ private:
     UINT32 m_numDescriptorsPerHeap;
     UINT32 m_descriptorHandleIncrementSize;
 
-    std::unique_ptr<D3D12_CPU_DESCRIPTOR_HANDLE[]> m_descriptorHandleCache;     // Flat storage for all staged CPU descriptor handles
-    DescriptorTableEntry m_descriptorTableEntries[MaxDescriptorTables];         // Per-rootParameter metadata: start position and count within m_descriptorHandleCache
+    std::unique_ptr<D3D12_CPU_DESCRIPTOR_HANDLE[]> m_descriptorHandleCache; // Flat storage for all staged CPU descriptor handles
+    DescriptorTableEntry m_descriptorTableEntries[MaxDescriptorTables];     // Per-rootParameter metadata: start position and count within m_descriptorHandleCache
 
     UINT32 m_currentOffset;
 
@@ -99,8 +99,8 @@ private:
     ID3D12DescriptorHeap* m_currentHeap;
     D3D12_GPU_DESCRIPTOR_HANDLE m_currentGpuDescriptorHandle;
     D3D12_CPU_DESCRIPTOR_HANDLE m_currentCpuDescriptorHandle;
-    UINT32 m_numFreeHandles;    // Number of free handles in current descriptor heap
+    UINT32 m_numFreeHandles; // Number of free handles in current descriptor heap
 
     Microsoft::WRL::ComPtr<ID3D12Device10> m_device;
-    const CommandQueue* m_pCommandQueue;     // For IsFenceComplete
+    const CommandQueue* m_pCommandQueue; // For IsFenceComplete
 };

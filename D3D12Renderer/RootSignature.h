@@ -1,12 +1,12 @@
 #pragma once
 
-#include <minwindef.h>
 #include <basetsd.h>
-#include <wrl/client.h>
-
-#include <d3d12.h>
+#include <minwindef.h>
 
 #include <vector>
+
+#include <d3d12.h>
+#include <wrl/client.h>
 
 #include "RendererConfig.h"
 
@@ -65,7 +65,7 @@ private:
 
     UINT32 m_cbvSrvUavTableBitMask = 0;
     UINT32 m_samplerTableBitMask = 0;
-    UINT32 m_descriptorTableSize[16] = {};  // Maximum number of tables is limited to 16
+    UINT32 m_descriptorTableSize[16] = {}; // Maximum number of tables is limited to 16
 
     std::vector<RootParameter> m_parameters;
     std::vector<D3D12_STATIC_SAMPLER_DESC> m_staticSamplers;

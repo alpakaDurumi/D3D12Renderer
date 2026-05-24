@@ -7,7 +7,7 @@
 class Texture : public GpuResource
 {
 public:
-    using GpuResource::GpuResource;     // Inheriting Constructor
+    using GpuResource::GpuResource; // Inheriting Constructor
 
     Texture(
         ID3D12Device10* pDevice,

@@ -1,22 +1,22 @@
 #pragma once
 
-#include <minwindef.h>
 #include <basetsd.h>
+#include <minwindef.h>
+
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <functional>
+#include <string>
+#include <tuple>
+#include <unordered_map>
+#include <vector>
 
 #include <d3d12.h>
 
-#include <vector>
-#include <array>
-#include <cassert>
-#include <algorithm>
-#include <tuple>
-#include <unordered_map>
-#include <functional>
-#include <string>
-
-#include "RenderGraphNode.h"
 #include "CacheKeys.h"
 #include "D3DHelper.h"
+#include "RenderGraphNode.h"
 #include "RendererConfig.h"
 
 class RenderGraph
@@ -35,7 +35,7 @@ public:
     {
         auto idx = RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, {});
         m_bufferGroups[idx].isDynamic = false;
-        return { idx };
+        return {idx};
     }
 
     RGBuffer RegisterBuffer(
@@ -46,7 +46,7 @@ public:
         auto idx = RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, {});
         m_bufferGroups[idx].isDynamic = true;
         m_bufferGroups[idx].provider = provider;
-        return { idx };
+        return {idx};
     }
 
     RGTexture RegisterTexture(
@@ -58,7 +58,7 @@ public:
         auto idx = RegisterHelper(name, isPerFrame, m_textureGroups, m_textureMap, initialUsage);
         m_textureGroups[idx].isDynamic = false;
         m_textureGroups[idx].subresourceCount = subresourceCount;
-        return { idx };
+        return {idx};
     }
 
     RGTexture RegisterTexture(
@@ -72,7 +72,7 @@ public:
         m_textureGroups[idx].isDynamic = true;
         m_textureGroups[idx].subresourceCount = subresourceCount;
         m_textureGroups[idx].provider = provider;
-        return { idx };
+        return {idx};
     }
 
     std::vector<ID3D12Resource*> GetResources(RGBuffer buffer, UINT frameIndex = 0) const
@@ -146,7 +146,7 @@ public:
     {
         auto desc = m_textureGroups[texture.index].pResources.front()->GetDesc();
         UINT8 planeCount = D3DHelper::GetFormatPlaneCount(pDevice, desc.Format);
-        return { desc.MipLevels, desc.DepthOrArraySize, planeCount };
+        return {desc.MipLevels, desc.DepthOrArraySize, planeCount};
     }
 
     UINT GetElementCount(RGBuffer buffer) const
@@ -161,12 +161,12 @@ public:
 
     RGBuffer GetRGBuffer(const std::string& name)
     {
-        return { m_bufferMap.at(name) };
+        return {m_bufferMap.at(name)};
     }
 
     RGTexture GetRGTexture(const std::string& name)
     {
-        return { m_textureMap.at(name) };
+        return {m_textureMap.at(name)};
     }
 
     void Compile()
@@ -191,7 +191,7 @@ public:
             PassType::SELECTION_MASK,
             PassType::HORIZONTAL_DILATE,
             PassType::OUTLINE_DRAWING,
-            PassType::TONEMAP };
+            PassType::TONEMAP};
 
         // Compile graph
         for (const PassType& passType : defaultOrder)
@@ -201,7 +201,7 @@ public:
             // Process buffer inputs
             for (auto& [buffer, usage] : node.bufferInputs)
             {
-                CompiledBufferBarrier barrier = { buffer, currentBufferUsages[buffer.index], usage };
+                CompiledBufferBarrier barrier = {buffer, currentBufferUsages[buffer.index], usage};
                 currentBufferUsages[buffer.index] = usage;
                 node.bufferBarriers.push_back(barrier);
             }
@@ -221,7 +221,7 @@ public:
                     {
                         if (latestUsages[i] != usage)
                         {
-                            CompiledTextureBarrier barrier = { texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0} };
+                            CompiledTextureBarrier barrier = {texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0}};
                             latestUsages[i] = usage;
                             node.textureBarriers.push_back(barrier);
                         }
@@ -241,7 +241,7 @@ public:
 
                                 if (latestUsages[subresourceIndex] != usage)
                                 {
-                                    CompiledTextureBarrier barrier = { texture, latestUsages[subresourceIndex], usage, {subresourceIndex, 0, 0, 0, 0, 0} };
+                                    CompiledTextureBarrier barrier = {texture, latestUsages[subresourceIndex], usage, {subresourceIndex, 0, 0, 0, 0, 0}};
                                     latestUsages[subresourceIndex] = usage;
                                     node.textureBarriers.push_back(barrier);
                                 }
@@ -312,7 +312,7 @@ public:
 private:
     struct ResourceGroup
     {
-        std::vector<ID3D12Resource*> pResources;    // size = elementCount * (isPerFrame ? frameCount : 1)
+        std::vector<ID3D12Resource*> pResources; // size = elementCount * (isPerFrame ? frameCount : 1)
         UINT elementCount;
         bool isPerFrame;
         bool isDynamic;

@@ -1,4 +1,5 @@
 #include "pch.h"
+
 #include "Buffer.h"
 
 #include "D3DHelper.h"
@@ -22,10 +23,10 @@ Buffer::Buffer(ID3D12Device10* pDevice, UINT64 width, D3D12_HEAP_TYPE heapType)
     resourceDesc.DepthOrArraySize = 1;
     resourceDesc.MipLevels = 1;
     resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-    resourceDesc.SampleDesc = { 1, 0 };
+    resourceDesc.SampleDesc = {1, 0};
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    resourceDesc.SamplerFeedbackMipRegion = {};     // Not use Sampler Feedback
+    resourceDesc.SamplerFeedbackMipRegion = {}; // Not use Sampler Feedback
 
     ThrowIfFailed(pDevice->CreateCommittedResource3(
         &heapProperties,

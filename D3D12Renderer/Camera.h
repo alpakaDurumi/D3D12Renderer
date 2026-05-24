@@ -8,7 +8,7 @@
 class Camera
 {
 public:
-    Camera(DirectX::XMFLOAT3 initialPosition = { 0.0f, 0.0f, 0.0f });
+    Camera(DirectX::XMFLOAT3 initialPosition = {0.0f, 0.0f, 0.0f});
 
     void UpdateRenderState(float alpha);
 
@@ -41,7 +41,7 @@ private:
 
     float m_yaw;
     float m_pitch;
-    DirectX::XMFLOAT4 m_rotation = { 0.0f, 0.0f, 0.0f, 1.0f };    // quaternion
+    DirectX::XMFLOAT4 m_rotation = {0.0f, 0.0f, 0.0f, 1.0f}; // quaternion
 
     float m_verticalFov;
     float m_horizontalFov;

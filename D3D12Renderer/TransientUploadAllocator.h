@@ -1,13 +1,13 @@
 #pragma once
 
-#include <minwindef.h>
 #include <basetsd.h>
+#include <minwindef.h>
+
+#include <cstddef>
+#include <memory>
+#include <vector>
 
 #include <d3d12.h>
-
-#include <vector>
-#include <memory>
-#include <cstddef>
 
 #include "Buffer.h"
 
@@ -34,7 +34,7 @@ public:
     void Reset();
 
 private:
-    static const UINT64 PAGE_SIZE = 16 * 1024 * 1024;     // 16MB
+    static const UINT64 PAGE_SIZE = 16 * 1024 * 1024; // 16MB
 
     void AllocatePage();
 

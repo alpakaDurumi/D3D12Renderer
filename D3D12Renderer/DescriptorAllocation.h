@@ -2,9 +2,9 @@
 
 #include <basetsd.h>
 
-#include <d3d12.h>
-
 #include <vector>
+
+#include <d3d12.h>
 
 class DescriptorAllocatorPage;
 
@@ -41,7 +41,10 @@ public:
     UINT32 GetNumHandles() const;
     UINT64 GetFenceValue() const;
 
-    void SetFenceValue(UINT64 fenceValue) { m_fenceValue = fenceValue; }
+    void SetFenceValue(UINT64 fenceValue)
+    {
+        m_fenceValue = fenceValue;
+    }
 
     // Split current DescriptorAllocation into 'm_numHandles' Allocations.
     std::vector<DescriptorAllocation> Split();

@@ -1,11 +1,11 @@
 #pragma once
 
-#include <minwindef.h>
 #include <basetsd.h>
-
-#include <DirectXMath.h>
+#include <minwindef.h>
 
 #include <vector>
+
+#include <DirectXMath.h>
 
 #include "GeometryData.h"
 
@@ -14,8 +14,7 @@ class GeometryGenerator
 public:
     static GeometryData GenerateCube()
     {
-        std::vector<Vertex> vertices =
-        {
+        std::vector<Vertex> vertices = {
             // upper
             {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
             {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
@@ -50,20 +49,17 @@ public:
             {{1.0f, -1.0f, 1.0f}, {0.0f, 1.0f}, {-1.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
             {{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
             {{-1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {-1.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
-            {{-1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}}
-        };
+            {{-1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}}};
 
-        std::vector<UINT32> indices =
-        {
+        std::vector<UINT32> indices = {
             0, 1, 2, 0, 2, 3,
             4, 5, 6, 4, 6, 7,
             8, 9, 10, 8, 10, 11,
             12, 13, 14, 12, 14, 15,
             16, 17, 18, 16, 18, 19,
-            20, 21, 22, 20, 22, 23
-        };
+            20, 21, 22, 20, 22, 23};
 
-        return { "builtin://mesh/cube", vertices, indices};
+        return {"builtin://mesh/cube", vertices, indices};
     }
 
     static GeometryData GenerateSphere()
@@ -90,10 +86,10 @@ public:
                 v.position.x = -stackStart.z * sinTheta;
                 v.position.y = stackStart.y;
                 v.position.z = -stackStart.z * -cosTheta;
-                v.texCoord = { float(j) / numSectors, 1.0f - float(i) / numStacks };
-                if (stackStart.z == 0.0f)       // Detect pole
+                v.texCoord = {float(j) / numSectors, 1.0f - float(i) / numStacks};
+                if (stackStart.z == 0.0f) // Detect pole
                 {
-                    v.tangent = { 1.0f, 0.0f, 0.0f, 1.0f };
+                    v.tangent = {1.0f, 0.0f, 0.0f, 1.0f};
                 }
                 else
                 {
@@ -124,6 +120,6 @@ public:
             }
         }
 
-        return { "builtin://mesh/sphere", vertices, indices};
+        return {"builtin://mesh/sphere", vertices, indices};
     }
 };

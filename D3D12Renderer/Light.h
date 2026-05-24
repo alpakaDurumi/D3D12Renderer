@@ -1,18 +1,18 @@
 #pragma once
 
-#include <minwindef.h>
 #include <basetsd.h>
-
-#include <d3d12.h>
-#include <DirectXMath.h>
+#include <minwindef.h>
 
 #include <array>
 #include <vector>
 
+#include <DirectXMath.h>
+#include <d3d12.h>
+
 #include "ConstantData.h"
 #include "SharedConfig.h"
-#include "UploadAllocation.h"
 #include "Texture.h"
+#include "UploadAllocation.h"
 #include "View.h"
 
 class DescriptorAllocation;
@@ -66,7 +66,7 @@ public:
 
 protected:
     std::vector<CameraConstantData> m_cameraConstantData;
-    std::vector<UploadAllocation> m_cameraUploadAllocations;    // transient, for single frame
+    std::vector<UploadAllocation> m_cameraUploadAllocations; // transient, for single frame
 
     LightConstantData m_lightConstantData;
     ConstantBufferView m_lightCbv;

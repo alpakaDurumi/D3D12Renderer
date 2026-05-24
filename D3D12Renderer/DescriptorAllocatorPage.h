@@ -1,14 +1,14 @@
 #pragma once
 
 #include <basetsd.h>
-#include <wrl/client.h>
+
+#include <map>
+#include <mutex>
+#include <optional>
+#include <queue>
 
 #include <d3d12.h>
-
-#include <mutex>
-#include <map>
-#include <queue>
-#include <optional>
+#include <wrl/client.h>
 
 class DescriptorAllocation;
 
@@ -18,8 +18,14 @@ class DescriptorAllocatorPage
 public:
     DescriptorAllocatorPage(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptors);
 
-    D3D12_DESCRIPTOR_HEAP_TYPE GetHeapType() const { return m_heapType; }
-    UINT32 GetNumFreeHandles() const { return m_numFreeHandles; }
+    D3D12_DESCRIPTOR_HEAP_TYPE GetHeapType() const
+    {
+        return m_heapType;
+    }
+    UINT32 GetNumFreeHandles() const
+    {
+        return m_numFreeHandles;
+    }
 
     bool HasSpace(UINT32 numDescriptors) const;
 
@@ -63,11 +69,12 @@ private:
         FreeListBySize::iterator freeListBySizeIt;
     };
 
-
     struct StaleDescriptorInfo
     {
         StaleDescriptorInfo(OffsetType offset, SizeType size, UINT64 fenceValue)
-            : offset(offset), size(size), fenceValue(fenceValue)
+            : offset(offset)
+            , size(size)
+            , fenceValue(fenceValue)
         {
         }
 
