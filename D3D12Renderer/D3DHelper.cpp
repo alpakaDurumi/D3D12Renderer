@@ -116,17 +116,15 @@ namespace D3DHelper
         return ret;
     }
 
-    void DowngradeDescriptorRanges(const D3D12_DESCRIPTOR_RANGE1* src, UINT NumDescriptorRanges, std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges)
+    void DowngradeDescriptorRanges(const D3D12_DESCRIPTOR_RANGE1* src, UINT NumDescriptorRanges, D3D12_DESCRIPTOR_RANGE* dst)
     {
-        D3D12_DESCRIPTOR_RANGE tempRange = {};
         for (UINT i = 0; i < NumDescriptorRanges; i++)
         {
-            tempRange.RangeType = src[i].RangeType;
-            tempRange.NumDescriptors = src[i].NumDescriptors;
-            tempRange.BaseShaderRegister = src[i].BaseShaderRegister;
-            tempRange.RegisterSpace = src[i].RegisterSpace;
-            tempRange.OffsetInDescriptorsFromTableStart = src[i].OffsetInDescriptorsFromTableStart;
-            convertedRanges.push_back(tempRange);
+            dst[i].RangeType = src[i].RangeType;
+            dst[i].NumDescriptors = src[i].NumDescriptors;
+            dst[i].BaseShaderRegister = src[i].BaseShaderRegister;
+            dst[i].RegisterSpace = src[i].RegisterSpace;
+            dst[i].OffsetInDescriptorsFromTableStart = src[i].OffsetInDescriptorsFromTableStart;
         }
     }
 
@@ -136,8 +134,9 @@ namespace D3DHelper
         dst->RegisterSpace = src->RegisterSpace;
     }
 
-    void DowngradeRootParameters(const D3D12_ROOT_PARAMETER1* src, UINT numParameters, D3D12_ROOT_PARAMETER* dst, std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges, UINT& offset)
+    void DowngradeRootParameters(const D3D12_ROOT_PARAMETER1* src, UINT numParameters, D3D12_ROOT_PARAMETER* dst, std::vector<D3D12_DESCRIPTOR_RANGE>& convertedRanges)
     {
+        UINT offset = 0;
         for (UINT i = 0; i < numParameters; i++)
         {
             dst[i].ParameterType = src[i].ParameterType;
@@ -148,7 +147,7 @@ namespace D3DHelper
             case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
             {
                 const UINT NumDescriptorRanges = src[i].DescriptorTable.NumDescriptorRanges;
-                DowngradeDescriptorRanges(src[i].DescriptorTable.pDescriptorRanges, NumDescriptorRanges, convertedRanges);
+                DowngradeDescriptorRanges(src[i].DescriptorTable.pDescriptorRanges, NumDescriptorRanges, convertedRanges.data() + offset);
                 dst[i].DescriptorTable = { NumDescriptorRanges, convertedRanges.data() + offset };
                 offset += NumDescriptorRanges;
                 break;

@@ -195,6 +195,8 @@ void RootSignature::InitStaticSampler(
 
 void RootSignature::Finalize(ID3D12Device10* pDevice)
 {
+    UINT numRanges = 0;
+
     // Fill bitmasks
     for (UINT i = 0; i < m_numParameters; ++i)
     {
@@ -215,6 +217,8 @@ void RootSignature::Finalize(ID3D12Device10* pDevice)
 
             for (UINT rangeIndex = 0; rangeIndex < param.DescriptorTable.NumDescriptorRanges; ++rangeIndex)
                 m_descriptorTableSize[i] += param.DescriptorTable.pDescriptorRanges[rangeIndex].NumDescriptors;
+
+            numRanges += param.DescriptorTable.NumDescriptorRanges;
         }
     }
 
@@ -253,9 +257,9 @@ void RootSignature::Finalize(ID3D12Device10* pDevice)
     else
     {
         downgradedParameters.resize(m_numParameters);
+        convertedRanges.resize(numRanges);
 
-        UINT offset = 0;
-        DowngradeRootParameters(parameters.data(), m_numParameters, downgradedParameters.data(), convertedRanges, offset);
+        DowngradeRootParameters(parameters.data(), m_numParameters, downgradedParameters.data(), convertedRanges);
 
         rootSignatureDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_0;
         rootSignatureDesc.Desc_1_0.NumParameters = m_numParameters;
