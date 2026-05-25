@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <queue>
@@ -120,20 +121,14 @@ public:
         if (pEntity->light.has_value())
         {
             auto lightHandle = pEntity->light.value();
-
-            auto resources = std::visit(
-                [&](auto&& handle)
-                {
-                    return Get(handle)->TakeResources();
-                },
-                lightHandle);
-            for (auto& res : resources)
-                m_deferred.push_back(std::move(res));
-
-            // It is valid to Remove Light after moving resources
             std::visit(
                 [&](auto&& handle)
                 {
+                    auto resources = Get(handle)->TakeResources();
+                    m_deferred.insert(
+                        m_deferred.end(),
+                        std::make_move_iterator(resources.begin()),
+                        std::make_move_iterator(resources.end()));
                     Remove(handle);
                 },
                 lightHandle);
