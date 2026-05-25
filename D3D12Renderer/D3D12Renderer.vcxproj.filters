@@ -19,6 +19,9 @@
     <Filter Include="imgui">
       <UniqueIdentifier>{427c11c0-f3e8-4119-8e39-a54bf11c0319}</UniqueIdentifier>
     </Filter>
+    <Filter Include="DDSTextureLoader">
+      <UniqueIdentifier>{6b606485-1ef8-41c1-a797-32f25c431c3f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -78,9 +81,6 @@
     <ClCompile Include="Utility.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DDSTextureLoader12.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="CacheKeys.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -113,6 +113,12 @@
     </ClCompile>
     <ClCompile Include="TransientUploadAllocator.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RootSignature.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DDSTextureLoader\DDSTextureLoader12.cpp">
+      <Filter>DDSTextureLoader</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -195,9 +201,6 @@
     <ClInclude Include="Utility.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DDSTextureLoader12.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="ImGuiDescriptorAllocator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -260,6 +263,9 @@
     </ClInclude>
     <ClInclude Include="RendererConfig.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DDSTextureLoader\DDSTextureLoader12.h">
+      <Filter>DDSTextureLoader</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
