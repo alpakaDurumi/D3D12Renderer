@@ -23,7 +23,15 @@ struct UploadAllocation;
 class FrameResource
 {
 public:
-    FrameResource(
+    FrameResource(const FrameResource&) = delete;
+    FrameResource& operator=(const FrameResource&) = delete;
+    FrameResource(FrameResource&&) = delete;
+    FrameResource& operator=(FrameResource&&) = delete;
+
+    FrameResource() = default;
+    ~FrameResource();
+
+    void Init(
         ID3D12Device10* pDevice,
         IDXGISwapChain* pSwapChain,
         UINT frameIndex,
@@ -36,7 +44,6 @@ public:
         DescriptorAllocation&& selectionMaskSrvAllocation,
         DescriptorAllocation&& horizontalDilatedMaskRtvAllocation,
         DescriptorAllocation&& horizontalDilatedMaskSrvAllocation);
-    ~FrameResource();
 
     // Back buffer
     void AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameIndex);
@@ -115,5 +122,5 @@ private:
 
     UINT64 m_fenceValue = 0;
 
-    ID3D12Device10* m_pDevice;
+    ID3D12Device10* m_pDevice = nullptr;
 };

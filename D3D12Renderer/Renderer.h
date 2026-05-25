@@ -21,6 +21,7 @@
 #include "CacheKeys.h"
 #include "Camera.h"
 #include "ConstantData.h"
+#include "FrameResource.h"
 #include "InputManager.h"
 #include "RenderGraph.h"
 #include "RendererConfig.h"
@@ -33,7 +34,6 @@
 struct GeometryData;
 class DescriptorAllocation;
 class CommandQueue;
-class FrameResource;
 class DescriptorAllocator;
 class DynamicDescriptorHeap;
 class RootSignature;
@@ -134,7 +134,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
     std::unique_ptr<CommandQueue> m_commandQueue;
     std::array<std::unique_ptr<DescriptorAllocator>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
-    std::vector<std::unique_ptr<FrameResource>> m_frameResources;
+    std::array<FrameResource, FrameCount> m_frameResources;
 
     std::unique_ptr<RootSignature> m_rootSignature;
     std::unordered_map<PSOKey, Microsoft::WRL::ComPtr<ID3D12PipelineState>> m_pipelineStates;

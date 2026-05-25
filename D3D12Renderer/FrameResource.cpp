@@ -11,7 +11,13 @@
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
 
-FrameResource::FrameResource(
+FrameResource::~FrameResource()
+{
+    if (m_instanceBufferBegin)
+        m_instanceUploadBuffer.Get()->Unmap(0, nullptr);
+}
+
+void FrameResource::Init(
     ID3D12Device10* pDevice,
     IDXGISwapChain* pSwapChain,
     UINT frameIndex,
@@ -24,17 +30,15 @@ FrameResource::FrameResource(
     DescriptorAllocation&& selectionMaskSrvAllocation,
     DescriptorAllocation&& horizontalDilatedMaskRtvAllocation,
     DescriptorAllocation&& horizontalDilatedMaskSrvAllocation)
-    : m_pDevice(pDevice)
-    , m_backBufferRtv(std::move(rtvAllocation))
-    , m_selectionMaskRtv(std::move(selectionMaskRtvAllocation))
-    , m_selectionMaskSrv(std::move(selectionMaskSrvAllocation))
-    , m_horizontalDilatedMaskRtv(std::move(horizontalDilatedMaskRtvAllocation))
-    , m_horizontalDilatedMaskSrv(std::move(horizontalDilatedMaskSrvAllocation))
-    , m_uploadAllocator(pDevice)
 {
+    m_pDevice = pDevice;
+
     // Back buffer
-    AcquireBackBuffer(pSwapChain, frameIndex);
-    InitBackBufferRtv();
+    {
+        m_backBufferRtv = RenderTargetView(std::move(rtvAllocation));
+        AcquireBackBuffer(pSwapChain, frameIndex);
+        InitBackBufferRtv();
+    }
 
     auto rtDesc = m_backBuffer.Get()->GetDesc();
     const UINT64 width = rtDesc.Width;
@@ -65,17 +69,18 @@ FrameResource::FrameResource(
     }
 
     // Create masks
+    m_selectionMaskRtv = RenderTargetView(std::move(selectionMaskRtvAllocation));
+    m_selectionMaskSrv = ShaderResourceView(std::move(selectionMaskSrvAllocation));
+    m_horizontalDilatedMaskRtv = RenderTargetView(std::move(horizontalDilatedMaskRtvAllocation));
+    m_horizontalDilatedMaskSrv = ShaderResourceView(std::move(horizontalDilatedMaskSrvAllocation));
     CreateMasks(width, height);
 
     // Create Upload buffer
     m_instanceUploadBuffer = Buffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, D3D12_HEAP_TYPE_UPLOAD);
     D3D12_RANGE readRange = {0, 0};
     ThrowIfFailed(m_instanceUploadBuffer.Get()->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
-}
 
-FrameResource::~FrameResource()
-{
-    m_instanceUploadBuffer.Get()->Unmap(0, nullptr);
+    m_uploadAllocator.Init(pDevice);
 }
 
 // Back buffer

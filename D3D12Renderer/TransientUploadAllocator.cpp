@@ -5,15 +5,15 @@
 #include "UploadAllocation.h"
 #include "Utility.h"
 
-TransientUploadAllocator::TransientUploadAllocator(ID3D12Device10* pDevice)
-    : m_pDevice(pDevice)
+TransientUploadAllocator::~TransientUploadAllocator() = default;
+
+void TransientUploadAllocator::Init(ID3D12Device10* pDevice)
 {
+    m_pDevice = pDevice;
     AllocatePage();
     m_currentPageIndex = 0;
     m_currentOffset = 0;
 }
-
-TransientUploadAllocator::~TransientUploadAllocator() = default;
 
 // Only allocate space
 UploadAllocation TransientUploadAllocator::Allocate(std::size_t size, std::size_t alignment)

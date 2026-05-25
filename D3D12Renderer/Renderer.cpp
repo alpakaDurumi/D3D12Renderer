@@ -325,7 +325,7 @@ void Renderer::OnUpdate()
     float alpha = std::clamp(static_cast<float>(accumulatedMs / fixedDtMs), 0.0f, 1.0f);
 
     // 이번에 드로우할 프레임에 대해 constant buffers 업데이트
-    FrameResource& frameResource = *m_frameResources[m_frameIndex];
+    FrameResource& frameResource = m_frameResources[m_frameIndex];
 
     PrepareConstantData(alpha);
     UpdateConstantBuffers(frameResource);
@@ -360,7 +360,7 @@ void Renderer::OnRender()
         D3D12_BARRIER_ACCESS_NO_ACCESS,
         D3D12_BARRIER_LAYOUT_RENDER_TARGET,
         D3D12_BARRIER_LAYOUT_PRESENT,
-        m_frameResources[m_frameIndex]->GetBackBuffer(),
+        m_frameResources[m_frameIndex].GetBackBuffer(),
         {0xffff'ffff, 0, 0, 0, 0, 0},
         D3D12_TEXTURE_BARRIER_FLAG_NONE};
 
@@ -369,7 +369,7 @@ void Renderer::OnRender()
 
     // Execute the command lists and store the fence value
     UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(pCommandAllocator, pCommandList);
-    m_frameResources[m_frameIndex]->SetFenceValue(fenceValue);
+    m_frameResources[m_frameIndex].SetFenceValue(fenceValue);
     m_dynamicDescriptorHeapForCbvSrvUav->QueueRetiredHeaps(fenceValue);
     m_sceneManager.QueueDeferredDeletions(fenceValue, m_commandQueue->GetCompletedFenceValue());
 
@@ -446,18 +446,18 @@ void Renderer::OnResize(UINT width, UINT height)
     // Set current frame's fence value to all frameResources
     for (UINT i = 0; i < FrameCount; i++)
     {
-        m_frameResources[i]->ResetBackBuffer();
+        m_frameResources[i].ResetBackBuffer();
 
-        m_frameResources[i]->ResetSceneColorBuffers();
-        m_frameResources[i]->CreateSceneColorBuffers(m_width, m_height);
+        m_frameResources[i].ResetSceneColorBuffers();
+        m_frameResources[i].CreateSceneColorBuffers(m_width, m_height);
 
-        m_frameResources[i]->ResetGBuffers();
-        m_frameResources[i]->CreateGBuffers(m_width, m_height);
+        m_frameResources[i].ResetGBuffers();
+        m_frameResources[i].CreateGBuffers(m_width, m_height);
 
-        m_frameResources[i]->ResetMasks();
-        m_frameResources[i]->CreateMasks(m_width, m_height);
+        m_frameResources[i].ResetMasks();
+        m_frameResources[i].CreateMasks(m_width, m_height);
 
-        m_frameResources[i]->SetFenceValue(m_frameResources[m_frameIndex]->GetFenceValue());
+        m_frameResources[i].SetFenceValue(m_frameResources[m_frameIndex].GetFenceValue());
     }
 
     // Preserve existing format
@@ -468,8 +468,8 @@ void Renderer::OnResize(UINT width, UINT height)
     // Recreate RTVs
     for (UINT i = 0; i < FrameCount; i++)
     {
-        m_frameResources[i]->AcquireBackBuffer(m_swapChain.Get(), i);
-        m_frameResources[i]->InitBackBufferRtv();
+        m_frameResources[i].AcquireBackBuffer(m_swapChain.Get(), i);
+        m_frameResources[i].InitBackBufferRtv();
     }
 
     // Recreate depth-stencil buffer, DSV, and SRV
@@ -487,7 +487,7 @@ void Renderer::OnResize(UINT width, UINT height)
     std::vector<ID3D12Resource*> pBackBuffers;
     for (UINT i = 0; i < FrameCount; ++i)
     {
-        pBackBuffers.push_back(m_frameResources[i]->GetBackBuffer());
+        pBackBuffers.push_back(m_frameResources[i].GetBackBuffer());
     }
     auto backBuffer = m_renderGraph.GetRGTexture("BackBuffer");
     m_renderGraph.UpdateElement(backBuffer, 0, pBackBuffers);
@@ -496,7 +496,7 @@ void Renderer::OnResize(UINT width, UINT height)
     std::vector<ID3D12Resource*> pSceneColorBuffers0;
     for (UINT i = 0; i < FrameCount; ++i)
     {
-        pSceneColorBuffers0.push_back(m_frameResources[i]->GetSceneColorBuffer(0));
+        pSceneColorBuffers0.push_back(m_frameResources[i].GetSceneColorBuffer(0));
     }
     auto sceneColorBuffer0 = m_renderGraph.GetRGTexture("SceneColorBuffer0");
     m_renderGraph.UpdateElement(sceneColorBuffer0, 0, pSceneColorBuffers0);
@@ -504,7 +504,7 @@ void Renderer::OnResize(UINT width, UINT height)
     std::vector<ID3D12Resource*> pSceneColorBuffers1;
     for (UINT i = 0; i < FrameCount; ++i)
     {
-        pSceneColorBuffers1.push_back(m_frameResources[i]->GetSceneColorBuffer(1));
+        pSceneColorBuffers1.push_back(m_frameResources[i].GetSceneColorBuffer(1));
     }
     auto sceneColorBuffer1 = m_renderGraph.GetRGTexture("SceneColorBuffer1");
     m_renderGraph.UpdateElement(sceneColorBuffer1, 0, pSceneColorBuffers1);
@@ -520,7 +520,7 @@ void Renderer::OnResize(UINT width, UINT height)
         std::vector<ID3D12Resource*> pGBuffers;
         for (UINT i = 0; i < FrameCount; ++i)
         {
-            pGBuffers.push_back(m_frameResources[i]->GetGBuffer(static_cast<GBufferSlot>(slot)));
+            pGBuffers.push_back(m_frameResources[i].GetGBuffer(static_cast<GBufferSlot>(slot)));
         }
         m_renderGraph.UpdateElement(gBuffer, slot, pGBuffers);
     }
@@ -530,7 +530,7 @@ void Renderer::OnResize(UINT width, UINT height)
     std::vector<ID3D12Resource*> pSelectionMasks;
     for (UINT i = 0; i < FrameCount; ++i)
     {
-        pSelectionMasks.push_back(m_frameResources[i]->GetSelectionMask());
+        pSelectionMasks.push_back(m_frameResources[i].GetSelectionMask());
     }
     m_renderGraph.UpdateElement(selectionMask, 0, pSelectionMasks);
 
@@ -539,7 +539,7 @@ void Renderer::OnResize(UINT width, UINT height)
     std::vector<ID3D12Resource*> pHorizontalDilatedMasks;
     for (UINT i = 0; i < FrameCount; ++i)
     {
-        pHorizontalDilatedMasks.push_back(m_frameResources[i]->GetHorizontalDilatedMask());
+        pHorizontalDilatedMasks.push_back(m_frameResources[i].GetHorizontalDilatedMask());
     }
     m_renderGraph.UpdateElement(horizontalDilatedMask, 0, pHorizontalDilatedMasks);
 }
@@ -861,7 +861,7 @@ void Renderer::LoadPipeline()
     auto rtvAllocations = alloc.Split();
     for (UINT i = 0; i < FrameCount; i++)
     {
-        auto frameResource = std::make_unique<FrameResource>(
+        m_frameResources[i].Init(
             m_device.Get(),
             m_swapChain.Get(),
             i,
@@ -874,8 +874,6 @@ void Renderer::LoadPipeline()
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
-
-        m_frameResources.push_back(std::move(frameResource));
     }
 
     CreateRootSignature();
@@ -885,7 +883,8 @@ void Renderer::LoadPipeline()
 // Load the sample assets.
 void Renderer::LoadAssets()
 {
-    TransientUploadAllocator uploadAllocator(m_device.Get());
+    TransientUploadAllocator uploadAllocator;
+    uploadAllocator.Init(m_device.Get());
 
     // Read shaders
     {
@@ -1106,7 +1105,7 @@ void Renderer::LoadAssets()
     pSpotLight->SetAngles(50.0f, 10.0f);
 
     // Execute commands for loading assets and store fence value
-    m_frameResources[m_frameIndex]->SetFenceValue(m_commandQueue->ExecuteCommandLists(pCommandAllocator, pCommandList));
+    m_frameResources[m_frameIndex].SetFenceValue(m_commandQueue->ExecuteCommandLists(pCommandAllocator, pCommandList));
 
     // Wait until assets have been uploaded to the GPU
     WaitForGpu();
@@ -1119,11 +1118,11 @@ void Renderer::LoadAssets()
         "BackBuffer",
         true,
         {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_PRESENT},
-        GetSubresourceCount(m_device.Get(), m_frameResources.front()->GetBackBuffer()));
+        GetSubresourceCount(m_device.Get(), m_frameResources.front().GetBackBuffer()));
     std::vector<ID3D12Resource*> pBackBuffers;
     for (UINT i = 0; i < FrameCount; ++i)
     {
-        pBackBuffers.push_back(m_frameResources[i]->GetBackBuffer());
+        pBackBuffers.push_back(m_frameResources[i].GetBackBuffer());
     }
     m_renderGraph.AddElement(backBuffer, pBackBuffers);
 
@@ -1132,11 +1131,11 @@ void Renderer::LoadAssets()
         "SceneColorBuffer0",
         true,
         {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
-        GetSubresourceCount(m_device.Get(), m_frameResources.front()->GetSceneColorBuffer(0)));
+        GetSubresourceCount(m_device.Get(), m_frameResources.front().GetSceneColorBuffer(0)));
     std::vector<ID3D12Resource*> pSceneColorBuffers0;
     for (UINT i = 0; i < FrameCount; ++i)
     {
-        pSceneColorBuffers0.push_back(m_frameResources[i]->GetSceneColorBuffer(0));
+        pSceneColorBuffers0.push_back(m_frameResources[i].GetSceneColorBuffer(0));
     }
     m_renderGraph.AddElement(sceneColorBuffer0, pSceneColorBuffers0);
 
@@ -1145,11 +1144,11 @@ void Renderer::LoadAssets()
         "SceneColorBuffer1",
         true,
         {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
-        GetSubresourceCount(m_device.Get(), m_frameResources.front()->GetSceneColorBuffer(1)));
+        GetSubresourceCount(m_device.Get(), m_frameResources.front().GetSceneColorBuffer(1)));
     std::vector<ID3D12Resource*> pSceneColorBuffers1;
     for (UINT i = 0; i < FrameCount; ++i)
     {
-        pSceneColorBuffers1.push_back(m_frameResources[i]->GetSceneColorBuffer(1));
+        pSceneColorBuffers1.push_back(m_frameResources[i].GetSceneColorBuffer(1));
     }
     m_renderGraph.AddElement(sceneColorBuffer1, pSceneColorBuffers1);
 
@@ -1166,13 +1165,13 @@ void Renderer::LoadAssets()
         "GBuffer",
         true,
         {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
-        GetSubresourceCount(m_device.Get(), m_frameResources.front()->GetGBuffer(GBufferSlot::ALBEDO)));
+        GetSubresourceCount(m_device.Get(), m_frameResources.front().GetGBuffer(GBufferSlot::ALBEDO)));
     for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
     {
         std::vector<ID3D12Resource*> pGBuffers;
         for (UINT i = 0; i < FrameCount; ++i)
         {
-            pGBuffers.push_back(m_frameResources[i]->GetGBuffer(static_cast<GBufferSlot>(slot)));
+            pGBuffers.push_back(m_frameResources[i].GetGBuffer(static_cast<GBufferSlot>(slot)));
         }
         m_renderGraph.AddElement(gBuffer, pGBuffers);
     }
@@ -1182,11 +1181,11 @@ void Renderer::LoadAssets()
         "SelectionMask",
         true,
         {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
-        GetSubresourceCount(m_device.Get(), m_frameResources.front()->GetSelectionMask()));
+        GetSubresourceCount(m_device.Get(), m_frameResources.front().GetSelectionMask()));
     std::vector<ID3D12Resource*> pSelectionMasks;
     for (UINT i = 0; i < FrameCount; ++i)
     {
-        pSelectionMasks.push_back(m_frameResources[i]->GetSelectionMask());
+        pSelectionMasks.push_back(m_frameResources[i].GetSelectionMask());
     }
     m_renderGraph.AddElement(selectionMask, pSelectionMasks);
 
@@ -1195,11 +1194,11 @@ void Renderer::LoadAssets()
         "HorizontalDilatedMask",
         true,
         {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
-        GetSubresourceCount(m_device.Get(), m_frameResources.front()->GetHorizontalDilatedMask()));
+        GetSubresourceCount(m_device.Get(), m_frameResources.front().GetHorizontalDilatedMask()));
     std::vector<ID3D12Resource*> pHorizontalDilatedMasks;
     for (UINT i = 0; i < FrameCount; ++i)
     {
-        pHorizontalDilatedMasks.push_back(m_frameResources[i]->GetHorizontalDilatedMask());
+        pHorizontalDilatedMasks.push_back(m_frameResources[i].GetHorizontalDilatedMask());
     }
     m_renderGraph.AddElement(horizontalDilatedMask, pHorizontalDilatedMasks);
 
@@ -1253,7 +1252,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
     static constexpr UINT NUM_GBUFFER_SLOTS = static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS);
 
-    FrameResource& frameResource = *m_frameResources[m_frameIndex];
+    FrameResource& frameResource = m_frameResources[m_frameIndex];
     frameResource.ResetInstanceOffsetByte();
 
     // Set root signature
@@ -1737,7 +1736,7 @@ void Renderer::MoveToNextFrame()
 {
     // Update frame index and wait for fence value
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-    m_commandQueue->WaitForFenceValue(m_frameResources[m_frameIndex]->GetFenceValue());
+    m_commandQueue->WaitForFenceValue(m_frameResources[m_frameIndex].GetFenceValue());
 }
 
 // Setup Dear ImGui context

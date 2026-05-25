@@ -24,8 +24,10 @@ public:
     TransientUploadAllocator(TransientUploadAllocator&&) = delete;
     TransientUploadAllocator& operator=(TransientUploadAllocator&&) = delete;
 
-    TransientUploadAllocator(ID3D12Device10* pDevice);
+    TransientUploadAllocator() = default;
     ~TransientUploadAllocator();
+
+    void Init(ID3D12Device10* pDevice);
 
     UploadAllocation Allocate(std::size_t size, std::size_t alignment);
     UploadAllocation Push(void* src, std::size_t size, std::size_t alignment);
