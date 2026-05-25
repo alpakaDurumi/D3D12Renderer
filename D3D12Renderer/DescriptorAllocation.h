@@ -1,9 +1,8 @@
 #pragma once
 
-#include <basetsd.h>
-
 #include <vector>
 
+#include <basetsd.h>
 #include <d3d12.h>
 
 class DescriptorAllocatorPage;

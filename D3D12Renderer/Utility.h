@@ -1,10 +1,10 @@
 #pragma once
 
-#include <minwindef.h>
-
 #include <cstddef>
 #include <functional>
 #include <string>
+
+#include <minwindef.h>
 
 namespace Utility
 {

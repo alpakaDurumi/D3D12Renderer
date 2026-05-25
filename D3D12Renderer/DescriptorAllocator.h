@@ -1,12 +1,11 @@
 #pragma once
 
-#include <basetsd.h>
-
 #include <memory>
 #include <mutex>
 #include <set>
 #include <vector>
 
+#include <basetsd.h>
 #include <d3d12.h>
 #include <wrl/client.h>
 

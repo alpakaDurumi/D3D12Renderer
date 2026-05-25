@@ -1,11 +1,10 @@
 #pragma once
 
-#include <basetsd.h>
-#include <minwindef.h>
-
 #include <vector>
 
+#include <basetsd.h>
 #include <d3d12.h>
+#include <minwindef.h>
 #include <wrl/client.h>
 
 #include "RendererConfig.h"

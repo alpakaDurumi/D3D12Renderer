@@ -1,10 +1,9 @@
 #pragma once
 
-#include <minwindef.h>
-
 #include <cstring>
 
 #include <DirectXMath.h>
+#include <minwindef.h>
 
 #include "Aliases.h"
 

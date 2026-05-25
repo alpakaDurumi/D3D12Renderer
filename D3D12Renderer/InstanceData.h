@@ -1,8 +1,7 @@
 #pragma once
 
-#include <minwindef.h>
-
 #include <DirectXMath.h>
+#include <minwindef.h>
 
 struct InstanceData
 {

@@ -1,15 +1,14 @@
 #pragma once
 
-#include <basetsd.h>
-#include <minwindef.h>
-
 #include <functional>
 #include <memory>
 #include <queue>
 #include <utility>
 #include <vector>
 
+#include <basetsd.h>
 #include <d3d12.h>
+#include <minwindef.h>
 #include <wrl/client.h>
 
 class RootSignature;

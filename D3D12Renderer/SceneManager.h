@@ -1,8 +1,5 @@
 #pragma once
 
-#include <basetsd.h>
-#include <minwindef.h>
-
 #include <cassert>
 #include <functional>
 #include <memory>
@@ -15,11 +12,14 @@
 #include <vector>
 
 #include <DirectXMath.h>
+#include <basetsd.h>
 #include <d3d12.h>
+#include <minwindef.h>
 #include <wrl/client.h>
 
+#include <DDSTextureLoader12.h>
+
 #include "Aliases.h"
-#include "DDSTextureLoader12.h"
 #include "GeometryData.h"
 #include "InstanceData.h"
 #include "Light.h"

@@ -1,14 +1,13 @@
 #pragma once
 
-#include <basetsd.h>
-#include <minwindef.h>
-#include <sal.h>
-
 #include <string>
 #include <vector>
 
+#include <basetsd.h>
 #include <d3d12.h>
 #include <dxgi1_6.h>
+#include <minwindef.h>
+#include <sal.h>
 
 namespace D3DHelper
 {

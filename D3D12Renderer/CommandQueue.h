@@ -1,11 +1,10 @@
 #pragma once
 
-#include <basetsd.h>
-
 #include <queue>
 #include <utility> // for std::pair
 #include <vector>
 
+#include <basetsd.h>
 #include <d3d12.h>
 #include <wrl/client.h>
 

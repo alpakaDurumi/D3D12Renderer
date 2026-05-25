@@ -1,8 +1,7 @@
 #pragma once
 
-#include <minwindef.h>
-
 #include <d3d12.h>
+#include <minwindef.h>
 
 #include "DescriptorAllocation.h"
 

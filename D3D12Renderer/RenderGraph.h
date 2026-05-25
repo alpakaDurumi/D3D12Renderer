@@ -1,8 +1,5 @@
 #pragma once
 
-#include <basetsd.h>
-#include <minwindef.h>
-
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -12,7 +9,9 @@
 #include <unordered_map>
 #include <vector>
 
+#include <basetsd.h>
 #include <d3d12.h>
+#include <minwindef.h>
 
 #include "CacheKeys.h"
 #include "D3DHelper.h"

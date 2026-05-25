@@ -1,13 +1,12 @@
 #pragma once
 
-#include <basetsd.h>
-#include <minwindef.h>
-
 #include <array>
 #include <vector>
 
 #include <DirectXMath.h>
+#include <basetsd.h>
 #include <d3d12.h>
+#include <minwindef.h>
 
 #include "ConstantData.h"
 #include "SharedConfig.h"

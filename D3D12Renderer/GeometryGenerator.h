@@ -1,11 +1,10 @@
 #pragma once
 
-#include <basetsd.h>
-#include <minwindef.h>
-
 #include <vector>
 
 #include <DirectXMath.h>
+#include <basetsd.h>
+#include <minwindef.h>
 
 #include "GeometryData.h"
 

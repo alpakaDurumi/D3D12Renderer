@@ -2,16 +2,17 @@
 
 #include "Win32Application.h"
 
+#include <locale>
+
 #include <hidusage.h>
 #include <timeapi.h>
 #include <windowsx.h>
 
-#include <locale>
+#include <imgui_impl_dx12.h>
+#include <imgui_impl_win32.h>
 
 #include "Aliases.h"
 #include "Renderer.h"
-#include "imgui_impl_dx12.h"
-#include "imgui_impl_win32.h"
 
 int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmdLine, int nCmdShow)
 {

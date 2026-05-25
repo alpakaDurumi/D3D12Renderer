@@ -1,9 +1,8 @@
 #pragma once
 
-#include <minwindef.h>
-
 #include <DirectXMath.h>
 #include <d3d12.h>
+#include <minwindef.h>
 
 #include "SharedConfig.h"
 

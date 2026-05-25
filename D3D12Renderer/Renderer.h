@@ -1,8 +1,5 @@
 #pragma once
 
-#include <basetsd.h>
-#include <minwindef.h>
-
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -14,8 +11,10 @@
 
 #include <DirectXCollision.h>
 #include <DirectXMath.h>
+#include <basetsd.h>
 #include <d3d12.h>
 #include <dxgi1_6.h>
+#include <minwindef.h>
 #include <wrl/client.h>
 
 #include "Aliases.h"

@@ -13,19 +13,26 @@ AccessModifierOffset: -4
 
 IncludeBlocks: Regroup
 IncludeCategories:
+  # PCH
+  # main header file has Priority & SortPriority of 0.
   - Regex:        '^"pch\.h"$'
-    Priority:     1
+    Priority:     -1
     SortPriority: -1
-  - Regex:        '^<(d3d|dxgi|wrl|[Dd]irect).*>$'
-    Priority:     5
-  - Regex:        '^<(imgui|DirectXTex).*>$'
-    Priority:     6
-  - Regex:        '^<.*\.h>$'
+  # Cpp Standard Library
+  - Regex:        '^<[a-z_]+>$'
+    Priority:     1
+  # Windows Opensource Libraries
+  - Regex:        '^<(DirectXTex|DDSTextureLoader).*>$'
     Priority:     3
-  - Regex:        '^<.*>$'
+  # Third-party
+  - Regex:        '^<imgui.*\.h>$'
     Priority:     4
+  # Windows SDK (fallback)
+  - Regex:        '^<.*\.h>$'
+    Priority:     2
+  # Project headers
   - Regex:        '^".*"$'
-    Priority:     7
+    Priority:     5
 
 BreakConstructorInitializers: BeforeComma
 InsertNewlineAtEOF: true

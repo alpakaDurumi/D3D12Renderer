@@ -1,12 +1,11 @@
 #pragma once
 
-#include <minwindef.h>
-
 #include <tuple>
 #include <utility>
 #include <vector>
 
 #include <d3d12.h>
+#include <minwindef.h>
 
 struct RGBuffer
 {

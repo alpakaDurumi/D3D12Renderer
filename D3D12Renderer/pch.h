@@ -3,9 +3,6 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 
-#include <Windows.h>
-#include <shellapi.h>
-
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -24,8 +21,10 @@
 #include <vector>
 
 #include <DirectXMath.h>
+#include <Windows.h>
 #include <d3d12.h>
 #include <dxgi1_6.h>
+#include <shellapi.h>
 #include <wrl/client.h>
 
 // PIX Event

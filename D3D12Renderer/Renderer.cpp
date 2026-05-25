@@ -2,13 +2,16 @@
 
 #include "Renderer.h"
 
-#include <shlobj.h>
-
 #include <filesystem>
 #include <fstream>
 #include <thread>
 
 #include <dxgidebug.h>
+#include <shlobj.h>
+
+#include <imgui.h>
+#include <imgui_impl_dx12.h>
+#include <imgui_impl_win32.h>
 
 #include "CommandQueue.h"
 #include "D3DHelper.h"
@@ -27,9 +30,6 @@
 #include "SharedConfig.h"
 #include "TransientUploadAllocator.h"
 #include "Win32Application.h"
-#include "imgui.h"
-#include "imgui_impl_dx12.h"
-#include "imgui_impl_win32.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;

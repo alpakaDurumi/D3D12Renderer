@@ -1,7 +1,6 @@
 #pragma once
 
 #include <basetsd.h>
-
 #include <d3d12.h>
 
 #include "GpuResource.h"

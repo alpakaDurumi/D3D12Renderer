@@ -1,11 +1,10 @@
 #pragma once
 
-#include <basetsd.h>
-
 #include <string>
 #include <vector>
 
 #include <DirectXMath.h>
+#include <basetsd.h>
 
 struct Vertex
 {

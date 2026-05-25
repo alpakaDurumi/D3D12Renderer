@@ -1,11 +1,10 @@
 #pragma once
 
-#include <minwindef.h>
-
 #include <cassert>
 #include <vector>
 
 #include <d3d12.h>
+#include <minwindef.h>
 #include <wrl/client.h>
 
 #include "D3DHelper.h"

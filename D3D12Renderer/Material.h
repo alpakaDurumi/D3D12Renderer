@@ -1,12 +1,11 @@
 #pragma once
 
-#include <minwindef.h>
-
 #include <array>
 #include <cstddef>
 
 #include <DirectXMath.h>
 #include <d3d12.h>
+#include <minwindef.h>
 
 #include "ConstantData.h"
 #include "RendererConfig.h"

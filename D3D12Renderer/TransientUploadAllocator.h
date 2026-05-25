@@ -1,13 +1,12 @@
 #pragma once
 
-#include <basetsd.h>
-#include <minwindef.h>
-
 #include <cstddef>
 #include <memory>
 #include <vector>
 
+#include <basetsd.h>
 #include <d3d12.h>
+#include <minwindef.h>
 
 #include "Buffer.h"
 

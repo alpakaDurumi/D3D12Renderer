@@ -1,10 +1,10 @@
 #pragma once
 
-#include <minwindef.h>
-
 #include <cassert>
 #include <utility>
 #include <vector>
+
+#include <minwindef.h>
 
 template <typename T>
 class SlotMap
