@@ -11,11 +11,10 @@ using Microsoft::WRL::ComPtr;
 DescriptorAllocator::DescriptorAllocator() = default;
 DescriptorAllocator::~DescriptorAllocator() = default;
 
-void DescriptorAllocator::Init(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap)
+void DescriptorAllocator::Init(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type)
 {
     m_pDevice = pDevice;
     m_heapType = type;
-    m_numDescriptorsPerHeap = numDescriptorsPerHeap;
 }
 
 void DescriptorAllocator::SetCommandQueue(const CommandQueue* pCommandQueue)
@@ -26,6 +25,8 @@ void DescriptorAllocator::SetCommandQueue(const CommandQueue* pCommandQueue)
 // Allocate contiguous block of descriptors from heap
 DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
 {
+    assert(numDescriptors <= NumDescriptorsPerHeap);
+
     std::lock_guard<std::mutex> lock(m_allocationMutex);
 
     // Release allocations that have finished execution before allocation.
@@ -33,11 +34,9 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
 
     std::optional<DescriptorAllocation> allocation;
 
-    auto it = m_availableHeaps.begin();
-    while (it != m_availableHeaps.end())
+    for (auto it = m_availableHeaps.begin(); it != m_availableHeaps.end(); ++it)
     {
         auto& allocatorPage = m_heapPool[*it];
-
         allocation = allocatorPage->Allocate(numDescriptors);
 
         // A valid allocation has been found
@@ -53,20 +52,13 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
             }
             break;
         }
-        else
-        {
-            ++it;
-        }
     }
 
     // No available heap could satisfy the requested number of descriptors
     if (!allocation.has_value())
     {
-        // Increase page size for demand
-        m_numDescriptorsPerHeap = std::max(m_numDescriptorsPerHeap, numDescriptors);
-        auto newPage = CreateAllocatorPage();
-
-        allocation = newPage->Allocate(numDescriptors);
+        auto* pNewPage = CreateAllocatorPage();
+        allocation = pNewPage->Allocate(numDescriptors);
     }
 
     // std::optional<T>::value returns l-value reference, so std::move should be used for satisfy
@@ -77,7 +69,7 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
 // Create a new heap with a specific number of descriptors
 DescriptorAllocatorPage* DescriptorAllocator::CreateAllocatorPage()
 {
-    m_heapPool.emplace_back(std::make_unique<DescriptorAllocatorPage>(m_pDevice, m_heapType, m_numDescriptorsPerHeap));
+    m_heapPool.emplace_back(std::make_unique<DescriptorAllocatorPage>(m_pDevice, m_heapType, NumDescriptorsPerHeap));
     m_availableHeaps.insert(m_heapPool.size() - 1); // Index of the page added
     return m_heapPool.back().get();
 }

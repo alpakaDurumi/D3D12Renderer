@@ -24,19 +24,20 @@ public:
     DescriptorAllocator();
     ~DescriptorAllocator();
 
-    void Init(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap = 256);
+    void Init(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type);
     void SetCommandQueue(const CommandQueue* pCommandQueue);
 
     DescriptorAllocation Allocate(UINT32 numDescriptors = 1);
 
 private:
+    static constexpr UINT32 NumDescriptorsPerHeap = 256;
+
     // These functions not use mutex since they assume that mutex already locked on caller's side.
     // If this function called outside of DescriptorAllocator::Allocate, explicit mutex should be locked.
     DescriptorAllocatorPage* CreateAllocatorPage();
     void ReleaseStaleDescriptors(UINT64 completedFenceValue);
 
     D3D12_DESCRIPTOR_HEAP_TYPE m_heapType;
-    UINT32 m_numDescriptorsPerHeap;
 
     std::vector<std::unique_ptr<DescriptorAllocatorPage>> m_heapPool;
     std::set<SIZE_T> m_availableHeaps; // Indices of available heaps in the heap pool.
