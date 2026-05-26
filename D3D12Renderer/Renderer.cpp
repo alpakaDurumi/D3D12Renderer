@@ -364,13 +364,14 @@ void Renderer::OnRender()
     D3D12_BARRIER_GROUP barrierGroups[] = {TextureBarrierGroup(1, &barrier)};
     pCommandList->Barrier(1, barrierGroups);
 
-    // Execute the command lists and store the fence value
+    // Execute the command lists and update objects with fence values
     UINT64 signaledFenceValue = m_commandQueue.ExecuteCommandLists(pCommandAllocator, pCommandList);
     UINT64 completedFenceValue = m_commandQueue.GetCompletedFenceValue();
-    m_frameResources[m_frameIndex].SetFenceValue(signaledFenceValue);
+    m_frameResources[m_frameIndex].UpdateSignaledFenceValue(signaledFenceValue);
     m_dynamicDescriptorHeapForCbvSrvUav.QueueRetiredHeaps(signaledFenceValue);
     m_dynamicDescriptorHeapForCbvSrvUav.UpdateCompletedFenceValue(completedFenceValue);
-    m_sceneManager.QueueDeferredDeletions(signaledFenceValue, completedFenceValue);
+    m_sceneManager.QueueDeferredDeletions(signaledFenceValue);
+    m_sceneManager.ProcessCompletedDeletions(completedFenceValue);
 
     // Present the frame.
     UINT syncInterval = m_vSync ? 1 : 0;
@@ -456,7 +457,7 @@ void Renderer::OnResize(UINT width, UINT height)
         m_frameResources[i].ResetMasks();
         m_frameResources[i].CreateMasks(m_width, m_height);
 
-        m_frameResources[i].SetFenceValue(m_frameResources[m_frameIndex].GetFenceValue());
+        m_frameResources[i].UpdateSignaledFenceValue(m_frameResources[m_frameIndex].GetSignaledFenceValue());
     }
 
     // Preserve existing format
@@ -1098,8 +1099,8 @@ void Renderer::LoadAssets()
     pSpotLight->SetRange(50.0f);
     pSpotLight->SetAngles(50.0f, 10.0f);
 
-    // Execute commands for loading assets and store fence value
-    m_frameResources[m_frameIndex].SetFenceValue(m_commandQueue.ExecuteCommandLists(pCommandAllocator, pCommandList));
+    // Execute commands for loading assets and update signaled fence value
+    m_frameResources[m_frameIndex].UpdateSignaledFenceValue(m_commandQueue.ExecuteCommandLists(pCommandAllocator, pCommandList));
 
     // Wait until assets have been uploaded to the GPU
     WaitForGpu();
@@ -1730,7 +1731,7 @@ void Renderer::MoveToNextFrame()
 {
     // Update frame index and wait for fence value
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-    m_commandQueue.WaitForFenceValue(m_frameResources[m_frameIndex].GetFenceValue());
+    m_commandQueue.WaitForFenceValue(m_frameResources[m_frameIndex].GetSignaledFenceValue());
 }
 
 // Setup Dear ImGui context

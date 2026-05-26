@@ -700,14 +700,17 @@ public:
         return m_assetTextures.GetDense();
     }
 
-    void QueueDeferredDeletions(UINT64 fenceValue, UINT64 completedFenceValue)
+    // push resources to queue with signaledFenceValue
+    void QueueDeferredDeletions(UINT64 signaledFenceValue)
     {
-        // 1. push resources to queue with fenceValue
         for (auto& res : m_deferred)
-            m_deletionQueue.emplace(fenceValue, std::move(res));
+            m_deletionQueue.emplace(signaledFenceValue, std::move(res));
         m_deferred.clear();
+    }
 
-        // 2. Delete resources that completed in GPU timeline
+    // Delete resources that completed in GPU timeline
+    void ProcessCompletedDeletions(UINT64 completedFenceValue)
+    {
         while (!m_deletionQueue.empty() && m_deletionQueue.front().fenceValue <= completedFenceValue)
             m_deletionQueue.pop();
     }

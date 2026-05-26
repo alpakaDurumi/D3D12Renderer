@@ -245,12 +245,10 @@ ID3D12DescriptorHeap* DynamicDescriptorHeap::GetCurrentDescriptorHeap() const
     return m_currentHeap;
 }
 
-void DynamicDescriptorHeap::QueueRetiredHeaps(UINT64 fenceValue)
+void DynamicDescriptorHeap::QueueRetiredHeaps(UINT64 signaledFenceValue)
 {
     for (auto* pPage : m_retiredHeaps)
-    {
-        m_pendingHeaps.push({fenceValue, pPage});
-    }
+        m_pendingHeaps.push({signaledFenceValue, pPage});
     m_retiredHeaps.clear();
 }
 

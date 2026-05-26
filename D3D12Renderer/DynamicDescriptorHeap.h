@@ -43,7 +43,7 @@ public:
 
     ID3D12DescriptorHeap* GetCurrentDescriptorHeap() const;
 
-    void QueueRetiredHeaps(UINT64 fenceValue);
+    void QueueRetiredHeaps(UINT64 signaledFenceValue);
     void UpdateCompletedFenceValue(UINT64 completedFenceValue);
 
     void Reset();

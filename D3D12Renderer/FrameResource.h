@@ -88,8 +88,8 @@ public:
     void ResetUploadAllocator();
 
     // Synchronization
-    UINT64 GetFenceValue() const;
-    void SetFenceValue(UINT64 fenceValue);
+    UINT64 GetSignaledFenceValue() const;
+    void UpdateSignaledFenceValue(UINT64 signaledFenceValue);
 
     inline static constexpr UINT SceneColorBufferCount = 2;
 
@@ -120,7 +120,7 @@ private:
 
     TransientUploadAllocator m_uploadAllocator;
 
-    UINT64 m_fenceValue = 0;
+    UINT64 m_signaledFenceValue = 0;
 
     ID3D12Device10* m_pDevice = nullptr;
 };

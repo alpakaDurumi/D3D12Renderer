@@ -316,12 +316,12 @@ void FrameResource::ResetUploadAllocator()
 }
 
 // Synchronization
-UINT64 FrameResource::GetFenceValue() const
+UINT64 FrameResource::GetSignaledFenceValue() const
 {
-    return m_fenceValue;
+    return m_signaledFenceValue;
 }
 
-void FrameResource::SetFenceValue(UINT64 fenceValue)
+void FrameResource::UpdateSignaledFenceValue(UINT64 signaledFenceValue)
 {
-    m_fenceValue = fenceValue;
+    m_signaledFenceValue = signaledFenceValue;
 }
