@@ -7,7 +7,6 @@
 
 #include <basetsd.h>
 #include <d3d12.h>
-#include <wrl/client.h>
 
 class CommandQueue;
 class DescriptorAllocatorPage;
@@ -17,21 +16,18 @@ class DescriptorAllocation;
 class DescriptorAllocator
 {
 public:
-    // Disable copy and move. Only use as l-value reference
     DescriptorAllocator(const DescriptorAllocator&) = delete;
     DescriptorAllocator& operator=(const DescriptorAllocator&) = delete;
     DescriptorAllocator(DescriptorAllocator&&) = delete;
     DescriptorAllocator& operator=(DescriptorAllocator&&) = delete;
 
-    DescriptorAllocator(const Microsoft::WRL::ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap = 256);
+    DescriptorAllocator();
     ~DescriptorAllocator();
 
-    DescriptorAllocation Allocate(UINT32 numDescriptors = 1);
+    void Init(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap = 256);
+    void SetCommandQueue(const CommandQueue* pCommandQueue);
 
-    void SetCommandQueue(const CommandQueue* pCommandQueue)
-    {
-        m_pCommandQueue = pCommandQueue;
-    }
+    DescriptorAllocation Allocate(UINT32 numDescriptors = 1);
 
 private:
     // These functions not use mutex since they assume that mutex already locked on caller's side.
@@ -47,6 +43,6 @@ private:
 
     std::mutex m_allocationMutex;
 
-    Microsoft::WRL::ComPtr<ID3D12Device10> m_device;
-    const CommandQueue* m_pCommandQueue;
+    ID3D12Device10* m_pDevice = nullptr;
+    const CommandQueue* m_pCommandQueue = nullptr;
 };

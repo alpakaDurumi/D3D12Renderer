@@ -8,14 +8,20 @@
 
 using Microsoft::WRL::ComPtr;
 
-DescriptorAllocator::DescriptorAllocator(const ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap)
-    : m_device(device)
-    , m_heapType(type)
-    , m_numDescriptorsPerHeap(numDescriptorsPerHeap)
+DescriptorAllocator::DescriptorAllocator() = default;
+DescriptorAllocator::~DescriptorAllocator() = default;
+
+void DescriptorAllocator::Init(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptorsPerHeap)
 {
+    m_pDevice = pDevice;
+    m_heapType = type;
+    m_numDescriptorsPerHeap = numDescriptorsPerHeap;
 }
 
-DescriptorAllocator::~DescriptorAllocator() = default;
+void DescriptorAllocator::SetCommandQueue(const CommandQueue* pCommandQueue)
+{
+    m_pCommandQueue = pCommandQueue;
+}
 
 // Allocate contiguous block of descriptors from heap
 DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
@@ -71,7 +77,7 @@ DescriptorAllocation DescriptorAllocator::Allocate(UINT32 numDescriptors)
 // Create a new heap with a specific number of descriptors
 DescriptorAllocatorPage* DescriptorAllocator::CreateAllocatorPage()
 {
-    m_heapPool.emplace_back(std::make_unique<DescriptorAllocatorPage>(m_device.Get(), m_heapType, m_numDescriptorsPerHeap));
+    m_heapPool.emplace_back(std::make_unique<DescriptorAllocatorPage>(m_pDevice, m_heapType, m_numDescriptorsPerHeap));
     m_availableHeaps.insert(m_heapPool.size() - 1); // Index of the page added
     return m_heapPool.back().get();
 }

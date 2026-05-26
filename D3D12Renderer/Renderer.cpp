@@ -15,7 +15,6 @@
 
 #include "D3DHelper.h"
 #include "DescriptorAllocation.h"
-#include "DescriptorAllocator.h"
 #include "GeometryData.h"
 #include "GeometryGenerator.h"
 #include "ImGuiDescriptorAllocator.h"
@@ -798,8 +797,8 @@ void Renderer::LoadPipeline()
     for (UINT i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
     {
         D3D12_DESCRIPTOR_HEAP_TYPE type = static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(i);
-        m_descriptorAllocators[i] = std::make_unique<DescriptorAllocator>(m_device, type);
-        m_descriptorAllocators[i]->SetCommandQueue(&m_commandQueue); // Dependency injection
+        m_descriptorAllocators[i].Init(m_device.Get(), type);
+        m_descriptorAllocators[i].SetCommandQueue(&m_commandQueue); // Dependency injection
     }
 
     // Create descriptor heap for samplers
@@ -852,7 +851,7 @@ void Renderer::LoadPipeline()
     ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_NO_ALT_ENTER));
 
     // Create frame resources : RTV and command allocator for each frame
-    auto alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(FrameCount);
+    auto alloc = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(FrameCount);
     auto rtvAllocations = alloc.Split();
     for (UINT i = 0; i < FrameCount; i++)
     {
@@ -861,14 +860,14 @@ void Renderer::LoadPipeline()
             m_swapChain.Get(),
             i,
             std::move(rtvAllocations[i]),
-            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(FrameResource::SceneColorBufferCount),
-            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(FrameResource::SceneColorBufferCount),
-            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)),
-            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)),
-            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(),
-            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
-            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(),
-            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(FrameResource::SceneColorBufferCount),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(FrameResource::SceneColorBufferCount),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS)),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate());
     }
 
     CreateRootSignature();
@@ -940,17 +939,17 @@ void Renderer::LoadAssets()
         m_device.Get(),
         m_depthStencilBuffer.Get(),
         GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV].Allocate());
     m_readOnlyDsv = DepthStencilView(
         m_device.Get(),
         m_depthStencilBuffer.Get(),
         GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate());
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV].Allocate());
     m_depthSrv = ShaderResourceView(
         m_device.Get(),
         m_depthStencilBuffer.Get(),
         GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate());
 
     // Set viewport and scissorRect for shadow mapping
     m_shadowMapViewport = {0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f};
@@ -977,7 +976,7 @@ void Renderer::LoadAssets()
     // Allocate textures
     // Default textures
     {
-        auto allocations = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3).Split();
+        auto allocations = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(3).Split();
 
         // index 0: white albedo
         CreateAssetTexture(pCommandList, std::move(allocations[0]), uploadAllocator, {255, 255, 255, 255}, 1, 1);
@@ -998,7 +997,7 @@ void Renderer::LoadAssets()
         pDefaultMat->SetRenderingPath(RenderingPath::DEFERRED);
     }
 
-    auto allocations = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(3).Split();
+    auto allocations = m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(3).Split();
 
     CreateAssetTexture(
         pCommandList,
@@ -1903,13 +1902,13 @@ void Renderer::SetTextureFiltering(TextureFiltering filtering)
 // Allocate Material
 MaterialHandle Renderer::CreateMaterial()
 {
-    return m_sceneManager.AddMaterial(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate());
+    return m_sceneManager.AddMaterial(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate());
 }
 
 // Allocate & register Material
 MaterialHandle Renderer::CreateMaterial(const AssetID& id)
 {
-    return m_sceneManager.AddMaterial(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(), id);
+    return m_sceneManager.AddMaterial(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(), id);
 }
 
 MaterialHandle Renderer::CloneMaterial(MaterialHandle src)
@@ -1930,9 +1929,9 @@ DirectionalLightHandle Renderer::CreateDirectionalLight()
 {
     return m_sceneManager.AddDirectionalLight(
         m_device.Get(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(MAX_CASCADES),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV].Allocate(MAX_CASCADES),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
         m_shadowMapResolution);
 }
 
@@ -1940,10 +1939,10 @@ PointLightHandle Renderer::CreatePointLight()
 {
     return m_sceneManager.AddPointLight(
         m_device.Get(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(POINT_LIGHT_ARRAY_SIZE),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV]->Allocate(POINT_LIGHT_ARRAY_SIZE),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV].Allocate(POINT_LIGHT_ARRAY_SIZE),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(POINT_LIGHT_ARRAY_SIZE),
         m_shadowMapResolution);
 }
 
@@ -1951,9 +1950,9 @@ SpotLightHandle Renderer::CreateSpotLight()
 {
     return m_sceneManager.AddSpotLight(
         m_device.Get(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV]->Allocate(SPOT_LIGHT_ARRAY_SIZE),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV]->Allocate(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV].Allocate(SPOT_LIGHT_ARRAY_SIZE),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
         m_shadowMapResolution);
 }
 
