@@ -12,7 +12,6 @@
 #include <wrl/client.h>
 
 class RootSignature;
-class CommandQueue;
 
 // Staging CPU visible descriptors and committing those descriptors to a GPU visible descriptor heap
 // Root constants and root descriptors do not use descriptor heap
@@ -30,7 +29,6 @@ public:
     ~DynamicDescriptorHeap() = default;
 
     void Init(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE heapType);
-    void SetCommandQueue(const CommandQueue* pCommandQueue);
 
     void StageDescriptors(UINT32 rootParameterIndex, UINT32 offsetInParameter, UINT32 numDescriptors, D3D12_CPU_DESCRIPTOR_HANDLE baseCpuHandle);
 
@@ -46,6 +44,7 @@ public:
     ID3D12DescriptorHeap* GetCurrentDescriptorHeap() const;
 
     void QueueRetiredHeaps(UINT64 fenceValue);
+    void UpdateCompletedFenceValue(UINT64 completedFenceValue);
 
     void Reset();
 
@@ -97,6 +96,7 @@ private:
     D3D12_CPU_DESCRIPTOR_HANDLE m_currentCpuDescriptorHandle;
     UINT32 m_numFreeHandles; // Number of free handles in current descriptor heap
 
+    UINT64 m_completedFenceValue = 0;
+
     ID3D12Device10* m_pDevice = nullptr;
-    const CommandQueue* m_pCommandQueue = nullptr; // For IsFenceComplete
 };

@@ -2,7 +2,6 @@
 
 #include "DynamicDescriptorHeap.h"
 
-#include "CommandQueue.h"
 #include "D3DHelper.h"
 #include "RootSignature.h"
 
@@ -20,11 +19,6 @@ void DynamicDescriptorHeap::Init(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_
     m_currentCpuDescriptorHandle = m_currentHeap->GetCPUDescriptorHandleForHeapStart();
     m_currentGpuDescriptorHandle = m_currentHeap->GetGPUDescriptorHandleForHeapStart();
     m_numFreeHandles = NumDescriptorsPerHeap;
-}
-
-void DynamicDescriptorHeap::SetCommandQueue(const CommandQueue* pCommandQueue)
-{
-    m_pCommandQueue = pCommandQueue;
 }
 
 void DynamicDescriptorHeap::ParseRootSignature(const RootSignature& rootSignature)
@@ -112,7 +106,7 @@ UINT32 DynamicDescriptorHeap::ComputeStaleDescriptorCount() const
 
 ID3D12DescriptorHeap* DynamicDescriptorHeap::RequestDescriptorHeap()
 {
-    while (!m_pendingHeaps.empty() && m_pCommandQueue->IsFenceComplete(m_pendingHeaps.front().first))
+    while (!m_pendingHeaps.empty() && m_pendingHeaps.front().first <= m_completedFenceValue)
     {
         m_availableHeaps.push(m_pendingHeaps.front().second);
         m_pendingHeaps.pop();
@@ -258,6 +252,11 @@ void DynamicDescriptorHeap::QueueRetiredHeaps(UINT64 fenceValue)
         m_pendingHeaps.push({fenceValue, pPage});
     }
     m_retiredHeaps.clear();
+}
+
+void DynamicDescriptorHeap::UpdateCompletedFenceValue(UINT64 completedFenceValue)
+{
+    m_completedFenceValue = completedFenceValue;
 }
 
 void DynamicDescriptorHeap::Reset()

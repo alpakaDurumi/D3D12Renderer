@@ -365,10 +365,12 @@ void Renderer::OnRender()
     pCommandList->Barrier(1, barrierGroups);
 
     // Execute the command lists and store the fence value
-    UINT64 fenceValue = m_commandQueue.ExecuteCommandLists(pCommandAllocator, pCommandList);
-    m_frameResources[m_frameIndex].SetFenceValue(fenceValue);
-    m_dynamicDescriptorHeapForCbvSrvUav.QueueRetiredHeaps(fenceValue);
-    m_sceneManager.QueueDeferredDeletions(fenceValue, m_commandQueue.GetCompletedFenceValue());
+    UINT64 signaledFenceValue = m_commandQueue.ExecuteCommandLists(pCommandAllocator, pCommandList);
+    UINT64 completedFenceValue = m_commandQueue.GetCompletedFenceValue();
+    m_frameResources[m_frameIndex].SetFenceValue(signaledFenceValue);
+    m_dynamicDescriptorHeapForCbvSrvUav.QueueRetiredHeaps(signaledFenceValue);
+    m_dynamicDescriptorHeapForCbvSrvUav.UpdateCompletedFenceValue(completedFenceValue);
+    m_sceneManager.QueueDeferredDeletions(signaledFenceValue, completedFenceValue);
 
     // Present the frame.
     UINT syncInterval = m_vSync ? 1 : 0;
@@ -811,7 +813,6 @@ void Renderer::LoadPipeline()
 
     // Dependency injections
     m_commandQueue.SetDescriptorHeaps(&m_dynamicDescriptorHeapForCbvSrvUav, m_samplerDescriptorHeap.Get());
-    m_dynamicDescriptorHeapForCbvSrvUav.SetCommandQueue(&m_commandQueue);
 
     // For ImGui
     m_imguiDescriptorAllocator = std::make_unique<ImGuiDescriptorAllocator>(m_device.Get());
