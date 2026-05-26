@@ -56,7 +56,6 @@ private:
     void CommitStagedDescriptors(ID3D12GraphicsCommandList7* pCommandList, std::function<void(ID3D12GraphicsCommandList*, UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc);
 
     ID3D12DescriptorHeap* RequestDescriptorHeap();
-    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap();
 
     UINT32 ComputeStaleDescriptorCount() const;
 

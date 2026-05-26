@@ -120,25 +120,18 @@ ID3D12DescriptorHeap* DynamicDescriptorHeap::RequestDescriptorHeap()
     }
     else
     {
-        auto descriptorHeap = CreateDescriptorHeap();
+        D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+        heapDesc.Type = m_heapType;
+        heapDesc.NumDescriptors = NumDescriptorsPerHeap;
+        heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+        ComPtr<ID3D12DescriptorHeap> descriptorHeap;
+        ThrowIfFailed(m_pDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&descriptorHeap)));
         pDescriptorHeap = descriptorHeap.Get();
-        m_heapPool.push_back(descriptorHeap);
+        m_heapPool.push_back(std::move(descriptorHeap));
     }
 
     return pDescriptorHeap;
-}
-
-ComPtr<ID3D12DescriptorHeap> DynamicDescriptorHeap::CreateDescriptorHeap()
-{
-    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
-    heapDesc.Type = m_heapType;
-    heapDesc.NumDescriptors = NumDescriptorsPerHeap;
-    heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-
-    ComPtr<ID3D12DescriptorHeap> descriptorHeap;
-    ThrowIfFailed(m_pDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&descriptorHeap)));
-
-    return descriptorHeap;
 }
 
 bool DynamicDescriptorHeap::CheckHeapChanged()
