@@ -8,33 +8,30 @@
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
 
-CommandQueue::CommandQueue(const ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type)
-    : m_type(type)
-    , m_fenceValue(0)
-    , m_device(device)
-    , m_pDynamicDescriptorHeapForCbvSrvUav(nullptr)
-    , m_pSamplerDescriptorHeap(nullptr)
-{
-    D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-    queueDesc.Type = type;
-    queueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
-    queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-    queueDesc.NodeMask = 0;
-
-    ThrowIfFailed(device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
-
-    ThrowIfFailed(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
-
-    m_fenceEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    if (m_fenceEvent == nullptr)
-    {
-        ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
-    }
-}
-
 CommandQueue::~CommandQueue()
 {
     CloseHandle(m_fenceEvent);
+}
+
+void CommandQueue::Init(ID3D12Device10* pDevice, D3D12_COMMAND_LIST_TYPE type)
+{
+    m_pDevice = pDevice;
+    m_type = type;
+
+    // Create command queue
+    D3D12_COMMAND_QUEUE_DESC desc = {};
+    desc.Type = type;
+    desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+    desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+    desc.NodeMask = 0;
+
+    ThrowIfFailed(m_pDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&m_commandQueue)));
+
+    // Create fence object, event
+    ThrowIfFailed(m_pDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+    m_fenceEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (m_fenceEvent == nullptr)
+        ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
 }
 
 void CommandQueue::SetDescriptorHeaps(const DynamicDescriptorHeap* pHeapForCbvSrvUav, ID3D12DescriptorHeap* pHeapForSampler)
@@ -51,7 +48,7 @@ ID3D12CommandQueue* CommandQueue::GetCommandQueue() const
 ID3D12CommandAllocator* CommandQueue::CreateCommandAllocator()
 {
     ComPtr<ID3D12CommandAllocator> commandAllocator;
-    ThrowIfFailed(m_device->CreateCommandAllocator(m_type, IID_PPV_ARGS(&commandAllocator)));
+    ThrowIfFailed(m_pDevice->CreateCommandAllocator(m_type, IID_PPV_ARGS(&commandAllocator)));
     m_commandAllocatorPool.push_back(commandAllocator);
 
     return commandAllocator.Get();
@@ -60,7 +57,7 @@ ID3D12CommandAllocator* CommandQueue::CreateCommandAllocator()
 ID3D12GraphicsCommandList7* CommandQueue::CreateCommandList(ID3D12CommandAllocator* pCommandAllocator)
 {
     ComPtr<ID3D12GraphicsCommandList7> commandList;
-    ThrowIfFailed(m_device->CreateCommandList(0, m_type, pCommandAllocator, nullptr, IID_PPV_ARGS(&commandList)));
+    ThrowIfFailed(m_pDevice->CreateCommandList(0, m_type, pCommandAllocator, nullptr, IID_PPV_ARGS(&commandList)));
     m_commandListPool.push_back(commandList);
 
     return commandList.Get();

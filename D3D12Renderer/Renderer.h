@@ -20,6 +20,7 @@
 #include "Aliases.h"
 #include "CacheKeys.h"
 #include "Camera.h"
+#include "CommandQueue.h"
 #include "ConstantData.h"
 #include "DynamicDescriptorHeap.h"
 #include "FrameResource.h"
@@ -34,7 +35,6 @@
 
 struct GeometryData;
 class DescriptorAllocation;
-class CommandQueue;
 class DescriptorAllocator;
 class RootSignature;
 class ImGuiDescriptorAllocator;
@@ -132,7 +132,7 @@ private:
 
     DynamicDescriptorHeap m_dynamicDescriptorHeapForCbvSrvUav;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
-    std::unique_ptr<CommandQueue> m_commandQueue;
+    CommandQueue m_commandQueue;
     std::array<std::unique_ptr<DescriptorAllocator>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
     std::array<FrameResource, FrameCount> m_frameResources;
 

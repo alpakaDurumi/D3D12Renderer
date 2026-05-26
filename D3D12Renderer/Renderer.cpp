@@ -13,12 +13,9 @@
 #include <imgui_impl_dx12.h>
 #include <imgui_impl_win32.h>
 
-#include "CommandQueue.h"
 #include "D3DHelper.h"
 #include "DescriptorAllocation.h"
 #include "DescriptorAllocator.h"
-#include "DynamicDescriptorHeap.h"
-#include "FrameResource.h"
 #include "GeometryData.h"
 #include "GeometryGenerator.h"
 #include "ImGuiDescriptorAllocator.h"
@@ -336,7 +333,7 @@ void Renderer::OnUpdate()
 // Render the scene.
 void Renderer::OnRender()
 {
-    auto [pCommandAllocator, pCommandList] = m_commandQueue->GetAvailableCommandList();
+    auto [pCommandAllocator, pCommandList] = m_commandQueue.GetAvailableCommandList();
 
     PopulateCommandList(pCommandList);
 
@@ -368,10 +365,10 @@ void Renderer::OnRender()
     pCommandList->Barrier(1, barrierGroups);
 
     // Execute the command lists and store the fence value
-    UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(pCommandAllocator, pCommandList);
+    UINT64 fenceValue = m_commandQueue.ExecuteCommandLists(pCommandAllocator, pCommandList);
     m_frameResources[m_frameIndex].SetFenceValue(fenceValue);
     m_dynamicDescriptorHeapForCbvSrvUav.QueueRetiredHeaps(fenceValue);
-    m_sceneManager.QueueDeferredDeletions(fenceValue, m_commandQueue->GetCompletedFenceValue());
+    m_sceneManager.QueueDeferredDeletions(fenceValue, m_commandQueue.GetCompletedFenceValue());
 
     // Present the frame.
     UINT syncInterval = m_vSync ? 1 : 0;
@@ -793,17 +790,13 @@ void Renderer::LoadPipeline()
         throw std::runtime_error("Enhanced Barriers are not supported on this hardware.");
     }
 
-    // Do not transfer prvalue object to std::make_unique.
-    // These are non-copyable and non-movable types.
-    // Passing a temporary object like `std::make_unique<T>(T(...))` will fail to compile
-    // Instead, pass the constructor arguments directly to std::make_unique<T>()
-    m_commandQueue = std::make_unique<CommandQueue>(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+    m_commandQueue.Init(m_device.Get(), D3D12_COMMAND_LIST_TYPE_DIRECT);
     m_dynamicDescriptorHeapForCbvSrvUav.Init(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     for (UINT i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
     {
         D3D12_DESCRIPTOR_HEAP_TYPE type = static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(i);
         m_descriptorAllocators[i] = std::make_unique<DescriptorAllocator>(m_device, type);
-        m_descriptorAllocators[i]->SetCommandQueue(m_commandQueue.get()); // Dependency injection
+        m_descriptorAllocators[i]->SetCommandQueue(&m_commandQueue); // Dependency injection
     }
 
     // Create descriptor heap for samplers
@@ -817,8 +810,8 @@ void Renderer::LoadPipeline()
     ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_samplerDescriptorHeap)));
 
     // Dependency injections
-    m_commandQueue->SetDescriptorHeaps(&m_dynamicDescriptorHeapForCbvSrvUav, m_samplerDescriptorHeap.Get());
-    m_dynamicDescriptorHeapForCbvSrvUav.SetCommandQueue(m_commandQueue.get());
+    m_commandQueue.SetDescriptorHeaps(&m_dynamicDescriptorHeapForCbvSrvUav, m_samplerDescriptorHeap.Get());
+    m_dynamicDescriptorHeapForCbvSrvUav.SetCommandQueue(&m_commandQueue);
 
     // For ImGui
     m_imguiDescriptorAllocator = std::make_unique<ImGuiDescriptorAllocator>(m_device.Get());
@@ -842,7 +835,7 @@ void Renderer::LoadPipeline()
 
     ComPtr<IDXGISwapChain1> swapChain;
     ThrowIfFailed(factory->CreateSwapChainForHwnd(
-        m_commandQueue->GetCommandQueue(),
+        m_commandQueue.GetCommandQueue(),
         Win32Application::GetHwnd(),
         &swapChainDesc,
         nullptr,
@@ -962,7 +955,7 @@ void Renderer::LoadAssets()
     m_shadowMapScissorRect = {0, 0, static_cast<LONG>(m_shadowMapResolution), static_cast<LONG>(m_shadowMapResolution)};
 
     // Get command allocator and list for loading assets
-    auto [pCommandAllocator, pCommandList] = m_commandQueue->GetAvailableCommandList();
+    auto [pCommandAllocator, pCommandList] = m_commandQueue.GetAvailableCommandList();
 
     // Add samplers
     auto baseCpuHandle = m_samplerDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
@@ -1105,7 +1098,7 @@ void Renderer::LoadAssets()
     pSpotLight->SetAngles(50.0f, 10.0f);
 
     // Execute commands for loading assets and store fence value
-    m_frameResources[m_frameIndex].SetFenceValue(m_commandQueue->ExecuteCommandLists(pCommandAllocator, pCommandList));
+    m_frameResources[m_frameIndex].SetFenceValue(m_commandQueue.ExecuteCommandLists(pCommandAllocator, pCommandList));
 
     // Wait until assets have been uploaded to the GPU
     WaitForGpu();
@@ -1729,14 +1722,14 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 // Wait for pending GPU work to complete
 void Renderer::WaitForGpu()
 {
-    m_commandQueue->Flush();
+    m_commandQueue.Flush();
 }
 
 void Renderer::MoveToNextFrame()
 {
     // Update frame index and wait for fence value
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-    m_commandQueue->WaitForFenceValue(m_frameResources[m_frameIndex].GetFenceValue());
+    m_commandQueue.WaitForFenceValue(m_frameResources[m_frameIndex].GetFenceValue());
 }
 
 // Setup Dear ImGui context
@@ -1752,7 +1745,7 @@ void Renderer::InitImGui()
     // Setup Platform/Renderer backends
     ImGui_ImplDX12_InitInfo init_info = {};
     init_info.Device = m_device.Get();
-    init_info.CommandQueue = m_commandQueue->GetCommandQueue();
+    init_info.CommandQueue = m_commandQueue.GetCommandQueue();
     init_info.NumFramesInFlight = FrameCount;
     init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
     init_info.DSVFormat = DXGI_FORMAT_D32_FLOAT;

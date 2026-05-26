@@ -19,15 +19,14 @@ public:
     CommandQueue(CommandQueue&&) = delete;
     CommandQueue& operator=(CommandQueue&&) = delete;
 
-    CommandQueue(const Microsoft::WRL::ComPtr<ID3D12Device10>& device, D3D12_COMMAND_LIST_TYPE type);
+    CommandQueue() = default;
     ~CommandQueue();
+
+    void Init(ID3D12Device10* pDevice, D3D12_COMMAND_LIST_TYPE type);
 
     void SetDescriptorHeaps(const DynamicDescriptorHeap* pHeapForCbvSrvUav, ID3D12DescriptorHeap* pHeapForSampler);
 
     ID3D12CommandQueue* GetCommandQueue() const;
-
-    ID3D12CommandAllocator* CreateCommandAllocator();
-    ID3D12GraphicsCommandList7* CreateCommandList(ID3D12CommandAllocator* pCommandAllocator);
 
     std::pair<ID3D12CommandAllocator*, ID3D12GraphicsCommandList7*> GetAvailableCommandList();
 
@@ -40,6 +39,9 @@ public:
     void Flush();
 
 private:
+    ID3D12CommandAllocator* CreateCommandAllocator();
+    ID3D12GraphicsCommandList7* CreateCommandList(ID3D12CommandAllocator* pCommandAllocator);
+
     D3D12_COMMAND_LIST_TYPE m_type;
 
     struct CommandAllocatorEntry
@@ -58,12 +60,11 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_commandQueue;
 
-    Microsoft::WRL::ComPtr<ID3D12Device10> m_device;
-
     Microsoft::WRL::ComPtr<ID3D12Fence> m_fence;
-    HANDLE m_fenceEvent;
-    UINT64 m_fenceValue;
+    HANDLE m_fenceEvent = nullptr;
+    UINT64 m_fenceValue = 0;
 
-    const DynamicDescriptorHeap* m_pDynamicDescriptorHeapForCbvSrvUav;
-    ID3D12DescriptorHeap* m_pSamplerDescriptorHeap;
+    ID3D12Device10* m_pDevice = nullptr;
+    const DynamicDescriptorHeap* m_pDynamicDescriptorHeapForCbvSrvUav = nullptr;
+    ID3D12DescriptorHeap* m_pSamplerDescriptorHeap = nullptr;
 };
