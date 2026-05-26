@@ -9,42 +9,33 @@
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
 
-DynamicDescriptorHeap::DynamicDescriptorHeap(const ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT32 numDescriptorsPerHeap)
-    : m_device(device)
-    , m_heapType(heapType)
-    , m_numDescriptorsPerHeap(numDescriptorsPerHeap)
-    , m_descriptorTableBitMask(0)
-    , m_staleDescriptorTableBitMask(0)
-    , m_currentCpuDescriptorHandle{0}
-    , m_currentGpuDescriptorHandle{0}
-    , m_numFreeHandles(0)
-    , m_pCommandQueue(nullptr)
-    , m_currentOffset(0)
-    , m_numParameters(0)
+void DynamicDescriptorHeap::Init(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE heapType)
 {
-    m_descriptorHandleIncrementSize = device->GetDescriptorHandleIncrementSize(m_heapType);
-
-    // Allocate space for staging CPU visible descriptors
-    m_descriptorHandleCache = std::make_unique<D3D12_CPU_DESCRIPTOR_HANDLE[]>(m_numDescriptorsPerHeap);
+    m_pDevice = pDevice;
+    m_heapType = heapType;
+    m_descriptorHandleIncrementSize = pDevice->GetDescriptorHandleIncrementSize(m_heapType);
 
     // Allocate first descriptor heap
     m_currentHeap = RequestDescriptorHeap();
     m_currentCpuDescriptorHandle = m_currentHeap->GetCPUDescriptorHandleForHeapStart();
     m_currentGpuDescriptorHandle = m_currentHeap->GetGPUDescriptorHandleForHeapStart();
-    m_numFreeHandles = m_numDescriptorsPerHeap;
+    m_numFreeHandles = NumDescriptorsPerHeap;
+}
+
+void DynamicDescriptorHeap::SetCommandQueue(const CommandQueue* pCommandQueue)
+{
+    m_pCommandQueue = pCommandQueue;
 }
 
 void DynamicDescriptorHeap::ParseRootSignature(const RootSignature& rootSignature)
 {
-    // Reset stale descriptors
-    m_staleDescriptorTableBitMask = 0;
-
     // Get a bit mask that represents the root parameter indices that match the
     // descriptor heap type for this dynamic descriptor heap.
     m_descriptorTableBitMask = rootSignature.GetDescriptorTableBitMask(m_heapType);
+    // Reset stale descriptors
+    m_staleDescriptorTableBitMask = 0;
 
     m_currentOffset = 0;
-
     m_numParameters = rootSignature.GetNumParameters();
 }
 
@@ -60,7 +51,7 @@ void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 o
     bool isLastStaged = true;
 
     UINT start = isNewParameter ? m_currentOffset + offsetInParameter : entry.Offset + offsetInParameter;
-    UINT upperLimit = m_numDescriptorsPerHeap;
+    UINT upperLimit = NumDescriptorsPerHeap;
 
     // If given index is not last, check that next table is staged
     if (rootParameterIndex < m_numParameters - 1)
@@ -96,7 +87,7 @@ void DynamicDescriptorHeap::StageDescriptors(UINT32 rootParameterIndex, UINT32 o
 
     // Copy descriptor handles
     for (UINT i = 0; i < numDescriptors; ++i)
-        *(m_descriptorHandleCache.get() + start + i) = GetCpuDescriptorHandle(baseCpuHandle, i, m_descriptorHandleIncrementSize);
+        m_descriptorHandleCache[start + i] = GetCpuDescriptorHandle(baseCpuHandle, i, m_descriptorHandleIncrementSize);
 
     // Set the root parameter index bit as 1 to make sure the descriptor table
     // at that index is bound to the command list.
@@ -147,11 +138,11 @@ ComPtr<ID3D12DescriptorHeap> DynamicDescriptorHeap::CreateDescriptorHeap()
 {
     D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
     heapDesc.Type = m_heapType;
-    heapDesc.NumDescriptors = m_numDescriptorsPerHeap;
+    heapDesc.NumDescriptors = NumDescriptorsPerHeap;
     heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
     ComPtr<ID3D12DescriptorHeap> descriptorHeap;
-    ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&descriptorHeap)));
+    ThrowIfFailed(m_pDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&descriptorHeap)));
 
     return descriptorHeap;
 }
@@ -170,7 +161,7 @@ bool DynamicDescriptorHeap::CheckHeapChanged()
             m_currentHeap = RequestDescriptorHeap();
             m_currentCpuDescriptorHandle = m_currentHeap->GetCPUDescriptorHandleForHeapStart();
             m_currentGpuDescriptorHandle = m_currentHeap->GetGPUDescriptorHandleForHeapStart();
-            m_numFreeHandles = m_numDescriptorsPerHeap;
+            m_numFreeHandles = NumDescriptorsPerHeap;
 
             // When updating the descriptor heap on the command list, all descriptor
             // tables must be (re)recopied to the new descriptor heap (not just the stale descriptor tables)
@@ -191,14 +182,14 @@ void DynamicDescriptorHeap::CommitStagedDescriptors(ID3D12GraphicsCommandList7* 
     while (_BitScanForward(&rootIndex, m_staleDescriptorTableBitMask))
     {
         UINT numSrcDescriptors = m_descriptorTableEntries[rootIndex].NumDescriptors;
-        D3D12_CPU_DESCRIPTOR_HANDLE* pSrcDescriptorHandles = m_descriptorHandleCache.get() + m_descriptorTableEntries[rootIndex].Offset;
+        D3D12_CPU_DESCRIPTOR_HANDLE* pSrcDescriptorHandles = &m_descriptorHandleCache[m_descriptorTableEntries[rootIndex].Offset];
 
         D3D12_CPU_DESCRIPTOR_HANDLE pDestDescriptorRangeStarts[] = {m_currentCpuDescriptorHandle};
         UINT pDestDescriptorRangeSizes[] = {numSrcDescriptors};
 
         // Copy the staged CPU visible descriptors to the GPU visible descriptor heap.
         // Assume that descriptors in m_descriptorHandleCache are discontinuous or reside in different heap.
-        m_device->CopyDescriptors(
+        m_pDevice->CopyDescriptors(
             1, pDestDescriptorRangeStarts, pDestDescriptorRangeSizes,
             numSrcDescriptors, pSrcDescriptorHandles, nullptr,
             m_heapType);
@@ -236,7 +227,7 @@ D3D12_GPU_DESCRIPTOR_HANDLE DynamicDescriptorHeap::CopyDescriptor(ComPtr<ID3D12G
         m_currentHeap = RequestDescriptorHeap();
         m_currentCpuDescriptorHandle = m_currentHeap->GetCPUDescriptorHandleForHeapStart();
         m_currentGpuDescriptorHandle = m_currentHeap->GetGPUDescriptorHandleForHeapStart();
-        m_numFreeHandles = m_numDescriptorsPerHeap;
+        m_numFreeHandles = NumDescriptorsPerHeap;
 
         ID3D12DescriptorHeap* ppHeaps[] = {m_currentHeap};
         commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
@@ -245,7 +236,7 @@ D3D12_GPU_DESCRIPTOR_HANDLE DynamicDescriptorHeap::CopyDescriptor(ComPtr<ID3D12G
     }
 
     D3D12_GPU_DESCRIPTOR_HANDLE hGpu = m_currentGpuDescriptorHandle;
-    m_device->CopyDescriptorsSimple(1, m_currentCpuDescriptorHandle, cpuDescriptor, m_heapType);
+    m_pDevice->CopyDescriptorsSimple(1, m_currentCpuDescriptorHandle, cpuDescriptor, m_heapType);
 
     m_currentCpuDescriptorHandle = GetCpuDescriptorHandle(m_currentCpuDescriptorHandle, 1, m_descriptorHandleIncrementSize);
     m_currentGpuDescriptorHandle = GetGpuDescriptorHandle(m_currentGpuDescriptorHandle, 1, m_descriptorHandleIncrementSize);

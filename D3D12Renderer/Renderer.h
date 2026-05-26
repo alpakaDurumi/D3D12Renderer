@@ -21,6 +21,7 @@
 #include "CacheKeys.h"
 #include "Camera.h"
 #include "ConstantData.h"
+#include "DynamicDescriptorHeap.h"
 #include "FrameResource.h"
 #include "InputManager.h"
 #include "RenderGraph.h"
@@ -35,7 +36,6 @@ struct GeometryData;
 class DescriptorAllocation;
 class CommandQueue;
 class DescriptorAllocator;
-class DynamicDescriptorHeap;
 class RootSignature;
 class ImGuiDescriptorAllocator;
 class DirectionalLight;
@@ -130,7 +130,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D12Device10> m_device;
     Microsoft::WRL::ComPtr<IDXGISwapChain3> m_swapChain;
 
-    std::unique_ptr<DynamicDescriptorHeap> m_dynamicDescriptorHeapForCbvSrvUav;
+    DynamicDescriptorHeap m_dynamicDescriptorHeapForCbvSrvUav;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
     std::unique_ptr<CommandQueue> m_commandQueue;
     std::array<std::unique_ptr<DescriptorAllocator>, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;

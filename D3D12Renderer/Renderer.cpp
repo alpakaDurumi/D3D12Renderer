@@ -340,7 +340,7 @@ void Renderer::OnRender()
 
     PopulateCommandList(pCommandList);
 
-    m_dynamicDescriptorHeapForCbvSrvUav->Reset();
+    m_dynamicDescriptorHeapForCbvSrvUav.Reset();
 
     // Populate commands for ImGui
     // Is it OK to call SetDescriptorHeaps? (Does it affect performance?)
@@ -370,7 +370,7 @@ void Renderer::OnRender()
     // Execute the command lists and store the fence value
     UINT64 fenceValue = m_commandQueue->ExecuteCommandLists(pCommandAllocator, pCommandList);
     m_frameResources[m_frameIndex].SetFenceValue(fenceValue);
-    m_dynamicDescriptorHeapForCbvSrvUav->QueueRetiredHeaps(fenceValue);
+    m_dynamicDescriptorHeapForCbvSrvUav.QueueRetiredHeaps(fenceValue);
     m_sceneManager.QueueDeferredDeletions(fenceValue, m_commandQueue->GetCompletedFenceValue());
 
     // Present the frame.
@@ -798,7 +798,7 @@ void Renderer::LoadPipeline()
     // Passing a temporary object like `std::make_unique<T>(T(...))` will fail to compile
     // Instead, pass the constructor arguments directly to std::make_unique<T>()
     m_commandQueue = std::make_unique<CommandQueue>(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
-    m_dynamicDescriptorHeapForCbvSrvUav = std::make_unique<DynamicDescriptorHeap>(m_device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_dynamicDescriptorHeapForCbvSrvUav.Init(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     for (UINT i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
     {
         D3D12_DESCRIPTOR_HEAP_TYPE type = static_cast<D3D12_DESCRIPTOR_HEAP_TYPE>(i);
@@ -817,8 +817,8 @@ void Renderer::LoadPipeline()
     ThrowIfFailed(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_samplerDescriptorHeap)));
 
     // Dependency injections
-    m_commandQueue->SetDescriptorHeaps(m_dynamicDescriptorHeapForCbvSrvUav.get(), m_samplerDescriptorHeap.Get());
-    m_dynamicDescriptorHeapForCbvSrvUav->SetCommandQueue(m_commandQueue.get());
+    m_commandQueue->SetDescriptorHeaps(&m_dynamicDescriptorHeapForCbvSrvUav, m_samplerDescriptorHeap.Get());
+    m_dynamicDescriptorHeapForCbvSrvUav.SetCommandQueue(m_commandQueue.get());
 
     // For ImGui
     m_imguiDescriptorAllocator = std::make_unique<ImGuiDescriptorAllocator>(m_device.Get());
@@ -877,7 +877,7 @@ void Renderer::LoadPipeline()
     }
 
     CreateRootSignature();
-    m_dynamicDescriptorHeapForCbvSrvUav->ParseRootSignature(*m_rootSignature);
+    m_dynamicDescriptorHeapForCbvSrvUav.ParseRootSignature(*m_rootSignature);
 }
 
 // Load the sample assets.
@@ -1268,7 +1268,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT matIdx = 0;
     for (auto& mat : m_sceneManager.GetMaterials())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(5, matIdx, 1, mat.GetCbvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(5, matIdx, 1, mat.GetCbvHandle());
         ++matIdx;
     }
 
@@ -1276,17 +1276,17 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT lightIdx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
         ++lightIdx;
     }
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
         ++lightIdx;
     }
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
         ++lightIdx;
     }
 
@@ -1294,7 +1294,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT textureIdx = 0;
     for (auto& [texture, srv] : m_sceneManager.GetAssetTextures())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(7, textureIdx, 1, srv.GetHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(7, textureIdx, 1, srv.GetHandle());
         ++textureIdx;
     }
 
@@ -1302,27 +1302,27 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(8, lightIdx, 1, light.GetSrvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(8, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(9, lightIdx, 1, light.GetSrvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(9, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(10, lightIdx, 1, light.GetSrvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(10, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
 
-    m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(11, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferBaseSrvHandle());
-    m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthSrv.GetHandle());
-    m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(11, NUM_GBUFFER_SLOTS + 1, 1, frameResource.GetSelectionMaskSrvHandle());
-    m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(11, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetHorizontalDilatedMaskSrvHandle());
-    m_dynamicDescriptorHeapForCbvSrvUav->StageDescriptors(11, NUM_GBUFFER_SLOTS + 3, 1, frameResource.GetSceneColorBufferSrvHandle(0));
+    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(11, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferBaseSrvHandle());
+    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthSrv.GetHandle());
+    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(11, NUM_GBUFFER_SLOTS + 1, 1, frameResource.GetSelectionMaskSrvHandle());
+    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(11, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetHorizontalDilatedMaskSrvHandle());
+    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(11, NUM_GBUFFER_SLOTS + 3, 1, frameResource.GetSceneColorBufferSrvHandle(0));
 
     BindDescriptorTables(pCommandList);
 
@@ -2017,15 +2017,15 @@ void Renderer::SetFpsCap(std::string fps)
 
 void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList)
 {
-    bool cbvSrvUavHeapChanged = m_dynamicDescriptorHeapForCbvSrvUav->CheckHeapChanged();
+    bool cbvSrvUavHeapChanged = m_dynamicDescriptorHeapForCbvSrvUav.CheckHeapChanged();
 
     if (cbvSrvUavHeapChanged)
     {
-        ID3D12DescriptorHeap* ppHeaps[] = {m_dynamicDescriptorHeapForCbvSrvUav->GetCurrentDescriptorHeap(), m_samplerDescriptorHeap.Get()};
+        ID3D12DescriptorHeap* ppHeaps[] = {m_dynamicDescriptorHeapForCbvSrvUav.GetCurrentDescriptorHeap(), m_samplerDescriptorHeap.Get()};
         pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
     }
 
-    m_dynamicDescriptorHeapForCbvSrvUav->CommitStagedDescriptorsForDraw(pCommandList);
+    m_dynamicDescriptorHeapForCbvSrvUav.CommitStagedDescriptorsForDraw(pCommandList);
     pCommandList->SetGraphicsRootDescriptorTable(12, m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart()); // Root parameter 12
 }
 

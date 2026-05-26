@@ -1,7 +1,7 @@
 #pragma once
 
+#include <array>
 #include <functional>
-#include <memory>
 #include <queue>
 #include <utility>
 #include <vector>
@@ -26,12 +26,11 @@ public:
     DynamicDescriptorHeap(DynamicDescriptorHeap&&) = delete;
     DynamicDescriptorHeap& operator=(DynamicDescriptorHeap&&) = delete;
 
-    DynamicDescriptorHeap(const Microsoft::WRL::ComPtr<ID3D12Device10>& device, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT32 numDescriptorsPerHeap = 1024);
+    DynamicDescriptorHeap() = default;
+    ~DynamicDescriptorHeap() = default;
 
-    void SetCommandQueue(const CommandQueue* pCommandQueue)
-    {
-        m_pCommandQueue = pCommandQueue;
-    }
+    void Init(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE heapType);
+    void SetCommandQueue(const CommandQueue* pCommandQueue);
 
     void StageDescriptors(UINT32 rootParameterIndex, UINT32 offsetInParameter, UINT32 numDescriptors, D3D12_CPU_DESCRIPTOR_HANDLE baseCpuHandle);
 
@@ -51,15 +50,16 @@ public:
     void Reset();
 
 private:
+    // A 16-bit mask is used to keep track of the root parameter indices that are descriptor tables
+    static constexpr UINT32 MaxDescriptorTables = 16;
+    static constexpr UINT32 NumDescriptorsPerHeap = 1024;
+
     void CommitStagedDescriptors(ID3D12GraphicsCommandList7* pCommandList, std::function<void(ID3D12GraphicsCommandList*, UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc);
 
     ID3D12DescriptorHeap* RequestDescriptorHeap();
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap();
 
     UINT32 ComputeStaleDescriptorCount() const;
-
-    // A 16-bit mask is used to keep track of the root parameter indices that are descriptor tables
-    static const UINT32 MaxDescriptorTables = 16;
 
     // A structure that represents a descriptor table entry in the root signature.
     struct DescriptorTableEntry
@@ -74,20 +74,17 @@ private:
     };
 
     D3D12_DESCRIPTOR_HEAP_TYPE m_heapType;
-    UINT32 m_numDescriptorsPerHeap;
-    UINT32 m_descriptorHandleIncrementSize;
+    UINT32 m_descriptorHandleIncrementSize = 0;
 
-    std::unique_ptr<D3D12_CPU_DESCRIPTOR_HANDLE[]> m_descriptorHandleCache; // Flat storage for all staged CPU descriptor handles
-    DescriptorTableEntry m_descriptorTableEntries[MaxDescriptorTables];     // Per-rootParameter metadata: start position and count within m_descriptorHandleCache
-
-    UINT32 m_currentOffset;
-
-    UINT m_numParameters;
+    std::array<D3D12_CPU_DESCRIPTOR_HANDLE, NumDescriptorsPerHeap> m_descriptorHandleCache; // Flat storage for all staged CPU descriptor handles
+    DescriptorTableEntry m_descriptorTableEntries[MaxDescriptorTables];                     // Per-rootParameter metadata: start position and count within m_descriptorHandleCache
+    UINT32 m_currentOffset = 0;
+    UINT m_numParameters = 0;
 
     // Represents the index in the root signature that contains a descriptor table
-    UINT16 m_descriptorTableBitMask;
+    UINT16 m_descriptorTableBitMask = 0;
     // Represents a descriptor table in the root signature that has changed since the last time the descriptors were copied
-    UINT16 m_staleDescriptorTableBitMask;
+    UINT16 m_staleDescriptorTableBitMask = 0;
 
     std::vector<Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>> m_heapPool;
     std::queue<ID3D12DescriptorHeap*> m_availableHeaps;
@@ -95,11 +92,11 @@ private:
     std::vector<ID3D12DescriptorHeap*> m_retiredHeaps;
     std::queue<std::pair<UINT64, ID3D12DescriptorHeap*>> m_pendingHeaps;
 
-    ID3D12DescriptorHeap* m_currentHeap;
+    ID3D12DescriptorHeap* m_currentHeap = nullptr;
     D3D12_GPU_DESCRIPTOR_HANDLE m_currentGpuDescriptorHandle;
     D3D12_CPU_DESCRIPTOR_HANDLE m_currentCpuDescriptorHandle;
     UINT32 m_numFreeHandles; // Number of free handles in current descriptor heap
 
-    Microsoft::WRL::ComPtr<ID3D12Device10> m_device;
-    const CommandQueue* m_pCommandQueue; // For IsFenceComplete
+    ID3D12Device10* m_pDevice = nullptr;
+    const CommandQueue* m_pCommandQueue = nullptr; // For IsFenceComplete
 };
