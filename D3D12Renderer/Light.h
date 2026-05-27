@@ -57,7 +57,7 @@ public:
 
     LightConstantData* GetLightConstantDataPtr();
     D3D12_CPU_DESCRIPTOR_HANDLE GetLightCbvHandle() const;
-    void InitLightCbv(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr);
+    void InitLightCbv(ID3D12Device* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr);
 
     virtual std::vector<GpuResource> TakeResources();
 

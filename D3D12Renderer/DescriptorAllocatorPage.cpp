@@ -7,7 +7,7 @@
 
 using namespace D3DHelper;
 
-DescriptorAllocatorPage::DescriptorAllocatorPage(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptors)
+DescriptorAllocatorPage::DescriptorAllocatorPage(ID3D12Device* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptors)
     : m_heapType(type)
     , m_numDescriptorsInHeap(numDescriptors)
 {

@@ -62,7 +62,7 @@ public:
         TextureAddressingMode addressingMode,
         D3D12_COMPARISON_FUNC comparisonFunc = D3D12_COMPARISON_FUNC_NONE);
 
-    void Finalize(ID3D12Device10* pDevice);
+    void Finalize(ID3D12Device* pDevice);
 
 private:
     static constexpr UINT MaxNumParameters = 16;

@@ -15,7 +15,7 @@ class DescriptorAllocation;
 class DescriptorAllocatorPage
 {
 public:
-    DescriptorAllocatorPage(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptors);
+    DescriptorAllocatorPage(ID3D12Device* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT32 numDescriptors);
 
     D3D12_DESCRIPTOR_HEAP_TYPE GetHeapType() const
     {

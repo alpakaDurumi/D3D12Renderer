@@ -191,7 +191,7 @@ void RootSignature::InitStaticSampler(
     samplerDesc.ShaderVisibility = visibility;
 }
 
-void RootSignature::Finalize(ID3D12Device10* pDevice)
+void RootSignature::Finalize(ID3D12Device* pDevice)
 {
     UINT numRanges = 0;
 

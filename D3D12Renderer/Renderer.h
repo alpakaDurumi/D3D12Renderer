@@ -240,7 +240,7 @@ private:
 
     void SetFpsCap(std::string fps);
 
-    void BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList);
+    void BindDescriptorTables(ID3D12GraphicsCommandList* pCommandList);
 
     void CreateRootSignature();
     ID3D12PipelineState* GetPipelineState(const PSOKey& psoKey);
@@ -257,8 +257,8 @@ private:
 
     void UpdateConstantBuffers(FrameResource& frameResource);
 
-    void DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
-    void DrawEntity(ID3D12GraphicsCommandList7* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
+    void DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
+    void DrawEntity(ID3D12GraphicsCommandList* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
 
     void ProcessInput();
     void BeginOrbit();

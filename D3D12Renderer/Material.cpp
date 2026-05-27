@@ -77,7 +77,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE Material::GetCbvHandle() const
     return m_cbv.GetHandle();
 }
 
-void Material::InitCbv(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr)
+void Material::InitCbv(ID3D12Device* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr)
 {
     m_cbv.Init(pDevice, gpuPtr, sizeof(MaterialConstantData));
 }

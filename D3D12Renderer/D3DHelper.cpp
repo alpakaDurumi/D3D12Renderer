@@ -317,7 +317,7 @@ D3D12_DEPTH_STENCIL_VIEW_DESC GetDsvDesc2DArray(DXGI_FORMAT format, UINT arraySl
 // Assume that intermediate resource is already mapped
 void UpdateSubresources(
     ID3D12Device* pDevice,
-    ID3D12GraphicsCommandList7* pCommandList,
+    ID3D12GraphicsCommandList* pCommandList,
     ID3D12Resource* pDest,
     ID3D12Resource* pIntermediate,
     UINT64 offsetInIntermediate,

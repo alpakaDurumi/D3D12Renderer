@@ -13,7 +13,7 @@ CommandQueue::~CommandQueue()
     CloseHandle(m_fenceEvent);
 }
 
-void CommandQueue::Init(ID3D12Device10* pDevice, D3D12_COMMAND_LIST_TYPE type)
+void CommandQueue::Init(ID3D12Device* pDevice, D3D12_COMMAND_LIST_TYPE type)
 {
     m_pDevice = pDevice;
     m_type = type;

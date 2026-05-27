@@ -11,7 +11,7 @@ using Microsoft::WRL::ComPtr;
 DescriptorAllocator::DescriptorAllocator() = default;
 DescriptorAllocator::~DescriptorAllocator() = default;
 
-void DescriptorAllocator::Init(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type)
+void DescriptorAllocator::Init(ID3D12Device* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type)
 {
     m_pDevice = pDevice;
     m_heapType = type;

@@ -152,7 +152,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE Light::GetLightCbvHandle() const
     return m_lightCbv.GetHandle();
 }
 
-void Light::InitLightCbv(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr)
+void Light::InitLightCbv(ID3D12Device* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr)
 {
     m_lightCbv.Init(pDevice, gpuPtr, sizeof(LightConstantData));
 }

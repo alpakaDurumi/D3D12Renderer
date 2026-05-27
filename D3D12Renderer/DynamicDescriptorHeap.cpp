@@ -8,7 +8,7 @@
 using Microsoft::WRL::ComPtr;
 using namespace D3DHelper;
 
-void DynamicDescriptorHeap::Init(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE heapType)
+void DynamicDescriptorHeap::Init(ID3D12Device* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE heapType)
 {
     m_pDevice = pDevice;
     m_heapType = heapType;
@@ -163,7 +163,7 @@ bool DynamicDescriptorHeap::CheckHeapChanged()
 
 // Copy all of the staged descriptors to the GPU visible descriptor heap and
 // bind the descriptor heap and the descriptor tables to the command list
-void DynamicDescriptorHeap::CommitStagedDescriptors(ID3D12GraphicsCommandList7* pCommandList, std::function<void(ID3D12GraphicsCommandList*, UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc)
+void DynamicDescriptorHeap::CommitStagedDescriptors(ID3D12GraphicsCommandList* pCommandList, std::function<void(ID3D12GraphicsCommandList*, UINT, D3D12_GPU_DESCRIPTOR_HANDLE)> setFunc)
 {
     DWORD rootIndex;
     while (_BitScanForward(&rootIndex, m_staleDescriptorTableBitMask))
@@ -194,18 +194,18 @@ void DynamicDescriptorHeap::CommitStagedDescriptors(ID3D12GraphicsCommandList7* 
     }
 }
 
-void DynamicDescriptorHeap::CommitStagedDescriptorsForDraw(ID3D12GraphicsCommandList7* pCommandList)
+void DynamicDescriptorHeap::CommitStagedDescriptorsForDraw(ID3D12GraphicsCommandList* pCommandList)
 {
     CommitStagedDescriptors(pCommandList, &ID3D12GraphicsCommandList::SetGraphicsRootDescriptorTable);
 }
 
-void DynamicDescriptorHeap::CommitStagedDescriptorsForDispatch(ID3D12GraphicsCommandList7* pCommandList)
+void DynamicDescriptorHeap::CommitStagedDescriptorsForDispatch(ID3D12GraphicsCommandList* pCommandList)
 {
     CommitStagedDescriptors(pCommandList, &ID3D12GraphicsCommandList::SetComputeRootDescriptorTable);
 }
 
 // Copy a single CPU visible descriptor to a GPU visible descriptor heap
-D3D12_GPU_DESCRIPTOR_HANDLE DynamicDescriptorHeap::CopyDescriptor(ID3D12GraphicsCommandList7* pCommandList, D3D12_CPU_DESCRIPTOR_HANDLE cpuDescriptor)
+D3D12_GPU_DESCRIPTOR_HANDLE DynamicDescriptorHeap::CopyDescriptor(ID3D12GraphicsCommandList* pCommandList, D3D12_CPU_DESCRIPTOR_HANDLE cpuDescriptor)
 {
     if (m_numFreeHandles < 1)
     {

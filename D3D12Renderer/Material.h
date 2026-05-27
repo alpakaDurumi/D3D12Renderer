@@ -52,7 +52,7 @@ public:
 
     D3D12_CPU_DESCRIPTOR_HANDLE GetCbvHandle() const;
 
-    void InitCbv(ID3D12Device10* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr);
+    void InitCbv(ID3D12Device* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr);
 
     void CopyDataFrom(const Material& src);
 

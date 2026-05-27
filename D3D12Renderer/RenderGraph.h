@@ -21,7 +21,7 @@
 class RenderGraph
 {
 public:
-    void Init(ID3D12Device10* pDevice)
+    void Init(ID3D12Device* pDevice)
     {
         m_pDevice = pDevice;
     }
@@ -383,5 +383,5 @@ private:
     std::unordered_map<std::string, UINT> m_bufferMap;
     std::unordered_map<std::string, UINT> m_textureMap;
 
-    ID3D12Device10* m_pDevice;
+    ID3D12Device* m_pDevice;
 };

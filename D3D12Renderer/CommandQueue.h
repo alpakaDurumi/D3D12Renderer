@@ -22,7 +22,7 @@ public:
     CommandQueue() = default;
     ~CommandQueue();
 
-    void Init(ID3D12Device10* pDevice, D3D12_COMMAND_LIST_TYPE type);
+    void Init(ID3D12Device* pDevice, D3D12_COMMAND_LIST_TYPE type);
 
     void SetDescriptorHeaps(const DynamicDescriptorHeap* pHeapForCbvSrvUav, ID3D12DescriptorHeap* pHeapForSampler);
 
@@ -64,7 +64,7 @@ private:
     HANDLE m_fenceEvent = nullptr;
     UINT64 m_fenceValue = 0;
 
-    ID3D12Device10* m_pDevice = nullptr;
+    ID3D12Device* m_pDevice = nullptr;
     const DynamicDescriptorHeap* m_pDynamicDescriptorHeapForCbvSrvUav = nullptr;
     ID3D12DescriptorHeap* m_pSamplerDescriptorHeap = nullptr;
 };

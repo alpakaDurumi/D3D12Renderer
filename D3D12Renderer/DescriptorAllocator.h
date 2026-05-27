@@ -24,7 +24,7 @@ public:
     DescriptorAllocator();
     ~DescriptorAllocator();
 
-    void Init(ID3D12Device10* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type);
+    void Init(ID3D12Device* pDevice, D3D12_DESCRIPTOR_HEAP_TYPE type);
     void SetCommandQueue(const CommandQueue* pCommandQueue);
 
     DescriptorAllocation Allocate(UINT32 numDescriptors = 1);
@@ -44,6 +44,6 @@ private:
 
     std::mutex m_allocationMutex;
 
-    ID3D12Device10* m_pDevice = nullptr;
+    ID3D12Device* m_pDevice = nullptr;
     const CommandQueue* m_pCommandQueue = nullptr;
 };

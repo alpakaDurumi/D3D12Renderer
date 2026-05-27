@@ -2007,7 +2007,7 @@ void Renderer::SetFpsCap(std::string fps)
     }
 }
 
-void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList)
+void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList* pCommandList)
 {
     bool cbvSrvUavHeapChanged = m_dynamicDescriptorHeapForCbvSrvUav.CheckHeapChanged();
 
@@ -2686,7 +2686,7 @@ void Renderer::ProcessInput()
     m_camera.SnapshotState();
 }
 
-void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)
+void Renderer::DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)
 {
     static const UINT instanceDataSize = static_cast<UINT>(sizeof(InstanceData));
 
@@ -2729,7 +2729,7 @@ void Renderer::DrawMesh(ID3D12GraphicsCommandList7* pCommandList, MeshHandle mes
     pCommandList->DrawIndexedInstanced(pMesh->GetNumIndices(), instanceCount, 0, 0, 0);
 }
 
-void Renderer::DrawEntity(ID3D12GraphicsCommandList7* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)
+void Renderer::DrawEntity(ID3D12GraphicsCommandList* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)
 {
     static const UINT instanceDataSize = static_cast<UINT>(sizeof(InstanceData));
 
