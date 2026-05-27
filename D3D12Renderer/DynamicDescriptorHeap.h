@@ -37,7 +37,7 @@ public:
     void CommitStagedDescriptorsForDraw(ID3D12GraphicsCommandList7* pCommandList);
     void CommitStagedDescriptorsForDispatch(ID3D12GraphicsCommandList7* pCommandList);
 
-    D3D12_GPU_DESCRIPTOR_HANDLE CopyDescriptor(Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList7>& commandList, D3D12_CPU_DESCRIPTOR_HANDLE cpuDescriptor);
+    D3D12_GPU_DESCRIPTOR_HANDLE CopyDescriptor(ID3D12GraphicsCommandList7* pCommandList, D3D12_CPU_DESCRIPTOR_HANDLE cpuDescriptor);
 
     void ParseRootSignature(const RootSignature& rootSignature);
 

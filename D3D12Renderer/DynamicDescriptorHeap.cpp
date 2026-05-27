@@ -205,7 +205,7 @@ void DynamicDescriptorHeap::CommitStagedDescriptorsForDispatch(ID3D12GraphicsCom
 }
 
 // Copy a single CPU visible descriptor to a GPU visible descriptor heap
-D3D12_GPU_DESCRIPTOR_HANDLE DynamicDescriptorHeap::CopyDescriptor(ComPtr<ID3D12GraphicsCommandList7>& commandList, D3D12_CPU_DESCRIPTOR_HANDLE cpuDescriptor)
+D3D12_GPU_DESCRIPTOR_HANDLE DynamicDescriptorHeap::CopyDescriptor(ID3D12GraphicsCommandList7* pCommandList, D3D12_CPU_DESCRIPTOR_HANDLE cpuDescriptor)
 {
     if (m_numFreeHandles < 1)
     {
@@ -217,7 +217,7 @@ D3D12_GPU_DESCRIPTOR_HANDLE DynamicDescriptorHeap::CopyDescriptor(ComPtr<ID3D12G
         m_numFreeHandles = NumDescriptorsPerHeap;
 
         ID3D12DescriptorHeap* ppHeaps[] = {m_currentHeap};
-        commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+        pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
         m_staleDescriptorTableBitMask = m_descriptorTableBitMask;
     }
