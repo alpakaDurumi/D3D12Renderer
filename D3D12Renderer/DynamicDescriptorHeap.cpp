@@ -168,8 +168,16 @@ void DynamicDescriptorHeap::CommitStagedDescriptors(ID3D12GraphicsCommandList* p
     DWORD rootIndex;
     while (_BitScanForward(&rootIndex, m_staleDescriptorTableBitMask))
     {
-        UINT numSrcDescriptors = m_descriptorTableEntries[rootIndex].NumDescriptors;
-        D3D12_CPU_DESCRIPTOR_HANDLE* pSrcDescriptorHandles = &m_descriptorHandleCache[m_descriptorTableEntries[rootIndex].Offset];
+        const auto& entry = m_descriptorTableEntries[rootIndex];
+
+        if (entry.IsEmpty())
+        {
+            m_staleDescriptorTableBitMask ^= (1 << rootIndex);
+            continue;
+        }
+
+        UINT numSrcDescriptors = entry.NumDescriptors;
+        D3D12_CPU_DESCRIPTOR_HANDLE* pSrcDescriptorHandles = &m_descriptorHandleCache[entry.Offset];
 
         D3D12_CPU_DESCRIPTOR_HANDLE pDestDescriptorRangeStarts[] = {m_currentCpuDescriptorHandle};
         UINT pDestDescriptorRangeSizes[] = {numSrcDescriptors};
