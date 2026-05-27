@@ -17,7 +17,6 @@
 #include "DescriptorAllocation.h"
 #include "GeometryData.h"
 #include "GeometryGenerator.h"
-#include "ImGuiDescriptorAllocator.h"
 #include "InstanceData.h"
 #include "Light.h"
 #include "Material.h"
@@ -178,12 +177,12 @@ static D3D12_SAMPLER_DESC GetSamplerDesc(
 // Wrappers of callback functions for ImGui SRV descriptor
 void Renderer::ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
 {
-    Renderer::GetInstance()->m_imguiDescriptorAllocator->Allocate(out_cpu_handle, out_gpu_handle);
+    Renderer::GetInstance()->m_imguiDescriptorAllocator.Allocate(out_cpu_handle, out_gpu_handle);
 }
 
 void Renderer::ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
 {
-    Renderer::GetInstance()->m_imguiDescriptorAllocator->Free(cpu_handle, gpu_handle);
+    Renderer::GetInstance()->m_imguiDescriptorAllocator.Free(cpu_handle, gpu_handle);
 }
 
 Renderer::Renderer(std::wstring name)
@@ -340,7 +339,7 @@ void Renderer::OnRender()
     // Populate commands for ImGui
     // Is it OK to call SetDescriptorHeaps? (Does it affect performance?)
     ImGui::Render();
-    ID3D12DescriptorHeap* ppHeaps[] = {m_imguiDescriptorAllocator->GetDescriptorHeap()};
+    ID3D12DescriptorHeap* ppHeaps[] = {m_imguiDescriptorAllocator.GetDescriptorHeap()};
     pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), pCommandList);
 
@@ -814,7 +813,7 @@ void Renderer::LoadPipeline()
     m_commandQueue.SetDescriptorHeaps(&m_dynamicDescriptorHeapForCbvSrvUav, m_samplerDescriptorHeap.Get());
 
     // For ImGui
-    m_imguiDescriptorAllocator = std::make_unique<ImGuiDescriptorAllocator>(m_device.Get());
+    m_imguiDescriptorAllocator.Init(m_device.Get());
 
     // Check for Variable Refresh Rate(VRR)
     m_tearingSupported = CheckTearingSupport();
@@ -1749,7 +1748,7 @@ void Renderer::InitImGui()
     init_info.NumFramesInFlight = FrameCount;
     init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
     init_info.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-    init_info.SrvDescriptorHeap = m_imguiDescriptorAllocator->GetDescriptorHeap();
+    init_info.SrvDescriptorHeap = m_imguiDescriptorAllocator.GetDescriptorHeap();
     init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
     {
         return ImGuiSrvDescriptorAllocate(out_cpu_handle, out_gpu_handle);

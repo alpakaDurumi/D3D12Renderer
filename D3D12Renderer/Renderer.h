@@ -25,6 +25,7 @@
 #include "DescriptorAllocator.h"
 #include "DynamicDescriptorHeap.h"
 #include "FrameResource.h"
+#include "ImGuiDescriptorAllocator.h"
 #include "InputManager.h"
 #include "RenderGraph.h"
 #include "RendererConfig.h"
@@ -37,7 +38,6 @@
 
 struct GeometryData;
 class DescriptorAllocation;
-class ImGuiDescriptorAllocator;
 class DirectionalLight;
 class PointLight;
 class SpotLight;
@@ -183,7 +183,7 @@ private:
     TextureFiltering m_currentTextureFiltering = TextureFiltering::ANISOTROPIC_X16;
 
     // For ImGui
-    std::unique_ptr<ImGuiDescriptorAllocator> m_imguiDescriptorAllocator;
+    ImGuiDescriptorAllocator m_imguiDescriptorAllocator;
     static Renderer* sm_instance;
 
     std::chrono::steady_clock m_clock;

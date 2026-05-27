@@ -12,22 +12,29 @@
 class ImGuiDescriptorAllocator
 {
 public:
-    ImGuiDescriptorAllocator(ID3D12Device* pDevice)
+    ImGuiDescriptorAllocator(const ImGuiDescriptorAllocator&) = delete;
+    ImGuiDescriptorAllocator& operator=(const ImGuiDescriptorAllocator&) = delete;
+    ImGuiDescriptorAllocator(ImGuiDescriptorAllocator&&) = delete;
+    ImGuiDescriptorAllocator& operator=(ImGuiDescriptorAllocator&&) = delete;
+
+    ImGuiDescriptorAllocator() = default;
+    ~ImGuiDescriptorAllocator() = default;
+
+    void Init(ID3D12Device* pDevice)
     {
-        // Create descriptor heap for ImGui
-        const UINT ImGuiHeapSize = 64;
         D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
         heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        heapDesc.NumDescriptors = ImGuiHeapSize;
+        heapDesc.NumDescriptors = NumDescriptors;
         heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         D3DHelper::ThrowIfFailed(pDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_heap)));
 
         heapStartCpu = m_heap->GetCPUDescriptorHandleForHeapStart();
         heapStartGpu = m_heap->GetGPUDescriptorHandleForHeapStart();
         heapHandleIncrement = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        freeIndices.reserve(ImGuiHeapSize);
-        for (UINT i = 0; i < ImGuiHeapSize; i++)
-            freeIndices.push_back(i);
+
+        freeIndices.resize(NumDescriptors);
+        for (UINT i = 0; i < NumDescriptors; ++i)
+            freeIndices[i] = i;
     }
 
     void Allocate(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_desc_handle)
@@ -53,6 +60,8 @@ public:
     }
 
 private:
+    static constexpr UINT NumDescriptors = 64;
+
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_heap;
     D3D12_CPU_DESCRIPTOR_HANDLE heapStartCpu;
     D3D12_GPU_DESCRIPTOR_HANDLE heapStartGpu;
