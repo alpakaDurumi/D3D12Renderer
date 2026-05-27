@@ -35,7 +35,15 @@ private:
 class RootSignature
 {
 public:
-    RootSignature(UINT numParameters, UINT numStaticSamplers);
+    RootSignature(const RootSignature&) = delete;
+    RootSignature& operator=(const RootSignature&) = delete;
+    RootSignature(RootSignature&&) = delete;
+    RootSignature& operator=(RootSignature&&) = delete;
+
+    RootSignature() = default;
+    ~RootSignature() = default;
+
+    void Init(UINT numParameters, UINT numStaticSamplers);
 
     ID3D12RootSignature* GetRootSignature() const;
     UINT GetNumParameters() const;
@@ -57,15 +65,18 @@ public:
     void Finalize(ID3D12Device10* pDevice);
 
 private:
+    static constexpr UINT MaxNumParameters = 16;
+
     Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
 
-    UINT m_numParameters;
-    UINT m_numStaticSamplers;
+    UINT m_numParameters = 0;
+    UINT m_numStaticSamplers = 0;
 
     UINT32 m_cbvSrvUavTableBitMask = 0;
     UINT32 m_samplerTableBitMask = 0;
-    UINT32 m_descriptorTableSize[16] = {}; // Maximum number of tables is limited to 16
 
     std::vector<RootParameter> m_parameters;
+    std::vector<UINT32> m_descriptorTableSize;
+
     std::vector<D3D12_STATIC_SAMPLER_DESC> m_staticSamplers;
 };

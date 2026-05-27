@@ -28,6 +28,7 @@
 #include "InputManager.h"
 #include "RenderGraph.h"
 #include "RendererConfig.h"
+#include "RootSignature.h"
 #include "SceneHandles.h"
 #include "SceneManager.h"
 #include "Texture.h"
@@ -36,7 +37,6 @@
 
 struct GeometryData;
 class DescriptorAllocation;
-class RootSignature;
 class ImGuiDescriptorAllocator;
 class DirectionalLight;
 class PointLight;
@@ -136,7 +136,7 @@ private:
     std::array<DescriptorAllocator, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
     std::array<FrameResource, FrameCount> m_frameResources;
 
-    std::unique_ptr<RootSignature> m_rootSignature;
+    RootSignature m_rootSignature;
     std::unordered_map<PSOKey, Microsoft::WRL::ComPtr<ID3D12PipelineState>> m_pipelineStates;
 
     PSOKey m_currentPSOKey = {PassType::FORWARD_COLORING};

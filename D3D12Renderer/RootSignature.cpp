@@ -57,13 +57,17 @@ void RootParameter::InitAsRange(UINT rangeIndex, UINT reg, UINT space, D3D12_DES
     range.Flags = flags;
 }
 
-RootSignature::RootSignature(UINT numParameters, UINT numStaticSamplers)
-    : m_numParameters(numParameters)
-    , m_numStaticSamplers(numStaticSamplers)
-    , m_parameters(numParameters)
-    , m_staticSamplers(numStaticSamplers)
+void RootSignature::Init(UINT numParameters, UINT numStaticSamplers)
 {
-    assert(numParameters <= 16); // Maximum number of parameters is limited to 16
+    assert(numParameters <= MaxNumParameters);
+
+    m_numParameters = numParameters;
+    m_numStaticSamplers = numStaticSamplers;
+
+    m_parameters.resize(m_numParameters);
+    m_descriptorTableSize.assign(m_numParameters, 0);
+
+    m_staticSamplers.resize(m_numStaticSamplers);
 }
 
 ID3D12RootSignature* RootSignature::GetRootSignature() const

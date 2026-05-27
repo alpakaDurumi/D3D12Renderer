@@ -22,7 +22,6 @@
 #include "Light.h"
 #include "Material.h"
 #include "Mesh.h"
-#include "RootSignature.h"
 #include "SharedConfig.h"
 #include "TransientUploadAllocator.h"
 #include "Win32Application.h"
@@ -871,7 +870,7 @@ void Renderer::LoadPipeline()
     }
 
     CreateRootSignature();
-    m_dynamicDescriptorHeapForCbvSrvUav.ParseRootSignature(*m_rootSignature);
+    m_dynamicDescriptorHeapForCbvSrvUav.ParseRootSignature(m_rootSignature);
 }
 
 // Load the sample assets.
@@ -1250,7 +1249,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     frameResource.ResetInstanceOffsetByte();
 
     // Set root signature
-    pCommandList->SetGraphicsRootSignature(m_rootSignature->GetRootSignature());
+    pCommandList->SetGraphicsRootSignature(m_rootSignature.GetRootSignature());
 
     UINT numLights = m_sceneManager.GetLightCount();
     pCommandList->SetGraphicsRoot32BitConstant(2, numLights, 0);
@@ -2025,67 +2024,66 @@ void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList7* pCommandList)
 
 void Renderer::CreateRootSignature()
 {
-    m_rootSignature = std::make_unique<RootSignature>(13, 2);
-    auto& rootSignature = *m_rootSignature;
+    m_rootSignature.Init(13, 2);
 
     // Root descriptor for CameraCB and ShadowCB
-    rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);   // Camera
-    rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC); // Shadow
+    m_rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);   // Camera
+    m_rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC); // Shadow
 
     // Root constants for number of lights
-    rootSignature[2].InitAsConstant(2, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[2].InitAsConstant(2, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Root constant for PointLightShadowPS
-    rootSignature[3].InitAsConstant(3, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[3].InitAsConstant(3, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Root constant for outline
-    rootSignature[4].InitAsConstant(4, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[4].InitAsConstant(4, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Descriptor table for MaterialConstantBuffers[]
-    rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[5].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+    m_rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[5].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for LightConstantBuffers[]
-    rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[6].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+    m_rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[6].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for textures (albedo, normal map, height map)
-    rootSignature[7].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[7].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+    m_rootSignature[7].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[7].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for shadowMaps[]
     // Directional
-    rootSignature[8].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[8].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    m_rootSignature[8].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[8].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
     // Point
-    rootSignature[9].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[9].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    m_rootSignature[9].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[9].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
     // Spot
-    rootSignature[10].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[10].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    m_rootSignature[10].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[10].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
 
     // Descriptor table for
     // SRV for GBuffers
     // SRV for depth value
     // SRV for selectionMask/horizontalDilatedMask
     // SRV for scene color buffer
-    rootSignature[11].InitAsTable(4, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[11].InitAsRange(0, 0, 4, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    rootSignature[11].InitAsRange(1, 0, 5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    rootSignature[11].InitAsRange(2, 0, 6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    rootSignature[11].InitAsRange(3, 0, 7, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    m_rootSignature[11].InitAsTable(4, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[11].InitAsRange(0, 0, 4, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    m_rootSignature[11].InitAsRange(1, 0, 5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    m_rootSignature[11].InitAsRange(2, 0, 6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    m_rootSignature[11].InitAsRange(3, 0, 7, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
 
     // Descriptor table for samplers
-    rootSignature[12].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    rootSignature[12].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
-                                  static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS) * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES),
-                                  D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
+    m_rootSignature[12].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[12].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
+                                    static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS) * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES),
+                                    D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
 
     // Static samplers
-    rootSignature.InitStaticSampler(0, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_GREATER_EQUAL);
-    rootSignature.InitStaticSampler(1, 1, 1, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_LESS_EQUAL);
+    m_rootSignature.InitStaticSampler(0, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_GREATER_EQUAL);
+    m_rootSignature.InitStaticSampler(1, 1, 1, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_LESS_EQUAL);
 
-    rootSignature.Finalize(m_device.Get());
+    m_rootSignature.Finalize(m_device.Get());
 }
 
 ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
@@ -2191,7 +2189,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
             psoDesc.InputLayout = {nullptr, 0};
         else
             psoDesc.InputLayout = {m_inputLayout.data(), static_cast<UINT>(m_inputLayout.size())};
-        psoDesc.pRootSignature = m_rootSignature->GetRootSignature();
+        psoDesc.pRootSignature = m_rootSignature.GetRootSignature();
 
         // Shader stages are selected by demand.
         // VS is essential for rasterization.
