@@ -69,21 +69,13 @@ public:
         return sm_instance;
     }
 
-    void SetWidth(UINT width)
-    {
-        m_width = width;
-    }
-    void SetHeight(UINT height)
-    {
-        m_height = height;
-    }
     void SetWarp(bool value)
     {
         m_useWarpDevice = value;
     }
 
     void SetPix();
-    void UpdateWidthHeight();
+    void SetResolution(UINT width, UINT height);
 
     void Init(UINT dpi);
     void ProcessInput();

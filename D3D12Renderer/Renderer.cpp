@@ -205,8 +205,11 @@ void Renderer::SetPix()
     }
 }
 
-void Renderer::UpdateWidthHeight()
+void Renderer::SetResolution(UINT width, UINT height)
 {
+    m_width = width == 0 ? m_width : width;
+    m_height = height == 0 ? m_height : height;
+
     m_camera.SetAspectRatio(static_cast<float>(m_width) / static_cast<float>(m_height));
     m_viewport = {0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f};
     m_scissorRect = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
@@ -454,16 +457,14 @@ void Renderer::OnKillFocus()
 
 void Renderer::OnResize(UINT width, UINT height)
 {
-    if (width == m_width && height == m_height)
+    if ((width == m_width && height == m_height) ||
+        (width == 0u && height == 0u))
         return;
 
     // Wait till GPU complete currently queued works
     WaitForGpu();
 
-    // Size 0 is not allowed
-    m_width = std::max(1u, width);
-    m_height = std::max(1u, height);
-    UpdateWidthHeight();
+    SetResolution(width, height);
 
     // Reset back buffer
     // Reset & create scene color buffers and gbuffers

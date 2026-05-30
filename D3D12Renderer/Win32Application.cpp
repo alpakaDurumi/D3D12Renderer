@@ -17,7 +17,6 @@
 int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
     ParseCommandLineArgs(pRenderer, lpCmdLine);
-    pRenderer->UpdateWidthHeight();
 
     // Set locale for converting between multi-byte character and wide character (e.g. std::mbstowcs)
     std::setlocale(LC_ALL, ".UTF8");
@@ -256,17 +255,22 @@ void Win32Application::ParseCommandLineArgs(Renderer* pRenderer, LPWSTR lpCmdLin
     int argc;
     WCHAR** argv = CommandLineToArgvW(lpCmdLine, &argc);
 
+    UINT width = 0;
+    UINT height = 0;
+
     for (int i = 0; i < argc; i++)
     {
         if (wcscmp(argv[i], L"-w") == 0 || wcscmp(argv[i], L"--width") == 0)
-            pRenderer->SetWidth(wcstol(argv[++i], nullptr, 10));
+            width = wcstoul(argv[++i], nullptr, 10);
         if (wcscmp(argv[i], L"-h") == 0 || wcscmp(argv[i], L"--height") == 0)
-            pRenderer->SetHeight(wcstol(argv[++i], nullptr, 10));
+            height = wcstoul(argv[++i], nullptr, 10);
         if (wcscmp(argv[i], L"-warp") == 0 || wcscmp(argv[i], L"--warp") == 0)
             pRenderer->SetWarp(true);
         if (wcscmp(argv[i], L"-pix") == 0 || wcscmp(argv[i], L"--pix") == 0)
             pRenderer->SetPix();
     }
+
+    pRenderer->SetResolution(width, height);
 
     LocalFree(argv);
 }
