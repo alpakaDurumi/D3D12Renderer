@@ -39,7 +39,6 @@ void FrameResource::Init(
     {
         m_backBufferRtv = RenderTargetView(std::move(rtvAllocation));
         AcquireBackBuffer(pSwapChain, frameIndex);
-        InitBackBufferRtv();
     }
 
     auto rtDesc = m_backBuffer.Get()->GetDesc();
@@ -96,16 +95,12 @@ void FrameResource::AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameInde
     ComPtr<ID3D12Resource> backBuffer;
     ThrowIfFailed(pSwapChain->GetBuffer(frameIndex, IID_PPV_ARGS(&backBuffer)));
     m_backBuffer = Texture(std::move(backBuffer));
+    m_backBufferRtv.Init(m_pDevice, m_backBuffer.Get(), GetRtvDesc(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, 0));
 }
 
 ID3D12Resource* FrameResource::GetBackBuffer() const
 {
     return m_backBuffer.Get();
-}
-
-void FrameResource::InitBackBufferRtv()
-{
-    m_backBufferRtv.Init(m_pDevice, m_backBuffer.Get(), GetRtvDesc(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, 0));
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetBackBufferRtvHandle() const
@@ -153,12 +148,6 @@ D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetSceneColorBufferRtvHandle(UINT ind
 D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetSceneColorBufferSrvHandle(UINT index) const
 {
     return m_sceneColorBufferSrvs[index].GetHandle();
-}
-
-void FrameResource::ResetSceneColorBuffers()
-{
-    for (UINT i = 0; i < SceneColorBufferCount; ++i)
-        m_sceneColorBuffers[i].Reset();
 }
 
 // GBuffer
@@ -211,12 +200,6 @@ DXGI_FORMAT FrameResource::GetGBufferFormat(GBufferSlot slot)
         assert(false);
         return DXGI_FORMAT_UNKNOWN;
     }
-}
-
-void FrameResource::ResetGBuffers()
-{
-    for (auto& gBuffer : m_gBuffers)
-        gBuffer.Reset();
 }
 
 // Masks
@@ -272,12 +255,6 @@ D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetHorizontalDilatedMaskRtvHandle() c
 D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetHorizontalDilatedMaskSrvHandle() const
 {
     return m_horizontalDilatedMaskSrv.GetHandle();
-}
-
-void FrameResource::ResetMasks()
-{
-    m_selectionMask.Reset();
-    m_horizontalDilatedMask.Reset();
 }
 
 // ToneMappedBuffer

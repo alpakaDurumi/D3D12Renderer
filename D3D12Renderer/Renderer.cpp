@@ -697,37 +697,27 @@ void Renderer::OnResize(UINT width, UINT height)
 
     SetResolution(width, height);
 
-    // Reset back buffer
-    // Reset & create scene color buffers and gbuffers
-    // Set current frame's fence value to all frameResources
-    for (UINT i = 0; i < FrameCount; i++)
-    {
-        m_frameResources[i].ResetBackBuffer();
-
-        m_frameResources[i].ResetSceneColorBuffers();
-        m_frameResources[i].CreateSceneColorBuffers(m_width, m_height);
-
-        m_frameResources[i].ResetGBuffers();
-        m_frameResources[i].CreateGBuffers(m_width, m_height);
-
-        m_frameResources[i].ResetMasks();
-        m_frameResources[i].CreateMasks(m_width, m_height);
-
-        m_frameResources[i].CreateToneMappedBuffer(m_width, m_height);
-
-        m_frameResources[i].UpdateSignaledFenceValue(m_frameResources[m_frameIndex].GetSignaledFenceValue());
-    }
+    // Before calling ResizeBuffers, all backbuffer references should be released.
+    for (auto& frameResource : m_frameResources)
+        frameResource.ResetBackBuffer();
 
     // Preserve existing format
-    // Before calling ResizeBuffers, all backbuffer references should be released.
     ThrowIfFailed(m_swapChain->ResizeBuffers(FrameCount, m_width, m_height, DXGI_FORMAT_UNKNOWN, m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-    // Recreate RTVs
+    // Re-acquire backBuffer, recreate buffers, re-init views
     for (UINT i = 0; i < FrameCount; i++)
     {
-        m_frameResources[i].AcquireBackBuffer(m_swapChain.Get(), i);
-        m_frameResources[i].InitBackBufferRtv();
+        auto& frameResource = m_frameResources[i];
+
+        frameResource.AcquireBackBuffer(m_swapChain.Get(), i);
+        frameResource.CreateSceneColorBuffers(m_width, m_height);
+        frameResource.CreateGBuffers(m_width, m_height);
+        frameResource.CreateMasks(m_width, m_height);
+        frameResource.CreateToneMappedBuffer(m_width, m_height);
+
+        // Set current frame's fence value to all frameResources
+        frameResource.UpdateSignaledFenceValue(m_frameResources[m_frameIndex].GetSignaledFenceValue());
     }
 
     // Recreate depth-stencil buffer, DSV, and SRV

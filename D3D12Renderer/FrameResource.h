@@ -52,7 +52,6 @@ public:
     // Back buffer
     void AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameIndex);
     ID3D12Resource* GetBackBuffer() const;
-    void InitBackBufferRtv();
     D3D12_CPU_DESCRIPTOR_HANDLE GetBackBufferRtvHandle() const;
     void ResetBackBuffer();
 
@@ -61,7 +60,6 @@ public:
     ID3D12Resource* GetSceneColorBuffer(UINT index) const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetSceneColorBufferRtvHandle(UINT index) const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetSceneColorBufferSrvHandle(UINT index) const;
-    void ResetSceneColorBuffers();
 
     // GBuffer
     void CreateGBuffers(UINT64 width, UINT height);
@@ -69,7 +67,6 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferBaseRtvHandle() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferBaseSrvHandle() const;
     static DXGI_FORMAT GetGBufferFormat(GBufferSlot slot);
-    void ResetGBuffers();
 
     // Masks
     void CreateMasks(UINT64 width, UINT height);
@@ -79,7 +76,6 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetSelectionMaskSrvHandle() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetHorizontalDilatedMaskRtvHandle() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetHorizontalDilatedMaskSrvHandle() const;
-    void ResetMasks();
 
     // ToneMappedBuffer
     void CreateToneMappedBuffer(UINT64 width, UINT height);
