@@ -196,6 +196,26 @@ Renderer::Renderer(std::wstring name)
 
 Renderer::~Renderer() = default;
 
+std::pair<UINT, UINT> Renderer::GetResolution() const
+{
+    return {m_width, m_height};
+}
+
+const WCHAR* Renderer::GetTitle() const
+{
+    return m_title.c_str();
+}
+
+Renderer* Renderer::GetInstance()
+{
+    return sm_instance;
+}
+
+void Renderer::SetWarp(bool value)
+{
+    m_useWarpDevice = value;
+}
+
 void Renderer::SetPix()
 {
     if (GetModuleHandleW(L"WinPixGpuCapturer.dll") == 0)

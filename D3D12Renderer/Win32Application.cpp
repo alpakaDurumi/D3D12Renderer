@@ -44,7 +44,8 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     // Make application DPI-aware before adjusting window.
     SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-    RECT windowRect = {0, 0, static_cast<LONG>(pRenderer->GetWidth()), static_cast<LONG>(pRenderer->GetHeight())};
+    const auto [width, height] = pRenderer->GetResolution();
+    RECT windowRect = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
     sm_dpi = GetDpiForSystem(); // Before creating window, get DPI from system
     AdjustWindowRectExForDpi(&windowRect, WS_OVERLAPPEDWINDOW, FALSE, 0, sm_dpi);
 

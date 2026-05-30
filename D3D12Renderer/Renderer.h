@@ -5,6 +5,7 @@
 #include <ratio>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <DirectXCollision.h>
@@ -52,28 +53,11 @@ public:
     Renderer(std::wstring name);
     ~Renderer();
 
-    UINT GetWidth() const
-    {
-        return m_width;
-    }
-    UINT GetHeight() const
-    {
-        return m_height;
-    }
-    const WCHAR* GetTitle() const
-    {
-        return m_title.c_str();
-    }
-    static Renderer* GetInstance()
-    {
-        return sm_instance;
-    }
+    std::pair<UINT, UINT> GetResolution() const;
+    const WCHAR* GetTitle() const;
+    static Renderer* GetInstance();
 
-    void SetWarp(bool value)
-    {
-        m_useWarpDevice = value;
-    }
-
+    void SetWarp(bool value);
     void SetPix();
     void SetResolution(UINT width, UINT height);
 
