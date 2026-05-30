@@ -85,63 +85,61 @@ private:
     // Window
     UINT m_width = 1920;
     UINT m_height = 1080;
-
     std::wstring m_title;
-
     bool m_vSync = false;
     bool m_tearingSupported = false;
     bool m_fullScreen = false;
     int m_fpsCap = -1;
-
+    float m_dpiScale;
     RECT m_windowRect;
     D3D12_VIEWPORT m_viewport;
     D3D12_RECT m_scissorRect;
 
-    // Adapter info
-    bool m_useWarpDevice = false;
-
-    // Pipeline objects
+    // Device & swap chain
     Microsoft::WRL::ComPtr<ID3D12Device10> m_device;
     Microsoft::WRL::ComPtr<IDXGISwapChain3> m_swapChain;
+    UINT m_frameIndex;
+    bool m_useWarpDevice = false;
 
+    // Command & descriptor infra
+    CommandQueue m_commandQueue;
     DynamicDescriptorHeap m_dynamicDescriptorHeapForCbvSrvUav;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
-    CommandQueue m_commandQueue;
     std::array<DescriptorAllocator, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
+    ImGuiDescriptorAllocator m_imguiDescriptorAllocator;
+
     std::array<FrameResource, FrameCount> m_frameResources;
 
+    // Pipeline
     RootSignature m_rootSignature;
     std::unordered_map<PSOKey, Microsoft::WRL::ComPtr<ID3D12PipelineState>> m_pipelineStates;
-
     PSOKey m_currentPSOKey = {PassType::FORWARD_COLORING};
-
     std::vector<D3D12_INPUT_ELEMENT_DESC> m_inputLayout;
     std::unordered_map<ShaderKey, std::vector<char>> m_shaderBlobs;
+    RenderGraph m_renderGraph;
 
     Texture m_depthStencilBuffer;
     DepthStencilView m_dsv;
     DepthStencilView m_readOnlyDsv;
     ShaderResourceView m_depthSrv;
 
-    // App resources
+    // Camera control
     Camera m_camera;
     CameraConstantData m_cameraConstantData;
     UploadAllocation m_cameraUploadAllocation;
-
-    InputManager m_inputManager;
-
-    RenderGraph m_renderGraph;
-
-    SceneManager m_sceneManager;
-    EntityHandle m_selected;
-
     inline static constexpr float DEFAULT_FOCUS_DIST = 30.0f;
-
     bool m_cameraControl = false;
     bool m_orbiting = false;
     DirectX::XMFLOAT3 m_orbitPivot;
     float m_orbitDistance = DEFAULT_FOCUS_DIST;
     bool m_panning = false;
+
+    // Input
+    InputManager m_inputManager;
+
+    // Scene control
+    SceneManager m_sceneManager;
+    EntityHandle m_selected;
 
     std::vector<EntityHandle> m_previewRotations;
 
@@ -152,21 +150,17 @@ private:
     ShadowConstantData m_shadowConstantData;
     UploadAllocation m_shadowUploadAllocation;
 
+    // Config
     TextureFiltering m_currentTextureFiltering = TextureFiltering::ANISOTROPIC_X16;
 
-    // For ImGui
-    ImGuiDescriptorAllocator m_imguiDescriptorAllocator;
-    inline static Renderer* sm_instance = nullptr;
-
+    // Timing
     std::chrono::steady_clock m_clock;
     std::chrono::time_point<std::chrono::steady_clock> m_prevTime;
     std::chrono::time_point<std::chrono::steady_clock> m_deadLine;
     std::chrono::duration<double, std::milli> m_deltaTime;
 
-    float m_dpiScale;
-
-    // Synchronization objects
-    UINT m_frameIndex;
+    // Singleton
+    inline static Renderer* sm_instance = nullptr;
 
     // Init
     void LoadPipeline();
