@@ -29,9 +29,6 @@ using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 using namespace D3DHelper;
 
-// Definition for static member
-Renderer* Renderer::sm_instance = nullptr;
-
 // Generate a simple black and white checkerboard texture.
 std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UINT texturePixelSize)
 {

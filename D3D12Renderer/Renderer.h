@@ -158,7 +158,7 @@ private:
 
     // For ImGui
     ImGuiDescriptorAllocator m_imguiDescriptorAllocator;
-    static Renderer* sm_instance;
+    inline static Renderer* sm_instance = nullptr;
 
     std::chrono::steady_clock m_clock;
     std::chrono::time_point<std::chrono::steady_clock> m_prevTime;
