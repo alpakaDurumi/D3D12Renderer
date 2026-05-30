@@ -84,8 +84,6 @@ public:
 
     void SetPix();
     void UpdateWidthHeight();
-    void ToggleFullScreen();
-    void SetFullScreen(bool fullScreen);
 
     void Init(UINT dpi);
     void ProcessInput();
@@ -261,4 +259,7 @@ private:
     void DrawEntity(ID3D12GraphicsCommandList* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
 
     void BeginOrbit();
+
+    void ToggleFullScreen();
+    void SetFullScreen(bool fullScreen);
 };
