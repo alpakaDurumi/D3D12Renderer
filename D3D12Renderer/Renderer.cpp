@@ -731,58 +731,44 @@ void Renderer::OnResize(UINT width, UINT height)
     m_readOnlyDsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH));
     m_depthSrv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1));
 
-    // Update registered info of scene color buffers
-    std::vector<ID3D12Resource*> pSceneColorBuffers0;
-    for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pSceneColorBuffers0.push_back(m_frameResources[i].GetSceneColorBuffer(0));
-    }
+    // Update registered info
     auto sceneColorBuffer0 = m_renderGraph.GetRGTexture("SceneColorBuffer0");
+    std::vector<ID3D12Resource*> pSceneColorBuffers0(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pSceneColorBuffers0[i] = m_frameResources[i].GetSceneColorBuffer(0);
     m_renderGraph.UpdateElement(sceneColorBuffer0, 0, pSceneColorBuffers0);
 
-    std::vector<ID3D12Resource*> pSceneColorBuffers1;
-    for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pSceneColorBuffers1.push_back(m_frameResources[i].GetSceneColorBuffer(1));
-    }
     auto sceneColorBuffer1 = m_renderGraph.GetRGTexture("SceneColorBuffer1");
+    std::vector<ID3D12Resource*> pSceneColorBuffers1(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pSceneColorBuffers1[i] = m_frameResources[i].GetSceneColorBuffer(1);
     m_renderGraph.UpdateElement(sceneColorBuffer1, 0, pSceneColorBuffers1);
 
-    // Update registered info of depth-stencil buffer
     auto depthStencilBuffer = m_renderGraph.GetRGTexture("DepthStencilBuffer");
     m_renderGraph.UpdateElement(depthStencilBuffer, 0, {m_depthStencilBuffer.Get()});
 
-    // Update registered info of GBuffers
     auto gBuffer = m_renderGraph.GetRGTexture("GBuffer");
     for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
     {
-        std::vector<ID3D12Resource*> pGBuffers;
+        std::vector<ID3D12Resource*> pGBuffers(FrameCount);
         for (UINT i = 0; i < FrameCount; ++i)
-        {
-            pGBuffers.push_back(m_frameResources[i].GetGBuffer(static_cast<GBufferSlot>(slot)));
-        }
+            pGBuffers[i] = m_frameResources[i].GetGBuffer(static_cast<GBufferSlot>(slot));
         m_renderGraph.UpdateElement(gBuffer, slot, pGBuffers);
     }
 
-    // Update registered info of selection mask
     auto selectionMask = m_renderGraph.GetRGTexture("SelectionMask");
-    std::vector<ID3D12Resource*> pSelectionMasks;
+    std::vector<ID3D12Resource*> pSelectionMasks(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pSelectionMasks.push_back(m_frameResources[i].GetSelectionMask());
-    }
+        pSelectionMasks[i] = m_frameResources[i].GetSelectionMask();
     m_renderGraph.UpdateElement(selectionMask, 0, pSelectionMasks);
 
-    // Update registered info of horizontal dilated mask
-    RGTexture horizontalDilatedMask = m_renderGraph.GetRGTexture("HorizontalDilatedMask");
-    std::vector<ID3D12Resource*> pHorizontalDilatedMasks;
+    auto horizontalDilatedMask = m_renderGraph.GetRGTexture("HorizontalDilatedMask");
+    std::vector<ID3D12Resource*> pHorizontalDilatedMasks(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pHorizontalDilatedMasks.push_back(m_frameResources[i].GetHorizontalDilatedMask());
-    }
+        pHorizontalDilatedMasks[i] = m_frameResources[i].GetHorizontalDilatedMask();
     m_renderGraph.UpdateElement(horizontalDilatedMask, 0, pHorizontalDilatedMasks);
 
-    RGTexture toneMappedBuffer = m_renderGraph.GetRGTexture("ToneMappedBuffer");
+    auto toneMappedBuffer = m_renderGraph.GetRGTexture("ToneMappedBuffer");
     std::vector<ID3D12Resource*> pToneMappedBuffers(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
         pToneMappedBuffers[i] = m_frameResources[i].GetToneMappedBuffer();
@@ -1186,33 +1172,27 @@ void Renderer::LoadAssets()
     // Render Graph
     m_renderGraph.Init(m_device.Get());
 
-    // Scene color buffer0
+    // Register resources
     RGTexture sceneColorBuffer0 = m_renderGraph.RegisterTexture(
         "SceneColorBuffer0",
         true,
         {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetSceneColorBuffer(0)));
-    std::vector<ID3D12Resource*> pSceneColorBuffers0;
+    std::vector<ID3D12Resource*> pSceneColorBuffers0(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pSceneColorBuffers0.push_back(m_frameResources[i].GetSceneColorBuffer(0));
-    }
+        pSceneColorBuffers0[i] = m_frameResources[i].GetSceneColorBuffer(0);
     m_renderGraph.AddElement(sceneColorBuffer0, pSceneColorBuffers0);
 
-    // Scene color buffer1
     RGTexture sceneColorBuffer1 = m_renderGraph.RegisterTexture(
         "SceneColorBuffer1",
         true,
         {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetSceneColorBuffer(1)));
-    std::vector<ID3D12Resource*> pSceneColorBuffers1;
+    std::vector<ID3D12Resource*> pSceneColorBuffers1(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pSceneColorBuffers1.push_back(m_frameResources[i].GetSceneColorBuffer(1));
-    }
+        pSceneColorBuffers1[i] = m_frameResources[i].GetSceneColorBuffer(1);
     m_renderGraph.AddElement(sceneColorBuffer1, pSceneColorBuffers1);
 
-    // Depth-stencil buffer
     RGTexture depthStencilBuffer = m_renderGraph.RegisterTexture(
         "DepthStencilBuffer",
         false,
@@ -1220,7 +1200,6 @@ void Renderer::LoadAssets()
         GetSubresourceCount(m_device.Get(), m_depthStencilBuffer.Get()));
     m_renderGraph.AddElement(depthStencilBuffer, {m_depthStencilBuffer.Get()});
 
-    // GBuffer
     RGTexture gBuffer = m_renderGraph.RegisterTexture(
         "GBuffer",
         true,
@@ -1228,41 +1207,32 @@ void Renderer::LoadAssets()
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetGBuffer(GBufferSlot::ALBEDO)));
     for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
     {
-        std::vector<ID3D12Resource*> pGBuffers;
+        std::vector<ID3D12Resource*> pGBuffers(FrameCount);
         for (UINT i = 0; i < FrameCount; ++i)
-        {
-            pGBuffers.push_back(m_frameResources[i].GetGBuffer(static_cast<GBufferSlot>(slot)));
-        }
+            pGBuffers[i] = m_frameResources[i].GetGBuffer(static_cast<GBufferSlot>(slot));
         m_renderGraph.AddElement(gBuffer, pGBuffers);
     }
 
-    // Selection mask
     RGTexture selectionMask = m_renderGraph.RegisterTexture(
         "SelectionMask",
         true,
         {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetSelectionMask()));
-    std::vector<ID3D12Resource*> pSelectionMasks;
+    std::vector<ID3D12Resource*> pSelectionMasks(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pSelectionMasks.push_back(m_frameResources[i].GetSelectionMask());
-    }
+        pSelectionMasks[i] = m_frameResources[i].GetSelectionMask();
     m_renderGraph.AddElement(selectionMask, pSelectionMasks);
 
-    // Horizontal dilated mask
     RGTexture horizontalDilatedMask = m_renderGraph.RegisterTexture(
         "HorizontalDilatedMask",
         true,
         {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetHorizontalDilatedMask()));
-    std::vector<ID3D12Resource*> pHorizontalDilatedMasks;
+    std::vector<ID3D12Resource*> pHorizontalDilatedMasks(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pHorizontalDilatedMasks.push_back(m_frameResources[i].GetHorizontalDilatedMask());
-    }
+        pHorizontalDilatedMasks[i] = m_frameResources[i].GetHorizontalDilatedMask();
     m_renderGraph.AddElement(horizontalDilatedMask, pHorizontalDilatedMasks);
 
-    // Light
     m_renderGraph.RegisterTexture(
         "DirectionalLight",
         false,
@@ -1270,9 +1240,11 @@ void Renderer::LoadAssets()
         GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, MAX_CASCADES, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
         [this]()
         {
-            std::vector<ID3D12Resource*> pResources;
-            for (auto& light : m_sceneManager.GetDirectionalLights())
-                pResources.push_back(light.GetDepthBuffer());
+            auto& lights = m_sceneManager.GetDirectionalLights();
+            const UINT count = static_cast<UINT>(lights.size());
+            std::vector<ID3D12Resource*> pResources(count);
+            for (UINT i = 0; i < count; ++i)
+                pResources[i] = lights[i].GetDepthBuffer();
             return pResources;
         });
 
@@ -1283,9 +1255,11 @@ void Renderer::LoadAssets()
         GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET)),
         [this]()
         {
-            std::vector<ID3D12Resource*> pResources;
-            for (auto& light : m_sceneManager.GetPointLights())
-                pResources.push_back(light.GetRenderTarget());
+            auto& lights = m_sceneManager.GetPointLights();
+            const UINT count = static_cast<UINT>(lights.size());
+            std::vector<ID3D12Resource*> pResources(count);
+            for (UINT i = 0; i < count; ++i)
+                pResources[i] = lights[i].GetRenderTarget();
             return pResources;
         });
 
@@ -1296,9 +1270,11 @@ void Renderer::LoadAssets()
         GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, SPOT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
         [this]()
         {
-            std::vector<ID3D12Resource*> pResources;
-            for (auto& light : m_sceneManager.GetSpotLights())
-                pResources.push_back(light.GetDepthBuffer());
+            auto& lights = m_sceneManager.GetSpotLights();
+            const UINT count = static_cast<UINT>(lights.size());
+            std::vector<ID3D12Resource*> pResources(count);
+            for (UINT i = 0; i < count; ++i)
+                pResources[i] = lights[i].GetDepthBuffer();
             return pResources;
         });
 
