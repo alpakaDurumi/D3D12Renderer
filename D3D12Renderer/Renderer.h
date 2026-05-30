@@ -124,8 +124,6 @@ private:
     ShaderResourceView m_depthSrv;
 
     // App resources
-    //
-    // Main Camera
     Camera m_camera;
     CameraConstantData m_cameraConstantData;
     UploadAllocation m_cameraUploadAllocation;
@@ -170,20 +168,47 @@ private:
     // Synchronization objects
     UINT m_frameIndex;
 
+    // Init
     void LoadPipeline();
     void LoadAssets();
+    void InitImGui();
+    void CreateRootSignature();
+    void PrepareRenderGraph();
+
+    // ProcessInput
+    void ToggleFullScreen();
+    void SetFullScreen(bool fullScreen);
+    void BeginOrbit();
+
+    // BuildImGuiFrame
+    void SetFpsCap(std::string fps);
+    void SetTextureFiltering(TextureFiltering filtering);
+    void RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete, bool& selectionChanged);
+
+    // Update
+    void FixedUpdate(double fixedDt);
+    void PrepareConstantData(float alpha);
+    void PrepareTransform(Entity& entity, DirectX::XMMATRIX& accumulated, float alpha);
+    std::vector<DirectX::BoundingSphere> CalcCascadeSpheres();
+    void PrepareDirectionalLight(DirectionalLight& light, const std::vector<DirectX::BoundingSphere>& cascadeSpheres);
+    void PreparePointLight(PointLight& light);
+    void PrepareSpotLight(SpotLight& light);
+    void UpdateConstantBuffers(FrameResource& frameResource);
+
+    // Render
     void PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList);
+    void BindDescriptorTables(ID3D12GraphicsCommandList* pCommandList);
+    void ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID3D12GraphicsCommandList7* pCommandList);
+    ID3D12PipelineState* GetPipelineState(const PSOKey& psoKey);
+    const std::vector<char>& GetShaderBlobRef(const ShaderKey& shaderKey) const;
+    void DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
+    void DrawEntity(ID3D12GraphicsCommandList* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
+
+    // Synchronization
     void WaitForGpu();
     void MoveToNextFrame();
 
-    void InitImGui();
-    void RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete, bool& selectionChanged);
-
-    void PrepareRenderGraph();
-    void ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID3D12GraphicsCommandList7* pCommandList);
-
-    void SetTextureFiltering(TextureFiltering filtering);
-
+    // SceneManager helpers
     MaterialHandle CreateMaterial();
     MaterialHandle CreateMaterial(const AssetID& id);
     MaterialHandle CloneMaterial(MaterialHandle src);
@@ -211,31 +236,4 @@ private:
         bool useBlockCompress,
         bool flipImage,
         bool isCubeMap);
-
-    void SetFpsCap(std::string fps);
-
-    void BindDescriptorTables(ID3D12GraphicsCommandList* pCommandList);
-
-    void CreateRootSignature();
-    ID3D12PipelineState* GetPipelineState(const PSOKey& psoKey);
-    const std::vector<char>& GetShaderBlobRef(const ShaderKey& shaderKey) const;
-
-    void FixedUpdate(double fixedDt);
-
-    void PrepareConstantData(float alpha);
-    void PrepareTransform(Entity& entity, DirectX::XMMATRIX& accumulated, float alpha);
-    std::vector<DirectX::BoundingSphere> CalcCascadeSpheres();
-    void PrepareDirectionalLight(DirectionalLight& light, const std::vector<DirectX::BoundingSphere>& cascadeSpheres);
-    void PreparePointLight(PointLight& light);
-    void PrepareSpotLight(SpotLight& light);
-
-    void UpdateConstantBuffers(FrameResource& frameResource);
-
-    void DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
-    void DrawEntity(ID3D12GraphicsCommandList* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
-
-    void BeginOrbit();
-
-    void ToggleFullScreen();
-    void SetFullScreen(bool fullScreen);
 };
