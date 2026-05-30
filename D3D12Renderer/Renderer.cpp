@@ -265,7 +265,7 @@ void Renderer::SetFullScreen(bool fullScreen)
     }
 }
 
-void Renderer::OnInit(UINT dpi)
+void Renderer::Init(UINT dpi)
 {
     ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED)); // For initializing DirectXTex
     LoadPipeline();
@@ -278,7 +278,7 @@ void Renderer::OnInit(UINT dpi)
     m_deadLine = m_prevTime;
 }
 
-void Renderer::OnUpdate()
+void Renderer::Update()
 {
     auto now = m_clock.now();
 
@@ -326,7 +326,7 @@ void Renderer::OnUpdate()
 }
 
 // Render the scene.
-void Renderer::OnRender()
+void Renderer::Render()
 {
     auto [pCommandAllocator, pCommandList] = m_commandQueue.GetAvailableCommandList();
 
@@ -405,7 +405,7 @@ void Renderer::OnRender()
     MoveToNextFrame();
 }
 
-void Renderer::OnDestroy()
+void Renderer::Destroy()
 {
     // Ensure that the GPU is no longer referencing resources that are about to be
     // cleaned up by the destructor.

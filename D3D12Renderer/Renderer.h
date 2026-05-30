@@ -81,15 +81,19 @@ public:
     {
         m_useWarpDevice = value;
     }
+
     void SetPix();
     void UpdateWidthHeight();
     void ToggleFullScreen();
     void SetFullScreen(bool fullScreen);
 
-    void OnInit(UINT dpi);
-    void OnUpdate();
-    void OnRender();
-    void OnDestroy();
+    void Init(UINT dpi);
+    void ProcessInput();
+    void BuildImGuiFrame();
+    void Update();
+    void Render();
+    void Destroy();
+
     void OnKeyDown(VKCode key);
     void OnKeyUp(VKCode key);
     void OnMouseButtonDown(UINT button);
@@ -99,9 +103,6 @@ public:
     void OnKillFocus();
     void OnResize(UINT width, UINT height);
     void OnDpiChanged(UINT dpi);
-
-    void ProcessInput();
-    void BuildImGuiFrame();
 
     static void ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle);
     static void ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle);
