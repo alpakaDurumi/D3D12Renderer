@@ -175,14 +175,14 @@ static D3D12_SAMPLER_DESC GetSamplerDesc(
 }
 
 // Wrappers of callback functions for ImGui SRV descriptor
-void Renderer::ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
+void Renderer::ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
 {
-    Renderer::GetInstance()->m_imguiDescriptorAllocator.Allocate(out_cpu_handle, out_gpu_handle);
+    Renderer::GetInstance()->m_imguiDescriptorAllocator.Allocate(outCpuHandle, outGpuHandle);
 }
 
-void Renderer::ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
+void Renderer::ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle)
 {
-    Renderer::GetInstance()->m_imguiDescriptorAllocator.Free(cpu_handle, gpu_handle);
+    Renderer::GetInstance()->m_imguiDescriptorAllocator.Free(cpuHandle, gpuHandle);
 }
 
 Renderer::Renderer(std::wstring name)
@@ -280,8 +280,6 @@ void Renderer::OnInit(UINT dpi)
 
 void Renderer::OnUpdate()
 {
-    ProcessInput();
-
     auto now = m_clock.now();
 
     if (!m_vSync && m_fpsCap > 0)
@@ -337,29 +335,58 @@ void Renderer::OnRender()
     m_dynamicDescriptorHeapForCbvSrvUav.Reset();
 
     // Populate commands for ImGui
-    // Is it OK to call SetDescriptorHeaps? (Does it affect performance?)
+    // ImGui uses its dedicated descriptor heap for now, so calling SetDescriptorHeaps is mandatory
     ImGui::Render();
     ID3D12DescriptorHeap* ppHeaps[] = {m_imguiDescriptorAllocator.GetDescriptorHeap()};
     pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    auto rtvHandle = m_frameResources[m_frameIndex].GetBackBufferRtvHandle();
+    pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+    // Change layout of backbuffer: Present -> Render target
+    {
+        D3D12_TEXTURE_BARRIER barrier = {
+            D3D12_BARRIER_SYNC_NONE,
+            D3D12_BARRIER_SYNC_RENDER_TARGET,
+            D3D12_BARRIER_ACCESS_NO_ACCESS,
+            D3D12_BARRIER_ACCESS_RENDER_TARGET,
+            D3D12_BARRIER_LAYOUT_PRESENT,
+            D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+            m_frameResources[m_frameIndex].GetBackBuffer(),
+            {0xffff'ffff, 0, 0, 0, 0, 0},
+            D3D12_TEXTURE_BARRIER_FLAG_NONE};
+        D3D12_BARRIER_GROUP barrierGroups[] = {TextureBarrierGroup(1, &barrier)};
+        pCommandList->Barrier(1, barrierGroups);
+    }
+
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), pCommandList);
 
-    // Barrier for RTV should be called after ImGui Render.
-    // Swap Chain textures initially created in D3D12_BARRIER_LAYOUT_COMMON.
-    // and presentation requires the back buffer is using D3D12_BARRIER_LAYOUT_COMMON.
-    // LAYOUT_PRESENT is alias for LAYOUT_COMMON.
-    D3D12_TEXTURE_BARRIER barrier = {
-        D3D12_BARRIER_SYNC_RENDER_TARGET,
-        D3D12_BARRIER_SYNC_NONE,
-        D3D12_BARRIER_ACCESS_RENDER_TARGET,
-        D3D12_BARRIER_ACCESS_NO_ACCESS,
-        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-        D3D12_BARRIER_LAYOUT_PRESENT,
-        m_frameResources[m_frameIndex].GetBackBuffer(),
-        {0xffff'ffff, 0, 0, 0, 0, 0},
-        D3D12_TEXTURE_BARRIER_FLAG_NONE};
+    // Change layout of tonemappedbuffer and backbuffer after ImGui Render
+    {
+        std::vector<D3D12_TEXTURE_BARRIER> barriers = {
+            {D3D12_BARRIER_SYNC_PIXEL_SHADING,
+             D3D12_BARRIER_SYNC_RENDER_TARGET,
+             D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+             D3D12_BARRIER_ACCESS_RENDER_TARGET,
+             D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+             D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+             m_frameResources[m_frameIndex].GetToneMappedBuffer(),
+             {0xffff'ffff, 0, 0, 0, 0, 0},
+             D3D12_TEXTURE_BARRIER_FLAG_NONE},
 
-    D3D12_BARRIER_GROUP barrierGroups[] = {TextureBarrierGroup(1, &barrier)};
-    pCommandList->Barrier(1, barrierGroups);
+            // Swap Chain textures initially created in D3D12_BARRIER_LAYOUT_COMMON (D3D12_BARRIER_LAYOUT_PRESENT)
+            {D3D12_BARRIER_SYNC_RENDER_TARGET,
+             D3D12_BARRIER_SYNC_NONE,
+             D3D12_BARRIER_ACCESS_RENDER_TARGET,
+             D3D12_BARRIER_ACCESS_NO_ACCESS,
+             D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+             D3D12_BARRIER_LAYOUT_PRESENT,
+             m_frameResources[m_frameIndex].GetBackBuffer(),
+             {0xffff'ffff, 0, 0, 0, 0, 0},
+             D3D12_TEXTURE_BARRIER_FLAG_NONE}};
+
+        D3D12_BARRIER_GROUP barrierGroups[] = {TextureBarrierGroup(static_cast<UINT32>(barriers.size()), barriers.data())};
+        pCommandList->Barrier(1, barrierGroups);
+    }
 
     // Execute the command lists and update objects with fence values
     UINT64 signaledFenceValue = m_commandQueue.ExecuteCommandLists(pCommandAllocator, pCommandList);
@@ -454,6 +481,8 @@ void Renderer::OnResize(UINT width, UINT height)
         m_frameResources[i].ResetMasks();
         m_frameResources[i].CreateMasks(m_width, m_height);
 
+        m_frameResources[i].CreateToneMappedBuffer(m_width, m_height);
+
         m_frameResources[i].UpdateSignaledFenceValue(m_frameResources[m_frameIndex].GetSignaledFenceValue());
     }
 
@@ -479,15 +508,6 @@ void Renderer::OnResize(UINT width, UINT height)
     m_dsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT));
     m_readOnlyDsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH));
     m_depthSrv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1));
-
-    // Update registered info of backbuffers
-    std::vector<ID3D12Resource*> pBackBuffers;
-    for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pBackBuffers.push_back(m_frameResources[i].GetBackBuffer());
-    }
-    auto backBuffer = m_renderGraph.GetRGTexture("BackBuffer");
-    m_renderGraph.UpdateElement(backBuffer, 0, pBackBuffers);
 
     // Update registered info of scene color buffers
     std::vector<ID3D12Resource*> pSceneColorBuffers0;
@@ -539,6 +559,12 @@ void Renderer::OnResize(UINT width, UINT height)
         pHorizontalDilatedMasks.push_back(m_frameResources[i].GetHorizontalDilatedMask());
     }
     m_renderGraph.UpdateElement(horizontalDilatedMask, 0, pHorizontalDilatedMasks);
+
+    RGTexture toneMappedBuffer = m_renderGraph.GetRGTexture("ToneMappedBuffer");
+    std::vector<ID3D12Resource*> pToneMappedBuffers(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pToneMappedBuffers[i] = m_frameResources[i].GetToneMappedBuffer();
+    m_renderGraph.UpdateElement(toneMappedBuffer, 0, pToneMappedBuffers);
 }
 
 void Renderer::OnDpiChanged(UINT dpi)
@@ -547,140 +573,271 @@ void Renderer::OnDpiChanged(UINT dpi)
     ImGui::GetStyle().FontScaleMain = m_dpiScale;
 }
 
+void Renderer::ProcessInput()
+{
+    if (m_inputManager.IsKeyPressed(VK_ESCAPE))
+    {
+        if (!PostMessageW(Win32Application::GetHwnd(), WM_CLOSE, 0, 0))
+        {
+            DWORD err = GetLastError();
+            WCHAR buf[128];
+            swprintf_s(buf, L"PostMessageW(WM_CLOSE) failed. GetLastError=%lu\n", err);
+            OutputDebugStringW(buf);
+
+            // fallback
+            PostQuitMessage(static_cast<int>(err));
+        }
+    }
+
+    if (m_inputManager.IsKeyPressed(VK_F11) ||
+        (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsKeyPressed(VK_RETURN)))
+    {
+        ToggleFullScreen();
+    }
+
+    if (m_inputManager.IsKeyPressed('V'))
+    {
+        m_vSync = !m_vSync;
+    }
+
+    // Focus
+    if (m_inputManager.IsKeyPressed('F') && !(m_selected.index == UINT_MAX && m_selected.generation == 0))
+    {
+        auto* pEntity = m_sceneManager.Get(m_selected);
+        auto pos = pEntity->transform->GetTranslation();
+
+        m_camera.SetCurrentPosition(XMLoadFloat3(&pos) - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
+
+        m_orbitDistance = DEFAULT_FOCUS_DIST;
+    }
+
+    // Dolly
+    {
+        static float cameraDollySpeed = 5.0f;
+
+        float wheelStep = m_inputManager.GetAndResetMouseWheelStep();
+        if (wheelStep != 0.0f)
+        {
+            m_camera.MoveForward(wheelStep * cameraDollySpeed);
+            XMVECTOR camPos = m_camera.GetCurrentPosition();
+            m_orbitDistance = XMVectorGetX(XMVector3Length(camPos - XMLoadFloat3(&m_orbitPivot)));
+        }
+    }
+
+    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
+
+    // Camera control
+    if (m_inputManager.IsMouseButtonPressed(1))
+    {
+        m_cameraControl = true;
+        Win32Application::HideCursor();
+    }
+    if (m_cameraControl)
+    {
+        if (m_inputManager.IsMouseButtonDown(1))
+        {
+            m_camera.Rotate(mouseMove);
+        }
+        else
+        {
+            m_cameraControl = false;
+            Win32Application::RestoreCursor();
+        }
+    }
+
+    // Orbit
+    if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonPressed(0))
+    {
+        BeginOrbit();
+        Win32Application::HideCursor();
+    }
+    if (m_orbiting)
+    {
+        if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonDown(0))
+        {
+            m_camera.Orbit(XMLoadFloat3(&m_orbitPivot), m_orbitDistance, mouseMove);
+        }
+        else
+        {
+            m_orbiting = false;
+            Win32Application::RestoreCursor();
+        }
+    }
+
+    // Pan
+    if (m_inputManager.IsMouseButtonPressed(2))
+    {
+        m_panning = true;
+        Win32Application::HideCursor();
+    }
+    if (m_panning)
+    {
+        if (m_inputManager.IsMouseButtonDown(2))
+        {
+            m_camera.Pan(mouseMove);
+        }
+        else
+        {
+            m_panning = false;
+            Win32Application::RestoreCursor();
+        }
+    }
+
+    // Operations in ProcessInput are immediate, requiring no interpolation.
+    m_camera.SnapshotState();
+}
+
 void Renderer::BuildImGuiFrame()
 {
     // ImGui::ShowDemoWindow(); // Show demo window! :)
 
-    ImGui::Begin("Test");
+    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_None);
 
-    static UINT64 frameCounter = 0;
-    static double elapsedSeconds = 0.0;
-
-    ++frameCounter;
-
-    static double fps = 0.0;
-    static double frameTime = 0.0;
-
-    elapsedSeconds += std::chrono::duration<double>(m_deltaTime).count();
-    if (elapsedSeconds >= 1.0)
+    // Scene window
     {
-        fps = frameCounter / elapsedSeconds;
-        frameTime = 1000.0 / fps;
+        ImGui::Begin("Scene");
 
-        frameCounter = 0;
-        elapsedSeconds = 0.0;
+        const auto srvGpuHandle = m_frameResources[m_frameIndex].GetToneMappedBufferSrvHandle();
+        ImGui::Image(static_cast<ImTextureID>(srvGpuHandle.ptr), ImVec2(static_cast<float>(m_width), static_cast<float>(m_height)));
+
+        ImGui::End();
     }
 
-    ImGui::Text("FPS: %.1f", fps);
-    ImGui::Text("Latency: %.3f", frameTime);
-
-    ImGui::Checkbox("vSync", &m_vSync);
-
-    const char* items0[] = {"Unlimited", "30", "60", "120", "144", "160", "240"};
-    static int item0_selected_idx = 0;
-
-    // FPS cap can be set when vSync enabled.
-    ImGui::BeginDisabled(m_vSync);
-    if (ImGui::BeginCombo("FPS Cap", items0[item0_selected_idx]))
+    // Test window
     {
-        for (int n = 0; n < IM_ARRAYSIZE(items0); ++n)
+        ImGui::Begin("Test");
+
+        static UINT64 frameCounter = 0;
+        static double elapsedSeconds = 0.0;
+
+        ++frameCounter;
+
+        static double fps = 0.0;
+        static double frameTime = 0.0;
+
+        elapsedSeconds += std::chrono::duration<double>(m_deltaTime).count();
+        if (elapsedSeconds >= 1.0)
         {
-            const bool is_selected = item0_selected_idx == n;
-            if (ImGui::Selectable(items0[n], is_selected))
+            fps = frameCounter / elapsedSeconds;
+            frameTime = 1000.0 / fps;
+
+            frameCounter = 0;
+            elapsedSeconds = 0.0;
+        }
+
+        ImGui::Text("FPS: %.1f", fps);
+        ImGui::Text("Latency: %.3f", frameTime);
+
+        ImGui::Checkbox("vSync", &m_vSync);
+
+        const char* items0[] = {"Unlimited", "30", "60", "120", "144", "160", "240"};
+        static int item0_selected_idx = 0;
+
+        // FPS cap can be set when vSync enabled.
+        ImGui::BeginDisabled(m_vSync);
+        if (ImGui::BeginCombo("FPS Cap", items0[item0_selected_idx]))
+        {
+            for (int n = 0; n < IM_ARRAYSIZE(items0); ++n)
             {
-                item0_selected_idx = n;
-                SetFpsCap(std::string(items0[n]));
+                const bool is_selected = item0_selected_idx == n;
+                if (ImGui::Selectable(items0[n], is_selected))
+                {
+                    item0_selected_idx = n;
+                    SetFpsCap(std::string(items0[n]));
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::EndDisabled();
+
+        const char* items[] = {"Point", "Bilinear", "AnisotropicX2", "AnisotropicX4", "AnisotropicX8", "AnisotropicX16"};
+        static int item_selected_idx = 5;
+
+        const char* combo_preview_value = items[item_selected_idx];
+        if (ImGui::BeginCombo("Texture Filtering", combo_preview_value))
+        {
+            for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+            {
+                const bool is_selected = (item_selected_idx == n);
+                if (ImGui::Selectable(items[n], is_selected))
+                {
+                    item_selected_idx = n;
+                    SetTextureFiltering(static_cast<TextureFiltering>(n));
+                }
+
+                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+
+        if (ImGui::Button("Add Cube"))
+        {
+            auto hMesh = m_sceneManager.GetMeshHandle("builtin://mesh/cube");
+            auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
+            auto hMat = CloneMaterial(hTemplateMat);
+
+            auto hCube = m_sceneManager.AddEntity("New Cube");
+            m_sceneManager.AddTransform(hCube);
+            m_sceneManager.SetMesh(hCube, hMesh);
+            m_sceneManager.SetMaterial(hCube, hMat);
+        }
+
+        ImGui::End();
+    }
+
+    // Hierarchy window
+    {
+        bool selectionChanged = false;
+
+        ImGui::Begin("Hierarchy");
+
+        EntityHandle toDelete;
+
+        if (ImGui::IsKeyPressed(ImGuiKey_Delete))
+            toDelete = m_selected;
+
+        for (const auto& entity : m_sceneManager.GetEntities())
+        {
+            if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
+                RenderEntityNode(entity, m_selected, toDelete, selectionChanged);
+        }
+
+        m_sceneManager.Remove(toDelete);
+        if (m_selected == toDelete)
+            m_selected = {};
+
+        ImGui::End();
+
+        // Inspector
+        ImGui::Begin("Inspector");
+
+        auto* pEntity = m_sceneManager.Get(m_selected);
+        if (pEntity)
+        {
+            if (pEntity->transform.has_value())
+            {
+                auto& transform = pEntity->transform.value();
+
+                XMFLOAT3 s = transform.GetScale();
+                if (ImGui::DragFloat3("Scale", &s.x))
+                    transform.SetScale(s);
+
+                XMFLOAT3 eulerR = transform.GetEulerCache(selectionChanged);
+                if (ImGui::DragFloat3("Rotation", &eulerR.x))
+                {
+                    transform.SetRotation(eulerR);
+                }
+
+                XMFLOAT3 t = transform.GetTranslation();
+                if (ImGui::DragFloat3("Translation", &t.x))
+                    transform.SetTranslation(t);
             }
         }
-        ImGui::EndCombo();
+
+        ImGui::End();
     }
-    ImGui::EndDisabled();
-
-    const char* items[] = {"Point", "Bilinear", "AnisotropicX2", "AnisotropicX4", "AnisotropicX8", "AnisotropicX16"};
-    static int item_selected_idx = 5;
-
-    const char* combo_preview_value = items[item_selected_idx];
-    if (ImGui::BeginCombo("Texture Filtering", combo_preview_value))
-    {
-        for (int n = 0; n < IM_ARRAYSIZE(items); n++)
-        {
-            const bool is_selected = (item_selected_idx == n);
-            if (ImGui::Selectable(items[n], is_selected))
-            {
-                item_selected_idx = n;
-                SetTextureFiltering(static_cast<TextureFiltering>(n));
-            }
-
-            // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-            if (is_selected)
-                ImGui::SetItemDefaultFocus();
-        }
-        ImGui::EndCombo();
-    }
-
-    if (ImGui::Button("Add Cube"))
-    {
-        auto hMesh = m_sceneManager.GetMeshHandle("builtin://mesh/cube");
-        auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
-        auto hMat = CloneMaterial(hTemplateMat);
-
-        auto hCube = m_sceneManager.AddEntity("New Cube");
-        m_sceneManager.AddTransform(hCube);
-        m_sceneManager.SetMesh(hCube, hMesh);
-        m_sceneManager.SetMaterial(hCube, hMat);
-    }
-
-    ImGui::End();
-
-    bool selectionChanged = false;
-
-    // Hierarchy
-    ImGui::Begin("Hierarchy");
-
-    EntityHandle toDelete;
-
-    if (ImGui::IsKeyPressed(ImGuiKey_Delete))
-        toDelete = m_selected;
-
-    for (const auto& entity : m_sceneManager.GetEntities())
-    {
-        if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
-            RenderEntityNode(entity, m_selected, toDelete, selectionChanged);
-    }
-
-    m_sceneManager.Remove(toDelete);
-    if (m_selected == toDelete)
-        m_selected = {};
-
-    ImGui::End();
-
-    // Inspector
-    ImGui::Begin("Inspector");
-
-    auto* pEntity = m_sceneManager.Get(m_selected);
-    if (pEntity)
-    {
-        if (pEntity->transform.has_value())
-        {
-            auto& transform = pEntity->transform.value();
-
-            XMFLOAT3 s = transform.GetScale();
-            if (ImGui::DragFloat3("Scale", &s.x))
-                transform.SetScale(s);
-
-            XMFLOAT3 eulerR = transform.GetEulerCache(selectionChanged);
-            if (ImGui::DragFloat3("Rotation", &eulerR.x))
-            {
-                transform.SetRotation(eulerR);
-            }
-
-            XMFLOAT3 t = transform.GetTranslation();
-            if (ImGui::DragFloat3("Translation", &t.x))
-                transform.SetTranslation(t);
-        }
-    }
-
-    ImGui::End();
 }
 
 void Renderer::RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete, bool& selectionChanged)
@@ -865,7 +1022,9 @@ void Renderer::LoadPipeline()
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(),
-            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate());
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(),
+            m_imguiDescriptorAllocator.Allocate());
     }
 
     CreateRootSignature();
@@ -1105,19 +1264,6 @@ void Renderer::LoadAssets()
     // Render Graph
     m_renderGraph.Init(m_device.Get());
 
-    // Back buffer
-    RGTexture backBuffer = m_renderGraph.RegisterTexture(
-        "BackBuffer",
-        true,
-        {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_PRESENT},
-        GetSubresourceCount(m_device.Get(), m_frameResources.front().GetBackBuffer()));
-    std::vector<ID3D12Resource*> pBackBuffers;
-    for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pBackBuffers.push_back(m_frameResources[i].GetBackBuffer());
-    }
-    m_renderGraph.AddElement(backBuffer, pBackBuffers);
-
     // Scene color buffer0
     RGTexture sceneColorBuffer0 = m_renderGraph.RegisterTexture(
         "SceneColorBuffer0",
@@ -1233,6 +1379,16 @@ void Renderer::LoadAssets()
                 pResources.push_back(light.GetDepthBuffer());
             return pResources;
         });
+
+    RGTexture toneMappedBuffer = m_renderGraph.RegisterTexture(
+        "ToneMappedBuffer",
+        true,
+        {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
+        GetSubresourceCount(m_device.Get(), m_frameResources.front().GetToneMappedBuffer()));
+    std::vector<ID3D12Resource*> pToneMappedBuffers(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pToneMappedBuffers[i] = m_frameResources[i].GetToneMappedBuffer();
+    m_renderGraph.AddElement(toneMappedBuffer, pToneMappedBuffers);
 
     PrepareRenderGraph();
     m_renderGraph.Compile();
@@ -1666,6 +1822,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
              frameResource.GetSelectionMask(),
              {0xffff'ffff, 0, 0, 0, 0, 0},
              D3D12_TEXTURE_BARRIER_FLAG_NONE},
+
             {D3D12_BARRIER_SYNC_PIXEL_SHADING,
              D3D12_BARRIER_SYNC_NONE,
              D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
@@ -1696,13 +1853,23 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
         pCommandList->SetPipelineState(pso);
 
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetBackBufferRtvHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetToneMappedBufferRtvHandle();
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
         pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         pCommandList->DrawInstanced(3, 1, 0, 0);
 
         std::vector<D3D12_TEXTURE_BARRIER> barriers = {
+            {D3D12_BARRIER_SYNC_RENDER_TARGET,
+             D3D12_BARRIER_SYNC_PIXEL_SHADING,
+             D3D12_BARRIER_ACCESS_RENDER_TARGET,
+             D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+             D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+             D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+             frameResource.GetToneMappedBuffer(),
+             {0xffff'ffff, 0, 0, 0, 0, 0},
+             D3D12_TEXTURE_BARRIER_FLAG_NONE},
+
             {D3D12_BARRIER_SYNC_PIXEL_SHADING,
              D3D12_BARRIER_SYNC_NONE,
              D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
@@ -1737,7 +1904,7 @@ void Renderer::InitImGui()
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
 
     ImGui_ImplWin32_Init(Win32Application::GetHwnd());
 
@@ -1747,7 +1914,7 @@ void Renderer::InitImGui()
     init_info.CommandQueue = m_commandQueue.GetCommandQueue();
     init_info.NumFramesInFlight = FrameCount;
     init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-    init_info.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+    init_info.DSVFormat = DXGI_FORMAT_UNKNOWN;
     init_info.SrvDescriptorHeap = m_imguiDescriptorAllocator.GetDescriptorHeap();
     init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
     {
@@ -1775,7 +1942,6 @@ void Renderer::PrepareRenderGraph()
     auto& toneMapPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::TONEMAP)];
 
     // Resource handles
-    auto backBuffer = m_renderGraph.GetRGTexture("BackBuffer");
     auto sceneColorBuffer0 = m_renderGraph.GetRGTexture("SceneColorBuffer0");
     auto sceneColorBuffer1 = m_renderGraph.GetRGTexture("SceneColorBuffer1");
     auto depthStencilBuffer = m_renderGraph.GetRGTexture("DepthStencilBuffer");
@@ -1785,6 +1951,7 @@ void Renderer::PrepareRenderGraph()
     auto directionalLightDepthBuffer = m_renderGraph.GetRGTexture("DirectionalLight");
     auto pointLightRenderTarget = m_renderGraph.GetRGTexture("PointLight");
     auto spotLightDepthBuffer = m_renderGraph.GetRGTexture("SpotLight");
+    auto toneMappedBuffer = m_renderGraph.GetRGTexture("ToneMappedBuffer");
 
     // Shadow map pass
     shadowMapPass.AddTextureInput(directionalLightDepthBuffer, {D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE});
@@ -1832,7 +1999,8 @@ void Renderer::PrepareRenderGraph()
     outlineDrawingPass.AddTextureOutput(horizontalDilatedMask, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
 
     // Tone mapping pass
-    toneMapPass.AddTextureInput(backBuffer, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+    toneMapPass.AddTextureInput(toneMappedBuffer, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+    toneMapPass.AddTextureOutput(toneMappedBuffer, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
     toneMapPass.AddTextureInput(sceneColorBuffer0, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
     toneMapPass.AddTextureOutput(sceneColorBuffer0, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
 }
@@ -2258,7 +2426,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
             break;
         case PassType::TONEMAP:
             psoDesc.NumRenderTargets = 1;
-            psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+            psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
             break;
         }
 
@@ -2570,120 +2738,6 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
         processLight(light, POINT_LIGHT_ARRAY_SIZE);
     for (auto& light : m_sceneManager.GetSpotLights())
         processLight(light, SPOT_LIGHT_ARRAY_SIZE);
-}
-
-void Renderer::ProcessInput()
-{
-    if (m_inputManager.IsKeyPressed(VK_ESCAPE))
-    {
-        if (!PostMessageW(Win32Application::GetHwnd(), WM_CLOSE, 0, 0))
-        {
-            DWORD err = GetLastError();
-            WCHAR buf[128];
-            swprintf_s(buf, L"PostMessageW(WM_CLOSE) failed. GetLastError=%lu\n", err);
-            OutputDebugStringW(buf);
-
-            // fallback
-            PostQuitMessage(static_cast<int>(err));
-        }
-    }
-
-    if (m_inputManager.IsKeyPressed(VK_F11) ||
-        (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsKeyPressed(VK_RETURN)))
-    {
-        ToggleFullScreen();
-    }
-
-    if (m_inputManager.IsKeyPressed('V'))
-    {
-        m_vSync = !m_vSync;
-    }
-
-    // Focus
-    if (m_inputManager.IsKeyPressed('F') && !(m_selected.index == UINT_MAX && m_selected.generation == 0))
-    {
-        auto* pEntity = m_sceneManager.Get(m_selected);
-        auto pos = pEntity->transform->GetTranslation();
-
-        m_camera.SetCurrentPosition(XMLoadFloat3(&pos) - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
-
-        m_orbitDistance = DEFAULT_FOCUS_DIST;
-    }
-
-    // Dolly
-    {
-        static float cameraDollySpeed = 5.0f;
-
-        float wheelStep = m_inputManager.GetAndResetMouseWheelStep();
-        if (wheelStep != 0.0f)
-        {
-            m_camera.MoveForward(wheelStep * cameraDollySpeed);
-            XMVECTOR camPos = m_camera.GetCurrentPosition();
-            m_orbitDistance = XMVectorGetX(XMVector3Length(camPos - XMLoadFloat3(&m_orbitPivot)));
-        }
-    }
-
-    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
-
-    // Camera control
-    if (m_inputManager.IsMouseButtonPressed(1))
-    {
-        m_cameraControl = true;
-        Win32Application::HideCursor();
-    }
-    if (m_cameraControl)
-    {
-        if (m_inputManager.IsMouseButtonDown(1))
-        {
-            m_camera.Rotate(mouseMove);
-        }
-        else
-        {
-            m_cameraControl = false;
-            Win32Application::RestoreCursor();
-        }
-    }
-
-    // Orbit
-    if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonPressed(0))
-    {
-        BeginOrbit();
-        Win32Application::HideCursor();
-    }
-    if (m_orbiting)
-    {
-        if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonDown(0))
-        {
-            m_camera.Orbit(XMLoadFloat3(&m_orbitPivot), m_orbitDistance, mouseMove);
-        }
-        else
-        {
-            m_orbiting = false;
-            Win32Application::RestoreCursor();
-        }
-    }
-
-    // Pan
-    if (m_inputManager.IsMouseButtonPressed(2))
-    {
-        m_panning = true;
-        Win32Application::HideCursor();
-    }
-    if (m_panning)
-    {
-        if (m_inputManager.IsMouseButtonDown(2))
-        {
-            m_camera.Pan(mouseMove);
-        }
-        else
-        {
-            m_panning = false;
-            Win32Application::RestoreCursor();
-        }
-    }
-
-    // Operations in ProcessInput are immediate, requiring no interpolation.
-    m_camera.SnapshotState();
 }
 
 void Renderer::DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)

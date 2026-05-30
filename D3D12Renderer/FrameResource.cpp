@@ -29,7 +29,9 @@ void FrameResource::Init(
     DescriptorAllocation&& selectionMaskRtvAllocation,
     DescriptorAllocation&& selectionMaskSrvAllocation,
     DescriptorAllocation&& horizontalDilatedMaskRtvAllocation,
-    DescriptorAllocation&& horizontalDilatedMaskSrvAllocation)
+    DescriptorAllocation&& horizontalDilatedMaskSrvAllocation,
+    DescriptorAllocation&& toneMappedBufferRtvAllocation,
+    ImGuiDescriptorAllocation&& toneMappedBufferSrvAllocation)
 {
     m_pDevice = pDevice;
 
@@ -74,6 +76,11 @@ void FrameResource::Init(
     m_horizontalDilatedMaskRtv = RenderTargetView(std::move(horizontalDilatedMaskRtvAllocation));
     m_horizontalDilatedMaskSrv = ShaderResourceView(std::move(horizontalDilatedMaskSrvAllocation));
     CreateMasks(width, height);
+
+    // ToneMappedBuffer
+    m_toneMappedBufferSrv = ImGuiShaderResourceView(std::move(toneMappedBufferSrvAllocation));
+    m_toneMappedBufferRtv = RenderTargetView(std::move(toneMappedBufferRtvAllocation));
+    CreateToneMappedBuffer(width, height);
 
     // Create Upload buffer
     m_instanceUploadBuffer = Buffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, D3D12_HEAP_TYPE_UPLOAD);
@@ -271,6 +278,37 @@ void FrameResource::ResetMasks()
 {
     m_selectionMask.Reset();
     m_horizontalDilatedMask.Reset();
+}
+
+// ToneMappedBuffer
+void FrameResource::CreateToneMappedBuffer(UINT64 width, UINT height)
+{
+    const auto format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    const auto clearValue = CreateClearValue(format, 0.0f, 0.0f, 0.0f, 0.0f);
+
+    m_toneMappedBuffer = Texture(
+        m_pDevice,
+        GetTexture2DDesc(width, height, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET),
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+        &clearValue);
+
+    m_toneMappedBufferRtv.Init(m_pDevice, m_toneMappedBuffer.Get(), GetRtvDesc(format, 0));
+    m_toneMappedBufferSrv.Init(m_pDevice, m_toneMappedBuffer.Get(), GetSrvDesc(format, 1));
+}
+
+ID3D12Resource* FrameResource::GetToneMappedBuffer() const
+{
+    return m_toneMappedBuffer.Get();
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetToneMappedBufferRtvHandle() const
+{
+    return m_toneMappedBufferRtv.GetHandle();
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE FrameResource::GetToneMappedBufferSrvHandle() const
+{
+    return m_toneMappedBufferSrv.GetGpuHandle();
 }
 
 // Instance data

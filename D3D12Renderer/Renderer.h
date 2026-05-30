@@ -2,8 +2,6 @@
 
 #include <array>
 #include <chrono>
-#include <cstddef>
-#include <memory>
 #include <ratio>
 #include <string>
 #include <unordered_map>
@@ -102,10 +100,11 @@ public:
     void OnResize(UINT width, UINT height);
     void OnDpiChanged(UINT dpi);
 
+    void ProcessInput();
     void BuildImGuiFrame();
 
-    static void ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle);
-    static void ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle);
+    static void ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle);
+    static void ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle);
 
 private:
     // Window
@@ -260,6 +259,5 @@ private:
     void DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
     void DrawEntity(ID3D12GraphicsCommandList* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
 
-    void ProcessInput();
     void BeginOrbit();
 };

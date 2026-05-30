@@ -10,12 +10,14 @@
 #include <minwindef.h>
 
 #include "Buffer.h"
+#include "ImGuiShaderResourceView.h"
 #include "SharedConfig.h"
 #include "Texture.h"
 #include "TransientUploadAllocator.h"
 #include "View.h"
 
 class DescriptorAllocation;
+class ImGuiDescriptorAllocation;
 struct InstanceData;
 struct UploadAllocation;
 
@@ -43,7 +45,9 @@ public:
         DescriptorAllocation&& selectionMaskRtvAllocation,
         DescriptorAllocation&& selectionMaskSrvAllocation,
         DescriptorAllocation&& horizontalDilatedMaskRtvAllocation,
-        DescriptorAllocation&& horizontalDilatedMaskSrvAllocation);
+        DescriptorAllocation&& horizontalDilatedMaskSrvAllocation,
+        DescriptorAllocation&& toneMappedBufferRtvAllocation,
+        ImGuiDescriptorAllocation&& toneMappedBufferSrvAllocation);
 
     // Back buffer
     void AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameIndex);
@@ -76,6 +80,12 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetHorizontalDilatedMaskRtvHandle() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetHorizontalDilatedMaskSrvHandle() const;
     void ResetMasks();
+
+    // ToneMappedBuffer
+    void CreateToneMappedBuffer(UINT64 width, UINT height);
+    ID3D12Resource* GetToneMappedBuffer() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetToneMappedBufferRtvHandle() const;
+    D3D12_GPU_DESCRIPTOR_HANDLE GetToneMappedBufferSrvHandle() const;
 
     // Instance data
     void ResetInstanceOffsetByte();
@@ -112,6 +122,10 @@ private:
     Texture m_horizontalDilatedMask;
     RenderTargetView m_horizontalDilatedMaskRtv;
     ShaderResourceView m_horizontalDilatedMaskSrv;
+
+    Texture m_toneMappedBuffer;
+    RenderTargetView m_toneMappedBufferRtv;
+    ImGuiShaderResourceView m_toneMappedBufferSrv;
 
     Buffer m_instanceUploadBuffer;
     UINT8* m_instanceBufferBegin = nullptr;
