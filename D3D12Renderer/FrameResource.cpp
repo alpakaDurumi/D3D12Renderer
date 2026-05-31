@@ -4,6 +4,7 @@
 
 #include "D3DHelper.h"
 #include "DescriptorAllocation.h"
+#include "ImGuiDescriptorAllocation.h"
 #include "InstanceData.h"
 #include "UploadAllocation.h"
 #include "Utility.h"
@@ -21,6 +22,8 @@ void FrameResource::Init(
     ID3D12Device10* pDevice,
     IDXGISwapChain* pSwapChain,
     UINT frameIndex,
+    UINT sceneWidth,
+    UINT sceneHeight,
     DescriptorAllocation&& rtvAllocation,
     DescriptorAllocation&& sceneBufferRtvAllocation,
     DescriptorAllocation&& sceneBufferSrvAllocation,
@@ -41,10 +44,6 @@ void FrameResource::Init(
         AcquireBackBuffer(pSwapChain, frameIndex);
     }
 
-    auto rtDesc = m_backBuffer.Get()->GetDesc();
-    const UINT64 width = rtDesc.Width;
-    const UINT height = rtDesc.Height;
-
     // Scene color buffers
     {
         auto rtvAllocs = sceneBufferRtvAllocation.Split();
@@ -54,7 +53,7 @@ void FrameResource::Init(
             m_sceneColorBufferRtvs[i] = RenderTargetView(std::move(rtvAllocs[i]));
             m_sceneColorBufferSrvs[i] = ShaderResourceView(std::move(srvAllocs[i]));
         }
-        CreateSceneColorBuffers(width, height);
+        CreateSceneColorBuffers(sceneWidth, sceneHeight);
     }
 
     // GBuffers
@@ -66,7 +65,7 @@ void FrameResource::Init(
             m_gBufferRtvs[i] = RenderTargetView(std::move(rtvAllocs[i]));
             m_gBufferSrvs[i] = ShaderResourceView(std::move(srvAllocs[i]));
         }
-        CreateGBuffers(width, height);
+        CreateGBuffers(sceneWidth, sceneHeight);
     }
 
     // Create masks
@@ -74,12 +73,12 @@ void FrameResource::Init(
     m_selectionMaskSrv = ShaderResourceView(std::move(selectionMaskSrvAllocation));
     m_horizontalDilatedMaskRtv = RenderTargetView(std::move(horizontalDilatedMaskRtvAllocation));
     m_horizontalDilatedMaskSrv = ShaderResourceView(std::move(horizontalDilatedMaskSrvAllocation));
-    CreateMasks(width, height);
+    CreateMasks(sceneWidth, sceneHeight);
 
     // ToneMappedBuffer
     m_toneMappedBufferSrv = ImGuiShaderResourceView(std::move(toneMappedBufferSrvAllocation));
     m_toneMappedBufferRtv = RenderTargetView(std::move(toneMappedBufferRtvAllocation));
-    CreateToneMappedBuffer(width, height);
+    CreateToneMappedBuffer(sceneWidth, sceneHeight);
 
     // Create Upload buffer
     m_instanceUploadBuffer = Buffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, D3D12_HEAP_TYPE_UPLOAD);

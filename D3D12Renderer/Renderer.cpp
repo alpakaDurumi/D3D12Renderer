@@ -193,9 +193,9 @@ Renderer::Renderer(std::wstring name)
 
 Renderer::~Renderer() = default;
 
-std::pair<UINT, UINT> Renderer::GetResolution() const
+std::pair<UINT, UINT> Renderer::GetWindowResolution() const
 {
-    return {m_width, m_height};
+    return {m_windowWidth, m_windowHeight};
 }
 
 const WCHAR* Renderer::GetTitle() const
@@ -222,14 +222,10 @@ void Renderer::SetPix()
     }
 }
 
-void Renderer::SetResolution(UINT width, UINT height)
+void Renderer::SetWindowResolution(UINT width, UINT height)
 {
-    m_width = width == 0 ? m_width : width;
-    m_height = height == 0 ? m_height : height;
-
-    m_camera.SetAspectRatio(static_cast<float>(m_width) / static_cast<float>(m_height));
-    m_viewport = {0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f};
-    m_scissorRect = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
+    m_windowWidth = width == 0 ? m_windowWidth : width;
+    m_windowHeight = height == 0 ? m_windowHeight : height;
 }
 
 void Renderer::Init(UINT dpi)
@@ -369,8 +365,17 @@ void Renderer::BuildImGuiFrame()
     {
         ImGui::Begin("Scene");
 
-        const auto srvGpuHandle = m_frameResources[m_frameIndex].GetToneMappedBufferSrvHandle();
-        ImGui::Image(static_cast<ImTextureID>(srvGpuHandle.ptr), ImVec2(static_cast<float>(m_width), static_cast<float>(m_height)));
+        ImVec2 resolution = ImGui::GetContentRegionAvail();
+        if (resolution.x >= 1.0f && resolution.y >= 1.0f)
+        {
+            UINT width = static_cast<UINT>(resolution.x);
+            UINT height = static_cast<UINT>(resolution.y);
+            if (width != m_sceneWidth || height != m_sceneHeight)
+                ResizeSceneResolution(width, height);
+
+            const auto srvGpuHandle = m_frameResources[m_frameIndex].GetToneMappedBufferSrvHandle();
+            ImGui::Image(static_cast<ImTextureID>(srvGpuHandle.ptr), resolution);
+        }
 
         ImGui::End();
     }
@@ -688,91 +693,32 @@ void Renderer::OnKillFocus()
 
 void Renderer::OnResize(UINT width, UINT height)
 {
-    if ((width == m_width && height == m_height) ||
+    if ((width == m_windowWidth && height == m_windowHeight) ||
         (width == 0u && height == 0u))
         return;
 
     // Wait till GPU complete currently queued works
     WaitForGpu();
 
-    SetResolution(width, height);
+    SetWindowResolution(width, height);
 
     // Before calling ResizeBuffers, all backbuffer references should be released.
     for (auto& frameResource : m_frameResources)
         frameResource.ResetBackBuffer();
 
     // Preserve existing format
-    ThrowIfFailed(m_swapChain->ResizeBuffers(FrameCount, m_width, m_height, DXGI_FORMAT_UNKNOWN, m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0));
+    ThrowIfFailed(m_swapChain->ResizeBuffers(FrameCount, m_windowWidth, m_windowHeight, DXGI_FORMAT_UNKNOWN, m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-    // Re-acquire backBuffer, recreate buffers, re-init views
+    // Re-acquire backBuffer
     for (UINT i = 0; i < FrameCount; i++)
     {
         auto& frameResource = m_frameResources[i];
 
         frameResource.AcquireBackBuffer(m_swapChain.Get(), i);
-        frameResource.CreateSceneColorBuffers(m_width, m_height);
-        frameResource.CreateGBuffers(m_width, m_height);
-        frameResource.CreateMasks(m_width, m_height);
-        frameResource.CreateToneMappedBuffer(m_width, m_height);
-
         // Set current frame's fence value to all frameResources
         frameResource.UpdateSignaledFenceValue(m_frameResources[m_frameIndex].GetSignaledFenceValue());
     }
-
-    // Recreate depth-stencil buffer, DSV, and SRV
-    auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
-    m_depthStencilBuffer = Texture(
-        m_device.Get(),
-        GetTexture2DDesc(m_width, m_height, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
-        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
-        &clearValue);
-    m_dsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT));
-    m_readOnlyDsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH));
-    m_depthSrv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1));
-
-    // Update registered info
-    auto sceneColorBuffer0 = m_renderGraph.GetRGTexture("SceneColorBuffer0");
-    std::vector<ID3D12Resource*> pSceneColorBuffers0(FrameCount);
-    for (UINT i = 0; i < FrameCount; ++i)
-        pSceneColorBuffers0[i] = m_frameResources[i].GetSceneColorBuffer(0);
-    m_renderGraph.UpdateElement(sceneColorBuffer0, 0, pSceneColorBuffers0);
-
-    auto sceneColorBuffer1 = m_renderGraph.GetRGTexture("SceneColorBuffer1");
-    std::vector<ID3D12Resource*> pSceneColorBuffers1(FrameCount);
-    for (UINT i = 0; i < FrameCount; ++i)
-        pSceneColorBuffers1[i] = m_frameResources[i].GetSceneColorBuffer(1);
-    m_renderGraph.UpdateElement(sceneColorBuffer1, 0, pSceneColorBuffers1);
-
-    auto depthStencilBuffer = m_renderGraph.GetRGTexture("DepthStencilBuffer");
-    m_renderGraph.UpdateElement(depthStencilBuffer, 0, {m_depthStencilBuffer.Get()});
-
-    auto gBuffer = m_renderGraph.GetRGTexture("GBuffer");
-    for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
-    {
-        std::vector<ID3D12Resource*> pGBuffers(FrameCount);
-        for (UINT i = 0; i < FrameCount; ++i)
-            pGBuffers[i] = m_frameResources[i].GetGBuffer(static_cast<GBufferSlot>(slot));
-        m_renderGraph.UpdateElement(gBuffer, slot, pGBuffers);
-    }
-
-    auto selectionMask = m_renderGraph.GetRGTexture("SelectionMask");
-    std::vector<ID3D12Resource*> pSelectionMasks(FrameCount);
-    for (UINT i = 0; i < FrameCount; ++i)
-        pSelectionMasks[i] = m_frameResources[i].GetSelectionMask();
-    m_renderGraph.UpdateElement(selectionMask, 0, pSelectionMasks);
-
-    auto horizontalDilatedMask = m_renderGraph.GetRGTexture("HorizontalDilatedMask");
-    std::vector<ID3D12Resource*> pHorizontalDilatedMasks(FrameCount);
-    for (UINT i = 0; i < FrameCount; ++i)
-        pHorizontalDilatedMasks[i] = m_frameResources[i].GetHorizontalDilatedMask();
-    m_renderGraph.UpdateElement(horizontalDilatedMask, 0, pHorizontalDilatedMasks);
-
-    auto toneMappedBuffer = m_renderGraph.GetRGTexture("ToneMappedBuffer");
-    std::vector<ID3D12Resource*> pToneMappedBuffers(FrameCount);
-    for (UINT i = 0; i < FrameCount; ++i)
-        pToneMappedBuffers[i] = m_frameResources[i].GetToneMappedBuffer();
-    m_renderGraph.UpdateElement(toneMappedBuffer, 0, pToneMappedBuffers);
 }
 
 void Renderer::OnDpiChanged(UINT dpi)
@@ -885,8 +831,8 @@ void Renderer::LoadPipeline()
 
     // Describe and create the swap chain.
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-    swapChainDesc.Width = m_width;
-    swapChainDesc.Height = m_height;
+    swapChainDesc.Width = m_windowWidth;
+    swapChainDesc.Height = m_windowHeight;
     swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     swapChainDesc.Stereo = FALSE;
     swapChainDesc.SampleDesc = {1, 0};
@@ -922,6 +868,8 @@ void Renderer::LoadPipeline()
             m_device.Get(),
             m_swapChain.Get(),
             i,
+            m_sceneWidth,
+            m_sceneHeight,
             std::move(rtvAllocations[i]),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(FrameResource::SceneColorBufferCount),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(FrameResource::SceneColorBufferCount),
@@ -997,7 +945,7 @@ void Renderer::LoadAssets()
     auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
     m_depthStencilBuffer = Texture(
         m_device.Get(),
-        GetTexture2DDesc(m_width, m_height, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
+        GetTexture2DDesc(m_sceneWidth, m_sceneHeight, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
         D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
         &clearValue);
     m_dsv = DepthStencilView(
@@ -1015,6 +963,10 @@ void Renderer::LoadAssets()
         m_depthStencilBuffer.Get(),
         GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate());
+
+    m_viewport = {0.0f, 0.0f, static_cast<float>(m_sceneWidth), static_cast<float>(m_sceneHeight), 0.0f, 1.0f};
+    m_scissorRect = {0, 0, static_cast<LONG>(m_sceneWidth), static_cast<LONG>(m_sceneHeight)};
+    m_camera.SetAspectRatio(static_cast<float>(m_sceneWidth) / static_cast<float>(m_sceneHeight));
 
     // Set viewport and scissorRect for shadow mapping
     m_shadowMapViewport = {0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f};
@@ -1521,6 +1473,82 @@ void Renderer::BeginOrbit()
     XMVECTOR camPos = m_camera.GetCurrentPosition();
     XMStoreFloat3(&m_orbitPivot, camPos + m_camera.GetForward() * m_orbitDistance);
     m_orbiting = true;
+}
+
+void Renderer::ResizeSceneResolution(UINT width, UINT height)
+{
+    WaitForGpu();
+
+    m_sceneWidth = width;
+    m_sceneHeight = height;
+
+    m_viewport = {0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
+    m_scissorRect = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
+
+    m_camera.SetAspectRatio(static_cast<float>(width) / static_cast<float>(height));
+
+    for (UINT i = 0; i < FrameCount; i++)
+    {
+        auto& frameResource = m_frameResources[i];
+        frameResource.CreateSceneColorBuffers(width, height);
+        frameResource.CreateGBuffers(width, height);
+        frameResource.CreateMasks(width, height);
+        frameResource.CreateToneMappedBuffer(width, height);
+    }
+
+    // Recreate depth-stencil buffer, DSV, and SRV
+    auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
+    m_depthStencilBuffer = Texture(
+        m_device.Get(),
+        GetTexture2DDesc(width, height, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
+        &clearValue);
+    m_dsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT));
+    m_readOnlyDsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH));
+    m_depthSrv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1));
+
+    // Update registered info
+    auto sceneColorBuffer0 = m_renderGraph.GetRGTexture("SceneColorBuffer0");
+    std::vector<ID3D12Resource*> pSceneColorBuffers0(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pSceneColorBuffers0[i] = m_frameResources[i].GetSceneColorBuffer(0);
+    m_renderGraph.UpdateElement(sceneColorBuffer0, 0, pSceneColorBuffers0);
+
+    auto sceneColorBuffer1 = m_renderGraph.GetRGTexture("SceneColorBuffer1");
+    std::vector<ID3D12Resource*> pSceneColorBuffers1(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pSceneColorBuffers1[i] = m_frameResources[i].GetSceneColorBuffer(1);
+    m_renderGraph.UpdateElement(sceneColorBuffer1, 0, pSceneColorBuffers1);
+
+    auto depthStencilBuffer = m_renderGraph.GetRGTexture("DepthStencilBuffer");
+    m_renderGraph.UpdateElement(depthStencilBuffer, 0, {m_depthStencilBuffer.Get()});
+
+    auto gBuffer = m_renderGraph.GetRGTexture("GBuffer");
+    for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
+    {
+        std::vector<ID3D12Resource*> pGBuffers(FrameCount);
+        for (UINT i = 0; i < FrameCount; ++i)
+            pGBuffers[i] = m_frameResources[i].GetGBuffer(static_cast<GBufferSlot>(slot));
+        m_renderGraph.UpdateElement(gBuffer, slot, pGBuffers);
+    }
+
+    auto selectionMask = m_renderGraph.GetRGTexture("SelectionMask");
+    std::vector<ID3D12Resource*> pSelectionMasks(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pSelectionMasks[i] = m_frameResources[i].GetSelectionMask();
+    m_renderGraph.UpdateElement(selectionMask, 0, pSelectionMasks);
+
+    auto horizontalDilatedMask = m_renderGraph.GetRGTexture("HorizontalDilatedMask");
+    std::vector<ID3D12Resource*> pHorizontalDilatedMasks(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pHorizontalDilatedMasks[i] = m_frameResources[i].GetHorizontalDilatedMask();
+    m_renderGraph.UpdateElement(horizontalDilatedMask, 0, pHorizontalDilatedMasks);
+
+    auto toneMappedBuffer = m_renderGraph.GetRGTexture("ToneMappedBuffer");
+    std::vector<ID3D12Resource*> pToneMappedBuffers(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pToneMappedBuffers[i] = m_frameResources[i].GetToneMappedBuffer();
+    m_renderGraph.UpdateElement(toneMappedBuffer, 0, pToneMappedBuffers);
 }
 
 void Renderer::SetFpsCap(std::string fps)

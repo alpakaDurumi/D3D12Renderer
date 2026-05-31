@@ -37,6 +37,8 @@ public:
         ID3D12Device10* pDevice,
         IDXGISwapChain* pSwapChain,
         UINT frameIndex,
+        UINT sceneWidth,
+        UINT sceneHeight,
         DescriptorAllocation&& rtvAllocation,
         DescriptorAllocation&& sceneBufferRtvAllocation,
         DescriptorAllocation&& sceneBufferSrvAllocation,

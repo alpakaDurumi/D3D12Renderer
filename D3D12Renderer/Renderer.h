@@ -53,13 +53,13 @@ public:
     Renderer(std::wstring name);
     ~Renderer();
 
-    std::pair<UINT, UINT> GetResolution() const;
+    std::pair<UINT, UINT> GetWindowResolution() const;
     const WCHAR* GetTitle() const;
     static Renderer* GetInstance();
 
     void SetWarp(bool value);
     void SetPix();
-    void SetResolution(UINT width, UINT height);
+    void SetWindowResolution(UINT width, UINT height);
 
     void Init(UINT dpi);
     void ProcessInput();
@@ -83,8 +83,8 @@ public:
 
 private:
     // Window
-    UINT m_width = 1920;
-    UINT m_height = 1080;
+    UINT m_windowWidth = 1920;
+    UINT m_windowHeight = 1080;
     std::wstring m_title;
     bool m_vSync = false;
     bool m_tearingSupported = false;
@@ -92,6 +92,10 @@ private:
     int m_fpsCap = -1;
     float m_dpiScale;
     RECT m_windowRect;
+
+    // Scene ImGui Window
+    UINT m_sceneWidth = m_windowWidth;
+    UINT m_sceneHeight = m_windowHeight;
     D3D12_VIEWPORT m_viewport;
     D3D12_RECT m_scissorRect;
 
@@ -175,6 +179,7 @@ private:
     void BeginOrbit();
 
     // BuildImGuiFrame
+    void ResizeSceneResolution(UINT width, UINT height);
     void SetFpsCap(std::string fps);
     void SetTextureFiltering(TextureFiltering filtering);
     void RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete, bool& selectionChanged);
