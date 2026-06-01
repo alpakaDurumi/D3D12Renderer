@@ -357,6 +357,11 @@ void Renderer::ProcessInput()
 
 void Renderer::BuildImGuiFrame()
 {
+    static UINT64 frameCounter = 0;
+    static double elapsedSeconds = 0.0;
+    static double fps = 0.0;
+    static double frameTime = 0.0;
+
     // ImGui::ShowDemoWindow(); // Show demo window! :)
 
     ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_None);
@@ -365,16 +370,30 @@ void Renderer::BuildImGuiFrame()
     {
         ImGui::Begin("Scene");
 
-        ImVec2 resolution = ImGui::GetContentRegionAvail();
-        if (resolution.x >= 1.0f && resolution.y >= 1.0f)
+        static constexpr double DEBOUNCE_DELAY = 0.15; // 0.15 sec
+
+        ImVec2 measured = ImGui::GetContentRegionAvail();
+        if (measured.x >= 1.0f && measured.y >= 1.0f)
         {
-            UINT width = static_cast<UINT>(resolution.x);
-            UINT height = static_cast<UINT>(resolution.y);
-            if (width != m_sceneWidth || height != m_sceneHeight)
+            UINT width = static_cast<UINT>(measured.x);
+            UINT height = static_cast<UINT>(measured.y);
+
+            // If scene size changed
+            if (width != m_pendingSceneWidth || height != m_pendingSceneHeight)
+            {
+                m_pendingSceneWidth = width;
+                m_pendingSceneHeight = height;
+                m_lastResizeRequestTime = m_prevTime;
+            }
+            // If pending size not been applied yet, and debounce delay has passed
+            else if ((width != m_sceneWidth || height != m_sceneHeight) &&
+                     (std::chrono::duration<double>(m_prevTime - m_lastResizeRequestTime).count() >= DEBOUNCE_DELAY))
+            {
                 ResizeSceneResolution(width, height);
+            }
 
             const auto srvGpuHandle = m_frameResources[m_frameIndex].GetToneMappedBufferSrvHandle();
-            ImGui::Image(static_cast<ImTextureID>(srvGpuHandle.ptr), resolution);
+            ImGui::Image(static_cast<ImTextureID>(srvGpuHandle.ptr), measured);
         }
 
         ImGui::End();
@@ -384,13 +403,7 @@ void Renderer::BuildImGuiFrame()
     {
         ImGui::Begin("Test");
 
-        static UINT64 frameCounter = 0;
-        static double elapsedSeconds = 0.0;
-
         ++frameCounter;
-
-        static double fps = 0.0;
-        static double frameTime = 0.0;
 
         elapsedSeconds += std::chrono::duration<double>(m_deltaTime).count();
         if (elapsedSeconds >= 1.0)

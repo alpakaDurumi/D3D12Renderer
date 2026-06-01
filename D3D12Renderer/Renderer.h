@@ -96,6 +96,9 @@ private:
     // Scene ImGui Window
     UINT m_sceneWidth = m_windowWidth;
     UINT m_sceneHeight = m_windowHeight;
+    UINT m_pendingSceneWidth = 0;
+    UINT m_pendingSceneHeight = 0;
+    std::chrono::time_point<std::chrono::steady_clock> m_lastResizeRequestTime;
     D3D12_VIEWPORT m_viewport;
     D3D12_RECT m_scissorRect;
 
