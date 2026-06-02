@@ -62,10 +62,12 @@ public:
     void SetWindowResolution(UINT width, UINT height);
 
     void Init(UINT dpi);
+    void BeginFrameTiming();
     void ProcessInput();
     void BuildImGuiFrame();
     void Update();
     void Render();
+    void EndFrameTiming();
     void Destroy();
 
     void OnKeyDown(VKCode key);

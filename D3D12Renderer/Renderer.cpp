@@ -241,6 +241,14 @@ void Renderer::Init(UINT dpi)
     m_deadLine = m_prevTime;
 }
 
+void Renderer::BeginFrameTiming()
+{
+    auto now = m_clock.now();
+
+    m_deltaTime = now - m_prevTime;
+    m_prevTime = now;
+}
+
 void Renderer::ProcessInput()
 {
     if (m_inputManager.IsKeyPressed(VK_ESCAPE))
@@ -532,32 +540,10 @@ void Renderer::BuildImGuiFrame()
 
 void Renderer::Update()
 {
-    auto now = m_clock.now();
-
-    if (!m_vSync && m_fpsCap > 0)
-    {
-        if (now < m_deadLine)
-        {
-            std::this_thread::sleep_until(m_deadLine);
-            now = m_clock.now(); // Re-measure current time_point after sleep so m_deltaTime reflects actual elapsed time
-        }
-
-        m_deadLine += std::chrono::duration_cast<std::chrono::steady_clock::duration>(m_targetPeriod);
-
-        // If too late, re-sync
-        if (m_deadLine < now && (now - m_deadLine) > 2 * m_targetPeriod)
-        {
-            m_deadLine = now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(m_targetPeriod);
-        }
-    }
-
-    m_deltaTime = now - m_prevTime;
-    m_prevTime = now;
-
-    static double fixedDtMs = 1000.0 / 60.0; // Target to 60Hz fixed time step
+    static constexpr double fixedDtMs = 1000.0 / 60.0; // Target to 60Hz fixed time step
     static double accumulatedMs = 0.0;
 
-    accumulatedMs += std::chrono::duration<double, std::milli>(m_deltaTime).count();
+    accumulatedMs += m_deltaTime.count();
     while (accumulatedMs >= fixedDtMs)
     {
         FixedUpdate(fixedDtMs);
@@ -653,6 +639,23 @@ void Renderer::Render()
     ThrowIfFailed(m_swapChain->Present(syncInterval, presentFlags));
 
     MoveToNextFrame();
+}
+
+void Renderer::EndFrameTiming()
+{
+    if (!m_vSync && m_fpsCap > 0)
+    {
+        auto now = m_clock.now();
+
+        if (now < m_deadLine)
+            std::this_thread::sleep_until(m_deadLine);
+
+        m_deadLine += std::chrono::duration_cast<std::chrono::steady_clock::duration>(m_targetPeriod);
+
+        // If too late, re-sync
+        if (m_deadLine < now && (now - m_deadLine) > 2 * m_targetPeriod)
+            m_deadLine = now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(m_targetPeriod);
+    }
 }
 
 void Renderer::Destroy()

@@ -124,10 +124,12 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
+        pRenderer->BeginFrameTiming();
         pRenderer->ProcessInput();
         pRenderer->BuildImGuiFrame();
         pRenderer->Update();
         pRenderer->Render();
+        pRenderer->EndFrameTiming();
     }
 
     pRenderer->Destroy();
