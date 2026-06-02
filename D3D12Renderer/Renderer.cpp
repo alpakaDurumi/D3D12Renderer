@@ -366,7 +366,7 @@ void Renderer::ProcessInput()
 void Renderer::BuildImGuiFrame()
 {
     static UINT64 frameCounter = 0;
-    static double elapsedSeconds = 0.0;
+    static std::chrono::nanoseconds elapsed = std::chrono::nanoseconds::zero();
     static double fps = 0.0;
     static double frameTime = 0.0;
 
@@ -413,14 +413,15 @@ void Renderer::BuildImGuiFrame()
 
         ++frameCounter;
 
-        elapsedSeconds += std::chrono::duration<double>(m_deltaTime).count();
+        elapsed += m_deltaTime;
+        const double elapsedSeconds = std::chrono::duration<double>(elapsed).count();
         if (elapsedSeconds >= 1.0)
         {
             fps = frameCounter / elapsedSeconds;
             frameTime = 1000.0 / fps;
 
             frameCounter = 0;
-            elapsedSeconds = 0.0;
+            elapsed = std::chrono::nanoseconds::zero();
         }
 
         ImGui::Text("FPS: %.1f", fps);
@@ -540,17 +541,17 @@ void Renderer::BuildImGuiFrame()
 
 void Renderer::Update()
 {
-    static constexpr double fixedDtMs = 1000.0 / 60.0; // Target to 60Hz fixed time step
-    static double accumulatedMs = 0.0;
+    static constexpr std::chrono::nanoseconds fixedDt(1'000'000'000 / 60); // Target to 60Hz fixed time step
+    static std::chrono::nanoseconds accumulated = std::chrono::nanoseconds::zero();
 
-    accumulatedMs += m_deltaTime.count();
-    while (accumulatedMs >= fixedDtMs)
+    accumulated += m_deltaTime;
+    while (accumulated >= fixedDt)
     {
-        FixedUpdate(fixedDtMs);
-        accumulatedMs -= fixedDtMs;
+        FixedUpdate(fixedDt);
+        accumulated -= fixedDt;
     }
 
-    float alpha = std::clamp(static_cast<float>(accumulatedMs / fixedDtMs), 0.0f, 1.0f);
+    float alpha = std::clamp(static_cast<float>(accumulated.count()) / fixedDt.count(), 0.0f, 1.0f);
 
     // 이번에 드로우할 프레임에 대해 constant buffers 업데이트
     FrameResource& frameResource = m_frameResources[m_frameIndex];
@@ -650,11 +651,11 @@ void Renderer::EndFrameTiming()
         if (now < m_deadLine)
             std::this_thread::sleep_until(m_deadLine);
 
-        m_deadLine += std::chrono::duration_cast<std::chrono::steady_clock::duration>(m_targetPeriod);
+        m_deadLine += m_targetPeriod;
 
         // If too late, re-sync
         if (m_deadLine < now && (now - m_deadLine) > 2 * m_targetPeriod)
-            m_deadLine = now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(m_targetPeriod);
+            m_deadLine = now + m_targetPeriod;
     }
 }
 
@@ -1575,7 +1576,9 @@ void Renderer::SetFpsCap(std::string fps)
     {
         m_fpsCap = std::stoi(fps);
         m_deadLine = m_clock.now();
-        m_targetPeriod = std::chrono::duration<double, std::milli>(1000.0 / m_fpsCap);
+
+        auto temp = std::chrono::duration<double, std::nano>(1e9 / m_fpsCap);
+        m_targetPeriod = std::chrono::duration_cast<std::chrono::nanoseconds>(temp);
     }
 }
 
@@ -1621,9 +1624,9 @@ void Renderer::RenderEntityNode(const Entity& entity, EntityHandle& selected, En
     }
 }
 
-void Renderer::FixedUpdate(double fixedDtMs)
+void Renderer::FixedUpdate(std::chrono::nanoseconds fixedDt)
 {
-    float fixedDtSec = static_cast<float>(fixedDtMs) * 0.001f;
+    const float fixedDtSec = fixedDt.count() * 1e-9f;
 
     // Camera
     static float cameraMoveSpeed = 50.0f;

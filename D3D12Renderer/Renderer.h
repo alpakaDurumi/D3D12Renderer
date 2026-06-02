@@ -166,8 +166,8 @@ private:
     std::chrono::steady_clock m_clock;
     std::chrono::time_point<std::chrono::steady_clock> m_prevTime;
     std::chrono::time_point<std::chrono::steady_clock> m_deadLine;
-    std::chrono::duration<double, std::milli> m_deltaTime;
-    std::chrono::duration<double, std::milli> m_targetPeriod;
+    std::chrono::nanoseconds m_deltaTime;
+    std::chrono::nanoseconds m_targetPeriod;
 
     // Singleton
     inline static Renderer* sm_instance = nullptr;
@@ -191,7 +191,7 @@ private:
     void RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete, bool& selectionChanged);
 
     // Update
-    void FixedUpdate(double fixedDt);
+    void FixedUpdate(std::chrono::nanoseconds fixedDt);
     void PrepareConstantData(float alpha);
     void PrepareTransform(Entity& entity, DirectX::XMMATRIX& accumulated, float alpha);
     std::vector<DirectX::BoundingSphere> CalcCascadeSpheres();
