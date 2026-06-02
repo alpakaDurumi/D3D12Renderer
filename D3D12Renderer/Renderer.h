@@ -165,6 +165,7 @@ private:
     std::chrono::time_point<std::chrono::steady_clock> m_prevTime;
     std::chrono::time_point<std::chrono::steady_clock> m_deadLine;
     std::chrono::duration<double, std::milli> m_deltaTime;
+    std::chrono::duration<double, std::milli> m_targetPeriod;
 
     // Singleton
     inline static Renderer* sm_instance = nullptr;

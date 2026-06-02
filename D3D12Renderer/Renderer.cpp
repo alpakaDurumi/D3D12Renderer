@@ -536,20 +536,18 @@ void Renderer::Update()
 
     if (!m_vSync && m_fpsCap > 0)
     {
-        auto targetMs = std::chrono::duration<double, std::milli>(1000.0 / m_fpsCap);
-
         if (now < m_deadLine)
         {
             std::this_thread::sleep_until(m_deadLine);
         }
 
-        m_deadLine += std::chrono::duration_cast<std::chrono::steady_clock::duration>(targetMs);
+        m_deadLine += std::chrono::duration_cast<std::chrono::steady_clock::duration>(m_targetPeriod);
 
         now = m_clock.now();
         // If too late, re-sync
-        if (m_deadLine < now && (now - m_deadLine) > 2 * targetMs)
+        if (m_deadLine < now && (now - m_deadLine) > 2 * m_targetPeriod)
         {
-            m_deadLine = now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(targetMs);
+            m_deadLine = now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(m_targetPeriod);
         }
     }
 
@@ -1574,6 +1572,7 @@ void Renderer::SetFpsCap(std::string fps)
     {
         m_fpsCap = std::stoi(fps);
         m_deadLine = m_clock.now();
+        m_targetPeriod = std::chrono::duration<double, std::milli>(1000.0 / m_fpsCap);
     }
 }
 
