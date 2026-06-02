@@ -539,11 +539,11 @@ void Renderer::Update()
         if (now < m_deadLine)
         {
             std::this_thread::sleep_until(m_deadLine);
+            now = m_clock.now(); // Re-measure current time_point after sleep so m_deltaTime reflects actual elapsed time
         }
 
         m_deadLine += std::chrono::duration_cast<std::chrono::steady_clock::duration>(m_targetPeriod);
 
-        now = m_clock.now();
         // If too late, re-sync
         if (m_deadLine < now && (now - m_deadLine) > 2 * m_targetPeriod)
         {
