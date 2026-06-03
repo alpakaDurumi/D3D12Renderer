@@ -95,7 +95,7 @@ private:
     float m_dpiScale;
     RECT m_windowRect;
 
-    // Scene ImGui Window
+    // ImGui (scene window, ini, etc.)
     UINT m_sceneWidth = m_windowWidth;
     UINT m_sceneHeight = m_windowHeight;
     UINT m_pendingSceneWidth = 0;
@@ -103,6 +103,8 @@ private:
     std::chrono::time_point<std::chrono::steady_clock> m_lastResizeRequestTime;
     D3D12_VIEWPORT m_viewport;
     D3D12_RECT m_scissorRect;
+
+    std::string m_imguiIniPath; // UTF-8
 
     // Device & swap chain
     Microsoft::WRL::ComPtr<ID3D12Device10> m_device;

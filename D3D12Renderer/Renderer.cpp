@@ -69,11 +69,13 @@ std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UI
 // https://devblogs.microsoft.com/pix/taking-a-capture/
 static std::wstring GetLatestWinPixGpuCapturerPath_Cpp17()
 {
-    LPWSTR programFilesPath = nullptr;
-    SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &programFilesPath);
+    PWSTR programFilesPath = nullptr;
+    SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, nullptr, &programFilesPath);
 
     std::filesystem::path pixInstallationPath = programFilesPath;
     pixInstallationPath /= "Microsoft PIX";
+
+    CoTaskMemFree(programFilesPath);
 
     std::wstring newestVersionFound;
 
@@ -1288,6 +1290,30 @@ void Renderer::InitImGui()
     ImGui_ImplDX12_Init(&init_info);
 
     ImGui::GetStyle().FontScaleMain = m_dpiScale;
+
+    // Create config directory in LocalAppData if not exists
+    PWSTR localAppDataPath = nullptr;
+    SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_DEFAULT, nullptr, &localAppDataPath);
+
+    std::filesystem::path configPath = std::filesystem::path(localAppDataPath) / "D3D12Renderer";
+    CoTaskMemFree(localAppDataPath);
+
+    bool configPathReady = false;
+    if (CreateDirectoryW(configPath.c_str(), nullptr))
+        configPathReady = true;
+    else
+    {
+        DWORD attr = GetFileAttributesW(configPath.c_str());
+        configPathReady = (attr != INVALID_FILE_ATTRIBUTES) && (attr & FILE_ATTRIBUTE_DIRECTORY);
+    }
+
+    // Set ImGui ini file in LocalAppData
+    if (configPathReady)
+    {
+        m_imguiIniPath = (configPath / "imgui.ini").u8string();
+        io.IniFilename = m_imguiIniPath.c_str();
+    }
+    // else: use ImGui default setting ("imgui.ini" in CWD)
 }
 
 void Renderer::CreateRootSignature()
