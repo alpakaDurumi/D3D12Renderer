@@ -12,6 +12,7 @@
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
 #include <imgui_impl_win32.h>
+#include <imgui_internal.h>
 
 #include "D3DHelper.h"
 #include "DescriptorAllocation.h"
@@ -28,9 +29,6 @@
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 using namespace D3DHelper;
-
-// Definition for static member
-Renderer* Renderer::sm_instance = nullptr;
 
 // Generate a simple black and white checkerboard texture.
 std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UINT texturePixelSize)
@@ -72,11 +70,13 @@ std::vector<UINT8> GenerateTextureData(UINT textureWidth, UINT textureHeight, UI
 // https://devblogs.microsoft.com/pix/taking-a-capture/
 static std::wstring GetLatestWinPixGpuCapturerPath_Cpp17()
 {
-    LPWSTR programFilesPath = nullptr;
-    SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &programFilesPath);
+    PWSTR programFilesPath = nullptr;
+    SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, nullptr, &programFilesPath);
 
     std::filesystem::path pixInstallationPath = programFilesPath;
     pixInstallationPath /= "Microsoft PIX";
+
+    CoTaskMemFree(programFilesPath);
 
     std::wstring newestVersionFound;
 
@@ -175,14 +175,14 @@ static D3D12_SAMPLER_DESC GetSamplerDesc(
 }
 
 // Wrappers of callback functions for ImGui SRV descriptor
-void Renderer::ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
+void Renderer::ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
 {
-    Renderer::GetInstance()->m_imguiDescriptorAllocator.Allocate(out_cpu_handle, out_gpu_handle);
+    Renderer::GetInstance()->m_imguiDescriptorAllocator.Allocate(outCpuHandle, outGpuHandle);
 }
 
-void Renderer::ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
+void Renderer::ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle)
 {
-    Renderer::GetInstance()->m_imguiDescriptorAllocator.Free(cpu_handle, gpu_handle);
+    Renderer::GetInstance()->m_imguiDescriptorAllocator.Free(cpuHandle, gpuHandle);
 }
 
 Renderer::Renderer(std::wstring name)
@@ -196,6 +196,26 @@ Renderer::Renderer(std::wstring name)
 
 Renderer::~Renderer() = default;
 
+std::pair<UINT, UINT> Renderer::GetWindowResolution() const
+{
+    return {m_windowWidth, m_windowHeight};
+}
+
+const WCHAR* Renderer::GetTitle() const
+{
+    return m_title.c_str();
+}
+
+Renderer* Renderer::GetInstance()
+{
+    return sm_instance;
+}
+
+void Renderer::SetWarp(bool value)
+{
+    m_useWarpDevice = value;
+}
+
 void Renderer::SetPix()
 {
     if (GetModuleHandleW(L"WinPixGpuCapturer.dll") == 0)
@@ -205,67 +225,13 @@ void Renderer::SetPix()
     }
 }
 
-void Renderer::UpdateWidthHeight()
+void Renderer::SetWindowResolution(UINT width, UINT height)
 {
-    m_camera.SetAspectRatio(static_cast<float>(m_width) / static_cast<float>(m_height));
-    m_viewport = {0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f};
-    m_scissorRect = {0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
+    m_windowWidth = width == 0 ? m_windowWidth : width;
+    m_windowHeight = height == 0 ? m_windowHeight : height;
 }
 
-void Renderer::ToggleFullScreen()
-{
-    SetFullScreen(!m_fullScreen);
-}
-
-void Renderer::SetFullScreen(bool fullScreen)
-{
-    if (m_fullScreen != fullScreen)
-    {
-        m_fullScreen = fullScreen;
-        if (m_fullScreen)
-        {
-            // Before switching to fullscreen mode, save window RECT
-            GetWindowRect(Win32Application::GetHwnd(), &m_windowRect);
-
-            // fullscreen borderless
-            UINT windowStyle = WS_OVERLAPPEDWINDOW & ~(WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
-            SetWindowLongPtrW(Win32Application::GetHwnd(), GWL_STYLE, windowStyle);
-
-            // Query the name of the nearest display device for the window.
-            // This is required to set the fullscreen dimensions of the window
-            // when using a multi-monitor setup.
-            HMONITOR hMonitor = MonitorFromWindow(Win32Application::GetHwnd(), MONITOR_DEFAULTTONEAREST);
-            MONITORINFOEXW monitorInfo = {};
-            monitorInfo.cbSize = sizeof(MONITORINFOEXW);
-            GetMonitorInfoW(hMonitor, &monitorInfo);
-
-            SetWindowPos(Win32Application::GetHwnd(), HWND_TOP,
-                         monitorInfo.rcMonitor.left,
-                         monitorInfo.rcMonitor.top,
-                         monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
-                         monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top,
-                         SWP_FRAMECHANGED | SWP_NOACTIVATE);
-
-            ShowWindow(Win32Application::GetHwnd(), SW_MAXIMIZE);
-        }
-        else
-        {
-            // Restore all the window decorators.
-            SetWindowLongW(Win32Application::GetHwnd(), GWL_STYLE, WS_OVERLAPPEDWINDOW);
-
-            SetWindowPos(Win32Application::GetHwnd(), HWND_NOTOPMOST,
-                         m_windowRect.left,
-                         m_windowRect.top,
-                         m_windowRect.right - m_windowRect.left,
-                         m_windowRect.bottom - m_windowRect.top,
-                         SWP_FRAMECHANGED | SWP_NOACTIVATE);
-
-            ShowWindow(Win32Application::GetHwnd(), SW_NORMAL);
-        }
-    }
-}
-
-void Renderer::OnInit(UINT dpi)
+void Renderer::Init(UINT dpi)
 {
     ThrowIfFailed(CoInitializeEx(nullptr, COINIT_MULTITHREADED)); // For initializing DirectXTex
     LoadPipeline();
@@ -278,45 +244,356 @@ void Renderer::OnInit(UINT dpi)
     m_deadLine = m_prevTime;
 }
 
-void Renderer::OnUpdate()
+void Renderer::BeginFrameTiming()
 {
-    ProcessInput();
-
     auto now = m_clock.now();
-
-    if (!m_vSync && m_fpsCap > 0)
-    {
-        auto targetMs = std::chrono::duration<double, std::milli>(1000.0 / m_fpsCap);
-
-        if (now < m_deadLine)
-        {
-            std::this_thread::sleep_until(m_deadLine);
-        }
-
-        m_deadLine += std::chrono::duration_cast<std::chrono::steady_clock::duration>(targetMs);
-
-        now = m_clock.now();
-        // If too late, re-sync
-        if (m_deadLine < now && (now - m_deadLine) > 2 * targetMs)
-        {
-            m_deadLine = now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(targetMs);
-        }
-    }
 
     m_deltaTime = now - m_prevTime;
     m_prevTime = now;
+}
 
-    static double fixedDtMs = 1000.0 / 60.0; // Target to 60Hz fixed time step
-    static double accumulatedMs = 0.0;
-
-    accumulatedMs += std::chrono::duration<double, std::milli>(m_deltaTime).count();
-    while (accumulatedMs >= fixedDtMs)
+void Renderer::ProcessInput()
+{
+    if (m_inputManager.IsKeyPressed(VK_ESCAPE))
     {
-        FixedUpdate(fixedDtMs);
-        accumulatedMs -= fixedDtMs;
+        if (!PostMessageW(Win32Application::GetHwnd(), WM_CLOSE, 0, 0))
+        {
+            DWORD err = GetLastError();
+            WCHAR buf[128];
+            swprintf_s(buf, L"PostMessageW(WM_CLOSE) failed. GetLastError=%lu\n", err);
+            OutputDebugStringW(buf);
+
+            // fallback
+            PostQuitMessage(static_cast<int>(err));
+        }
     }
 
-    float alpha = std::clamp(static_cast<float>(accumulatedMs / fixedDtMs), 0.0f, 1.0f);
+    if (m_inputManager.IsKeyPressed(VK_F11) ||
+        (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsKeyPressed(VK_RETURN)))
+    {
+        ToggleFullScreen();
+    }
+
+    if (m_inputManager.IsKeyPressed('V'))
+    {
+        m_vSync = !m_vSync;
+    }
+
+    // Focus
+    if (m_inputManager.IsKeyPressed('F') && !(m_selected.index == UINT_MAX && m_selected.generation == 0))
+    {
+        auto* pEntity = m_sceneManager.Get(m_selected);
+        auto pos = pEntity->transform->GetTranslation();
+
+        m_camera.SetCurrentPosition(XMLoadFloat3(&pos) - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
+
+        m_orbitDistance = DEFAULT_FOCUS_DIST;
+    }
+
+    // Dolly
+    {
+        static float cameraDollySpeed = 5.0f;
+
+        float wheelStep = m_inputManager.GetAndResetMouseWheelStep();
+        if (wheelStep != 0.0f)
+        {
+            m_camera.MoveForward(wheelStep * cameraDollySpeed);
+            XMVECTOR camPos = m_camera.GetCurrentPosition();
+            m_orbitDistance = XMVectorGetX(XMVector3Length(camPos - XMLoadFloat3(&m_orbitPivot)));
+        }
+    }
+
+    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
+
+    // Camera control
+    if (m_inputManager.IsMouseButtonPressed(1))
+    {
+        m_cameraControl = true;
+        Win32Application::HideCursor();
+    }
+    if (m_cameraControl)
+    {
+        if (m_inputManager.IsMouseButtonDown(1))
+        {
+            m_camera.Rotate(mouseMove);
+        }
+        else
+        {
+            m_cameraControl = false;
+            Win32Application::RestoreCursor();
+        }
+    }
+
+    // Orbit
+    if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonPressed(0))
+    {
+        BeginOrbit();
+        Win32Application::HideCursor();
+    }
+    if (m_orbiting)
+    {
+        if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonDown(0))
+        {
+            m_camera.Orbit(XMLoadFloat3(&m_orbitPivot), m_orbitDistance, mouseMove);
+        }
+        else
+        {
+            m_orbiting = false;
+            Win32Application::RestoreCursor();
+        }
+    }
+
+    // Pan
+    if (m_inputManager.IsMouseButtonPressed(2))
+    {
+        m_panning = true;
+        Win32Application::HideCursor();
+    }
+    if (m_panning)
+    {
+        if (m_inputManager.IsMouseButtonDown(2))
+        {
+            m_camera.Pan(mouseMove);
+        }
+        else
+        {
+            m_panning = false;
+            Win32Application::RestoreCursor();
+        }
+    }
+
+    // Operations in ProcessInput are immediate, requiring no interpolation.
+    m_camera.SnapshotState();
+}
+
+void Renderer::BuildImGuiFrame()
+{
+    static UINT64 frameCounter = 0;
+    static std::chrono::nanoseconds elapsed = std::chrono::nanoseconds::zero();
+    static double fps = 0.0;
+    static double frameTime = 0.0;
+
+    // ImGui::ShowDemoWindow(); // Show demo window! :)
+
+    // ImGuiID string is hashed and stored in the INI file.
+    // Changing it will invalidate any previously saved settings associated with it.
+    // Also, GetID uses Window ID Stack as seed.
+    ImGuiID dockSpaceId = ImGui::GetID("My Dockspace");
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+    // Use DockBuilder API to set layout.
+    // if the INI file does not contain DockSpaceId information or if a layout reset has been requested.
+    if (ImGui::DockBuilderGetNode(dockSpaceId) == nullptr || m_resetLayout)
+    {
+        ImGui::DockBuilderAddNode(dockSpaceId, ImGuiDockNodeFlags_DockSpace);
+        ImGui::DockBuilderSetNodeSize(dockSpaceId, viewport->Size);
+
+        ImGuiID leftId = 0;
+        ImGuiID centerId = 0;
+        ImGui::DockBuilderSplitNode(dockSpaceId, ImGuiDir_Left, 0.20f, &leftId, &centerId);
+
+        ImGuiID leftTopId = 0;
+        ImGuiID leftBottomId = 0;
+        ImGui::DockBuilderSplitNode(leftId, ImGuiDir_Up, 0.50f, &leftTopId, &leftBottomId);
+
+        ImGuiID rightId = 0;
+        ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Right, 0.20f, &rightId, &centerId);
+
+        ImGui::DockBuilderDockWindow("Scene", centerId);
+        ImGui::DockBuilderDockWindow("Test", leftTopId);
+        ImGui::DockBuilderDockWindow("Hierarchy", leftBottomId);
+        ImGui::DockBuilderDockWindow("Inspector", rightId);
+
+        ImGui::DockBuilderFinish(dockSpaceId);
+
+        m_resetLayout = false;
+    }
+
+    ImGui::DockSpaceOverViewport(dockSpaceId, viewport, ImGuiDockNodeFlags_None);
+
+    // Scene window
+    {
+        ImGui::Begin("Scene");
+
+        static constexpr double DEBOUNCE_DELAY = 0.15; // 0.15 sec
+
+        ImVec2 measured = ImGui::GetContentRegionAvail();
+        if (measured.x >= 1.0f && measured.y >= 1.0f)
+        {
+            UINT width = static_cast<UINT>(measured.x);
+            UINT height = static_cast<UINT>(measured.y);
+
+            // If scene size changed
+            if (width != m_pendingSceneWidth || height != m_pendingSceneHeight)
+            {
+                m_pendingSceneWidth = width;
+                m_pendingSceneHeight = height;
+                m_lastResizeRequestTime = m_prevTime;
+            }
+            // If pending size not been applied yet, and debounce delay has passed
+            else if ((width != m_sceneWidth || height != m_sceneHeight) &&
+                     (std::chrono::duration<double>(m_prevTime - m_lastResizeRequestTime).count() >= DEBOUNCE_DELAY))
+            {
+                ResizeSceneResolution(width, height);
+            }
+
+            const auto srvGpuHandle = m_frameResources[m_frameIndex].GetToneMappedBufferSrvHandle();
+            ImGui::Image(static_cast<ImTextureID>(srvGpuHandle.ptr), measured);
+        }
+
+        ImGui::End();
+    }
+
+    // Test window
+    {
+        ImGui::Begin("Test");
+
+        ++frameCounter;
+
+        elapsed += m_deltaTime;
+        const double elapsedSeconds = std::chrono::duration<double>(elapsed).count();
+        if (elapsedSeconds >= 1.0)
+        {
+            fps = frameCounter / elapsedSeconds;
+            frameTime = 1000.0 / fps;
+
+            frameCounter = 0;
+            elapsed = std::chrono::nanoseconds::zero();
+        }
+
+        ImGui::Text("FPS: %.1f", fps);
+        ImGui::Text("Latency: %.3f", frameTime);
+
+        ImGui::Checkbox("vSync", &m_vSync);
+
+        const char* items0[] = {"Unlimited", "30", "60", "120", "144", "160", "240"};
+        static int item0_selected_idx = 0;
+
+        // FPS cap can be set when vSync enabled.
+        ImGui::BeginDisabled(m_vSync);
+        if (ImGui::BeginCombo("FPS Cap", items0[item0_selected_idx]))
+        {
+            for (int n = 0; n < IM_ARRAYSIZE(items0); ++n)
+            {
+                const bool is_selected = item0_selected_idx == n;
+                if (ImGui::Selectable(items0[n], is_selected))
+                {
+                    item0_selected_idx = n;
+                    SetFpsCap(std::string(items0[n]));
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::EndDisabled();
+
+        const char* items[] = {"Point", "Bilinear", "AnisotropicX2", "AnisotropicX4", "AnisotropicX8", "AnisotropicX16"};
+        static int item_selected_idx = 5;
+
+        const char* combo_preview_value = items[item_selected_idx];
+        if (ImGui::BeginCombo("Texture Filtering", combo_preview_value))
+        {
+            for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+            {
+                const bool is_selected = (item_selected_idx == n);
+                if (ImGui::Selectable(items[n], is_selected))
+                {
+                    item_selected_idx = n;
+                    SetTextureFiltering(static_cast<TextureFiltering>(n));
+                }
+
+                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+
+        if (ImGui::Button("Add Cube"))
+        {
+            auto hMesh = m_sceneManager.GetMeshHandle("builtin://mesh/cube");
+            auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
+            auto hMat = CloneMaterial(hTemplateMat);
+
+            auto hCube = m_sceneManager.AddEntity("New Cube");
+            m_sceneManager.AddTransform(hCube);
+            m_sceneManager.SetMesh(hCube, hMesh);
+            m_sceneManager.SetMaterial(hCube, hMat);
+        }
+
+        if (ImGui::Button("Reset Layout"))
+        {
+            m_resetLayout = true;
+        }
+
+        ImGui::End();
+    }
+
+    // Hierarchy window
+    {
+        bool selectionChanged = false;
+
+        ImGui::Begin("Hierarchy");
+
+        EntityHandle toDelete;
+
+        if (ImGui::IsKeyPressed(ImGuiKey_Delete))
+            toDelete = m_selected;
+
+        for (const auto& entity : m_sceneManager.GetEntities())
+        {
+            if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
+                RenderEntityNode(entity, m_selected, toDelete, selectionChanged);
+        }
+
+        m_sceneManager.Remove(toDelete);
+        if (m_selected == toDelete)
+            m_selected = {};
+
+        ImGui::End();
+
+        // Inspector
+        ImGui::Begin("Inspector");
+
+        auto* pEntity = m_sceneManager.Get(m_selected);
+        if (pEntity)
+        {
+            if (pEntity->transform.has_value())
+            {
+                auto& transform = pEntity->transform.value();
+
+                XMFLOAT3 s = transform.GetScale();
+                if (ImGui::DragFloat3("Scale", &s.x))
+                    transform.SetScale(s);
+
+                XMFLOAT3 eulerR = transform.GetEulerCache(selectionChanged);
+                if (ImGui::DragFloat3("Rotation", &eulerR.x))
+                {
+                    transform.SetRotation(eulerR);
+                }
+
+                XMFLOAT3 t = transform.GetTranslation();
+                if (ImGui::DragFloat3("Translation", &t.x))
+                    transform.SetTranslation(t);
+            }
+        }
+
+        ImGui::End();
+    }
+}
+
+void Renderer::Update()
+{
+    static constexpr std::chrono::nanoseconds fixedDt(1'000'000'000 / 60); // Target to 60Hz fixed time step
+    static std::chrono::nanoseconds accumulated = std::chrono::nanoseconds::zero();
+
+    accumulated += m_deltaTime;
+    while (accumulated >= fixedDt)
+    {
+        FixedUpdate(fixedDt);
+        accumulated -= fixedDt;
+    }
+
+    float alpha = std::clamp(static_cast<float>(accumulated.count()) / fixedDt.count(), 0.0f, 1.0f);
 
     // 이번에 드로우할 프레임에 대해 constant buffers 업데이트
     FrameResource& frameResource = m_frameResources[m_frameIndex];
@@ -328,7 +605,7 @@ void Renderer::OnUpdate()
 }
 
 // Render the scene.
-void Renderer::OnRender()
+void Renderer::Render()
 {
     auto [pCommandAllocator, pCommandList] = m_commandQueue.GetAvailableCommandList();
 
@@ -337,29 +614,58 @@ void Renderer::OnRender()
     m_dynamicDescriptorHeapForCbvSrvUav.Reset();
 
     // Populate commands for ImGui
-    // Is it OK to call SetDescriptorHeaps? (Does it affect performance?)
+    // ImGui uses its dedicated descriptor heap for now, so calling SetDescriptorHeaps is mandatory
     ImGui::Render();
     ID3D12DescriptorHeap* ppHeaps[] = {m_imguiDescriptorAllocator.GetDescriptorHeap()};
     pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    auto rtvHandle = m_frameResources[m_frameIndex].GetBackBufferRtvHandle();
+    pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+    // Change layout of backbuffer: Present -> Render target
+    {
+        D3D12_TEXTURE_BARRIER barrier = {
+            D3D12_BARRIER_SYNC_NONE,
+            D3D12_BARRIER_SYNC_RENDER_TARGET,
+            D3D12_BARRIER_ACCESS_NO_ACCESS,
+            D3D12_BARRIER_ACCESS_RENDER_TARGET,
+            D3D12_BARRIER_LAYOUT_PRESENT,
+            D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+            m_frameResources[m_frameIndex].GetBackBuffer(),
+            {0xffff'ffff, 0, 0, 0, 0, 0},
+            D3D12_TEXTURE_BARRIER_FLAG_NONE};
+        D3D12_BARRIER_GROUP barrierGroups[] = {TextureBarrierGroup(1, &barrier)};
+        pCommandList->Barrier(1, barrierGroups);
+    }
+
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), pCommandList);
 
-    // Barrier for RTV should be called after ImGui Render.
-    // Swap Chain textures initially created in D3D12_BARRIER_LAYOUT_COMMON.
-    // and presentation requires the back buffer is using D3D12_BARRIER_LAYOUT_COMMON.
-    // LAYOUT_PRESENT is alias for LAYOUT_COMMON.
-    D3D12_TEXTURE_BARRIER barrier = {
-        D3D12_BARRIER_SYNC_RENDER_TARGET,
-        D3D12_BARRIER_SYNC_NONE,
-        D3D12_BARRIER_ACCESS_RENDER_TARGET,
-        D3D12_BARRIER_ACCESS_NO_ACCESS,
-        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-        D3D12_BARRIER_LAYOUT_PRESENT,
-        m_frameResources[m_frameIndex].GetBackBuffer(),
-        {0xffff'ffff, 0, 0, 0, 0, 0},
-        D3D12_TEXTURE_BARRIER_FLAG_NONE};
+    // Change layout of tonemappedbuffer and backbuffer after ImGui Render
+    {
+        std::vector<D3D12_TEXTURE_BARRIER> barriers = {
+            {D3D12_BARRIER_SYNC_PIXEL_SHADING,
+             D3D12_BARRIER_SYNC_RENDER_TARGET,
+             D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+             D3D12_BARRIER_ACCESS_RENDER_TARGET,
+             D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+             D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+             m_frameResources[m_frameIndex].GetToneMappedBuffer(),
+             {0xffff'ffff, 0, 0, 0, 0, 0},
+             D3D12_TEXTURE_BARRIER_FLAG_NONE},
 
-    D3D12_BARRIER_GROUP barrierGroups[] = {TextureBarrierGroup(1, &barrier)};
-    pCommandList->Barrier(1, barrierGroups);
+            // Swap Chain textures initially created in D3D12_BARRIER_LAYOUT_COMMON (D3D12_BARRIER_LAYOUT_PRESENT)
+            {D3D12_BARRIER_SYNC_RENDER_TARGET,
+             D3D12_BARRIER_SYNC_NONE,
+             D3D12_BARRIER_ACCESS_RENDER_TARGET,
+             D3D12_BARRIER_ACCESS_NO_ACCESS,
+             D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+             D3D12_BARRIER_LAYOUT_PRESENT,
+             m_frameResources[m_frameIndex].GetBackBuffer(),
+             {0xffff'ffff, 0, 0, 0, 0, 0},
+             D3D12_TEXTURE_BARRIER_FLAG_NONE}};
+
+        D3D12_BARRIER_GROUP barrierGroups[] = {TextureBarrierGroup(static_cast<UINT32>(barriers.size()), barriers.data())};
+        pCommandList->Barrier(1, barrierGroups);
+    }
 
     // Execute the command lists and update objects with fence values
     UINT64 signaledFenceValue = m_commandQueue.ExecuteCommandLists(pCommandAllocator, pCommandList);
@@ -378,7 +684,24 @@ void Renderer::OnRender()
     MoveToNextFrame();
 }
 
-void Renderer::OnDestroy()
+void Renderer::EndFrameTiming()
+{
+    if (!m_vSync && m_fpsCap > 0)
+    {
+        auto now = m_clock.now();
+
+        if (now < m_deadLine)
+            std::this_thread::sleep_until(m_deadLine);
+
+        m_deadLine += m_targetPeriod;
+
+        // If too late, re-sync
+        if (m_deadLine < now && (now - m_deadLine) > 2 * m_targetPeriod)
+            m_deadLine = now + m_targetPeriod;
+    }
+}
+
+void Renderer::Destroy()
 {
     // Ensure that the GPU is no longer referencing resources that are about to be
     // cleaned up by the destructor.
@@ -427,293 +750,38 @@ void Renderer::OnKillFocus()
 
 void Renderer::OnResize(UINT width, UINT height)
 {
-    if (width == m_width && height == m_height)
+    if ((width == m_windowWidth && height == m_windowHeight) ||
+        (width == 0u && height == 0u))
         return;
 
     // Wait till GPU complete currently queued works
     WaitForGpu();
 
-    // Size 0 is not allowed
-    m_width = std::max(1u, width);
-    m_height = std::max(1u, height);
-    UpdateWidthHeight();
+    SetWindowResolution(width, height);
 
-    // Reset back buffer
-    // Reset & create scene color buffers and gbuffers
-    // Set current frame's fence value to all frameResources
-    for (UINT i = 0; i < FrameCount; i++)
-    {
-        m_frameResources[i].ResetBackBuffer();
-
-        m_frameResources[i].ResetSceneColorBuffers();
-        m_frameResources[i].CreateSceneColorBuffers(m_width, m_height);
-
-        m_frameResources[i].ResetGBuffers();
-        m_frameResources[i].CreateGBuffers(m_width, m_height);
-
-        m_frameResources[i].ResetMasks();
-        m_frameResources[i].CreateMasks(m_width, m_height);
-
-        m_frameResources[i].UpdateSignaledFenceValue(m_frameResources[m_frameIndex].GetSignaledFenceValue());
-    }
+    // Before calling ResizeBuffers, all backbuffer references should be released.
+    for (auto& frameResource : m_frameResources)
+        frameResource.ResetBackBuffer();
 
     // Preserve existing format
-    // Before calling ResizeBuffers, all backbuffer references should be released.
-    ThrowIfFailed(m_swapChain->ResizeBuffers(FrameCount, m_width, m_height, DXGI_FORMAT_UNKNOWN, m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0));
+    ThrowIfFailed(m_swapChain->ResizeBuffers(FrameCount, m_windowWidth, m_windowHeight, DXGI_FORMAT_UNKNOWN, m_tearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-    // Recreate RTVs
+    // Re-acquire backBuffer
     for (UINT i = 0; i < FrameCount; i++)
     {
-        m_frameResources[i].AcquireBackBuffer(m_swapChain.Get(), i);
-        m_frameResources[i].InitBackBufferRtv();
+        auto& frameResource = m_frameResources[i];
+
+        frameResource.AcquireBackBuffer(m_swapChain.Get(), i);
+        // Set current frame's fence value to all frameResources
+        frameResource.UpdateSignaledFenceValue(m_frameResources[m_frameIndex].GetSignaledFenceValue());
     }
-
-    // Recreate depth-stencil buffer, DSV, and SRV
-    auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
-    m_depthStencilBuffer = Texture(
-        m_device.Get(),
-        GetTexture2DDesc(m_width, m_height, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
-        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
-        &clearValue);
-    m_dsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT));
-    m_readOnlyDsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH));
-    m_depthSrv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1));
-
-    // Update registered info of backbuffers
-    std::vector<ID3D12Resource*> pBackBuffers;
-    for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pBackBuffers.push_back(m_frameResources[i].GetBackBuffer());
-    }
-    auto backBuffer = m_renderGraph.GetRGTexture("BackBuffer");
-    m_renderGraph.UpdateElement(backBuffer, 0, pBackBuffers);
-
-    // Update registered info of scene color buffers
-    std::vector<ID3D12Resource*> pSceneColorBuffers0;
-    for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pSceneColorBuffers0.push_back(m_frameResources[i].GetSceneColorBuffer(0));
-    }
-    auto sceneColorBuffer0 = m_renderGraph.GetRGTexture("SceneColorBuffer0");
-    m_renderGraph.UpdateElement(sceneColorBuffer0, 0, pSceneColorBuffers0);
-
-    std::vector<ID3D12Resource*> pSceneColorBuffers1;
-    for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pSceneColorBuffers1.push_back(m_frameResources[i].GetSceneColorBuffer(1));
-    }
-    auto sceneColorBuffer1 = m_renderGraph.GetRGTexture("SceneColorBuffer1");
-    m_renderGraph.UpdateElement(sceneColorBuffer1, 0, pSceneColorBuffers1);
-
-    // Update registered info of depth-stencil buffer
-    auto depthStencilBuffer = m_renderGraph.GetRGTexture("DepthStencilBuffer");
-    m_renderGraph.UpdateElement(depthStencilBuffer, 0, {m_depthStencilBuffer.Get()});
-
-    // Update registered info of GBuffers
-    auto gBuffer = m_renderGraph.GetRGTexture("GBuffer");
-    for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
-    {
-        std::vector<ID3D12Resource*> pGBuffers;
-        for (UINT i = 0; i < FrameCount; ++i)
-        {
-            pGBuffers.push_back(m_frameResources[i].GetGBuffer(static_cast<GBufferSlot>(slot)));
-        }
-        m_renderGraph.UpdateElement(gBuffer, slot, pGBuffers);
-    }
-
-    // Update registered info of selection mask
-    auto selectionMask = m_renderGraph.GetRGTexture("SelectionMask");
-    std::vector<ID3D12Resource*> pSelectionMasks;
-    for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pSelectionMasks.push_back(m_frameResources[i].GetSelectionMask());
-    }
-    m_renderGraph.UpdateElement(selectionMask, 0, pSelectionMasks);
-
-    // Update registered info of horizontal dilated mask
-    RGTexture horizontalDilatedMask = m_renderGraph.GetRGTexture("HorizontalDilatedMask");
-    std::vector<ID3D12Resource*> pHorizontalDilatedMasks;
-    for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pHorizontalDilatedMasks.push_back(m_frameResources[i].GetHorizontalDilatedMask());
-    }
-    m_renderGraph.UpdateElement(horizontalDilatedMask, 0, pHorizontalDilatedMasks);
 }
 
 void Renderer::OnDpiChanged(UINT dpi)
 {
     m_dpiScale = static_cast<float>(dpi) / USER_DEFAULT_SCREEN_DPI;
     ImGui::GetStyle().FontScaleMain = m_dpiScale;
-}
-
-void Renderer::BuildImGuiFrame()
-{
-    // ImGui::ShowDemoWindow(); // Show demo window! :)
-
-    ImGui::Begin("Test");
-
-    static UINT64 frameCounter = 0;
-    static double elapsedSeconds = 0.0;
-
-    ++frameCounter;
-
-    static double fps = 0.0;
-    static double frameTime = 0.0;
-
-    elapsedSeconds += std::chrono::duration<double>(m_deltaTime).count();
-    if (elapsedSeconds >= 1.0)
-    {
-        fps = frameCounter / elapsedSeconds;
-        frameTime = 1000.0 / fps;
-
-        frameCounter = 0;
-        elapsedSeconds = 0.0;
-    }
-
-    ImGui::Text("FPS: %.1f", fps);
-    ImGui::Text("Latency: %.3f", frameTime);
-
-    ImGui::Checkbox("vSync", &m_vSync);
-
-    const char* items0[] = {"Unlimited", "30", "60", "120", "144", "160", "240"};
-    static int item0_selected_idx = 0;
-
-    // FPS cap can be set when vSync enabled.
-    ImGui::BeginDisabled(m_vSync);
-    if (ImGui::BeginCombo("FPS Cap", items0[item0_selected_idx]))
-    {
-        for (int n = 0; n < IM_ARRAYSIZE(items0); ++n)
-        {
-            const bool is_selected = item0_selected_idx == n;
-            if (ImGui::Selectable(items0[n], is_selected))
-            {
-                item0_selected_idx = n;
-                SetFpsCap(std::string(items0[n]));
-            }
-        }
-        ImGui::EndCombo();
-    }
-    ImGui::EndDisabled();
-
-    const char* items[] = {"Point", "Bilinear", "AnisotropicX2", "AnisotropicX4", "AnisotropicX8", "AnisotropicX16"};
-    static int item_selected_idx = 5;
-
-    const char* combo_preview_value = items[item_selected_idx];
-    if (ImGui::BeginCombo("Texture Filtering", combo_preview_value))
-    {
-        for (int n = 0; n < IM_ARRAYSIZE(items); n++)
-        {
-            const bool is_selected = (item_selected_idx == n);
-            if (ImGui::Selectable(items[n], is_selected))
-            {
-                item_selected_idx = n;
-                SetTextureFiltering(static_cast<TextureFiltering>(n));
-            }
-
-            // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-            if (is_selected)
-                ImGui::SetItemDefaultFocus();
-        }
-        ImGui::EndCombo();
-    }
-
-    if (ImGui::Button("Add Cube"))
-    {
-        auto hMesh = m_sceneManager.GetMeshHandle("builtin://mesh/cube");
-        auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
-        auto hMat = CloneMaterial(hTemplateMat);
-
-        auto hCube = m_sceneManager.AddEntity("New Cube");
-        m_sceneManager.AddTransform(hCube);
-        m_sceneManager.SetMesh(hCube, hMesh);
-        m_sceneManager.SetMaterial(hCube, hMat);
-    }
-
-    ImGui::End();
-
-    bool selectionChanged = false;
-
-    // Hierarchy
-    ImGui::Begin("Hierarchy");
-
-    EntityHandle toDelete;
-
-    if (ImGui::IsKeyPressed(ImGuiKey_Delete))
-        toDelete = m_selected;
-
-    for (const auto& entity : m_sceneManager.GetEntities())
-    {
-        if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
-            RenderEntityNode(entity, m_selected, toDelete, selectionChanged);
-    }
-
-    m_sceneManager.Remove(toDelete);
-    if (m_selected == toDelete)
-        m_selected = {};
-
-    ImGui::End();
-
-    // Inspector
-    ImGui::Begin("Inspector");
-
-    auto* pEntity = m_sceneManager.Get(m_selected);
-    if (pEntity)
-    {
-        if (pEntity->transform.has_value())
-        {
-            auto& transform = pEntity->transform.value();
-
-            XMFLOAT3 s = transform.GetScale();
-            if (ImGui::DragFloat3("Scale", &s.x))
-                transform.SetScale(s);
-
-            XMFLOAT3 eulerR = transform.GetEulerCache(selectionChanged);
-            if (ImGui::DragFloat3("Rotation", &eulerR.x))
-            {
-                transform.SetRotation(eulerR);
-            }
-
-            XMFLOAT3 t = transform.GetTranslation();
-            if (ImGui::DragFloat3("Translation", &t.x))
-                transform.SetTranslation(t);
-        }
-    }
-
-    ImGui::End();
-}
-
-void Renderer::RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete, bool& selectionChanged)
-{
-    bool isSelected = (entity.selfHandle == selected);
-
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth;
-    if (entity.children.empty())
-        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-    if (isSelected)
-        flags |= ImGuiTreeNodeFlags_Selected;
-
-    UINT64 id = (static_cast<UINT64>(entity.selfHandle.index) << 32) | entity.selfHandle.generation;
-    bool isExpanded = ImGui::TreeNodeEx(reinterpret_cast<void*>(id), flags, "%s", entity.name.c_str());
-
-    if (ImGui::IsItemClicked() && selected != entity.selfHandle)
-    {
-        selected = entity.selfHandle;
-        selectionChanged = true;
-    }
-
-    if (ImGui::BeginPopupContextItem())
-    {
-        if (ImGui::MenuItem("Delete"))
-            toDelete = entity.selfHandle;
-        ImGui::EndPopup();
-    }
-    if (!(flags & ImGuiTreeNodeFlags_NoTreePushOnOpen) && isExpanded)
-    {
-        for (auto c : entity.children)
-            RenderEntityNode(*m_sceneManager.Get(c), selected, toDelete, selectionChanged);
-        ImGui::TreePop();
-    }
 }
 
 void Renderer::LoadPipeline()
@@ -820,8 +888,8 @@ void Renderer::LoadPipeline()
 
     // Describe and create the swap chain.
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-    swapChainDesc.Width = m_width;
-    swapChainDesc.Height = m_height;
+    swapChainDesc.Width = m_windowWidth;
+    swapChainDesc.Height = m_windowHeight;
     swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     swapChainDesc.Stereo = FALSE;
     swapChainDesc.SampleDesc = {1, 0};
@@ -857,6 +925,8 @@ void Renderer::LoadPipeline()
             m_device.Get(),
             m_swapChain.Get(),
             i,
+            m_sceneWidth,
+            m_sceneHeight,
             std::move(rtvAllocations[i]),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(FrameResource::SceneColorBufferCount),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(FrameResource::SceneColorBufferCount),
@@ -865,7 +935,9 @@ void Renderer::LoadPipeline()
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(),
-            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate());
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(),
+            m_imguiDescriptorAllocator.Allocate());
     }
 
     CreateRootSignature();
@@ -930,7 +1002,7 @@ void Renderer::LoadAssets()
     auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
     m_depthStencilBuffer = Texture(
         m_device.Get(),
-        GetTexture2DDesc(m_width, m_height, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
+        GetTexture2DDesc(m_sceneWidth, m_sceneHeight, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
         D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
         &clearValue);
     m_dsv = DepthStencilView(
@@ -948,6 +1020,10 @@ void Renderer::LoadAssets()
         m_depthStencilBuffer.Get(),
         GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate());
+
+    m_viewport = {0.0f, 0.0f, static_cast<float>(m_sceneWidth), static_cast<float>(m_sceneHeight), 0.0f, 1.0f};
+    m_scissorRect = {0, 0, static_cast<LONG>(m_sceneWidth), static_cast<LONG>(m_sceneHeight)};
+    m_camera.SetAspectRatio(static_cast<float>(m_sceneWidth) / static_cast<float>(m_sceneHeight));
 
     // Set viewport and scissorRect for shadow mapping
     m_shadowMapViewport = {0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f};
@@ -1105,46 +1181,27 @@ void Renderer::LoadAssets()
     // Render Graph
     m_renderGraph.Init(m_device.Get());
 
-    // Back buffer
-    RGTexture backBuffer = m_renderGraph.RegisterTexture(
-        "BackBuffer",
-        true,
-        {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_PRESENT},
-        GetSubresourceCount(m_device.Get(), m_frameResources.front().GetBackBuffer()));
-    std::vector<ID3D12Resource*> pBackBuffers;
-    for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pBackBuffers.push_back(m_frameResources[i].GetBackBuffer());
-    }
-    m_renderGraph.AddElement(backBuffer, pBackBuffers);
-
-    // Scene color buffer0
+    // Register resources
     RGTexture sceneColorBuffer0 = m_renderGraph.RegisterTexture(
         "SceneColorBuffer0",
         true,
         {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetSceneColorBuffer(0)));
-    std::vector<ID3D12Resource*> pSceneColorBuffers0;
+    std::vector<ID3D12Resource*> pSceneColorBuffers0(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pSceneColorBuffers0.push_back(m_frameResources[i].GetSceneColorBuffer(0));
-    }
+        pSceneColorBuffers0[i] = m_frameResources[i].GetSceneColorBuffer(0);
     m_renderGraph.AddElement(sceneColorBuffer0, pSceneColorBuffers0);
 
-    // Scene color buffer1
     RGTexture sceneColorBuffer1 = m_renderGraph.RegisterTexture(
         "SceneColorBuffer1",
         true,
         {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetSceneColorBuffer(1)));
-    std::vector<ID3D12Resource*> pSceneColorBuffers1;
+    std::vector<ID3D12Resource*> pSceneColorBuffers1(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pSceneColorBuffers1.push_back(m_frameResources[i].GetSceneColorBuffer(1));
-    }
+        pSceneColorBuffers1[i] = m_frameResources[i].GetSceneColorBuffer(1);
     m_renderGraph.AddElement(sceneColorBuffer1, pSceneColorBuffers1);
 
-    // Depth-stencil buffer
     RGTexture depthStencilBuffer = m_renderGraph.RegisterTexture(
         "DepthStencilBuffer",
         false,
@@ -1152,7 +1209,6 @@ void Renderer::LoadAssets()
         GetSubresourceCount(m_device.Get(), m_depthStencilBuffer.Get()));
     m_renderGraph.AddElement(depthStencilBuffer, {m_depthStencilBuffer.Get()});
 
-    // GBuffer
     RGTexture gBuffer = m_renderGraph.RegisterTexture(
         "GBuffer",
         true,
@@ -1160,41 +1216,32 @@ void Renderer::LoadAssets()
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetGBuffer(GBufferSlot::ALBEDO)));
     for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
     {
-        std::vector<ID3D12Resource*> pGBuffers;
+        std::vector<ID3D12Resource*> pGBuffers(FrameCount);
         for (UINT i = 0; i < FrameCount; ++i)
-        {
-            pGBuffers.push_back(m_frameResources[i].GetGBuffer(static_cast<GBufferSlot>(slot)));
-        }
+            pGBuffers[i] = m_frameResources[i].GetGBuffer(static_cast<GBufferSlot>(slot));
         m_renderGraph.AddElement(gBuffer, pGBuffers);
     }
 
-    // Selection mask
     RGTexture selectionMask = m_renderGraph.RegisterTexture(
         "SelectionMask",
         true,
         {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetSelectionMask()));
-    std::vector<ID3D12Resource*> pSelectionMasks;
+    std::vector<ID3D12Resource*> pSelectionMasks(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pSelectionMasks.push_back(m_frameResources[i].GetSelectionMask());
-    }
+        pSelectionMasks[i] = m_frameResources[i].GetSelectionMask();
     m_renderGraph.AddElement(selectionMask, pSelectionMasks);
 
-    // Horizontal dilated mask
     RGTexture horizontalDilatedMask = m_renderGraph.RegisterTexture(
         "HorizontalDilatedMask",
         true,
         {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetHorizontalDilatedMask()));
-    std::vector<ID3D12Resource*> pHorizontalDilatedMasks;
+    std::vector<ID3D12Resource*> pHorizontalDilatedMasks(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
-    {
-        pHorizontalDilatedMasks.push_back(m_frameResources[i].GetHorizontalDilatedMask());
-    }
+        pHorizontalDilatedMasks[i] = m_frameResources[i].GetHorizontalDilatedMask();
     m_renderGraph.AddElement(horizontalDilatedMask, pHorizontalDilatedMasks);
 
-    // Light
     m_renderGraph.RegisterTexture(
         "DirectionalLight",
         false,
@@ -1202,9 +1249,11 @@ void Renderer::LoadAssets()
         GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, MAX_CASCADES, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
         [this]()
         {
-            std::vector<ID3D12Resource*> pResources;
-            for (auto& light : m_sceneManager.GetDirectionalLights())
-                pResources.push_back(light.GetDepthBuffer());
+            auto& lights = m_sceneManager.GetDirectionalLights();
+            const UINT count = static_cast<UINT>(lights.size());
+            std::vector<ID3D12Resource*> pResources(count);
+            for (UINT i = 0; i < count; ++i)
+                pResources[i] = lights[i].GetDepthBuffer();
             return pResources;
         });
 
@@ -1215,9 +1264,11 @@ void Renderer::LoadAssets()
         GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET)),
         [this]()
         {
-            std::vector<ID3D12Resource*> pResources;
-            for (auto& light : m_sceneManager.GetPointLights())
-                pResources.push_back(light.GetRenderTarget());
+            auto& lights = m_sceneManager.GetPointLights();
+            const UINT count = static_cast<UINT>(lights.size());
+            std::vector<ID3D12Resource*> pResources(count);
+            for (UINT i = 0; i < count; ++i)
+                pResources[i] = lights[i].GetRenderTarget();
             return pResources;
         });
 
@@ -1228,14 +1279,706 @@ void Renderer::LoadAssets()
         GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, SPOT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
         [this]()
         {
-            std::vector<ID3D12Resource*> pResources;
-            for (auto& light : m_sceneManager.GetSpotLights())
-                pResources.push_back(light.GetDepthBuffer());
+            auto& lights = m_sceneManager.GetSpotLights();
+            const UINT count = static_cast<UINT>(lights.size());
+            std::vector<ID3D12Resource*> pResources(count);
+            for (UINT i = 0; i < count; ++i)
+                pResources[i] = lights[i].GetDepthBuffer();
             return pResources;
         });
 
+    RGTexture toneMappedBuffer = m_renderGraph.RegisterTexture(
+        "ToneMappedBuffer",
+        true,
+        {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
+        GetSubresourceCount(m_device.Get(), m_frameResources.front().GetToneMappedBuffer()));
+    std::vector<ID3D12Resource*> pToneMappedBuffers(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pToneMappedBuffers[i] = m_frameResources[i].GetToneMappedBuffer();
+    m_renderGraph.AddElement(toneMappedBuffer, pToneMappedBuffers);
+
     PrepareRenderGraph();
     m_renderGraph.Compile();
+}
+
+// Setup Dear ImGui context
+void Renderer::InitImGui()
+{
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
+
+    ImGui_ImplWin32_Init(Win32Application::GetHwnd());
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplDX12_InitInfo init_info = {};
+    init_info.Device = m_device.Get();
+    init_info.CommandQueue = m_commandQueue.GetCommandQueue();
+    init_info.NumFramesInFlight = FrameCount;
+    init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    init_info.DSVFormat = DXGI_FORMAT_UNKNOWN;
+    init_info.SrvDescriptorHeap = m_imguiDescriptorAllocator.GetDescriptorHeap();
+    init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
+    {
+        return ImGuiSrvDescriptorAllocate(out_cpu_handle, out_gpu_handle);
+    };
+    init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
+    {
+        return ImGuiSrvDescriptorFree(cpu_handle, gpu_handle);
+    };
+    ImGui_ImplDX12_Init(&init_info);
+
+    ImGui::GetStyle().FontScaleMain = m_dpiScale;
+
+    // Create config directory in LocalAppData if not exists
+    PWSTR localAppDataPath = nullptr;
+    SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_DEFAULT, nullptr, &localAppDataPath);
+
+    std::filesystem::path configPath = std::filesystem::path(localAppDataPath) / "D3D12Renderer";
+    CoTaskMemFree(localAppDataPath);
+
+    bool configPathReady = false;
+    if (CreateDirectoryW(configPath.c_str(), nullptr))
+        configPathReady = true;
+    else
+    {
+        DWORD attr = GetFileAttributesW(configPath.c_str());
+        configPathReady = (attr != INVALID_FILE_ATTRIBUTES) && (attr & FILE_ATTRIBUTE_DIRECTORY);
+    }
+
+    // Set ImGui ini file in LocalAppData
+    if (configPathReady)
+    {
+        m_imguiIniPath = (configPath / "imgui.ini").u8string();
+        io.IniFilename = m_imguiIniPath.c_str();
+    }
+    // else: use ImGui default setting ("imgui.ini" in CWD)
+}
+
+void Renderer::CreateRootSignature()
+{
+    m_rootSignature.Init(13, 2);
+
+    // Root descriptor for CameraCB and ShadowCB
+    m_rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);   // Camera
+    m_rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC); // Shadow
+
+    // Root constants for number of lights
+    m_rootSignature[2].InitAsConstant(2, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+
+    // Root constant for PointLightShadowPS
+    m_rootSignature[3].InitAsConstant(3, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+
+    // Root constant for outline
+    m_rootSignature[4].InitAsConstant(4, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+
+    // Descriptor table for MaterialConstantBuffers[]
+    m_rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[5].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+
+    // Descriptor table for LightConstantBuffers[]
+    m_rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[6].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+
+    // Descriptor table for textures (albedo, normal map, height map)
+    m_rootSignature[7].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[7].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+
+    // Descriptor table for shadowMaps[]
+    // Directional
+    m_rootSignature[8].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[8].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    // Point
+    m_rootSignature[9].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[9].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    // Spot
+    m_rootSignature[10].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[10].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+
+    // Descriptor table for
+    // SRV for GBuffers
+    // SRV for depth value
+    // SRV for selectionMask/horizontalDilatedMask
+    // SRV for scene color buffer
+    m_rootSignature[11].InitAsTable(4, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[11].InitAsRange(0, 0, 4, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    m_rootSignature[11].InitAsRange(1, 0, 5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    m_rootSignature[11].InitAsRange(2, 0, 6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    m_rootSignature[11].InitAsRange(3, 0, 7, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+
+    // Descriptor table for samplers
+    m_rootSignature[12].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[12].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
+                                    static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS) * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES),
+                                    D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
+
+    // Static samplers
+    m_rootSignature.InitStaticSampler(0, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_GREATER_EQUAL);
+    m_rootSignature.InitStaticSampler(1, 1, 1, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_LESS_EQUAL);
+
+    m_rootSignature.Finalize(m_device.Get());
+}
+
+void Renderer::PrepareRenderGraph()
+{
+    // Set up render graph
+    auto& shadowMapPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::SHADOW_MAP)];
+    auto& gBufferPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::GBUFFER)];
+    auto& deferredLightingPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::DEFERRED_LIGHTING)];
+    auto& forwardColoringPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::FORWARD_COLORING)];
+    auto& selectionMaskPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::SELECTION_MASK)];
+    auto& horizontalDilatePass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::HORIZONTAL_DILATE)];
+    auto& outlineDrawingPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::OUTLINE_DRAWING)];
+    auto& toneMapPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::TONEMAP)];
+
+    // Resource handles
+    auto sceneColorBuffer0 = m_renderGraph.GetRGTexture("SceneColorBuffer0");
+    auto sceneColorBuffer1 = m_renderGraph.GetRGTexture("SceneColorBuffer1");
+    auto depthStencilBuffer = m_renderGraph.GetRGTexture("DepthStencilBuffer");
+    auto gBuffer = m_renderGraph.GetRGTexture("GBuffer");
+    auto selectionMask = m_renderGraph.GetRGTexture("SelectionMask");
+    auto horizontalDilatedMask = m_renderGraph.GetRGTexture("HorizontalDilatedMask");
+    auto directionalLightDepthBuffer = m_renderGraph.GetRGTexture("DirectionalLight");
+    auto pointLightRenderTarget = m_renderGraph.GetRGTexture("PointLight");
+    auto spotLightDepthBuffer = m_renderGraph.GetRGTexture("SpotLight");
+    auto toneMappedBuffer = m_renderGraph.GetRGTexture("ToneMappedBuffer");
+
+    // Shadow map pass
+    shadowMapPass.AddTextureInput(directionalLightDepthBuffer, {D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE});
+    shadowMapPass.AddTextureInput(pointLightRenderTarget, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+    shadowMapPass.AddTextureInput(spotLightDepthBuffer, {D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE});
+
+    // GBuffer pass
+    gBufferPass.AddTextureInput(depthStencilBuffer, {D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE});
+    gBufferPass.AddTextureInput(gBuffer, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+
+    // Deferred lighting pass
+    deferredLightingPass.AddTextureInput(sceneColorBuffer0, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+    // To use depth-stencil buffer as both SRV and DSV simultaneously
+    // SRV: to reconstruct world pos
+    // DSV: for stencil test
+    deferredLightingPass.AddTextureInput(depthStencilBuffer, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE | D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ, D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_GENERIC_READ});
+    deferredLightingPass.AddTextureInput(gBuffer, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
+    deferredLightingPass.AddTextureOutput(gBuffer, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+    deferredLightingPass.AddTextureInput(directionalLightDepthBuffer, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
+    deferredLightingPass.AddTextureInput(pointLightRenderTarget, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
+    deferredLightingPass.AddTextureInput(spotLightDepthBuffer, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
+
+    // Forward coloring pass
+    forwardColoringPass.AddTextureInput(sceneColorBuffer0, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+    forwardColoringPass.AddTextureInput(depthStencilBuffer, {D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE});
+    forwardColoringPass.AddTextureInput(directionalLightDepthBuffer, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
+    forwardColoringPass.AddTextureOutput(directionalLightDepthBuffer, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE});
+    forwardColoringPass.AddTextureInput(pointLightRenderTarget, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
+    forwardColoringPass.AddTextureOutput(pointLightRenderTarget, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+    forwardColoringPass.AddTextureInput(spotLightDepthBuffer, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
+    forwardColoringPass.AddTextureOutput(spotLightDepthBuffer, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE});
+
+    // Selection mask pass
+    selectionMaskPass.AddTextureInput(selectionMask, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+
+    // Horizontal dilate pass
+    horizontalDilatePass.AddTextureInput(horizontalDilatedMask, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+    horizontalDilatePass.AddTextureInput(selectionMask, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
+
+    // Outline drawing pass
+    outlineDrawingPass.AddTextureInput(sceneColorBuffer0, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+    outlineDrawingPass.AddTextureInput(selectionMask, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
+    outlineDrawingPass.AddTextureOutput(selectionMask, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+    outlineDrawingPass.AddTextureInput(horizontalDilatedMask, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
+    outlineDrawingPass.AddTextureOutput(horizontalDilatedMask, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+
+    // Tone mapping pass
+    toneMapPass.AddTextureInput(toneMappedBuffer, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+    toneMapPass.AddTextureOutput(toneMappedBuffer, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
+    toneMapPass.AddTextureInput(sceneColorBuffer0, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
+    toneMapPass.AddTextureOutput(sceneColorBuffer0, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+}
+
+void Renderer::ToggleFullScreen()
+{
+    SetFullScreen(!m_fullScreen);
+}
+
+void Renderer::SetFullScreen(bool fullScreen)
+{
+    if (m_fullScreen != fullScreen)
+    {
+        m_fullScreen = fullScreen;
+        if (m_fullScreen)
+        {
+            // Before switching to fullscreen mode, save window RECT
+            GetWindowRect(Win32Application::GetHwnd(), &m_windowRect);
+
+            // fullscreen borderless
+            UINT windowStyle = WS_OVERLAPPEDWINDOW & ~(WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+            SetWindowLongPtrW(Win32Application::GetHwnd(), GWL_STYLE, windowStyle);
+
+            // Query the name of the nearest display device for the window.
+            // This is required to set the fullscreen dimensions of the window
+            // when using a multi-monitor setup.
+            HMONITOR hMonitor = MonitorFromWindow(Win32Application::GetHwnd(), MONITOR_DEFAULTTONEAREST);
+            MONITORINFOEXW monitorInfo = {};
+            monitorInfo.cbSize = sizeof(MONITORINFOEXW);
+            GetMonitorInfoW(hMonitor, &monitorInfo);
+
+            SetWindowPos(Win32Application::GetHwnd(), HWND_TOP,
+                         monitorInfo.rcMonitor.left,
+                         monitorInfo.rcMonitor.top,
+                         monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
+                         monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top,
+                         SWP_FRAMECHANGED | SWP_NOACTIVATE);
+
+            ShowWindow(Win32Application::GetHwnd(), SW_MAXIMIZE);
+        }
+        else
+        {
+            // Restore all the window decorators.
+            SetWindowLongW(Win32Application::GetHwnd(), GWL_STYLE, WS_OVERLAPPEDWINDOW);
+
+            SetWindowPos(Win32Application::GetHwnd(), HWND_NOTOPMOST,
+                         m_windowRect.left,
+                         m_windowRect.top,
+                         m_windowRect.right - m_windowRect.left,
+                         m_windowRect.bottom - m_windowRect.top,
+                         SWP_FRAMECHANGED | SWP_NOACTIVATE);
+
+            ShowWindow(Win32Application::GetHwnd(), SW_NORMAL);
+        }
+    }
+}
+
+void Renderer::BeginOrbit()
+{
+    XMVECTOR camPos = m_camera.GetCurrentPosition();
+    XMStoreFloat3(&m_orbitPivot, camPos + m_camera.GetForward() * m_orbitDistance);
+    m_orbiting = true;
+}
+
+void Renderer::ResizeSceneResolution(UINT width, UINT height)
+{
+    WaitForGpu();
+
+    m_sceneWidth = width;
+    m_sceneHeight = height;
+
+    m_viewport = {0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
+    m_scissorRect = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
+
+    m_camera.SetAspectRatio(static_cast<float>(width) / static_cast<float>(height));
+
+    for (UINT i = 0; i < FrameCount; i++)
+    {
+        auto& frameResource = m_frameResources[i];
+        frameResource.CreateSceneColorBuffers(width, height);
+        frameResource.CreateGBuffers(width, height);
+        frameResource.CreateMasks(width, height);
+        frameResource.CreateToneMappedBuffer(width, height);
+    }
+
+    // Recreate depth-stencil buffer, DSV, and SRV
+    auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
+    m_depthStencilBuffer = Texture(
+        m_device.Get(),
+        GetTexture2DDesc(width, height, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
+        &clearValue);
+    m_dsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT));
+    m_readOnlyDsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH));
+    m_depthSrv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1));
+
+    // Update registered info
+    auto sceneColorBuffer0 = m_renderGraph.GetRGTexture("SceneColorBuffer0");
+    std::vector<ID3D12Resource*> pSceneColorBuffers0(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pSceneColorBuffers0[i] = m_frameResources[i].GetSceneColorBuffer(0);
+    m_renderGraph.UpdateElement(sceneColorBuffer0, 0, pSceneColorBuffers0);
+
+    auto sceneColorBuffer1 = m_renderGraph.GetRGTexture("SceneColorBuffer1");
+    std::vector<ID3D12Resource*> pSceneColorBuffers1(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pSceneColorBuffers1[i] = m_frameResources[i].GetSceneColorBuffer(1);
+    m_renderGraph.UpdateElement(sceneColorBuffer1, 0, pSceneColorBuffers1);
+
+    auto depthStencilBuffer = m_renderGraph.GetRGTexture("DepthStencilBuffer");
+    m_renderGraph.UpdateElement(depthStencilBuffer, 0, {m_depthStencilBuffer.Get()});
+
+    auto gBuffer = m_renderGraph.GetRGTexture("GBuffer");
+    for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
+    {
+        std::vector<ID3D12Resource*> pGBuffers(FrameCount);
+        for (UINT i = 0; i < FrameCount; ++i)
+            pGBuffers[i] = m_frameResources[i].GetGBuffer(static_cast<GBufferSlot>(slot));
+        m_renderGraph.UpdateElement(gBuffer, slot, pGBuffers);
+    }
+
+    auto selectionMask = m_renderGraph.GetRGTexture("SelectionMask");
+    std::vector<ID3D12Resource*> pSelectionMasks(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pSelectionMasks[i] = m_frameResources[i].GetSelectionMask();
+    m_renderGraph.UpdateElement(selectionMask, 0, pSelectionMasks);
+
+    auto horizontalDilatedMask = m_renderGraph.GetRGTexture("HorizontalDilatedMask");
+    std::vector<ID3D12Resource*> pHorizontalDilatedMasks(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pHorizontalDilatedMasks[i] = m_frameResources[i].GetHorizontalDilatedMask();
+    m_renderGraph.UpdateElement(horizontalDilatedMask, 0, pHorizontalDilatedMasks);
+
+    auto toneMappedBuffer = m_renderGraph.GetRGTexture("ToneMappedBuffer");
+    std::vector<ID3D12Resource*> pToneMappedBuffers(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pToneMappedBuffers[i] = m_frameResources[i].GetToneMappedBuffer();
+    m_renderGraph.UpdateElement(toneMappedBuffer, 0, pToneMappedBuffers);
+}
+
+void Renderer::SetFpsCap(std::string fps)
+{
+    if (fps == "Unlimited")
+    {
+        m_fpsCap = -1;
+    }
+    else
+    {
+        m_fpsCap = std::stoi(fps);
+        m_deadLine = m_clock.now();
+
+        auto temp = std::chrono::duration<double, std::nano>(1e9 / m_fpsCap);
+        m_targetPeriod = std::chrono::duration_cast<std::chrono::nanoseconds>(temp);
+    }
+}
+
+void Renderer::SetTextureFiltering(TextureFiltering filtering)
+{
+    m_currentTextureFiltering = filtering;
+    for (auto& material : m_sceneManager.GetMaterials())
+    {
+        material.BuildSamplerIndices(m_currentTextureFiltering);
+    }
+}
+
+void Renderer::RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete, bool& selectionChanged)
+{
+    bool isSelected = (entity.selfHandle == selected);
+
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth;
+    if (entity.children.empty())
+        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+    if (isSelected)
+        flags |= ImGuiTreeNodeFlags_Selected;
+
+    UINT64 id = (static_cast<UINT64>(entity.selfHandle.index) << 32) | entity.selfHandle.generation;
+    bool isExpanded = ImGui::TreeNodeEx(reinterpret_cast<void*>(id), flags, "%s", entity.name.c_str());
+
+    if (ImGui::IsItemClicked() && selected != entity.selfHandle)
+    {
+        selected = entity.selfHandle;
+        selectionChanged = true;
+    }
+
+    if (ImGui::BeginPopupContextItem())
+    {
+        if (ImGui::MenuItem("Delete"))
+            toDelete = entity.selfHandle;
+        ImGui::EndPopup();
+    }
+    if (!(flags & ImGuiTreeNodeFlags_NoTreePushOnOpen) && isExpanded)
+    {
+        for (auto c : entity.children)
+            RenderEntityNode(*m_sceneManager.Get(c), selected, toDelete, selectionChanged);
+        ImGui::TreePop();
+    }
+}
+
+void Renderer::FixedUpdate(std::chrono::nanoseconds fixedDt)
+{
+    const float fixedDtSec = fixedDt.count() * 1e-9f;
+
+    // Camera
+    static float cameraMoveSpeed = 50.0f;
+
+    float dist = cameraMoveSpeed * fixedDtSec;
+
+    m_camera.SnapshotState();
+
+    if (m_inputManager.IsMouseButtonDown(1))
+    {
+        if (m_inputManager.IsKeyDown('W'))
+            m_camera.MoveForward(dist);
+        if (m_inputManager.IsKeyDown('A'))
+            m_camera.MoveRight(-dist);
+        if (m_inputManager.IsKeyDown('S'))
+            m_camera.MoveForward(-dist);
+        if (m_inputManager.IsKeyDown('D'))
+            m_camera.MoveRight(dist);
+        if (m_inputManager.IsKeyDown('Q'))
+            m_camera.MoveUp(-dist);
+        if (m_inputManager.IsKeyDown('E'))
+            m_camera.MoveUp(dist);
+    }
+
+    // Transforms
+    static float rotationSpeed = 1.0f; // unit : rad/s
+
+    for (auto& entity : m_sceneManager.GetEntities())
+    {
+        if (!entity.transform.has_value())
+            continue;
+        entity.transform->SnapshotState();
+    }
+
+    for (auto& handle : m_previewRotations)
+    {
+        auto* pEntity = m_sceneManager.Get(handle);
+        if (pEntity == nullptr)
+            continue;
+        pEntity->transform->Apply(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
+    }
+}
+
+void Renderer::PrepareConstantData(float alpha)
+{
+    // Transforms
+    for (auto& entity : m_sceneManager.GetEntities())
+    {
+        if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
+        {
+            XMMATRIX accumulated = XMMatrixIdentity();
+            PrepareTransform(entity, accumulated, alpha);
+        }
+    }
+
+    // Main Camera
+    m_camera.UpdateRenderState(alpha);
+    m_cameraConstantData.SetPos(m_camera.GetRenderPosition());
+    m_cameraConstantData.SetView(m_camera.GetViewMatrix());
+    m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());
+
+    // Light
+    // XMVECTOR lightDir = m_lights[0]->GetDirection();
+    // XMMATRIX rot = XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 0.001f);
+    // XMVECTOR rotated = XMVector3Transform(lightDir, rot);
+    // m_lights[0]->SetDirection(rotated);
+
+    // Pre-calculate common data for CSM.
+    std::vector<BoundingSphere> cascadeSpheres = CalcCascadeSpheres();
+
+    UINT idx = 0;
+    for (auto& light : m_sceneManager.GetDirectionalLights())
+    {
+        PrepareDirectionalLight(light, cascadeSpheres);
+        light.SetIdxInArray(idx);
+        ++idx;
+    }
+    idx = 0;
+    for (auto& light : m_sceneManager.GetPointLights())
+    {
+        PreparePointLight(light);
+        light.SetIdxInArray(idx);
+        ++idx;
+    }
+    idx = 0;
+    for (auto& light : m_sceneManager.GetSpotLights())
+    {
+        PrepareSpotLight(light);
+        light.SetIdxInArray(idx);
+        ++idx;
+    }
+}
+
+void Renderer::PrepareTransform(Entity& entity, XMMATRIX& accumulated, float alpha)
+{
+    if (!entity.transform.has_value())
+        return;
+
+    entity.transform->UpdateLocalRenderState(alpha);
+    XMMATRIX localRenderTransform = XMLoadFloat4x4(&entity.transform->GetLocalRenderTransform());
+
+    XMMATRIX world = localRenderTransform * accumulated;
+    entity.transform->SetWorldRenderTransform(world);
+
+    for (auto& child : entity.children)
+        PrepareTransform(*m_sceneManager.Get(child), world, alpha);
+}
+
+std::vector<BoundingSphere> Renderer::CalcCascadeSpheres()
+{
+    // Create bounding frustum of view frustum and transform to world space.
+    // BoundingFrustum::CreateFromMatrix and BoundingFrustum::GetCorners are implicitly assume that 0.0 is near plane and 1.0 is far plane.
+    // When using reverse-z, you need to handle this.
+    BoundingFrustum boundingFrustum;
+    BoundingFrustum::CreateFromMatrix(boundingFrustum, m_camera.GetProjectionMatrix());
+    XMMATRIX inverseView = XMMatrixInverse(nullptr, m_camera.GetViewMatrix());
+    boundingFrustum.Transform(boundingFrustum, inverseView);
+
+    // Get 8 corners of view frustum.
+    //     Far     Near
+    //    0----1  4----5
+    //    |    |  |    |
+    //    |    |  |    |
+    //    3----2  7----6
+    XMFLOAT3 frustumCorners[8];
+    boundingFrustum.GetCorners(frustumCorners);
+
+    XMFLOAT3 cascadeCorners[4][8];
+    std::vector<BoundingSphere> frustumBSs(4);
+
+    // Practical Split Scheme
+    // https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus
+    const float nearPlane = m_camera.GetNearPlane();
+    const float farPlane = m_camera.GetFarPlane();
+    const float lambda = 0.9f;
+
+    float splitRatio[MAX_CASCADES];
+
+    for (UINT i = 1; i <= MAX_CASCADES; ++i)
+    {
+        float ratio = static_cast<float>(i) / MAX_CASCADES;
+        float logSplit = nearPlane * std::pow(farPlane / nearPlane, ratio);
+        float uniSplit = nearPlane + (farPlane - nearPlane) * ratio;
+
+        float dist = lambda * logSplit + (1.0f - lambda) * uniSplit;
+        m_shadowConstantData.cascadeSplits[i - 1].x = dist;
+
+        splitRatio[i - 1] = (m_shadowConstantData.cascadeSplits[i - 1].x - nearPlane) / (farPlane - nearPlane);
+    }
+
+    for (UINT i = 0; i < MAX_CASCADES; ++i)
+    {
+        // Create corners.
+        for (UINT j = 0; j < 4; ++j)
+        {
+            // 4, 5, 6, 7 are near plane.
+            // 0, 1, 2, 3 are far plane.
+            XMVECTOR n = XMLoadFloat3(&frustumCorners[j + 4]);
+            XMVECTOR f = XMLoadFloat3(&frustumCorners[j]);
+
+            XMVECTOR s = XMVectorLerp(n, f, i == 0 ? 0.0f : splitRatio[i - 1]);
+            XMVECTOR e = XMVectorLerp(n, f, splitRatio[i]);
+
+            XMStoreFloat3(&cascadeCorners[i][j], s);
+            XMStoreFloat3(&cascadeCorners[i][j + 4], e);
+        }
+
+        // Create bounding sphere.
+        BoundingSphere::CreateFromPoints(frustumBSs[i], 8, cascadeCorners[i], sizeof(XMFLOAT3));
+    }
+
+    return frustumBSs;
+}
+
+void Renderer::PrepareDirectionalLight(DirectionalLight& light, const std::vector<BoundingSphere>& cascadeSpheres)
+{
+    static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+    XMVECTOR cameraPos = m_camera.GetRenderPosition();
+    XMVECTOR dir = light.GetDirection();
+
+    for (UINT i = 0; i < MAX_CASCADES; ++i)
+    {
+        XMVECTOR center = XMLoadFloat3(&cascadeSpheres[i].Center);
+        float radius = cascadeSpheres[i].Radius;
+
+        XMVECTOR viewOriginToCenter = center - cameraPos;
+
+        // Calculate view/projection matrix fit to light frustum
+
+        // Orthogonal projection of (center - view origin) onto lightDir.
+        // This represents where the view origin is located relative to the center on the light's Z-axis.
+        float d = XMVectorGetX(XMVector3Dot(viewOriginToCenter, dir));
+
+        XMMATRIX view = XMMatrixLookToLH(center, dir, up);
+        // Near Plane : Set to (view origin - sceneRadius) in Light Space.
+        //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
+        // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
+        XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, radius, -d - m_camera.GetFarPlane());
+
+        // Apply texel-sized increments to eliminate shadow shimmering.
+        XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+        shadowOrigin = XMVector4Transform(shadowOrigin, view * projection);
+        shadowOrigin = XMVectorScale(shadowOrigin, 1.0f / XMVectorGetW(shadowOrigin)); // Perspective divide. Can be ommitted if it uses orthographic projection.
+        // [-1, 1] -> [-resolution / 2, resolution / 2]
+        shadowOrigin = XMVectorScale(shadowOrigin, m_shadowMapResolution * 0.5f); // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
+
+        // Calculate diff and apply as translation matrix.
+        XMVECTOR roundedOrigin = XMVectorRound(shadowOrigin);
+        XMVECTOR diff = roundedOrigin - shadowOrigin;
+        diff = XMVectorScale(diff, 2.0f / m_shadowMapResolution); // Since diff is texel scale, it should be transformed to NDC scale.
+        XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
+
+        light.SetViewProjection(view, projection * fix, i);
+    }
+}
+
+void Renderer::PreparePointLight(PointLight& light)
+{
+    XMVECTOR pos = light.GetPosition();
+
+    // +X, -X, +Y, -Y, +Z, -Z
+    static const XMVECTOR Directions[6] = {
+        {1.0f, 0.0f, 0.0f, 0.0f},
+        {-1.0f, 0.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f, 0.0f},
+        {0.0f, -1.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, -1.0f, 0.0f}};
+    static const XMVECTOR Ups[6] = {
+        {0.0f, 1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, -1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f, 0.0f}};
+
+    // Set FOV as 90 degree
+    XMMATRIX projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.0f, light.GetRange(), m_camera.GetNearPlane());
+
+    for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
+    {
+        XMMATRIX view = XMMatrixLookToLH(pos, Directions[i], Ups[i]);
+        light.SetViewProjection(view, projection, i);
+    }
+}
+
+void Renderer::PrepareSpotLight(SpotLight& light)
+{
+    static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+    XMMATRIX view = XMMatrixLookToLH(light.GetPosition(), light.GetDirection(), up);
+    XMMATRIX projection = XMMatrixPerspectiveFovLH(light.GetOuterAngle(), 1.0f, light.GetRange(), m_camera.GetNearPlane());
+    light.SetViewProjection(view, projection, 0);
+}
+
+void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
+{
+    frameResource.ResetUploadAllocator();
+
+    m_cameraUploadAllocation = frameResource.PushConstantData(&m_cameraConstantData, sizeof(CameraConstantData));
+    m_shadowUploadAllocation = frameResource.PushConstantData(&m_shadowConstantData, sizeof(ShadowConstantData));
+
+    for (auto& mat : m_sceneManager.GetMaterials())
+    {
+        auto alloc = frameResource.PushConstantData(mat.GetConstantDataPtr(), sizeof(MaterialConstantData));
+        mat.InitCbv(m_device.Get(), alloc.gpuPtr);
+    }
+
+    auto processLight = [&](Light& light, UINT arraySize)
+    {
+        for (UINT i = 0; i < arraySize; ++i)
+        {
+            auto alloc = frameResource.PushConstantData(light.GetCameraConstantDataPtr(i), sizeof(CameraConstantData));
+            light.SetCameraUploadAllocation(i, alloc);
+        }
+        auto alloc = frameResource.PushConstantData(light.GetLightConstantDataPtr(), sizeof(LightConstantData));
+        light.InitLightCbv(m_device.Get(), alloc.gpuPtr);
+    };
+
+    for (auto& light : m_sceneManager.GetDirectionalLights())
+        processLight(light, MAX_CASCADES);
+    for (auto& light : m_sceneManager.GetPointLights())
+        processLight(light, POINT_LIGHT_ARRAY_SIZE);
+    for (auto& light : m_sceneManager.GetSpotLights())
+        processLight(light, SPOT_LIGHT_ARRAY_SIZE);
 }
 
 void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
@@ -1666,6 +2409,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
              frameResource.GetSelectionMask(),
              {0xffff'ffff, 0, 0, 0, 0, 0},
              D3D12_TEXTURE_BARRIER_FLAG_NONE},
+
             {D3D12_BARRIER_SYNC_PIXEL_SHADING,
              D3D12_BARRIER_SYNC_NONE,
              D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
@@ -1696,13 +2440,23 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto* pso = GetPipelineState(m_currentPSOKey);
         pCommandList->SetPipelineState(pso);
 
-        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetBackBufferRtvHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = frameResource.GetToneMappedBufferRtvHandle();
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
         pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         pCommandList->DrawInstanced(3, 1, 0, 0);
 
         std::vector<D3D12_TEXTURE_BARRIER> barriers = {
+            {D3D12_BARRIER_SYNC_RENDER_TARGET,
+             D3D12_BARRIER_SYNC_PIXEL_SHADING,
+             D3D12_BARRIER_ACCESS_RENDER_TARGET,
+             D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+             D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+             D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+             frameResource.GetToneMappedBuffer(),
+             {0xffff'ffff, 0, 0, 0, 0, 0},
+             D3D12_TEXTURE_BARRIER_FLAG_NONE},
+
             {D3D12_BARRIER_SYNC_PIXEL_SHADING,
              D3D12_BARRIER_SYNC_NONE,
              D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
@@ -1718,123 +2472,18 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     }
 }
 
-// Wait for pending GPU work to complete
-void Renderer::WaitForGpu()
+void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList* pCommandList)
 {
-    m_commandQueue.Flush();
-}
+    bool cbvSrvUavHeapChanged = m_dynamicDescriptorHeapForCbvSrvUav.CheckHeapChanged();
 
-void Renderer::MoveToNextFrame()
-{
-    // Update frame index and wait for fence value
-    m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-    m_commandQueue.WaitForFenceValue(m_frameResources[m_frameIndex].GetSignaledFenceValue());
-}
-
-// Setup Dear ImGui context
-void Renderer::InitImGui()
-{
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-
-    ImGui_ImplWin32_Init(Win32Application::GetHwnd());
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplDX12_InitInfo init_info = {};
-    init_info.Device = m_device.Get();
-    init_info.CommandQueue = m_commandQueue.GetCommandQueue();
-    init_info.NumFramesInFlight = FrameCount;
-    init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-    init_info.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-    init_info.SrvDescriptorHeap = m_imguiDescriptorAllocator.GetDescriptorHeap();
-    init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
+    if (cbvSrvUavHeapChanged)
     {
-        return ImGuiSrvDescriptorAllocate(out_cpu_handle, out_gpu_handle);
-    };
-    init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
-    {
-        return ImGuiSrvDescriptorFree(cpu_handle, gpu_handle);
-    };
-    ImGui_ImplDX12_Init(&init_info);
+        ID3D12DescriptorHeap* ppHeaps[] = {m_dynamicDescriptorHeapForCbvSrvUav.GetCurrentDescriptorHeap(), m_samplerDescriptorHeap.Get()};
+        pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    }
 
-    ImGui::GetStyle().FontScaleMain = m_dpiScale;
-}
-
-void Renderer::PrepareRenderGraph()
-{
-    // Set up render graph
-    auto& shadowMapPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::SHADOW_MAP)];
-    auto& gBufferPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::GBUFFER)];
-    auto& deferredLightingPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::DEFERRED_LIGHTING)];
-    auto& forwardColoringPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::FORWARD_COLORING)];
-    auto& selectionMaskPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::SELECTION_MASK)];
-    auto& horizontalDilatePass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::HORIZONTAL_DILATE)];
-    auto& outlineDrawingPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::OUTLINE_DRAWING)];
-    auto& toneMapPass = m_renderGraph.m_nodes[static_cast<UINT>(PassType::TONEMAP)];
-
-    // Resource handles
-    auto backBuffer = m_renderGraph.GetRGTexture("BackBuffer");
-    auto sceneColorBuffer0 = m_renderGraph.GetRGTexture("SceneColorBuffer0");
-    auto sceneColorBuffer1 = m_renderGraph.GetRGTexture("SceneColorBuffer1");
-    auto depthStencilBuffer = m_renderGraph.GetRGTexture("DepthStencilBuffer");
-    auto gBuffer = m_renderGraph.GetRGTexture("GBuffer");
-    auto selectionMask = m_renderGraph.GetRGTexture("SelectionMask");
-    auto horizontalDilatedMask = m_renderGraph.GetRGTexture("HorizontalDilatedMask");
-    auto directionalLightDepthBuffer = m_renderGraph.GetRGTexture("DirectionalLight");
-    auto pointLightRenderTarget = m_renderGraph.GetRGTexture("PointLight");
-    auto spotLightDepthBuffer = m_renderGraph.GetRGTexture("SpotLight");
-
-    // Shadow map pass
-    shadowMapPass.AddTextureInput(directionalLightDepthBuffer, {D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE});
-    shadowMapPass.AddTextureInput(pointLightRenderTarget, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
-    shadowMapPass.AddTextureInput(spotLightDepthBuffer, {D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE});
-
-    // GBuffer pass
-    gBufferPass.AddTextureInput(depthStencilBuffer, {D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE});
-    gBufferPass.AddTextureInput(gBuffer, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
-
-    // Deferred lighting pass
-    deferredLightingPass.AddTextureInput(sceneColorBuffer0, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
-    // To use depth-stencil buffer as both SRV and DSV simultaneously
-    // SRV: to reconstruct world pos
-    // DSV: for stencil test
-    deferredLightingPass.AddTextureInput(depthStencilBuffer, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE | D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ, D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_GENERIC_READ});
-    deferredLightingPass.AddTextureInput(gBuffer, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
-    deferredLightingPass.AddTextureOutput(gBuffer, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
-    deferredLightingPass.AddTextureInput(directionalLightDepthBuffer, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
-    deferredLightingPass.AddTextureInput(pointLightRenderTarget, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
-    deferredLightingPass.AddTextureInput(spotLightDepthBuffer, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
-
-    // Forward coloring pass
-    forwardColoringPass.AddTextureInput(sceneColorBuffer0, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
-    forwardColoringPass.AddTextureInput(depthStencilBuffer, {D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE});
-    forwardColoringPass.AddTextureInput(directionalLightDepthBuffer, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
-    forwardColoringPass.AddTextureOutput(directionalLightDepthBuffer, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE});
-    forwardColoringPass.AddTextureInput(pointLightRenderTarget, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
-    forwardColoringPass.AddTextureOutput(pointLightRenderTarget, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
-    forwardColoringPass.AddTextureInput(spotLightDepthBuffer, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
-    forwardColoringPass.AddTextureOutput(spotLightDepthBuffer, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE});
-
-    // Selection mask pass
-    selectionMaskPass.AddTextureInput(selectionMask, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
-
-    // Horizontal dilate pass
-    horizontalDilatePass.AddTextureInput(horizontalDilatedMask, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
-    horizontalDilatePass.AddTextureInput(selectionMask, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
-
-    // Outline drawing pass
-    outlineDrawingPass.AddTextureInput(sceneColorBuffer0, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
-    outlineDrawingPass.AddTextureInput(selectionMask, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
-    outlineDrawingPass.AddTextureOutput(selectionMask, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
-    outlineDrawingPass.AddTextureInput(horizontalDilatedMask, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
-    outlineDrawingPass.AddTextureOutput(horizontalDilatedMask, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
-
-    // Tone mapping pass
-    toneMapPass.AddTextureInput(backBuffer, {D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
-    toneMapPass.AddTextureInput(sceneColorBuffer0, {D3D12_BARRIER_SYNC_PIXEL_SHADING, D3D12_BARRIER_ACCESS_SHADER_RESOURCE, D3D12_BARRIER_LAYOUT_SHADER_RESOURCE});
-    toneMapPass.AddTextureOutput(sceneColorBuffer0, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET});
+    m_dynamicDescriptorHeapForCbvSrvUav.CommitStagedDescriptorsForDraw(pCommandList);
+    pCommandList->SetGraphicsRootDescriptorTable(12, m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart()); // Root parameter 12
 }
 
 void Renderer::ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID3D12GraphicsCommandList7* pCommandList)
@@ -1886,203 +2535,6 @@ void Renderer::ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID
 
     if (!barrierGroups.empty())
         pCommandList->Barrier(static_cast<UINT32>(barrierGroups.size()), barrierGroups.data());
-}
-
-void Renderer::SetTextureFiltering(TextureFiltering filtering)
-{
-    m_currentTextureFiltering = filtering;
-    for (auto& material : m_sceneManager.GetMaterials())
-    {
-        material.BuildSamplerIndices(m_currentTextureFiltering);
-    }
-}
-
-// Allocate Material
-MaterialHandle Renderer::CreateMaterial()
-{
-    return m_sceneManager.AddMaterial(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate());
-}
-
-// Allocate & register Material
-MaterialHandle Renderer::CreateMaterial(const AssetID& id)
-{
-    return m_sceneManager.AddMaterial(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(), id);
-}
-
-MaterialHandle Renderer::CloneMaterial(MaterialHandle src)
-{
-    auto hDst = CreateMaterial();
-    auto* pSrc = m_sceneManager.GetMaterial(src);
-    auto* pDst = m_sceneManager.GetMaterial(hDst);
-    pDst->CopyDataFrom(*pSrc);
-    return hDst;
-}
-
-MeshHandle Renderer::CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data)
-{
-    return m_sceneManager.AddMesh(m_device.Get(), pCommandList, allocator, data);
-}
-
-DirectionalLightHandle Renderer::CreateDirectionalLight()
-{
-    return m_sceneManager.AddDirectionalLight(
-        m_device.Get(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV].Allocate(MAX_CASCADES),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
-        m_shadowMapResolution);
-}
-
-PointLightHandle Renderer::CreatePointLight()
-{
-    return m_sceneManager.AddPointLight(
-        m_device.Get(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV].Allocate(POINT_LIGHT_ARRAY_SIZE),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(POINT_LIGHT_ARRAY_SIZE),
-        m_shadowMapResolution);
-}
-
-SpotLightHandle Renderer::CreateSpotLight()
-{
-    return m_sceneManager.AddSpotLight(
-        m_device.Get(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV].Allocate(SPOT_LIGHT_ARRAY_SIZE),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
-        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
-        m_shadowMapResolution);
-}
-
-AssetTextureHandle Renderer::CreateAssetTexture(
-    ID3D12GraphicsCommandList7* pCommandList,
-    DescriptorAllocation&& srvAllocation,
-    TransientUploadAllocator& uploadAllocator,
-    const std::vector<UINT8>& textureSrc,
-    UINT width,
-    UINT height)
-{
-    return m_sceneManager.AddAssetTexture(
-        m_device.Get(),
-        pCommandList,
-        std::move(srvAllocation),
-        uploadAllocator,
-        textureSrc,
-        width,
-        height);
-}
-
-AssetTextureHandle Renderer::CreateAssetTexture(
-    ID3D12GraphicsCommandList7* pCommandList,
-    DescriptorAllocation&& srvAllocation,
-    TransientUploadAllocator& uploadAllocator,
-    const std::wstring& filePath,
-    bool isSRGB,
-    bool useBlockCompress,
-    bool flipImage,
-    bool isCubeMap)
-{
-    return m_sceneManager.AddAssetTexture(
-        m_device.Get(),
-        pCommandList,
-        std::move(srvAllocation),
-        uploadAllocator,
-        filePath,
-        isSRGB,
-        useBlockCompress,
-        flipImage,
-        isCubeMap);
-}
-
-void Renderer::SetFpsCap(std::string fps)
-{
-    if (fps == "Unlimited")
-    {
-        m_fpsCap = -1;
-    }
-    else
-    {
-        m_fpsCap = std::stoi(fps);
-        m_deadLine = m_clock.now();
-    }
-}
-
-void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList* pCommandList)
-{
-    bool cbvSrvUavHeapChanged = m_dynamicDescriptorHeapForCbvSrvUav.CheckHeapChanged();
-
-    if (cbvSrvUavHeapChanged)
-    {
-        ID3D12DescriptorHeap* ppHeaps[] = {m_dynamicDescriptorHeapForCbvSrvUav.GetCurrentDescriptorHeap(), m_samplerDescriptorHeap.Get()};
-        pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-    }
-
-    m_dynamicDescriptorHeapForCbvSrvUav.CommitStagedDescriptorsForDraw(pCommandList);
-    pCommandList->SetGraphicsRootDescriptorTable(12, m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart()); // Root parameter 12
-}
-
-void Renderer::CreateRootSignature()
-{
-    m_rootSignature.Init(13, 2);
-
-    // Root descriptor for CameraCB and ShadowCB
-    m_rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);   // Camera
-    m_rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC); // Shadow
-
-    // Root constants for number of lights
-    m_rootSignature[2].InitAsConstant(2, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
-
-    // Root constant for PointLightShadowPS
-    m_rootSignature[3].InitAsConstant(3, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
-
-    // Root constant for outline
-    m_rootSignature[4].InitAsConstant(4, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
-
-    // Descriptor table for MaterialConstantBuffers[]
-    m_rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_rootSignature[5].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-
-    // Descriptor table for LightConstantBuffers[]
-    m_rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_rootSignature[6].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-
-    // Descriptor table for textures (albedo, normal map, height map)
-    m_rootSignature[7].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_rootSignature[7].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-
-    // Descriptor table for shadowMaps[]
-    // Directional
-    m_rootSignature[8].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_rootSignature[8].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    // Point
-    m_rootSignature[9].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_rootSignature[9].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    // Spot
-    m_rootSignature[10].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_rootSignature[10].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-
-    // Descriptor table for
-    // SRV for GBuffers
-    // SRV for depth value
-    // SRV for selectionMask/horizontalDilatedMask
-    // SRV for scene color buffer
-    m_rootSignature[11].InitAsTable(4, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_rootSignature[11].InitAsRange(0, 0, 4, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    m_rootSignature[11].InitAsRange(1, 0, 5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    m_rootSignature[11].InitAsRange(2, 0, 6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    m_rootSignature[11].InitAsRange(3, 0, 7, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-
-    // Descriptor table for samplers
-    m_rootSignature[12].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_rootSignature[12].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
-                                    static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS) * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES),
-                                    D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
-
-    // Static samplers
-    m_rootSignature.InitStaticSampler(0, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_GREATER_EQUAL);
-    m_rootSignature.InitStaticSampler(1, 1, 1, D3D12_SHADER_VISIBILITY_PIXEL, TextureFiltering::BILINEAR, TextureAddressingMode::BORDER, D3D12_COMPARISON_FUNC_LESS_EQUAL);
-
-    m_rootSignature.Finalize(m_device.Get());
 }
 
 ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
@@ -2258,7 +2710,7 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
             break;
         case PassType::TONEMAP:
             psoDesc.NumRenderTargets = 1;
-            psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+            psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
             break;
         }
 
@@ -2279,411 +2731,6 @@ const std::vector<char>& Renderer::GetShaderBlobRef(const ShaderKey& shaderKey) 
     }
 
     return it->second;
-}
-
-void Renderer::FixedUpdate(double fixedDtMs)
-{
-    float fixedDtSec = static_cast<float>(fixedDtMs) * 0.001f;
-
-    // Camera
-    static float cameraMoveSpeed = 50.0f;
-
-    float dist = cameraMoveSpeed * fixedDtSec;
-
-    m_camera.SnapshotState();
-
-    if (m_inputManager.IsMouseButtonDown(1))
-    {
-        if (m_inputManager.IsKeyDown('W'))
-            m_camera.MoveForward(dist);
-        if (m_inputManager.IsKeyDown('A'))
-            m_camera.MoveRight(-dist);
-        if (m_inputManager.IsKeyDown('S'))
-            m_camera.MoveForward(-dist);
-        if (m_inputManager.IsKeyDown('D'))
-            m_camera.MoveRight(dist);
-        if (m_inputManager.IsKeyDown('Q'))
-            m_camera.MoveUp(-dist);
-        if (m_inputManager.IsKeyDown('E'))
-            m_camera.MoveUp(dist);
-    }
-
-    // Transforms
-    static float rotationSpeed = 1.0f; // unit : rad/s
-
-    for (auto& entity : m_sceneManager.GetEntities())
-    {
-        if (!entity.transform.has_value())
-            continue;
-        entity.transform->SnapshotState();
-    }
-
-    for (auto& handle : m_previewRotations)
-    {
-        auto* pEntity = m_sceneManager.Get(handle);
-        if (pEntity == nullptr)
-            continue;
-        pEntity->transform->Apply(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
-    }
-}
-
-void Renderer::PrepareConstantData(float alpha)
-{
-    // Transforms
-    for (auto& entity : m_sceneManager.GetEntities())
-    {
-        if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
-        {
-            XMMATRIX accumulated = XMMatrixIdentity();
-            PrepareTransform(entity, accumulated, alpha);
-        }
-    }
-
-    // Main Camera
-    m_camera.UpdateRenderState(alpha);
-    m_cameraConstantData.SetPos(m_camera.GetRenderPosition());
-    m_cameraConstantData.SetView(m_camera.GetViewMatrix());
-    m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());
-
-    // Light
-    // XMVECTOR lightDir = m_lights[0]->GetDirection();
-    // XMMATRIX rot = XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 0.001f);
-    // XMVECTOR rotated = XMVector3Transform(lightDir, rot);
-    // m_lights[0]->SetDirection(rotated);
-
-    // Pre-calculate common data for CSM.
-    std::vector<BoundingSphere> cascadeSpheres = CalcCascadeSpheres();
-
-    UINT idx = 0;
-    for (auto& light : m_sceneManager.GetDirectionalLights())
-    {
-        PrepareDirectionalLight(light, cascadeSpheres);
-        light.SetIdxInArray(idx);
-        ++idx;
-    }
-    idx = 0;
-    for (auto& light : m_sceneManager.GetPointLights())
-    {
-        PreparePointLight(light);
-        light.SetIdxInArray(idx);
-        ++idx;
-    }
-    idx = 0;
-    for (auto& light : m_sceneManager.GetSpotLights())
-    {
-        PrepareSpotLight(light);
-        light.SetIdxInArray(idx);
-        ++idx;
-    }
-}
-
-void Renderer::PrepareTransform(Entity& entity, XMMATRIX& accumulated, float alpha)
-{
-    if (!entity.transform.has_value())
-        return;
-
-    entity.transform->UpdateLocalRenderState(alpha);
-    XMMATRIX localRenderTransform = XMLoadFloat4x4(&entity.transform->GetLocalRenderTransform());
-
-    XMMATRIX world = localRenderTransform * accumulated;
-    entity.transform->SetWorldRenderTransform(world);
-
-    for (auto& child : entity.children)
-        PrepareTransform(*m_sceneManager.Get(child), world, alpha);
-}
-
-std::vector<BoundingSphere> Renderer::CalcCascadeSpheres()
-{
-    // Create bounding frustum of view frustum and transform to world space.
-    // BoundingFrustum::CreateFromMatrix and BoundingFrustum::GetCorners are implicitly assume that 0.0 is near plane and 1.0 is far plane.
-    // When using reverse-z, you need to handle this.
-    BoundingFrustum boundingFrustum;
-    BoundingFrustum::CreateFromMatrix(boundingFrustum, m_camera.GetProjectionMatrix());
-    XMMATRIX inverseView = XMMatrixInverse(nullptr, m_camera.GetViewMatrix());
-    boundingFrustum.Transform(boundingFrustum, inverseView);
-
-    // Get 8 corners of view frustum.
-    //     Far     Near
-    //    0----1  4----5
-    //    |    |  |    |
-    //    |    |  |    |
-    //    3----2  7----6
-    XMFLOAT3 frustumCorners[8];
-    boundingFrustum.GetCorners(frustumCorners);
-
-    XMFLOAT3 cascadeCorners[4][8];
-    std::vector<BoundingSphere> frustumBSs(4);
-
-    // Practical Split Scheme
-    // https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus
-    const float nearPlane = m_camera.GetNearPlane();
-    const float farPlane = m_camera.GetFarPlane();
-    const float lambda = 0.9f;
-
-    float splitRatio[MAX_CASCADES];
-
-    for (UINT i = 1; i <= MAX_CASCADES; ++i)
-    {
-        float ratio = static_cast<float>(i) / MAX_CASCADES;
-        float logSplit = nearPlane * std::pow(farPlane / nearPlane, ratio);
-        float uniSplit = nearPlane + (farPlane - nearPlane) * ratio;
-
-        float dist = lambda * logSplit + (1.0f - lambda) * uniSplit;
-        m_shadowConstantData.cascadeSplits[i - 1].x = dist;
-
-        splitRatio[i - 1] = (m_shadowConstantData.cascadeSplits[i - 1].x - nearPlane) / (farPlane - nearPlane);
-    }
-
-    for (UINT i = 0; i < MAX_CASCADES; ++i)
-    {
-        // Create corners.
-        for (UINT j = 0; j < 4; ++j)
-        {
-            // 4, 5, 6, 7 are near plane.
-            // 0, 1, 2, 3 are far plane.
-            XMVECTOR n = XMLoadFloat3(&frustumCorners[j + 4]);
-            XMVECTOR f = XMLoadFloat3(&frustumCorners[j]);
-
-            XMVECTOR s = XMVectorLerp(n, f, i == 0 ? 0.0f : splitRatio[i - 1]);
-            XMVECTOR e = XMVectorLerp(n, f, splitRatio[i]);
-
-            XMStoreFloat3(&cascadeCorners[i][j], s);
-            XMStoreFloat3(&cascadeCorners[i][j + 4], e);
-        }
-
-        // Create bounding sphere.
-        BoundingSphere::CreateFromPoints(frustumBSs[i], 8, cascadeCorners[i], sizeof(XMFLOAT3));
-    }
-
-    return frustumBSs;
-}
-
-void Renderer::PrepareDirectionalLight(DirectionalLight& light, const std::vector<BoundingSphere>& cascadeSpheres)
-{
-    static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-
-    XMVECTOR cameraPos = m_camera.GetRenderPosition();
-    XMVECTOR dir = light.GetDirection();
-
-    for (UINT i = 0; i < MAX_CASCADES; ++i)
-    {
-        XMVECTOR center = XMLoadFloat3(&cascadeSpheres[i].Center);
-        float radius = cascadeSpheres[i].Radius;
-
-        XMVECTOR viewOriginToCenter = center - cameraPos;
-
-        // Calculate view/projection matrix fit to light frustum
-
-        // Orthogonal projection of (center - view origin) onto lightDir.
-        // This represents where the view origin is located relative to the center on the light's Z-axis.
-        float d = XMVectorGetX(XMVector3Dot(viewOriginToCenter, dir));
-
-        XMMATRIX view = XMMatrixLookToLH(center, dir, up);
-        // Near Plane : Set to (view origin - sceneRadius) in Light Space.
-        //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
-        // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
-        XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, radius, -d - m_camera.GetFarPlane());
-
-        // Apply texel-sized increments to eliminate shadow shimmering.
-        XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        shadowOrigin = XMVector4Transform(shadowOrigin, view * projection);
-        shadowOrigin = XMVectorScale(shadowOrigin, 1.0f / XMVectorGetW(shadowOrigin)); // Perspective divide. Can be ommitted if it uses orthographic projection.
-        // [-1, 1] -> [-resolution / 2, resolution / 2]
-        shadowOrigin = XMVectorScale(shadowOrigin, m_shadowMapResolution * 0.5f); // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
-
-        // Calculate diff and apply as translation matrix.
-        XMVECTOR roundedOrigin = XMVectorRound(shadowOrigin);
-        XMVECTOR diff = roundedOrigin - shadowOrigin;
-        diff = XMVectorScale(diff, 2.0f / m_shadowMapResolution); // Since diff is texel scale, it should be transformed to NDC scale.
-        XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
-
-        light.SetViewProjection(view, projection * fix, i);
-    }
-}
-
-void Renderer::PreparePointLight(PointLight& light)
-{
-    XMVECTOR pos = light.GetPosition();
-
-    // +X, -X, +Y, -Y, +Z, -Z
-    static const XMVECTOR Directions[6] = {
-        {1.0f, 0.0f, 0.0f, 0.0f},
-        {-1.0f, 0.0f, 0.0f, 0.0f},
-        {0.0f, 1.0f, 0.0f, 0.0f},
-        {0.0f, -1.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 1.0f, 0.0f},
-        {0.0f, 0.0f, -1.0f, 0.0f}};
-    static const XMVECTOR Ups[6] = {
-        {0.0f, 1.0f, 0.0f, 0.0f},
-        {0.0f, 1.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, -1.0f, 0.0f},
-        {0.0f, 0.0f, 1.0f, 0.0f},
-        {0.0f, 1.0f, 0.0f, 0.0f},
-        {0.0f, 1.0f, 0.0f, 0.0f}};
-
-    // Set FOV as 90 degree
-    XMMATRIX projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.0f, light.GetRange(), m_camera.GetNearPlane());
-
-    for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
-    {
-        XMMATRIX view = XMMatrixLookToLH(pos, Directions[i], Ups[i]);
-        light.SetViewProjection(view, projection, i);
-    }
-}
-
-void Renderer::PrepareSpotLight(SpotLight& light)
-{
-    static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-
-    XMMATRIX view = XMMatrixLookToLH(light.GetPosition(), light.GetDirection(), up);
-    XMMATRIX projection = XMMatrixPerspectiveFovLH(light.GetOuterAngle(), 1.0f, light.GetRange(), m_camera.GetNearPlane());
-    light.SetViewProjection(view, projection, 0);
-}
-
-void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
-{
-    frameResource.ResetUploadAllocator();
-
-    m_cameraUploadAllocation = frameResource.PushConstantData(&m_cameraConstantData, sizeof(CameraConstantData));
-    m_shadowUploadAllocation = frameResource.PushConstantData(&m_shadowConstantData, sizeof(ShadowConstantData));
-
-    for (auto& mat : m_sceneManager.GetMaterials())
-    {
-        auto alloc = frameResource.PushConstantData(mat.GetConstantDataPtr(), sizeof(MaterialConstantData));
-        mat.InitCbv(m_device.Get(), alloc.gpuPtr);
-    }
-
-    auto processLight = [&](Light& light, UINT arraySize)
-    {
-        for (UINT i = 0; i < arraySize; ++i)
-        {
-            auto alloc = frameResource.PushConstantData(light.GetCameraConstantDataPtr(i), sizeof(CameraConstantData));
-            light.SetCameraUploadAllocation(i, alloc);
-        }
-        auto alloc = frameResource.PushConstantData(light.GetLightConstantDataPtr(), sizeof(LightConstantData));
-        light.InitLightCbv(m_device.Get(), alloc.gpuPtr);
-    };
-
-    for (auto& light : m_sceneManager.GetDirectionalLights())
-        processLight(light, MAX_CASCADES);
-    for (auto& light : m_sceneManager.GetPointLights())
-        processLight(light, POINT_LIGHT_ARRAY_SIZE);
-    for (auto& light : m_sceneManager.GetSpotLights())
-        processLight(light, SPOT_LIGHT_ARRAY_SIZE);
-}
-
-void Renderer::ProcessInput()
-{
-    if (m_inputManager.IsKeyPressed(VK_ESCAPE))
-    {
-        if (!PostMessageW(Win32Application::GetHwnd(), WM_CLOSE, 0, 0))
-        {
-            DWORD err = GetLastError();
-            WCHAR buf[128];
-            swprintf_s(buf, L"PostMessageW(WM_CLOSE) failed. GetLastError=%lu\n", err);
-            OutputDebugStringW(buf);
-
-            // fallback
-            PostQuitMessage(static_cast<int>(err));
-        }
-    }
-
-    if (m_inputManager.IsKeyPressed(VK_F11) ||
-        (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsKeyPressed(VK_RETURN)))
-    {
-        ToggleFullScreen();
-    }
-
-    if (m_inputManager.IsKeyPressed('V'))
-    {
-        m_vSync = !m_vSync;
-    }
-
-    // Focus
-    if (m_inputManager.IsKeyPressed('F') && !(m_selected.index == UINT_MAX && m_selected.generation == 0))
-    {
-        auto* pEntity = m_sceneManager.Get(m_selected);
-        auto pos = pEntity->transform->GetTranslation();
-
-        m_camera.SetCurrentPosition(XMLoadFloat3(&pos) - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
-
-        m_orbitDistance = DEFAULT_FOCUS_DIST;
-    }
-
-    // Dolly
-    {
-        static float cameraDollySpeed = 5.0f;
-
-        float wheelStep = m_inputManager.GetAndResetMouseWheelStep();
-        if (wheelStep != 0.0f)
-        {
-            m_camera.MoveForward(wheelStep * cameraDollySpeed);
-            XMVECTOR camPos = m_camera.GetCurrentPosition();
-            m_orbitDistance = XMVectorGetX(XMVector3Length(camPos - XMLoadFloat3(&m_orbitPivot)));
-        }
-    }
-
-    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
-
-    // Camera control
-    if (m_inputManager.IsMouseButtonPressed(1))
-    {
-        m_cameraControl = true;
-        Win32Application::HideCursor();
-    }
-    if (m_cameraControl)
-    {
-        if (m_inputManager.IsMouseButtonDown(1))
-        {
-            m_camera.Rotate(mouseMove);
-        }
-        else
-        {
-            m_cameraControl = false;
-            Win32Application::RestoreCursor();
-        }
-    }
-
-    // Orbit
-    if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonPressed(0))
-    {
-        BeginOrbit();
-        Win32Application::HideCursor();
-    }
-    if (m_orbiting)
-    {
-        if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonDown(0))
-        {
-            m_camera.Orbit(XMLoadFloat3(&m_orbitPivot), m_orbitDistance, mouseMove);
-        }
-        else
-        {
-            m_orbiting = false;
-            Win32Application::RestoreCursor();
-        }
-    }
-
-    // Pan
-    if (m_inputManager.IsMouseButtonPressed(2))
-    {
-        m_panning = true;
-        Win32Application::HideCursor();
-    }
-    if (m_panning)
-    {
-        if (m_inputManager.IsMouseButtonDown(2))
-        {
-            m_camera.Pan(mouseMove);
-        }
-        else
-        {
-            m_panning = false;
-            Win32Application::RestoreCursor();
-        }
-    }
-
-    // Operations in ProcessInput are immediate, requiring no interpolation.
-    m_camera.SnapshotState();
 }
 
 void Renderer::DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)
@@ -2757,9 +2804,112 @@ void Renderer::DrawEntity(ID3D12GraphicsCommandList* pCommandList, EntityHandle 
     pCommandList->DrawIndexedInstanced(pMesh->GetNumIndices(), 1, 0, 0, 0);
 }
 
-void Renderer::BeginOrbit()
+// Wait for pending GPU work to complete
+void Renderer::WaitForGpu()
 {
-    XMVECTOR camPos = m_camera.GetCurrentPosition();
-    XMStoreFloat3(&m_orbitPivot, camPos + m_camera.GetForward() * m_orbitDistance);
-    m_orbiting = true;
+    m_commandQueue.Flush();
+}
+
+void Renderer::MoveToNextFrame()
+{
+    // Update frame index and wait for fence value
+    m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+    m_commandQueue.WaitForFenceValue(m_frameResources[m_frameIndex].GetSignaledFenceValue());
+}
+
+// Allocate Material
+MaterialHandle Renderer::CreateMaterial()
+{
+    return m_sceneManager.AddMaterial(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate());
+}
+
+// Allocate & register Material
+MaterialHandle Renderer::CreateMaterial(const AssetID& id)
+{
+    return m_sceneManager.AddMaterial(m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(), id);
+}
+
+MaterialHandle Renderer::CloneMaterial(MaterialHandle src)
+{
+    auto hDst = CreateMaterial();
+    auto* pSrc = m_sceneManager.GetMaterial(src);
+    auto* pDst = m_sceneManager.GetMaterial(hDst);
+    pDst->CopyDataFrom(*pSrc);
+    return hDst;
+}
+
+MeshHandle Renderer::CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data)
+{
+    return m_sceneManager.AddMesh(m_device.Get(), pCommandList, allocator, data);
+}
+
+DirectionalLightHandle Renderer::CreateDirectionalLight()
+{
+    return m_sceneManager.AddDirectionalLight(
+        m_device.Get(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV].Allocate(MAX_CASCADES),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
+        m_shadowMapResolution);
+}
+
+PointLightHandle Renderer::CreatePointLight()
+{
+    return m_sceneManager.AddPointLight(
+        m_device.Get(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV].Allocate(POINT_LIGHT_ARRAY_SIZE),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(POINT_LIGHT_ARRAY_SIZE),
+        m_shadowMapResolution);
+}
+
+SpotLightHandle Renderer::CreateSpotLight()
+{
+    return m_sceneManager.AddSpotLight(
+        m_device.Get(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV].Allocate(SPOT_LIGHT_ARRAY_SIZE),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
+        m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
+        m_shadowMapResolution);
+}
+
+AssetTextureHandle Renderer::CreateAssetTexture(
+    ID3D12GraphicsCommandList7* pCommandList,
+    DescriptorAllocation&& srvAllocation,
+    TransientUploadAllocator& uploadAllocator,
+    const std::vector<UINT8>& textureSrc,
+    UINT width,
+    UINT height)
+{
+    return m_sceneManager.AddAssetTexture(
+        m_device.Get(),
+        pCommandList,
+        std::move(srvAllocation),
+        uploadAllocator,
+        textureSrc,
+        width,
+        height);
+}
+
+AssetTextureHandle Renderer::CreateAssetTexture(
+    ID3D12GraphicsCommandList7* pCommandList,
+    DescriptorAllocation&& srvAllocation,
+    TransientUploadAllocator& uploadAllocator,
+    const std::wstring& filePath,
+    bool isSRGB,
+    bool useBlockCompress,
+    bool flipImage,
+    bool isCubeMap)
+{
+    return m_sceneManager.AddAssetTexture(
+        m_device.Get(),
+        pCommandList,
+        std::move(srvAllocation),
+        uploadAllocator,
+        filePath,
+        isSRGB,
+        useBlockCompress,
+        flipImage,
+        isCubeMap);
 }

@@ -120,6 +120,12 @@
     <ClCompile Include="DDSTextureLoader\DDSTextureLoader12.cpp">
       <Filter>DDSTextureLoader</Filter>
     </ClCompile>
+    <ClCompile Include="ImGuiDescriptorAllocator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiDescriptorAllocation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -266,6 +272,12 @@
     </ClInclude>
     <ClInclude Include="DDSTextureLoader\DDSTextureLoader12.h">
       <Filter>DDSTextureLoader</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiShaderResourceView.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiDescriptorAllocation.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

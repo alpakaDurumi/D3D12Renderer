@@ -10,12 +10,14 @@
 #include <minwindef.h>
 
 #include "Buffer.h"
+#include "ImGuiShaderResourceView.h"
 #include "SharedConfig.h"
 #include "Texture.h"
 #include "TransientUploadAllocator.h"
 #include "View.h"
 
 class DescriptorAllocation;
+class ImGuiDescriptorAllocation;
 struct InstanceData;
 struct UploadAllocation;
 
@@ -35,6 +37,8 @@ public:
         ID3D12Device10* pDevice,
         IDXGISwapChain* pSwapChain,
         UINT frameIndex,
+        UINT sceneWidth,
+        UINT sceneHeight,
         DescriptorAllocation&& rtvAllocation,
         DescriptorAllocation&& sceneBufferRtvAllocation,
         DescriptorAllocation&& sceneBufferSrvAllocation,
@@ -43,12 +47,13 @@ public:
         DescriptorAllocation&& selectionMaskRtvAllocation,
         DescriptorAllocation&& selectionMaskSrvAllocation,
         DescriptorAllocation&& horizontalDilatedMaskRtvAllocation,
-        DescriptorAllocation&& horizontalDilatedMaskSrvAllocation);
+        DescriptorAllocation&& horizontalDilatedMaskSrvAllocation,
+        DescriptorAllocation&& toneMappedBufferRtvAllocation,
+        ImGuiDescriptorAllocation&& toneMappedBufferSrvAllocation);
 
     // Back buffer
     void AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameIndex);
     ID3D12Resource* GetBackBuffer() const;
-    void InitBackBufferRtv();
     D3D12_CPU_DESCRIPTOR_HANDLE GetBackBufferRtvHandle() const;
     void ResetBackBuffer();
 
@@ -57,7 +62,6 @@ public:
     ID3D12Resource* GetSceneColorBuffer(UINT index) const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetSceneColorBufferRtvHandle(UINT index) const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetSceneColorBufferSrvHandle(UINT index) const;
-    void ResetSceneColorBuffers();
 
     // GBuffer
     void CreateGBuffers(UINT64 width, UINT height);
@@ -65,7 +69,6 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferBaseRtvHandle() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetGBufferBaseSrvHandle() const;
     static DXGI_FORMAT GetGBufferFormat(GBufferSlot slot);
-    void ResetGBuffers();
 
     // Masks
     void CreateMasks(UINT64 width, UINT height);
@@ -75,7 +78,12 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetSelectionMaskSrvHandle() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetHorizontalDilatedMaskRtvHandle() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetHorizontalDilatedMaskSrvHandle() const;
-    void ResetMasks();
+
+    // ToneMappedBuffer
+    void CreateToneMappedBuffer(UINT64 width, UINT height);
+    ID3D12Resource* GetToneMappedBuffer() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetToneMappedBufferRtvHandle() const;
+    D3D12_GPU_DESCRIPTOR_HANDLE GetToneMappedBufferSrvHandle() const;
 
     // Instance data
     void ResetInstanceOffsetByte();
@@ -112,6 +120,10 @@ private:
     Texture m_horizontalDilatedMask;
     RenderTargetView m_horizontalDilatedMaskRtv;
     ShaderResourceView m_horizontalDilatedMaskSrv;
+
+    Texture m_toneMappedBuffer;
+    RenderTargetView m_toneMappedBufferRtv;
+    ImGuiShaderResourceView m_toneMappedBufferSrv;
 
     Buffer m_instanceUploadBuffer;
     UINT8* m_instanceBufferBegin = nullptr;

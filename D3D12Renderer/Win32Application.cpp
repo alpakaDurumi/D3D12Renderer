@@ -17,7 +17,6 @@
 int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
     ParseCommandLineArgs(pRenderer, lpCmdLine);
-    pRenderer->UpdateWidthHeight();
 
     // Set locale for converting between multi-byte character and wide character (e.g. std::mbstowcs)
     std::setlocale(LC_ALL, ".UTF8");
@@ -45,7 +44,8 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     // Make application DPI-aware before adjusting window.
     SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-    RECT windowRect = {0, 0, static_cast<LONG>(pRenderer->GetWidth()), static_cast<LONG>(pRenderer->GetHeight())};
+    const auto [width, height] = pRenderer->GetWindowResolution();
+    RECT windowRect = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
     sm_dpi = GetDpiForSystem(); // Before creating window, get DPI from system
     AdjustWindowRectExForDpi(&windowRect, WS_OVERLAPPEDWINDOW, FALSE, 0, sm_dpi);
 
@@ -87,7 +87,7 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
 
     RegisterRawInputDevices(devices, 2, sizeof(RAWINPUTDEVICE));
 
-    pRenderer->OnInit(sm_dpi);
+    pRenderer->Init(sm_dpi);
 
     ShowWindow(sm_hwnd, nCmdShow);
 
@@ -124,12 +124,15 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
+        pRenderer->BeginFrameTiming();
+        pRenderer->ProcessInput();
         pRenderer->BuildImGuiFrame();
-        pRenderer->OnUpdate();
-        pRenderer->OnRender();
+        pRenderer->Update();
+        pRenderer->Render();
+        pRenderer->EndFrameTiming();
     }
 
-    pRenderer->OnDestroy();
+    pRenderer->Destroy();
 
     // Unset periodic timer resolution.
     if (timerResolutionSet)
@@ -168,15 +171,15 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
     }
     }
 
-    Renderer* renderer = reinterpret_cast<Renderer*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
-    if (!renderer)
+    Renderer* pRenderer = reinterpret_cast<Renderer*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+    if (!pRenderer)
         return DefWindowProcW(hWnd, message, wParam, lParam);
 
     switch (message)
     {
     case WM_INPUT:
     {
-        HandleRawInput(renderer, lParam);
+        HandleRawInput(pRenderer, lParam);
         break; // To call DefWindowProcW so the system can perform cleanup
     }
     case WM_KEYDOWN:
@@ -193,42 +196,42 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
         case WM_SYSKEYDOWN:
             // Only if prev key is up
             if (!(keyFlags & KF_REPEAT))
-                renderer->OnKeyDown(key);
+                pRenderer->OnKeyDown(key);
             return 0;
         case WM_KEYUP:
         case WM_SYSKEYUP:
-            renderer->OnKeyUp(key);
+            pRenderer->OnKeyUp(key);
             return 0;
         }
         return 0;
     }
     case WM_LBUTTONDOWN:
-        renderer->OnMouseButtonDown(0);
+        pRenderer->OnMouseButtonDown(0);
         return 0;
     case WM_LBUTTONUP:
-        renderer->OnMouseButtonUp(0);
+        pRenderer->OnMouseButtonUp(0);
         return 0;
     case WM_RBUTTONDOWN:
-        renderer->OnMouseButtonDown(1);
+        pRenderer->OnMouseButtonDown(1);
         return 0;
     case WM_RBUTTONUP:
-        renderer->OnMouseButtonUp(1);
+        pRenderer->OnMouseButtonUp(1);
         return 0;
     case WM_MBUTTONDOWN:
-        renderer->OnMouseButtonDown(2);
+        pRenderer->OnMouseButtonDown(2);
         return 0;
     case WM_MBUTTONUP:
-        renderer->OnMouseButtonUp(2);
+        pRenderer->OnMouseButtonUp(2);
         return 0;
     case WM_KILLFOCUS:
         RestoreCursor();
-        renderer->OnKillFocus();
+        pRenderer->OnKillFocus();
         return 0;
     case WM_SIZE:
     {
         UINT width = LOWORD(lParam);
         UINT height = HIWORD(lParam);
-        renderer->OnResize(width, height);
+        pRenderer->OnResize(width, height);
         return 0;
     }
     case WM_DPICHANGED:
@@ -242,7 +245,7 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
                      newRect->right - newRect->left,
                      newRect->bottom - newRect->top,
                      SWP_NOZORDER | SWP_NOACTIVATE);
-        renderer->OnDpiChanged(sm_dpi);
+        pRenderer->OnDpiChanged(sm_dpi);
         return 0;
     }
     }
@@ -255,17 +258,22 @@ void Win32Application::ParseCommandLineArgs(Renderer* pRenderer, LPWSTR lpCmdLin
     int argc;
     WCHAR** argv = CommandLineToArgvW(lpCmdLine, &argc);
 
+    UINT width = 0;
+    UINT height = 0;
+
     for (int i = 0; i < argc; i++)
     {
         if (wcscmp(argv[i], L"-w") == 0 || wcscmp(argv[i], L"--width") == 0)
-            pRenderer->SetWidth(wcstol(argv[++i], nullptr, 10));
+            width = wcstoul(argv[++i], nullptr, 10);
         if (wcscmp(argv[i], L"-h") == 0 || wcscmp(argv[i], L"--height") == 0)
-            pRenderer->SetHeight(wcstol(argv[++i], nullptr, 10));
+            height = wcstoul(argv[++i], nullptr, 10);
         if (wcscmp(argv[i], L"-warp") == 0 || wcscmp(argv[i], L"--warp") == 0)
             pRenderer->SetWarp(true);
         if (wcscmp(argv[i], L"-pix") == 0 || wcscmp(argv[i], L"--pix") == 0)
             pRenderer->SetPix();
     }
+
+    pRenderer->SetWindowResolution(width, height);
 
     LocalFree(argv);
 }

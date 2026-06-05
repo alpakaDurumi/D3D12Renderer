@@ -4,6 +4,7 @@
 
 #include "D3DHelper.h"
 #include "DescriptorAllocation.h"
+#include "ImGuiDescriptorAllocation.h"
 #include "InstanceData.h"
 #include "UploadAllocation.h"
 #include "Utility.h"
@@ -21,6 +22,8 @@ void FrameResource::Init(
     ID3D12Device10* pDevice,
     IDXGISwapChain* pSwapChain,
     UINT frameIndex,
+    UINT sceneWidth,
+    UINT sceneHeight,
     DescriptorAllocation&& rtvAllocation,
     DescriptorAllocation&& sceneBufferRtvAllocation,
     DescriptorAllocation&& sceneBufferSrvAllocation,
@@ -29,7 +32,9 @@ void FrameResource::Init(
     DescriptorAllocation&& selectionMaskRtvAllocation,
     DescriptorAllocation&& selectionMaskSrvAllocation,
     DescriptorAllocation&& horizontalDilatedMaskRtvAllocation,
-    DescriptorAllocation&& horizontalDilatedMaskSrvAllocation)
+    DescriptorAllocation&& horizontalDilatedMaskSrvAllocation,
+    DescriptorAllocation&& toneMappedBufferRtvAllocation,
+    ImGuiDescriptorAllocation&& toneMappedBufferSrvAllocation)
 {
     m_pDevice = pDevice;
 
@@ -37,12 +42,7 @@ void FrameResource::Init(
     {
         m_backBufferRtv = RenderTargetView(std::move(rtvAllocation));
         AcquireBackBuffer(pSwapChain, frameIndex);
-        InitBackBufferRtv();
     }
-
-    auto rtDesc = m_backBuffer.Get()->GetDesc();
-    const UINT64 width = rtDesc.Width;
-    const UINT height = rtDesc.Height;
 
     // Scene color buffers
     {
@@ -53,7 +53,7 @@ void FrameResource::Init(
             m_sceneColorBufferRtvs[i] = RenderTargetView(std::move(rtvAllocs[i]));
             m_sceneColorBufferSrvs[i] = ShaderResourceView(std::move(srvAllocs[i]));
         }
-        CreateSceneColorBuffers(width, height);
+        CreateSceneColorBuffers(sceneWidth, sceneHeight);
     }
 
     // GBuffers
@@ -65,7 +65,7 @@ void FrameResource::Init(
             m_gBufferRtvs[i] = RenderTargetView(std::move(rtvAllocs[i]));
             m_gBufferSrvs[i] = ShaderResourceView(std::move(srvAllocs[i]));
         }
-        CreateGBuffers(width, height);
+        CreateGBuffers(sceneWidth, sceneHeight);
     }
 
     // Create masks
@@ -73,7 +73,12 @@ void FrameResource::Init(
     m_selectionMaskSrv = ShaderResourceView(std::move(selectionMaskSrvAllocation));
     m_horizontalDilatedMaskRtv = RenderTargetView(std::move(horizontalDilatedMaskRtvAllocation));
     m_horizontalDilatedMaskSrv = ShaderResourceView(std::move(horizontalDilatedMaskSrvAllocation));
-    CreateMasks(width, height);
+    CreateMasks(sceneWidth, sceneHeight);
+
+    // ToneMappedBuffer
+    m_toneMappedBufferSrv = ImGuiShaderResourceView(std::move(toneMappedBufferSrvAllocation));
+    m_toneMappedBufferRtv = RenderTargetView(std::move(toneMappedBufferRtvAllocation));
+    CreateToneMappedBuffer(sceneWidth, sceneHeight);
 
     // Create Upload buffer
     m_instanceUploadBuffer = Buffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, D3D12_HEAP_TYPE_UPLOAD);
@@ -89,16 +94,12 @@ void FrameResource::AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameInde
     ComPtr<ID3D12Resource> backBuffer;
     ThrowIfFailed(pSwapChain->GetBuffer(frameIndex, IID_PPV_ARGS(&backBuffer)));
     m_backBuffer = Texture(std::move(backBuffer));
+    m_backBufferRtv.Init(m_pDevice, m_backBuffer.Get(), GetRtvDesc(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, 0));
 }
 
 ID3D12Resource* FrameResource::GetBackBuffer() const
 {
     return m_backBuffer.Get();
-}
-
-void FrameResource::InitBackBufferRtv()
-{
-    m_backBufferRtv.Init(m_pDevice, m_backBuffer.Get(), GetRtvDesc(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, 0));
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetBackBufferRtvHandle() const
@@ -146,12 +147,6 @@ D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetSceneColorBufferRtvHandle(UINT ind
 D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetSceneColorBufferSrvHandle(UINT index) const
 {
     return m_sceneColorBufferSrvs[index].GetHandle();
-}
-
-void FrameResource::ResetSceneColorBuffers()
-{
-    for (UINT i = 0; i < SceneColorBufferCount; ++i)
-        m_sceneColorBuffers[i].Reset();
 }
 
 // GBuffer
@@ -204,12 +199,6 @@ DXGI_FORMAT FrameResource::GetGBufferFormat(GBufferSlot slot)
         assert(false);
         return DXGI_FORMAT_UNKNOWN;
     }
-}
-
-void FrameResource::ResetGBuffers()
-{
-    for (auto& gBuffer : m_gBuffers)
-        gBuffer.Reset();
 }
 
 // Masks
@@ -267,10 +256,35 @@ D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetHorizontalDilatedMaskSrvHandle() c
     return m_horizontalDilatedMaskSrv.GetHandle();
 }
 
-void FrameResource::ResetMasks()
+// ToneMappedBuffer
+void FrameResource::CreateToneMappedBuffer(UINT64 width, UINT height)
 {
-    m_selectionMask.Reset();
-    m_horizontalDilatedMask.Reset();
+    const auto format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    const auto clearValue = CreateClearValue(format, 0.0f, 0.0f, 0.0f, 0.0f);
+
+    m_toneMappedBuffer = Texture(
+        m_pDevice,
+        GetTexture2DDesc(width, height, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET),
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+        &clearValue);
+
+    m_toneMappedBufferRtv.Init(m_pDevice, m_toneMappedBuffer.Get(), GetRtvDesc(format, 0));
+    m_toneMappedBufferSrv.Init(m_pDevice, m_toneMappedBuffer.Get(), GetSrvDesc(format, 1));
+}
+
+ID3D12Resource* FrameResource::GetToneMappedBuffer() const
+{
+    return m_toneMappedBuffer.Get();
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetToneMappedBufferRtvHandle() const
+{
+    return m_toneMappedBufferRtv.GetHandle();
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE FrameResource::GetToneMappedBufferSrvHandle() const
+{
+    return m_toneMappedBufferSrv.GetGpuHandle();
 }
 
 // Instance data
