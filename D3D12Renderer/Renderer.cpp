@@ -12,6 +12,7 @@
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
 #include <imgui_impl_win32.h>
+#include <imgui_internal.h>
 
 #include "D3DHelper.h"
 #include "DescriptorAllocation.h"
@@ -374,7 +375,41 @@ void Renderer::BuildImGuiFrame()
 
     // ImGui::ShowDemoWindow(); // Show demo window! :)
 
-    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_None);
+    // ImGuiID string is hashed and stored in the INI file.
+    // Changing it will invalidate any previously saved settings associated with it.
+    // Also, GetID uses Window ID Stack as seed.
+    ImGuiID dockSpaceId = ImGui::GetID("My Dockspace");
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+    // Use DockBuilder API to set layout.
+    // if the INI file does not contain DockSpaceId information or if a layout reset has been requested.
+    if (ImGui::DockBuilderGetNode(dockSpaceId) == nullptr || m_resetLayout)
+    {
+        ImGui::DockBuilderAddNode(dockSpaceId, ImGuiDockNodeFlags_DockSpace);
+        ImGui::DockBuilderSetNodeSize(dockSpaceId, viewport->Size);
+
+        ImGuiID leftId = 0;
+        ImGuiID centerId = 0;
+        ImGui::DockBuilderSplitNode(dockSpaceId, ImGuiDir_Left, 0.20f, &leftId, &centerId);
+
+        ImGuiID leftTopId = 0;
+        ImGuiID leftBottomId = 0;
+        ImGui::DockBuilderSplitNode(leftId, ImGuiDir_Up, 0.50f, &leftTopId, &leftBottomId);
+
+        ImGuiID rightId = 0;
+        ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Right, 0.20f, &rightId, &centerId);
+
+        ImGui::DockBuilderDockWindow("Scene", centerId);
+        ImGui::DockBuilderDockWindow("Test", leftTopId);
+        ImGui::DockBuilderDockWindow("Hierarchy", leftBottomId);
+        ImGui::DockBuilderDockWindow("Inspector", rightId);
+
+        ImGui::DockBuilderFinish(dockSpaceId);
+
+        m_resetLayout = false;
+    }
+
+    ImGui::DockSpaceOverViewport(dockSpaceId, viewport, ImGuiDockNodeFlags_None);
 
     // Scene window
     {
@@ -483,6 +518,11 @@ void Renderer::BuildImGuiFrame()
             m_sceneManager.AddTransform(hCube);
             m_sceneManager.SetMesh(hCube, hMesh);
             m_sceneManager.SetMaterial(hCube, hMat);
+        }
+
+        if (ImGui::Button("Reset Layout"))
+        {
+            m_resetLayout = true;
         }
 
         ImGui::End();

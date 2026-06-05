@@ -105,6 +105,7 @@ private:
     D3D12_RECT m_scissorRect;
 
     std::string m_imguiIniPath; // UTF-8
+    bool m_resetLayout = false;
 
     // Device & swap chain
     Microsoft::WRL::ComPtr<ID3D12Device10> m_device;
