@@ -4,9 +4,6 @@ Custom 3D rendering engine using Direct3D 12, C++17 and Win32 API
 
 ## Used
 
-- **Visual Studio 2026** with platform toolset **v145**
-- **Windows 10.0 SDK**
-
 ### Served as Nuget
 
 |Package|Version|
@@ -32,9 +29,9 @@ Custom 3D rendering engine using Direct3D 12, C++17 and Win32 API
 
 ### Prerequisites
 
-This project uses the **preview release** of the D3D12 Agility SDK to use *Enhanced Barriers*, and it can only be loaded when **Windows Developer Mode** is enabled.
-
-To enable Developer Mode, open Settings and search for 'Developer Mode', then turn it on.
+- Platform toolset v143
+- Windows SDK 10.0.19041.0 or later
+- This project uses the **preview release** of the D3D12 Agility SDK to use *Enhanced Barriers*, and it can only be loaded when **Windows Developer Mode** is enabled. To enable Developer Mode, open Settings and search for 'Developer Mode', then turn it on.
 
 ### Instructions
 
