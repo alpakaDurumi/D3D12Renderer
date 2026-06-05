@@ -2,12 +2,12 @@
 
 Custom 3D rendering engine using Direct3D 12, C++17 and Win32 API
 
-# Used
+## Used
 
 - **Visual Studio 2026** with platform toolset **v145**
 - **Windows 10.0 SDK**
 
-## Served as Nuget
+### Served as Nuget
 
 |Package|Version|
 |--|--|
@@ -17,24 +17,32 @@ Custom 3D rendering engine using Direct3D 12, C++17 and Win32 API
 |Microsoft.Direct3D.DXC|1.8.2505.32|
 |WinPixEventRuntime|1.0.240308001|
 
-## Included files or codes
+### Included files or codes
 
 - [ImGui](https://github.com/ocornut/imgui)
 - [DDSTextureLoader12](https://github.com/microsoft/DirectXTex/tree/main/DDSTextureLoader) from DirectXTex
 - [ThrowIfFailed](https://github.com/Microsoft/DirectXTK/wiki/ThrowIfFailed)
 - [GetLatestWinPixGpuCapturerPath_Cpp17](https://devblogs.microsoft.com/pix/taking-a-capture/)
 
-## Assets
+### Assets
 
 - https://ambientcg.com/a/PavingStones150
 
-# Build
+## Build
+
+### Prerequisites
+
+This project uses the **preview release** of the D3D12 Agility SDK to use *Enhanced Barriers*, and it can only be loaded when **Windows Developer Mode** is enabled.
+
+To enable Developer Mode, open Settings and search for 'Developer Mode', then turn it on.
+
+### Instructions
 
 1. Download assets from [here](https://drive.google.com/drive/folders/1CGZupYVKDUj7CQFzVJCZiTwuaJ--kPri?usp=sharing)
 2. copy `assets` folder to solution root directory
 3. Open `D3D12Renderer.sln` solution and build the project (Debug/Release/Release_PIX)
 
-# References
+## References
 
 - [Direct3D 12 graphics - Microsoft Learn](https://learn.microsoft.com/en-us/windows/win32/direct3d12/direct3d-12-graphics)
 - [DirectX-Specs](https://microsoft.github.io/DirectX-Specs/)
