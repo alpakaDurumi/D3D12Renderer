@@ -2,6 +2,11 @@
 
 #include <DirectXMath.h>
 
+namespace DirectX
+{
+struct BoundingFrustum;
+}
+
 // Scene Editor Camera
 // Position uses fixed timestep interpolation for smoothness.
 // Rotation uses immediate input response for low latency.
@@ -19,6 +24,7 @@ public:
     float GetFarPlane() const;
     DirectX::XMMATRIX GetViewMatrix() const;
     DirectX::XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection = true) const;
+    DirectX::BoundingFrustum GetWorldFrustum() const;
 
     void SetCurrentPosition(const DirectX::XMVECTOR& pos);
     void SetAspectRatio(float aspectRatio);

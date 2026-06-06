@@ -1766,16 +1766,10 @@ void Renderer::PrepareTransform(Entity& entity, XMMATRIX& accumulated, float alp
 
 std::vector<BoundingSphere> Renderer::CalcCascadeSpheres()
 {
-    // Create bounding frustum of view frustum and transform to world space.
-    // BoundingFrustum::CreateFromMatrix and BoundingFrustum::GetCorners are implicitly assume that 0.0 is near plane and 1.0 is far plane.
-    // When using reverse-z, you need to handle this.
-    BoundingFrustum boundingFrustum;
-    BoundingFrustum::CreateFromMatrix(boundingFrustum, m_camera.GetProjectionMatrix());
-    XMMATRIX inverseView = XMMatrixInverse(nullptr, m_camera.GetViewMatrix());
-    boundingFrustum.Transform(boundingFrustum, inverseView);
+    BoundingFrustum boundingFrustum = m_camera.GetWorldFrustum();
 
     // Get 8 corners of view frustum.
-    //     Far     Near
+    //     Near    Far
     //    0----1  4----5
     //    |    |  |    |
     //    |    |  |    |
@@ -1811,10 +1805,10 @@ std::vector<BoundingSphere> Renderer::CalcCascadeSpheres()
         // Create corners.
         for (UINT j = 0; j < 4; ++j)
         {
-            // 4, 5, 6, 7 are near plane.
-            // 0, 1, 2, 3 are far plane.
-            XMVECTOR n = XMLoadFloat3(&frustumCorners[j + 4]);
-            XMVECTOR f = XMLoadFloat3(&frustumCorners[j]);
+            // 0, 1, 2, 3 are near plane.
+            // 4, 5, 6, 7 are far plane.
+            XMVECTOR n = XMLoadFloat3(&frustumCorners[j]);
+            XMVECTOR f = XMLoadFloat3(&frustumCorners[j + 4]);
 
             XMVECTOR s = XMVectorLerp(n, f, i == 0 ? 0.0f : splitRatio[i - 1]);
             XMVECTOR e = XMVectorLerp(n, f, splitRatio[i]);
