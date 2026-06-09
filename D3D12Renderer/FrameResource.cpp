@@ -309,7 +309,7 @@ void FrameResource::EnsureInstanceCapacity(UINT requiredSize)
 
 void FrameResource::PushInstanceData(std::vector<InstanceData>& data)
 {
-    memcpy(m_instanceBufferBegin + m_instanceOffsetByte, data.data(), sizeof(InstanceData) * data.size());
+    std::memcpy(m_instanceBufferBegin + m_instanceOffsetByte, data.data(), sizeof(InstanceData) * data.size());
     m_instanceOffsetByte += sizeof(InstanceData) * static_cast<UINT>(data.size());
 }
 

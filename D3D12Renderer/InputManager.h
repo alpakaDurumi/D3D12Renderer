@@ -86,14 +86,14 @@ public:
 
     void ResetPressedFlags()
     {
-        memset(m_keyPressed, false, sizeof(m_keyPressed));
-        memset(m_mouseButtonPressed, false, sizeof(m_mouseButtonPressed));
+        std::memset(m_keyPressed, false, sizeof(m_keyPressed));
+        std::memset(m_mouseButtonPressed, false, sizeof(m_mouseButtonPressed));
     }
 
     void Reset()
     {
-        memset(m_keyDown, false, sizeof(m_keyDown));
-        memset(m_mouseButtonDown, false, sizeof(m_mouseButtonDown));
+        std::memset(m_keyDown, false, sizeof(m_keyDown));
+        std::memset(m_mouseButtonDown, false, sizeof(m_mouseButtonDown));
         ResetPressedFlags();
         m_mouseMove = {0, 0};
         m_mousePos = {0, 0};
