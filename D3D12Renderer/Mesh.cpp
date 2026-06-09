@@ -7,6 +7,7 @@
 #include "TransientUploadAllocator.h"
 #include "UploadAllocation.h"
 
+using namespace DirectX;
 using namespace D3DHelper;
 
 Mesh::Mesh(
@@ -69,6 +70,8 @@ Mesh::Mesh(
     m_ibv.BufferLocation = m_indexBuffer.Get()->GetGPUVirtualAddress();
     m_ibv.SizeInBytes = static_cast<UINT>(indexBufferSize);
     m_ibv.Format = DXGI_FORMAT_R32_UINT;
+
+    BoundingSphere::CreateFromPoints(m_boundingSphere, geometryData.vertices.size(), reinterpret_cast<const XMFLOAT3*>(geometryData.vertices.data()), sizeof(Vertex));
 }
 
 const D3D12_VERTEX_BUFFER_VIEW& Mesh::GetVbv() const
@@ -94,4 +97,9 @@ MaterialHandle Mesh::GetMaterial() const
 void Mesh::SetMaterial(MaterialHandle handle)
 {
     m_material = handle;
+}
+
+const BoundingSphere& Mesh::GetBoundingSphere() const
+{
+    return m_boundingSphere;
 }

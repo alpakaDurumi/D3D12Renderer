@@ -1,5 +1,6 @@
 #pragma once
 
+#include <DirectXCollision.h>
 #include <d3d12.h>
 #include <minwindef.h>
 
@@ -25,6 +26,8 @@ public:
     MaterialHandle GetMaterial() const;
     void SetMaterial(MaterialHandle handle);
 
+    const DirectX::BoundingSphere& GetBoundingSphere() const;
+
 private:
     Buffer m_vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vbv;
@@ -34,4 +37,6 @@ private:
     UINT m_numIndices = 0;
 
     MaterialHandle m_material;
+
+    DirectX::BoundingSphere m_boundingSphere;
 };
