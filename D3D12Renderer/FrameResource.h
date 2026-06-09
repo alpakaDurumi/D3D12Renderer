@@ -85,11 +85,16 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetToneMappedBufferRtvHandle() const;
     D3D12_GPU_DESCRIPTOR_HANDLE GetToneMappedBufferSrvHandle() const;
 
-    // Instance data
-    void ResetInstanceOffsetByte();
-    void EnsureInstanceCapacity(UINT requiredSize);
-    void PushInstanceData(std::vector<InstanceData>& data);
-    D3D12_GPU_VIRTUAL_ADDRESS GetInstanceBufferVirtualAddress() const;
+    // Instance buffers
+    void ResetInstanceOffsetBytes();
+
+    void EnsureInstanceDataCapacity(UINT requiredSize);
+    void PushInstanceData(const std::vector<InstanceData>& data);
+    D3D12_GPU_VIRTUAL_ADDRESS GetInstanceDataVA() const;
+
+    void EnsureInstanceIndexCapacity(UINT requiredSize);
+    void PushInstanceIndices(const std::vector<UINT32>& indices);
+    D3D12_GPU_VIRTUAL_ADDRESS GetInstanceIndexVA() const;
 
     // Transient upload
     UploadAllocation PushConstantData(void* src, std::size_t size);
@@ -125,10 +130,15 @@ private:
     RenderTargetView m_toneMappedBufferRtv;
     ImGuiShaderResourceView m_toneMappedBufferSrv;
 
-    Buffer m_instanceUploadBuffer;
-    UINT8* m_instanceBufferBegin = nullptr;
-    UINT m_instanceOffsetByte = 0;
-    UINT m_instanceCapacity = 1024;
+    Buffer m_instanceDataUploadBuffer;
+    UINT8* m_instanceDataBegin = nullptr;
+    UINT m_instanceDataOffsetByte = 0;
+    UINT m_instanceDataCapacity = 1024;
+
+    Buffer m_instanceIndexUploadBuffer;
+    UINT8* m_instanceIndexBegin = nullptr;
+    UINT m_instanceIndexOffsetByte = 0;
+    UINT m_instanceIndexCapacity = 1024;
 
     TransientUploadAllocator m_uploadAllocator;
 

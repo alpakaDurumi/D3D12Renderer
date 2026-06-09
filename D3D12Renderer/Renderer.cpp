@@ -1848,6 +1848,7 @@ void Renderer::PrepareDirectionalLight(DirectionalLight& light, const std::vecto
         // Near Plane : Set to (view origin - sceneRadius) in Light Space.
         //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
         // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
+        // Argument for NearZ and FarZ are swapped because of reverse-z
         XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, radius, -d - m_camera.GetFarPlane());
 
         // Apply texel-sized increments to eliminate shadow shimmering.
@@ -1945,7 +1946,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     static constexpr UINT NUM_GBUFFER_SLOTS = static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS);
 
     FrameResource& frameResource = m_frameResources[m_frameIndex];
-    frameResource.ResetInstanceOffsetByte();
+    frameResource.ResetInstanceOffsetBytes();
 
     // Set root signature
     pCommandList->SetGraphicsRootSignature(m_rootSignature.GetRootSignature());
@@ -2019,7 +2020,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     BindDescriptorTables(pCommandList);
 
     auto data = m_sceneManager.GatherInstances();
-    frameResource.EnsureInstanceCapacity(static_cast<UINT>(data.size()));
+    frameResource.EnsureInstanceDataCapacity(static_cast<UINT>(data.size()));
     frameResource.PushInstanceData(data);
 
     // Shadow map pass
@@ -2072,9 +2073,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
                 pCommandList->SetGraphicsRootConstantBufferView(0, pLight->GetCameraUploadAllocation(j).gpuPtr);
 
                 for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
-                {
-                    DrawMesh(pCommandList, meshHandle, PassType::SHADOW_MAP, frameResource.GetInstanceBufferVirtualAddress());
-                }
+                    DrawMesh(pCommandList, meshHandle, PassType::SHADOW_MAP, frameResource.GetInstanceDataVA());
             }
 
             ++lightIdx;
@@ -2130,9 +2129,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.gpuPtr);
 
         for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
-        {
-            DrawMesh(pCommandList, meshHandle, PassType::GBUFFER, frameResource.GetInstanceBufferVirtualAddress());
-        }
+            DrawMesh(pCommandList, meshHandle, PassType::GBUFFER, frameResource.GetInstanceDataVA());
     }
 
     // Deferred Lighting pass
@@ -2212,9 +2209,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->SetGraphicsRootConstantBufferView(1, m_shadowUploadAllocation.gpuPtr);
 
         for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
-        {
-            DrawMesh(pCommandList, meshHandle, PassType::FORWARD_COLORING, frameResource.GetInstanceBufferVirtualAddress());
-        }
+            DrawMesh(pCommandList, meshHandle, PassType::FORWARD_COLORING, frameResource.GetInstanceDataVA());
 
         std::vector<D3D12_TEXTURE_BARRIER> barriers;
 
@@ -2297,7 +2292,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.gpuPtr);
 
             // 선택된 Entity들에 대해서만 draw call을 호출해야 함 (나중에는 여러 Entity를 다중 선택할 수도 있어야 함)
-            DrawEntity(pCommandList, m_selected, frameResource.GetInstanceBufferVirtualAddress());
+            DrawEntity(pCommandList, m_selected, frameResource.GetInstanceDataVA());
         }
     }
 
