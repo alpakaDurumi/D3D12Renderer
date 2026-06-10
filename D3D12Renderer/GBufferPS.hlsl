@@ -1,4 +1,4 @@
-Texture2D g_textures[] : register(t0, space0);
+Texture2D g_textures[] : register(t0, space1);
 
 // Dynamic samplers for ordinary texture sampling
 SamplerState g_samplers[] : register(s0, space0);
@@ -17,7 +17,7 @@ struct PSInput
 struct GBufferOutput
 {
     float4 albedo : SV_Target0;
-    float4 normal : SV_Target1;             // pack with shininess
+    float4 normal : SV_Target1; // pack with shininess
     float4 materialAmbient : SV_Target2;
     float4 materialSpecular : SV_Target3;
 };
@@ -40,6 +40,7 @@ struct MaterialConstants
     uint4 samplerIndices;
     float4 textureTileScales;
 };
+
 ConstantBuffer<MaterialConstants> MaterialConstantBuffers[] : register(b0, space1);
 
 // Parallax Occlusion Mapping

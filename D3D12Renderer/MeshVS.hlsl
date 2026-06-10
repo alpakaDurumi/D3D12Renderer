@@ -17,12 +17,12 @@ struct PSInput
     float2 texCoord : TEXCOORD0;
     float3 tangentWorld : TANGENT;
     float3 normalWorld : NORMAL;
-    nointerpolation float tangentW : TEXCOORD1;     // Do not interpolate w component of tangent vector.
+    nointerpolation float tangentW : TEXCOORD1; // Do not interpolate w component of tangent vector.
     nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
 #endif  // DEPTH_ONLY
 };
 
-cbuffer CameraConstantBuffer : register(b0)
+cbuffer CameraConstantBuffer : register(b0, space0)
 {
     float3 cameraPos;
     float4x4 view;

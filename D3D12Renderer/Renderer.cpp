@@ -1321,58 +1321,59 @@ void Renderer::InitImGui()
 
 void Renderer::CreateRootSignature()
 {
-    m_rootSignature.Init(13, 2);
+    m_rootSignature.Init(14, 2);
 
-    // Root descriptor for CameraCB and ShadowCB
-    m_rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);   // Camera
-    m_rootSignature[1].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC); // Shadow
+    // Root descriptor for Instance Data, CameraCB and ShadowCB
+    m_rootSignature[0].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_VERTEX, D3D12_ROOT_PARAMETER_TYPE_SRV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC); // Instance Data
+    m_rootSignature[1].InitAsDescriptor(0, 0, D3D12_SHADER_VISIBILITY_ALL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);    // Camera
+    m_rootSignature[2].InitAsDescriptor(1, 0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_PARAMETER_TYPE_CBV, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC);  // Shadow
 
     // Root constants for number of lights
-    m_rootSignature[2].InitAsConstant(2, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[3].InitAsConstant(2, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Root constant for PointLightShadowPS
-    m_rootSignature[3].InitAsConstant(3, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[4].InitAsConstant(3, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Root constant for outline
-    m_rootSignature[4].InitAsConstant(4, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[5].InitAsConstant(4, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
 
     // Descriptor table for MaterialConstantBuffers[]
-    m_rootSignature[5].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_rootSignature[5].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+    m_rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[6].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for LightConstantBuffers[]
-    m_rootSignature[6].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_rootSignature[6].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+    m_rootSignature[7].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[7].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for textures (albedo, normal map, height map)
-    m_rootSignature[7].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_rootSignature[7].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+    m_rootSignature[8].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[8].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
     // Descriptor table for shadowMaps[]
     // Directional
-    m_rootSignature[8].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_rootSignature[8].InitAsRange(0, 0, 1, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    // Point
     m_rootSignature[9].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
     m_rootSignature[9].InitAsRange(0, 0, 2, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    // Spot
+    // Point
     m_rootSignature[10].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
     m_rootSignature[10].InitAsRange(0, 0, 3, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    // Spot
+    m_rootSignature[11].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[11].InitAsRange(0, 0, 4, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
 
     // Descriptor table for
     // SRV for GBuffers
     // SRV for depth value
     // SRV for selectionMask/horizontalDilatedMask
     // SRV for scene color buffer
-    m_rootSignature[11].InitAsTable(4, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_rootSignature[11].InitAsRange(0, 0, 4, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    m_rootSignature[11].InitAsRange(1, 0, 5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    m_rootSignature[11].InitAsRange(2, 0, 6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-    m_rootSignature[11].InitAsRange(3, 0, 7, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    m_rootSignature[12].InitAsTable(4, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[12].InitAsRange(0, 0, 5, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS), D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    m_rootSignature[12].InitAsRange(1, 0, 6, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    m_rootSignature[12].InitAsRange(2, 0, 7, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+    m_rootSignature[12].InitAsRange(3, 0, 8, D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
 
     // Descriptor table for samplers
-    m_rootSignature[12].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_rootSignature[12].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
+    m_rootSignature[13].InitAsTable(1, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_rootSignature[13].InitAsRange(0, 0, 0, D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
                                     static_cast<UINT>(TextureFiltering::NUM_TEXTURE_FILTERINGS) * static_cast<UINT>(TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES),
                                     D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
 
@@ -1952,16 +1953,16 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     pCommandList->SetGraphicsRootSignature(m_rootSignature.GetRootSignature());
 
     UINT numLights = m_sceneManager.GetLightCount();
-    pCommandList->SetGraphicsRoot32BitConstant(2, numLights, 0);
+    pCommandList->SetGraphicsRoot32BitConstant(3, numLights, 0);
 
     // Set outline thickness
-    pCommandList->SetGraphicsRoot32BitConstant(4, 4, 0);
+    pCommandList->SetGraphicsRoot32BitConstant(5, 4, 0);
 
     // Stage material CBVs
     UINT matIdx = 0;
     for (auto& mat : m_sceneManager.GetMaterials())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(5, matIdx, 1, mat.GetCbvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(6, matIdx, 1, mat.GetCbvHandle());
         ++matIdx;
     }
 
@@ -1969,17 +1970,17 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT lightIdx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(7, lightIdx, 1, light.GetLightCbvHandle());
         ++lightIdx;
     }
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(7, lightIdx, 1, light.GetLightCbvHandle());
         ++lightIdx;
     }
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(6, lightIdx, 1, light.GetLightCbvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(7, lightIdx, 1, light.GetLightCbvHandle());
         ++lightIdx;
     }
 
@@ -1987,7 +1988,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT textureIdx = 0;
     for (auto& [texture, srv] : m_sceneManager.GetAssetTextures())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(7, textureIdx, 1, srv.GetHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(8, textureIdx, 1, srv.GetHandle());
         ++textureIdx;
     }
 
@@ -1995,27 +1996,27 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(8, lightIdx, 1, light.GetSrvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(9, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(9, lightIdx, 1, light.GetSrvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(10, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
     lightIdx = 0;
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(10, lightIdx, 1, light.GetSrvHandle());
+        m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(11, lightIdx, 1, light.GetSrvHandle());
         ++lightIdx;
     }
 
-    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(11, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferBaseSrvHandle());
-    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(11, NUM_GBUFFER_SLOTS, 1, m_depthSrv.GetHandle());
-    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(11, NUM_GBUFFER_SLOTS + 1, 1, frameResource.GetSelectionMaskSrvHandle());
-    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(11, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetHorizontalDilatedMaskSrvHandle());
-    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(11, NUM_GBUFFER_SLOTS + 3, 1, frameResource.GetSceneColorBufferSrvHandle(0));
+    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(12, 0, NUM_GBUFFER_SLOTS, frameResource.GetGBufferBaseSrvHandle());
+    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(12, NUM_GBUFFER_SLOTS, 1, m_depthSrv.GetHandle());
+    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(12, NUM_GBUFFER_SLOTS + 1, 1, frameResource.GetSelectionMaskSrvHandle());
+    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(12, NUM_GBUFFER_SLOTS + 2, 1, frameResource.GetHorizontalDilatedMaskSrvHandle());
+    m_dynamicDescriptorHeapForCbvSrvUav.StageDescriptors(12, NUM_GBUFFER_SLOTS + 3, 1, frameResource.GetSceneColorBufferSrvHandle(0));
 
     BindDescriptorTables(pCommandList);
 
@@ -2044,7 +2045,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto processLight = [&](Light* pLight, bool isPointLight, UINT& lightIdx)
         {
             if (isPointLight)
-                pCommandList->SetGraphicsRoot32BitConstant(3, lightIdx, 0);
+                pCommandList->SetGraphicsRoot32BitConstant(4, lightIdx, 0);
 
             // Render each entry of shadow map.
             UINT16 arraySize = pLight->GetArraySize();
@@ -2070,7 +2071,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
                 pCommandList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
 
-                pCommandList->SetGraphicsRootConstantBufferView(0, pLight->GetCameraUploadAllocation(j).gpuPtr);
+                pCommandList->SetGraphicsRootConstantBufferView(1, pLight->GetCameraUploadAllocation(j).gpuPtr);
 
                 for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
                     DrawMesh(pCommandList, meshHandle, PassType::SHADOW_MAP, frameResource.GetInstanceDataVA());
@@ -2126,7 +2127,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         pCommandList->SetPipelineState(pso);
 
-        pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.gpuPtr);
+        pCommandList->SetGraphicsRootConstantBufferView(1, m_cameraUploadAllocation.gpuPtr);
 
         for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
             DrawMesh(pCommandList, meshHandle, PassType::GBUFFER, frameResource.GetInstanceDataVA());
@@ -2159,8 +2160,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         pCommandList->SetPipelineState(pso);
 
-        pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.gpuPtr);
-        pCommandList->SetGraphicsRootConstantBufferView(1, m_shadowUploadAllocation.gpuPtr);
+        pCommandList->SetGraphicsRootConstantBufferView(1, m_cameraUploadAllocation.gpuPtr);
+        pCommandList->SetGraphicsRootConstantBufferView(2, m_shadowUploadAllocation.gpuPtr);
 
         pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         pCommandList->DrawInstanced(3, 1, 0, 0);
@@ -2205,8 +2206,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         pCommandList->SetPipelineState(pso);
 
-        pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.gpuPtr);
-        pCommandList->SetGraphicsRootConstantBufferView(1, m_shadowUploadAllocation.gpuPtr);
+        pCommandList->SetGraphicsRootConstantBufferView(1, m_cameraUploadAllocation.gpuPtr);
+        pCommandList->SetGraphicsRootConstantBufferView(2, m_shadowUploadAllocation.gpuPtr);
 
         for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
             DrawMesh(pCommandList, meshHandle, PassType::FORWARD_COLORING, frameResource.GetInstanceDataVA());
@@ -2289,7 +2290,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             clearColor.v = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
             pCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-            pCommandList->SetGraphicsRootConstantBufferView(0, m_cameraUploadAllocation.gpuPtr);
+            pCommandList->SetGraphicsRootConstantBufferView(1, m_cameraUploadAllocation.gpuPtr);
 
             // 선택된 Entity들에 대해서만 draw call을 호출해야 함 (나중에는 여러 Entity를 다중 선택할 수도 있어야 함)
             DrawEntity(pCommandList, m_selected, frameResource.GetInstanceDataVA());
@@ -2435,7 +2436,7 @@ void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList* pCommandList)
     }
 
     m_dynamicDescriptorHeapForCbvSrvUav.CommitStagedDescriptorsForDraw(pCommandList);
-    pCommandList->SetGraphicsRootDescriptorTable(12, m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart()); // Root parameter 12
+    pCommandList->SetGraphicsRootDescriptorTable(13, m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart()); // Root parameter 13
 }
 
 void Renderer::ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID3D12GraphicsCommandList7* pCommandList)

@@ -1,11 +1,11 @@
 #include "SharedConfig.h"
 
-Texture2D g_textures[] : register(t0, space0);
+Texture2D g_textures[] : register(t0, space1);
 
 // SRV for lights
-Texture2DArray<float> g_directionalShadowMaps[] : register(t0, space1);
-TextureCube<float> g_PointShadowMaps[] : register(t0, space2);
-Texture2D<float> g_SpotShadowMaps[] : register(t0, space3);
+Texture2DArray<float> g_directionalShadowMaps[] : register(t0, space2);
+TextureCube<float> g_PointShadowMaps[] : register(t0, space3);
+Texture2D<float> g_SpotShadowMaps[] : register(t0, space4);
 
 // Dynamic samplers for ordinary texture sampling
 SamplerState g_samplers[] : register(s0, space0);

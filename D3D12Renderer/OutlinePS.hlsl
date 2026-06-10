@@ -1,5 +1,5 @@
-Texture2D<float> g_selectionMask : register(t0, space6);
-Texture2D<float> g_horizontalDilatedMask : register(t1, space6);
+Texture2D<float> g_selectionMask : register(t0, space7);
+Texture2D<float> g_horizontalDilatedMask : register(t1, space7);
 
 struct PSInput
 {
