@@ -3,6 +3,7 @@
 #include <array>
 #include <vector>
 
+#include <DirectXCollision.h>
 #include <DirectXMath.h>
 #include <basetsd.h>
 #include <d3d12.h>
@@ -94,6 +95,12 @@ public:
     void SetPosition(DirectX::XMVECTOR pos) override;
 
     virtual void SetRange(float range) override;
+
+    const std::array<DirectX::BoundingOrientedBox, MAX_CASCADES>& GetBoundingBoxes() const;
+    void SetBoundingBox(UINT arrayIndex, const DirectX::BoundingOrientedBox& boundingBox);
+
+private:
+    std::array<DirectX::BoundingOrientedBox, MAX_CASCADES> m_boundingBoxes;
 };
 
 class PointLight : public Light
@@ -115,11 +122,16 @@ public:
     ID3D12Resource* GetRenderTarget() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle(UINT index) const;
 
+    const DirectX::BoundingSphere& GetBoundingSphere() const;
+    void SetBoundingSphere(const DirectX::BoundingSphere& boundingSphere);
+
     virtual std::vector<GpuResource> TakeResources() override;
 
 private:
     Texture m_renderTarget;
     std::array<RenderTargetView, POINT_LIGHT_ARRAY_SIZE> m_rtvs;
+
+    DirectX::BoundingSphere m_boundingSphere;
 };
 
 class SpotLight : public Light
@@ -135,7 +147,12 @@ public:
     float GetOuterAngle() const;
     void SetAngles(float outerAngle, float innerAngle);
 
+    const DirectX::BoundingFrustum& GetBoundingFrustum() const;
+    void SetBoundingFrustum(const DirectX::BoundingFrustum& boundingFrustum);
+
 private:
     float m_outerAngle;
     float m_innerAngle;
+
+    DirectX::BoundingFrustum m_boundingFrustum;
 };

@@ -1850,7 +1850,9 @@ void Renderer::PrepareDirectionalLight(DirectionalLight& light, const std::vecto
         //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
         // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
         // Argument for NearZ and FarZ are swapped because of reverse-z
-        XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, radius, -d - m_camera.GetFarPlane());
+        float nearZ = -d - m_camera.GetFarPlane();
+        float farZ = radius;
+        XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, farZ, nearZ);
 
         // Apply texel-sized increments to eliminate shadow shimmering.
         XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
@@ -1866,6 +1868,15 @@ void Renderer::PrepareDirectionalLight(DirectionalLight& light, const std::vecto
         XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
 
         light.SetViewProjection(view, projection * fix, i);
+
+        // Set bounding box
+        BoundingOrientedBox boundingBox(
+            {0.0f, 0.0f, (nearZ + farZ) * 0.5f},
+            {radius, radius, (farZ - nearZ) * 0.5f},
+            {0.0f, 0.0f, 0.0f, 1.0f});
+        XMMATRIX inverseView = XMMatrixInverse(nullptr, view);
+        boundingBox.Transform(boundingBox, inverseView);
+        light.SetBoundingBox(i, boundingBox);
     }
 }
 
@@ -1897,6 +1908,12 @@ void Renderer::PreparePointLight(PointLight& light)
         XMMATRIX view = XMMatrixLookToLH(pos, Directions[i], Ups[i]);
         light.SetViewProjection(view, projection, i);
     }
+
+    // Set bounding sphere
+    XMFLOAT3 temp;
+    XMStoreFloat3(&temp, pos);
+    BoundingSphere lightBoundingVolume(temp, light.GetRange());
+    light.SetBoundingSphere(lightBoundingVolume);
 }
 
 void Renderer::PrepareSpotLight(SpotLight& light)
@@ -1906,6 +1923,14 @@ void Renderer::PrepareSpotLight(SpotLight& light)
     XMMATRIX view = XMMatrixLookToLH(light.GetPosition(), light.GetDirection(), up);
     XMMATRIX projection = XMMatrixPerspectiveFovLH(light.GetOuterAngle(), 1.0f, light.GetRange(), m_camera.GetNearPlane());
     light.SetViewProjection(view, projection, 0);
+
+    // Set bounding frustum
+    XMMATRIX proj = XMMatrixPerspectiveFovLH(light.GetOuterAngle(), 1.0f, m_camera.GetNearPlane(), light.GetRange());
+    BoundingFrustum boundingFrustum;
+    BoundingFrustum::CreateFromMatrix(boundingFrustum, proj);
+    XMMATRIX inverseView = XMMatrixInverse(nullptr, view);
+    boundingFrustum.Transform(boundingFrustum, inverseView);
+    light.SetBoundingFrustum(boundingFrustum);
 }
 
 void Renderer::UpdateConstantBuffers(FrameResource& frameResource)

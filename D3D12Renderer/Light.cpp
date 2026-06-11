@@ -217,6 +217,16 @@ void DirectionalLight::SetRange(float range)
     assert(false);
 }
 
+const std::array<BoundingOrientedBox, MAX_CASCADES>& DirectionalLight::GetBoundingBoxes() const
+{
+    return m_boundingBoxes;
+}
+
+void DirectionalLight::SetBoundingBox(UINT arrayIndex, const BoundingOrientedBox& boundingBox)
+{
+    m_boundingBoxes[arrayIndex] = boundingBox;
+}
+
 PointLight::PointLight(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,
@@ -271,6 +281,16 @@ D3D12_CPU_DESCRIPTOR_HANDLE PointLight::GetRtvHandle(UINT index) const
     return m_rtvs[index].GetHandle();
 }
 
+const BoundingSphere& PointLight::GetBoundingSphere() const
+{
+    return m_boundingSphere;
+}
+
+void PointLight::SetBoundingSphere(const BoundingSphere& boundingSphere)
+{
+    m_boundingSphere = boundingSphere;
+}
+
 std::vector<GpuResource> PointLight::TakeResources()
 {
     auto ret = Light::TakeResources();
@@ -309,4 +329,14 @@ void SpotLight::SetAngles(float outerAngleDegree, float innerAngleDegree)
 
     if ((m_lightConstantData.cosInnerAngle - m_lightConstantData.cosOuterAngle) < minDiff)
         m_lightConstantData.cosOuterAngle = m_lightConstantData.cosInnerAngle - minDiff;
+}
+
+const BoundingFrustum& SpotLight::GetBoundingFrustum() const
+{
+    return m_boundingFrustum;
+}
+
+void SpotLight::SetBoundingFrustum(const BoundingFrustum& boundingFrustum)
+{
+    m_boundingFrustum = boundingFrustum;
 }
