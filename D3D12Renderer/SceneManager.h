@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cassert>
-#include <functional>
 #include <iterator>
 #include <memory>
 #include <optional>
@@ -33,24 +32,6 @@
 #include "TransientUploadAllocator.h"
 #include "Utility.h"
 #include "View.h"
-
-template <>
-struct std::hash<MeshHandle>
-{
-    std::size_t operator()(const MeshHandle& h) const
-    {
-        return (static_cast<UINT64>(h.index) << 32) | static_cast<UINT64>(h.generation);
-    }
-};
-
-template <>
-struct std::hash<EntityHandle>
-{
-    std::size_t operator()(const EntityHandle& h) const
-    {
-        return (static_cast<UINT64>(h.index) << 32) | static_cast<UINT64>(h.generation);
-    }
-};
 
 struct InstanceRange
 {
