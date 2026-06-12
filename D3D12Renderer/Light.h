@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <unordered_map>
 #include <vector>
 
 #include <DirectXCollision.h>
@@ -10,10 +11,12 @@
 #include <minwindef.h>
 
 #include "ConstantData.h"
+#include "SceneHandles.h"
 #include "SharedConfig.h"
 #include "Texture.h"
 #include "UploadAllocation.h"
 #include "View.h"
+#include "VisibleRange.h"
 
 class DescriptorAllocation;
 class GpuResource;
@@ -60,6 +63,9 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetLightCbvHandle() const;
     void InitLightCbv(ID3D12Device* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr);
 
+    virtual const VisibleRange& GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex = 0) const = 0;
+    virtual void SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex = 0) = 0;
+
     virtual std::vector<GpuResource> TakeResources();
 
     static UINT16 GetRequiredArraySize(LightType type);
@@ -96,11 +102,15 @@ public:
 
     virtual void SetRange(float range) override;
 
+    const VisibleRange& GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex) const override;
+    void SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex) override;
+
     const std::array<DirectX::BoundingOrientedBox, MAX_CASCADES>& GetBoundingBoxes() const;
     void SetBoundingBox(UINT arrayIndex, const DirectX::BoundingOrientedBox& boundingBox);
 
 private:
     std::array<DirectX::BoundingOrientedBox, MAX_CASCADES> m_boundingBoxes;
+    std::array<std::unordered_map<MeshHandle, VisibleRange>, MAX_CASCADES> m_visibleIndexRange;
 };
 
 class PointLight : public Light
@@ -122,6 +132,9 @@ public:
     ID3D12Resource* GetRenderTarget() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle(UINT index) const;
 
+    const VisibleRange& GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex = 0) const override;
+    void SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex = 0) override;
+
     const DirectX::BoundingSphere& GetBoundingSphere() const;
     void SetBoundingSphere(const DirectX::BoundingSphere& boundingSphere);
 
@@ -132,6 +145,7 @@ private:
     std::array<RenderTargetView, POINT_LIGHT_ARRAY_SIZE> m_rtvs;
 
     DirectX::BoundingSphere m_boundingSphere;
+    std::unordered_map<MeshHandle, VisibleRange> m_visibleIndexRange;
 };
 
 class SpotLight : public Light
@@ -147,6 +161,9 @@ public:
     float GetOuterAngle() const;
     void SetAngles(float outerAngle, float innerAngle);
 
+    const VisibleRange& GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex = 0) const override;
+    void SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex = 0) override;
+
     const DirectX::BoundingFrustum& GetBoundingFrustum() const;
     void SetBoundingFrustum(const DirectX::BoundingFrustum& boundingFrustum);
 
@@ -155,4 +172,5 @@ private:
     float m_innerAngle;
 
     DirectX::BoundingFrustum m_boundingFrustum;
+    std::unordered_map<MeshHandle, VisibleRange> m_visibleIndexRange;
 };

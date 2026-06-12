@@ -34,6 +34,7 @@
 #include "Texture.h"
 #include "UploadAllocation.h"
 #include "View.h"
+#include "VisibleRange.h"
 
 struct GeometryData;
 class DescriptorAllocation;
@@ -154,6 +155,8 @@ private:
     EntityHandle m_selected;
 
     std::vector<EntityHandle> m_previewRotations;
+
+    std::unordered_map<MeshHandle, std::pair<VisibleRange, VisibleRange>> m_cameraVisibleIndexRange;
 
     // Shadows
     D3D12_VIEWPORT m_shadowMapViewport;

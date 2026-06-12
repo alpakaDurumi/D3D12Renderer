@@ -217,6 +217,22 @@ void DirectionalLight::SetRange(float range)
     assert(false);
 }
 
+const VisibleRange& DirectionalLight::GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex) const
+{
+    const auto& umap = m_visibleIndexRange[arrayIndex];
+
+    auto it = umap.find(meshHandle);
+    assert(it != umap.end());
+
+    return it->second;
+}
+
+void DirectionalLight::SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex)
+{
+    m_visibleIndexRange[arrayIndex][meshHandle].offset = offset;
+    m_visibleIndexRange[arrayIndex][meshHandle].count = count;
+}
+
 const std::array<BoundingOrientedBox, MAX_CASCADES>& DirectionalLight::GetBoundingBoxes() const
 {
     return m_boundingBoxes;
@@ -281,6 +297,20 @@ D3D12_CPU_DESCRIPTOR_HANDLE PointLight::GetRtvHandle(UINT index) const
     return m_rtvs[index].GetHandle();
 }
 
+const VisibleRange& PointLight::GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex) const
+{
+    auto it = m_visibleIndexRange.find(meshHandle);
+    assert(it != m_visibleIndexRange.end());
+
+    return it->second;
+}
+
+void PointLight::SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex)
+{
+    m_visibleIndexRange[meshHandle].offset = offset;
+    m_visibleIndexRange[meshHandle].count = count;
+}
+
 const BoundingSphere& PointLight::GetBoundingSphere() const
 {
     return m_boundingSphere;
@@ -329,6 +359,20 @@ void SpotLight::SetAngles(float outerAngleDegree, float innerAngleDegree)
 
     if ((m_lightConstantData.cosInnerAngle - m_lightConstantData.cosOuterAngle) < minDiff)
         m_lightConstantData.cosOuterAngle = m_lightConstantData.cosInnerAngle - minDiff;
+}
+
+const VisibleRange& SpotLight::GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex) const
+{
+    auto it = m_visibleIndexRange.find(meshHandle);
+    assert(it != m_visibleIndexRange.end());
+
+    return it->second;
+}
+
+void SpotLight::SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex)
+{
+    m_visibleIndexRange[meshHandle].offset = offset;
+    m_visibleIndexRange[meshHandle].count = count;
 }
 
 const BoundingFrustum& SpotLight::GetBoundingFrustum() const
