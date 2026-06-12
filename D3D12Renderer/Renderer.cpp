@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <ratio>
 #include <thread>
 
 #include <dxgidebug.h>
@@ -488,6 +489,8 @@ void Renderer::BuildImGuiFrame()
             m_resetLayout = true;
         }
 
+        ImGui::Text("Visible Count: %u", m_visibleCount);
+
         ImGui::End();
     }
 
@@ -947,19 +950,8 @@ void Renderer::LoadAssets()
         {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
         {"TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
         {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-
-        // Slot 1 for instanced data
-        {"INSTANCE_WORLD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
-        {"INSTANCE_WORLD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
-        {"INSTANCE_WORLD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
-        {"INSTANCE_WORLD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
-
-        {"INSTANCE_INVTRANSPOSE", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
-        {"INSTANCE_INVTRANSPOSE", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
-        {"INSTANCE_INVTRANSPOSE", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
-        {"INSTANCE_INVTRANSPOSE", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1},
-
-        {"INSTANCE_MATERIAL_INDEX", 0, DXGI_FORMAT_R32_UINT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1}};
+        // Slot 1 for instance index
+        {"INSTANCE_INDEX", 0, DXGI_FORMAT_R32_UINT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1}};
 
     // Create depth-stencil buffer, DSV, and SRV
     auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
@@ -1977,6 +1969,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     // Set root signature
     pCommandList->SetGraphicsRootSignature(m_rootSignature.GetRootSignature());
 
+    pCommandList->SetGraphicsRootShaderResourceView(0, frameResource.GetInstanceDataVA());
+
     UINT numLights = m_sceneManager.GetLightCount();
     pCommandList->SetGraphicsRoot32BitConstant(3, numLights, 0);
 
@@ -2049,6 +2043,148 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     frameResource.EnsureInstanceDataCapacity(static_cast<UINT>(data.size()));
     frameResource.PushInstanceData(data);
 
+    UINT worstIndexCapacity = static_cast<UINT>(data.size()) * (1 + m_sceneManager.GetDirectionalLights().size() * MAX_CASCADES + m_sceneManager.GetPointLights().size() + m_sceneManager.GetSpotLights().size());
+    frameResource.EnsureInstanceIndexCapacity(worstIndexCapacity);
+
+    {
+        // Main camera
+        auto frustum = m_camera.GetWorldFrustum();
+
+        m_cameraVisibleIndexRange.clear();
+
+        m_visibleCount = 0;
+        for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
+        {
+            std::vector<UINT32> forward;
+            std::vector<UINT32> deferred;
+
+            auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
+
+            auto* pMesh = m_sceneManager.GetMesh(meshHandle);
+            auto boundingSphere = pMesh->GetBoundingSphere();
+
+            UINT i = 0;
+            for (const auto& instanceData : bucket.forward)
+            {
+                XMMATRIX mat = XMMatrixTranspose(XMLoadFloat4x4(&instanceData.world));
+                BoundingSphere bs;
+                boundingSphere.Transform(bs, mat);
+                if (frustum.Intersects(bs))
+                    forward.push_back(instanceRange.offset / sizeof(InstanceData) + i);
+                ++i;
+            }
+            i = 0;
+            for (const auto& instanceData : bucket.deferred)
+            {
+                XMMATRIX mat = XMMatrixTranspose(XMLoadFloat4x4(&instanceData.world));
+                BoundingSphere bs;
+                boundingSphere.Transform(bs, mat);
+                if (frustum.Intersects(bs))
+                    deferred.push_back(instanceRange.offset / sizeof(InstanceData) + instanceRange.forwardCount + i);
+                ++i;
+            }
+
+            m_cameraVisibleIndexRange[meshHandle].first.offset = frameResource.PushInstanceIndices(forward);
+            m_cameraVisibleIndexRange[meshHandle].first.count = static_cast<UINT>(forward.size());
+
+            m_cameraVisibleIndexRange[meshHandle].second.offset = frameResource.PushInstanceIndices(deferred);
+            m_cameraVisibleIndexRange[meshHandle].second.count = static_cast<UINT>(deferred.size());
+
+            m_visibleCount += static_cast<UINT>(forward.size() + deferred.size());
+        }
+
+        // Lights
+        for (auto& light : m_sceneManager.GetDirectionalLights())
+        {
+            const auto& lightBoundingVolumes = light.GetBoundingBoxes();
+
+            for (UINT arrayIndex = 0; arrayIndex < MAX_CASCADES; ++arrayIndex)
+            {
+                for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
+                {
+                    auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
+
+                    auto* pMesh = m_sceneManager.GetMesh(meshHandle);
+                    auto meshBoundingVolume = pMesh->GetBoundingSphere();
+
+                    std::vector<UINT32> indices;
+
+                    for (UINT i = 0; i < instanceRange.forwardCount + instanceRange.deferredCount; ++i)
+                    {
+                        const auto& instanceData = i < instanceRange.forwardCount ? bucket.forward[i] : bucket.deferred[i - instanceRange.forwardCount];
+
+                        XMMATRIX mat = XMMatrixTranspose(XMLoadFloat4x4(&instanceData.world));
+                        BoundingSphere instanceBoundingVolume;
+                        meshBoundingVolume.Transform(instanceBoundingVolume, mat);
+                        if (lightBoundingVolumes[arrayIndex].Intersects(instanceBoundingVolume))
+                            indices.push_back(instanceRange.offset / sizeof(InstanceData) + i);
+                    }
+
+                    UINT offset = frameResource.PushInstanceIndices(indices);
+                    light.SetVisibleIndexRange(meshHandle, offset, static_cast<UINT>(indices.size()), arrayIndex);
+                }
+            }
+        }
+
+        for (auto& light : m_sceneManager.GetPointLights())
+        {
+            const BoundingSphere& lightBoundingVolume = light.GetBoundingSphere();
+
+            for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
+            {
+                auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
+
+                auto* pMesh = m_sceneManager.GetMesh(meshHandle);
+                auto meshBoundingVolume = pMesh->GetBoundingSphere();
+
+                std::vector<UINT32> indices;
+
+                for (UINT i = 0; i < instanceRange.forwardCount + instanceRange.deferredCount; ++i)
+                {
+                    const auto& instanceData = i < instanceRange.forwardCount ? bucket.forward[i] : bucket.deferred[i - instanceRange.forwardCount];
+
+                    XMMATRIX mat = XMMatrixTranspose(XMLoadFloat4x4(&instanceData.world));
+                    BoundingSphere instanceBoundingVolume;
+                    meshBoundingVolume.Transform(instanceBoundingVolume, mat);
+                    if (lightBoundingVolume.Intersects(instanceBoundingVolume))
+                        indices.push_back(instanceRange.offset / sizeof(InstanceData) + i);
+                }
+
+                UINT offset = frameResource.PushInstanceIndices(indices);
+                light.SetVisibleIndexRange(meshHandle, offset, static_cast<UINT>(indices.size()));
+            }
+        }
+
+        for (auto& light : m_sceneManager.GetSpotLights())
+        {
+            const BoundingFrustum& lightBoundingVolume = light.GetBoundingFrustum();
+
+            for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
+            {
+                auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
+
+                auto* pMesh = m_sceneManager.GetMesh(meshHandle);
+                auto boundingSphere = pMesh->GetBoundingSphere();
+
+                std::vector<UINT32> indices;
+
+                for (UINT i = 0; i < instanceRange.forwardCount + instanceRange.deferredCount; ++i)
+                {
+                    const auto& instanceData = i < instanceRange.forwardCount ? bucket.forward[i] : bucket.deferred[i - instanceRange.forwardCount];
+
+                    XMMATRIX mat = XMMatrixTranspose(XMLoadFloat4x4(&instanceData.world));
+                    BoundingSphere bs;
+                    boundingSphere.Transform(bs, mat);
+                    if (lightBoundingVolume.Intersects(bs))
+                        indices.push_back(instanceRange.offset / sizeof(InstanceData) + i);
+                }
+
+                UINT offset = frameResource.PushInstanceIndices(indices);
+                light.SetVisibleIndexRange(meshHandle, offset, static_cast<UINT>(indices.size()));
+            }
+        }
+    }
+
     // Shadow map pass
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Shadow map pass");
@@ -2099,7 +2235,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
                 pCommandList->SetGraphicsRootConstantBufferView(1, pLight->GetCameraUploadAllocation(j).gpuPtr);
 
                 for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
-                    DrawMesh(pCommandList, meshHandle, PassType::SHADOW_MAP, frameResource.GetInstanceDataVA());
+                {
+                    VisibleRange visibleRange = pLight->GetVisibleIndexRange(meshHandle, j);
+                    DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), visibleRange);
+                }
             }
 
             ++lightIdx;
@@ -2155,7 +2294,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->SetGraphicsRootConstantBufferView(1, m_cameraUploadAllocation.gpuPtr);
 
         for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
-            DrawMesh(pCommandList, meshHandle, PassType::GBUFFER, frameResource.GetInstanceDataVA());
+        {
+            VisibleRange visibleRange = m_cameraVisibleIndexRange[meshHandle].second;
+            DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), visibleRange);
+        }
     }
 
     // Deferred Lighting pass
@@ -2235,7 +2377,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->SetGraphicsRootConstantBufferView(2, m_shadowUploadAllocation.gpuPtr);
 
         for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
-            DrawMesh(pCommandList, meshHandle, PassType::FORWARD_COLORING, frameResource.GetInstanceDataVA());
+        {
+            VisibleRange visibleRange = m_cameraVisibleIndexRange[meshHandle].first;
+            DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), visibleRange);
+        }
 
         std::vector<D3D12_TEXTURE_BARRIER> barriers;
 
@@ -2711,47 +2856,24 @@ const std::vector<char>& Renderer::GetShaderBlobRef(const ShaderKey& shaderKey) 
     return it->second;
 }
 
-void Renderer::DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)
+void Renderer::DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceIndexVA, VisibleRange visibleRange)
 {
-    static const UINT instanceDataSize = static_cast<UINT>(sizeof(InstanceData));
-
-    const auto& instanceRange = m_sceneManager.GetInstanceRange(meshhandle);
-
-    if ((passType == PassType::FORWARD_COLORING && instanceRange.forwardCount == 0) ||
-        (passType == PassType::SHADOW_MAP && (instanceRange.forwardCount + instanceRange.deferredCount) == 0) ||
-        (passType == PassType::GBUFFER && instanceRange.deferredCount == 0) ||
-        (passType == PassType::DEFERRED_LIGHTING))
+    if (visibleRange.count == 0)
         return;
 
-    UINT instanceCount;
-    switch (passType)
-    {
-    case PassType::FORWARD_COLORING:
-        instanceCount = instanceRange.forwardCount;
-        break;
-    case PassType::SHADOW_MAP:
-        instanceCount = instanceRange.forwardCount + instanceRange.deferredCount;
-        break;
-    case PassType::GBUFFER:
-        instanceCount = instanceRange.deferredCount;
-        break;
-    }
+    D3D12_VERTEX_BUFFER_VIEW instanceBufferView = {};
+    instanceBufferView.BufferLocation = instanceIndexVA + visibleRange.offset;
+    instanceBufferView.StrideInBytes = sizeof(UINT32);
+    instanceBufferView.SizeInBytes = sizeof(UINT32) * visibleRange.count;
 
-    D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
-    instanceBufferView.BufferLocation = instanceBufferBase + instanceRange.offset;
-    if (passType == PassType::GBUFFER)
-        instanceBufferView.BufferLocation += instanceRange.forwardCount * sizeof(InstanceData);
-    instanceBufferView.StrideInBytes = instanceDataSize;
-    instanceBufferView.SizeInBytes = instanceDataSize * instanceCount;
-
-    auto* pMesh = m_sceneManager.GetMesh(meshhandle);
+    const auto* pMesh = m_sceneManager.GetMesh(meshHandle);
 
     D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = {pMesh->GetVbv(), instanceBufferView};
     pCommandList->IASetVertexBuffers(0, 2, pVertexBufferViews);
     pCommandList->IASetIndexBuffer(&pMesh->GetIbv());
     pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    pCommandList->DrawIndexedInstanced(pMesh->GetNumIndices(), instanceCount, 0, 0, 0);
+    pCommandList->DrawIndexedInstanced(pMesh->GetNumIndices(), visibleRange.count, 0, 0, 0);
 }
 
 void Renderer::DrawEntity(ID3D12GraphicsCommandList* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)

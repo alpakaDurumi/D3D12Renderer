@@ -93,7 +93,7 @@ public:
     D3D12_GPU_VIRTUAL_ADDRESS GetInstanceDataVA() const;
 
     void EnsureInstanceIndexCapacity(UINT requiredSize);
-    void PushInstanceIndices(const std::vector<UINT32>& indices);
+    UINT PushInstanceIndices(const std::vector<UINT32>& indices);
     D3D12_GPU_VIRTUAL_ADDRESS GetInstanceIndexVA() const;
 
     // Transient upload

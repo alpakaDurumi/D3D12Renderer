@@ -337,10 +337,12 @@ void FrameResource::EnsureInstanceIndexCapacity(UINT requiredSize)
     }
 }
 
-void FrameResource::PushInstanceIndices(const std::vector<UINT32>& indices)
+UINT FrameResource::PushInstanceIndices(const std::vector<UINT32>& indices)
 {
+    UINT ret = m_instanceIndexOffsetByte;
     std::memcpy(m_instanceIndexBegin + m_instanceIndexOffsetByte, indices.data(), sizeof(UINT32) * indices.size());
     m_instanceIndexOffsetByte += sizeof(UINT32) * static_cast<UINT>(indices.size());
+    return ret;
 }
 
 D3D12_GPU_VIRTUAL_ADDRESS FrameResource::GetInstanceIndexVA() const

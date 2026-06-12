@@ -2,7 +2,6 @@
 
 #include <array>
 #include <chrono>
-#include <ratio>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -156,7 +155,8 @@ private:
 
     std::vector<EntityHandle> m_previewRotations;
 
-    std::unordered_map<MeshHandle, std::pair<VisibleRange, VisibleRange>> m_cameraVisibleIndexRange;
+    std::unordered_map<MeshHandle, std::pair<VisibleRange, VisibleRange>> m_cameraVisibleIndexRange; // first: forward, second: deferred
+    UINT m_visibleCount = 0;
 
     // Shadows
     D3D12_VIEWPORT m_shadowMapViewport;
@@ -212,7 +212,7 @@ private:
     void ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID3D12GraphicsCommandList7* pCommandList);
     ID3D12PipelineState* GetPipelineState(const PSOKey& psoKey);
     const std::vector<char>& GetShaderBlobRef(const ShaderKey& shaderKey) const;
-    void DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
+    void DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceIndexVA, VisibleRange visibleRange);
     void DrawEntity(ID3D12GraphicsCommandList* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
 
     // Synchronization
