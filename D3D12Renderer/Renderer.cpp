@@ -2098,6 +2098,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         {
             const auto& lightBoundingVolumes = light.GetBoundingBoxes();
 
+            light.ResetVisibleIndexRange();
+
             for (UINT arrayIndex = 0; arrayIndex < MAX_CASCADES; ++arrayIndex)
             {
                 for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
@@ -2130,6 +2132,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         {
             const BoundingSphere& lightBoundingVolume = light.GetBoundingSphere();
 
+            light.ResetVisibleIndexRange();
+
             for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
             {
                 auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
@@ -2158,6 +2162,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         for (auto& light : m_sceneManager.GetSpotLights())
         {
             const BoundingFrustum& lightBoundingVolume = light.GetBoundingFrustum();
+
+            light.ResetVisibleIndexRange();
 
             for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
             {

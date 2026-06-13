@@ -233,6 +233,12 @@ void DirectionalLight::SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, 
     m_visibleIndexRange[arrayIndex][meshHandle].count = count;
 }
 
+void DirectionalLight::ResetVisibleIndexRange()
+{
+    for (auto& umap : m_visibleIndexRange)
+        umap.clear();
+}
+
 const std::array<BoundingOrientedBox, MAX_CASCADES>& DirectionalLight::GetBoundingBoxes() const
 {
     return m_boundingBoxes;
@@ -311,6 +317,11 @@ void PointLight::SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT c
     m_visibleIndexRange[meshHandle].count = count;
 }
 
+void PointLight::ResetVisibleIndexRange()
+{
+    m_visibleIndexRange.clear();
+}
+
 const BoundingSphere& PointLight::GetBoundingSphere() const
 {
     return m_boundingSphere;
@@ -373,6 +384,11 @@ void SpotLight::SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT co
 {
     m_visibleIndexRange[meshHandle].offset = offset;
     m_visibleIndexRange[meshHandle].count = count;
+}
+
+void SpotLight::ResetVisibleIndexRange()
+{
+    m_visibleIndexRange.clear();
 }
 
 const BoundingFrustum& SpotLight::GetBoundingFrustum() const

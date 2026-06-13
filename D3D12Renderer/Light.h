@@ -65,6 +65,7 @@ public:
 
     virtual const VisibleRange& GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex = 0) const = 0;
     virtual void SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex = 0) = 0;
+    virtual void ResetVisibleIndexRange() = 0;
 
     virtual std::vector<GpuResource> TakeResources();
 
@@ -104,6 +105,7 @@ public:
 
     const VisibleRange& GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex) const override;
     void SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex) override;
+    void ResetVisibleIndexRange() override;
 
     const std::array<DirectX::BoundingOrientedBox, MAX_CASCADES>& GetBoundingBoxes() const;
     void SetBoundingBox(UINT arrayIndex, const DirectX::BoundingOrientedBox& boundingBox);
@@ -134,6 +136,7 @@ public:
 
     const VisibleRange& GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex = 0) const override;
     void SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex = 0) override;
+    void ResetVisibleIndexRange() override;
 
     const DirectX::BoundingSphere& GetBoundingSphere() const;
     void SetBoundingSphere(const DirectX::BoundingSphere& boundingSphere);
@@ -163,6 +166,7 @@ public:
 
     const VisibleRange& GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex = 0) const override;
     void SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex = 0) override;
+    void ResetVisibleIndexRange() override;
 
     const DirectX::BoundingFrustum& GetBoundingFrustum() const;
     void SetBoundingFrustum(const DirectX::BoundingFrustum& boundingFrustum);
