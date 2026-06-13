@@ -2043,7 +2043,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     frameResource.EnsureInstanceDataCapacity(static_cast<UINT>(data.size()));
     frameResource.PushInstanceData(data);
 
-    UINT worstIndexCapacity = static_cast<UINT>(data.size()) * (1 + m_sceneManager.GetDirectionalLights().size() * MAX_CASCADES + m_sceneManager.GetPointLights().size() + m_sceneManager.GetSpotLights().size());
+    UINT worstIndexCapacity = static_cast<UINT>(data.size()) * (1 + m_sceneManager.GetDirectionalLights().size() * MAX_CASCADES + m_sceneManager.GetPointLights().size() + m_sceneManager.GetSpotLights().size() + 1);
     frameResource.EnsureInstanceIndexCapacity(worstIndexCapacity);
 
     {
@@ -2181,6 +2181,31 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
                 UINT offset = frameResource.PushInstanceIndices(indices);
                 light.SetVisibleIndexRange(meshHandle, offset, static_cast<UINT>(indices.size()));
+            }
+        }
+    }
+
+    // Push indices of selected entities (one entity for now)
+    {
+        m_selectedVisibleIndexRange.clear();
+
+        bool selectionExists = !(m_selected.index == UINT_MAX && m_selected.generation == 0);
+        if (selectionExists)
+        {
+            auto* pEntity = m_sceneManager.Get(m_selected);
+
+            if (pEntity->meshRenderer.has_value())
+            {
+                auto meshHandle = pEntity->meshRenderer->mesh;
+                auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
+
+                UINT index = m_sceneManager.GetEntityIndex(m_selected);
+
+                std::vector<UINT32> indices;
+                indices.push_back(index);
+
+                m_selectedVisibleIndexRange[meshHandle].offset = frameResource.PushInstanceIndices(indices);
+                m_selectedVisibleIndexRange[meshHandle].count = 1;
             }
         }
     }
@@ -2463,7 +2488,8 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             pCommandList->SetGraphicsRootConstantBufferView(1, m_cameraUploadAllocation.gpuPtr);
 
             // 선택된 Entity들에 대해서만 draw call을 호출해야 함 (나중에는 여러 Entity를 다중 선택할 수도 있어야 함)
-            DrawEntity(pCommandList, m_selected, frameResource.GetInstanceDataVA());
+            for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
+                DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), m_selectedVisibleIndexRange[meshHandle]);
         }
     }
 
@@ -2874,34 +2900,6 @@ void Renderer::DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle mesh
     pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     pCommandList->DrawIndexedInstanced(pMesh->GetNumIndices(), visibleRange.count, 0, 0, 0);
-}
-
-void Renderer::DrawEntity(ID3D12GraphicsCommandList* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase)
-{
-    static const UINT instanceDataSize = static_cast<UINT>(sizeof(InstanceData));
-
-    auto* pEntity = m_sceneManager.Get(entityHandle);
-
-    if (!pEntity->meshRenderer.has_value())
-        return;
-    auto meshHandle = pEntity->meshRenderer->mesh;
-    auto* pMesh = m_sceneManager.GetMesh(meshHandle);
-
-    auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
-
-    UINT indexInBucket = m_sceneManager.GetEntityIndexInBucket(entityHandle);
-
-    D3D12_VERTEX_BUFFER_VIEW instanceBufferView;
-    instanceBufferView.BufferLocation = instanceBufferBase + instanceRange.offset + indexInBucket * instanceDataSize;
-    instanceBufferView.StrideInBytes = instanceDataSize;
-    instanceBufferView.SizeInBytes = instanceDataSize;
-
-    D3D12_VERTEX_BUFFER_VIEW pVertexBufferViews[] = {pMesh->GetVbv(), instanceBufferView};
-    pCommandList->IASetVertexBuffers(0, 2, pVertexBufferViews);
-    pCommandList->IASetIndexBuffer(&pMesh->GetIbv());
-    pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-    pCommandList->DrawIndexedInstanced(pMesh->GetNumIndices(), 1, 0, 0, 0);
 }
 
 // Wait for pending GPU work to complete

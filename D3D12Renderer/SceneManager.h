@@ -299,7 +299,9 @@ public:
             bucket.deferred.clear();
         }
         m_instanceRanges.clear();
-        m_entityIndexInBucket.clear(); // 실제로 entity dense array에 변화가 있을 때만 clear하거나, 구조를 개선하기.
+        m_entityIndex.clear();
+
+        std::unordered_map<MeshHandle, std::pair<std::vector<EntityHandle>, std::vector<EntityHandle>>> temp;
 
         for (const auto& entity : m_entities.GetDense())
         {
@@ -316,52 +318,44 @@ public:
 
             if (renderingPath == RenderingPath::FORWARD)
             {
-                m_entityIndexInBucket[entity.selfHandle] = static_cast<UINT>(m_buckets[meshHandle].forward.size());
                 m_buckets[meshHandle].forward.push_back(data);
+                temp[meshHandle].first.push_back(entity.selfHandle);
             }
             else
             {
-                m_entityIndexInBucket[entity.selfHandle] = static_cast<UINT>(m_buckets[meshHandle].deferred.size());
                 m_buckets[meshHandle].deferred.push_back(data);
+                temp[meshHandle].second.push_back(entity.selfHandle);
             }
-        }
-
-        for (const auto& entity : m_entities.GetDense())
-        {
-            if (!entity.meshRenderer.has_value())
-                continue;
-
-            auto meshHandle = entity.meshRenderer->mesh;
-            auto matHandle = entity.meshRenderer->material;
-
-            auto renderingPath = GetMaterial(matHandle)->GetRenderingPath();
-
-            if (renderingPath == RenderingPath::DEFERRED)
-                m_entityIndexInBucket[entity.selfHandle] += static_cast<UINT>(m_buckets[meshHandle].forward.size());
         }
 
         UINT currentOffset = 0;
 
         // InstanceData도 버켓에 담긴 순으로 flat array만들고, 드로우 콜도 그냥 버켓 순으로 해버리기?
+        UINT i = 0;
 
-        std::vector<InstanceData> temp;
+        std::vector<InstanceData> ret;
 
         for (const auto& [meshHandle, bucket] : m_buckets)
         {
             const auto& [forward, deferred] = bucket;
+
+            for (const auto& entityHandle : temp[meshHandle].first)
+                m_entityIndex[entityHandle] = i++;
+            for (const auto& entityHandle : temp[meshHandle].second)
+                m_entityIndex[entityHandle] = i++;
 
             InstanceRange& range = m_instanceRanges[meshHandle];
             range.offset = currentOffset;
             range.forwardCount = static_cast<UINT>(forward.size());
             range.deferredCount = static_cast<UINT>(deferred.size());
 
-            temp.insert(temp.end(), forward.begin(), forward.end());
-            temp.insert(temp.end(), deferred.begin(), deferred.end());
+            ret.insert(ret.end(), forward.begin(), forward.end());
+            ret.insert(ret.end(), deferred.begin(), deferred.end());
 
             currentOffset += (range.forwardCount + range.deferredCount) * sizeof(InstanceData);
         }
 
-        return temp;
+        return ret;
     }
 
     InstanceRange GetInstanceRange(MeshHandle mesh)
@@ -369,9 +363,9 @@ public:
         return m_instanceRanges[mesh];
     }
 
-    UINT GetEntityIndexInBucket(EntityHandle entity)
+    UINT GetEntityIndex(EntityHandle entity)
     {
-        return m_entityIndexInBucket[entity];
+        return m_entityIndex[entity];
     }
 
     const std::unordered_map<MeshHandle, MeshBucket>& GetBuckets() const
@@ -719,7 +713,7 @@ private:
 
     std::unordered_map<MeshHandle, InstanceRange> m_instanceRanges;
 
-    std::unordered_map<EntityHandle, UINT> m_entityIndexInBucket;
+    std::unordered_map<EntityHandle, UINT> m_entityIndex;
 
     SlotMap<Material> m_materials;
     std::unordered_map<AssetID, MaterialHandle> m_materialRegistry;

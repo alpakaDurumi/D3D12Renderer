@@ -152,6 +152,7 @@ private:
     // Scene control
     SceneManager m_sceneManager;
     EntityHandle m_selected;
+    std::unordered_map<MeshHandle, VisibleRange> m_selectedVisibleIndexRange;
 
     std::vector<EntityHandle> m_previewRotations;
 
@@ -213,7 +214,6 @@ private:
     ID3D12PipelineState* GetPipelineState(const PSOKey& psoKey);
     const std::vector<char>& GetShaderBlobRef(const ShaderKey& shaderKey) const;
     void DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceIndexVA, VisibleRange visibleRange);
-    void DrawEntity(ID3D12GraphicsCommandList* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
 
     // Synchronization
     void WaitForGpu();
