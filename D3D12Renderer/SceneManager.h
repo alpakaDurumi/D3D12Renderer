@@ -227,9 +227,12 @@ public:
         return m_meshes.Get(handle);
     }
 
-    MeshHandle GetMeshHandle(const AssetID& id)
+    MeshHandle GetMeshHandle(const AssetID& id) const
     {
-        return m_meshRegistry[id];
+        auto it = m_meshRegistry.find(id);
+        assert(it != m_meshRegistry.end());
+
+        return it->second;
     }
 
     void RegisterMesh(MeshHandle handle, const AssetID& id)
@@ -255,9 +258,12 @@ public:
         return m_materials.Get(handle);
     }
 
-    MaterialHandle GetMaterialHandle(const AssetID& id)
+    MaterialHandle GetMaterialHandle(const AssetID& id) const
     {
-        return m_materialRegistry[id];
+        auto it = m_materialRegistry.find(id);
+        assert(it != m_materialRegistry.end());
+
+        return it->second;
     }
 
     void RegisterMaterial(MaterialHandle handle, const AssetID& id)
@@ -358,14 +364,20 @@ public:
         return ret;
     }
 
-    InstanceRange GetInstanceRange(MeshHandle mesh)
+    InstanceRange GetInstanceRange(MeshHandle mesh) const
     {
-        return m_instanceRanges[mesh];
+        auto it = m_instanceRanges.find(mesh);
+        assert(it != m_instanceRanges.end());
+
+        return it->second;
     }
 
-    UINT GetEntityIndex(EntityHandle entity)
+    UINT GetEntityIndex(EntityHandle entity) const
     {
-        return m_entityIndex[entity];
+        auto it = m_entityIndex.find(entity);
+        assert(it != m_entityIndex.end());
+
+        return it->second;
     }
 
     const std::unordered_map<MeshHandle, MeshBucket>& GetBuckets() const
