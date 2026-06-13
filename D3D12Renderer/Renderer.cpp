@@ -2046,6 +2046,23 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT worstIndexCapacity = static_cast<UINT>(data.size()) * (1 + m_sceneManager.GetDirectionalLights().size() * MAX_CASCADES + m_sceneManager.GetPointLights().size() + m_sceneManager.GetSpotLights().size() + 1);
     frameResource.EnsureInstanceIndexCapacity(worstIndexCapacity);
 
+    std::vector<BoundingSphere> worldBoundingSpheres(data.size());
+
+    for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
+    {
+        const BoundingSphere& local = m_sceneManager.GetMesh(meshHandle)->GetBoundingSphere();
+
+        const auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
+        const UINT base = instanceRange.offset / sizeof(InstanceData);
+        const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
+        for (UINT i = 0; i < n; ++i)
+        {
+            const auto& instanceData = i < instanceRange.forwardCount ? bucket.forward[i] : bucket.deferred[i - instanceRange.forwardCount];
+            XMMATRIX world = XMMatrixTranspose(XMLoadFloat4x4(&instanceData.world));
+            local.Transform(worldBoundingSpheres[base + i], world);
+        }
+    }
+
     {
         // Main camera
         auto frustum = m_camera.GetWorldFrustum();
@@ -2058,30 +2075,19 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             std::vector<UINT32> forward;
             std::vector<UINT32> deferred;
 
-            auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
+            const auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
+            const UINT base = instanceRange.offset / sizeof(InstanceData);
+            const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
-            auto* pMesh = m_sceneManager.GetMesh(meshHandle);
-            auto boundingSphere = pMesh->GetBoundingSphere();
-
-            UINT i = 0;
-            for (const auto& instanceData : bucket.forward)
+            for (UINT i = 0; i < n; ++i)
             {
-                XMMATRIX mat = XMMatrixTranspose(XMLoadFloat4x4(&instanceData.world));
-                BoundingSphere bs;
-                boundingSphere.Transform(bs, mat);
-                if (frustum.Intersects(bs))
-                    forward.push_back(instanceRange.offset / sizeof(InstanceData) + i);
-                ++i;
-            }
-            i = 0;
-            for (const auto& instanceData : bucket.deferred)
-            {
-                XMMATRIX mat = XMMatrixTranspose(XMLoadFloat4x4(&instanceData.world));
-                BoundingSphere bs;
-                boundingSphere.Transform(bs, mat);
-                if (frustum.Intersects(bs))
-                    deferred.push_back(instanceRange.offset / sizeof(InstanceData) + instanceRange.forwardCount + i);
-                ++i;
+                if (frustum.Intersects(worldBoundingSpheres[base + i]))
+                {
+                    if (i < instanceRange.forwardCount)
+                        forward.push_back(base + i);
+                    else
+                        deferred.push_back(base + i);
+                }
             }
 
             m_cameraVisibleIndexRange[meshHandle].first.offset = frameResource.PushInstanceIndices(forward);
@@ -2104,22 +2110,16 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             {
                 for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
                 {
-                    auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
-
-                    auto* pMesh = m_sceneManager.GetMesh(meshHandle);
-                    auto meshBoundingVolume = pMesh->GetBoundingSphere();
-
                     std::vector<UINT32> indices;
 
-                    for (UINT i = 0; i < instanceRange.forwardCount + instanceRange.deferredCount; ++i)
-                    {
-                        const auto& instanceData = i < instanceRange.forwardCount ? bucket.forward[i] : bucket.deferred[i - instanceRange.forwardCount];
+                    auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
+                    const UINT base = instanceRange.offset / sizeof(InstanceData);
+                    const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
-                        XMMATRIX mat = XMMatrixTranspose(XMLoadFloat4x4(&instanceData.world));
-                        BoundingSphere instanceBoundingVolume;
-                        meshBoundingVolume.Transform(instanceBoundingVolume, mat);
-                        if (lightBoundingVolumes[arrayIndex].Intersects(instanceBoundingVolume))
-                            indices.push_back(instanceRange.offset / sizeof(InstanceData) + i);
+                    for (UINT i = 0; i < n; ++i)
+                    {
+                        if (lightBoundingVolumes[arrayIndex].Intersects(worldBoundingSpheres[base + i]))
+                            indices.push_back(base + i);
                     }
 
                     UINT offset = frameResource.PushInstanceIndices(indices);
@@ -2136,22 +2136,16 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
             for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
             {
-                auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
-
-                auto* pMesh = m_sceneManager.GetMesh(meshHandle);
-                auto meshBoundingVolume = pMesh->GetBoundingSphere();
-
                 std::vector<UINT32> indices;
 
-                for (UINT i = 0; i < instanceRange.forwardCount + instanceRange.deferredCount; ++i)
-                {
-                    const auto& instanceData = i < instanceRange.forwardCount ? bucket.forward[i] : bucket.deferred[i - instanceRange.forwardCount];
+                auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
+                const UINT base = instanceRange.offset / sizeof(InstanceData);
+                const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
-                    XMMATRIX mat = XMMatrixTranspose(XMLoadFloat4x4(&instanceData.world));
-                    BoundingSphere instanceBoundingVolume;
-                    meshBoundingVolume.Transform(instanceBoundingVolume, mat);
-                    if (lightBoundingVolume.Intersects(instanceBoundingVolume))
-                        indices.push_back(instanceRange.offset / sizeof(InstanceData) + i);
+                for (UINT i = 0; i < n; ++i)
+                {
+                    if (lightBoundingVolume.Intersects(worldBoundingSpheres[base + i]))
+                        indices.push_back(base + i);
                 }
 
                 UINT offset = frameResource.PushInstanceIndices(indices);
@@ -2167,22 +2161,16 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
             for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
             {
-                auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
-
-                auto* pMesh = m_sceneManager.GetMesh(meshHandle);
-                auto boundingSphere = pMesh->GetBoundingSphere();
-
                 std::vector<UINT32> indices;
 
-                for (UINT i = 0; i < instanceRange.forwardCount + instanceRange.deferredCount; ++i)
-                {
-                    const auto& instanceData = i < instanceRange.forwardCount ? bucket.forward[i] : bucket.deferred[i - instanceRange.forwardCount];
+                auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
+                const UINT base = instanceRange.offset / sizeof(InstanceData);
+                const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
-                    XMMATRIX mat = XMMatrixTranspose(XMLoadFloat4x4(&instanceData.world));
-                    BoundingSphere bs;
-                    boundingSphere.Transform(bs, mat);
-                    if (lightBoundingVolume.Intersects(bs))
-                        indices.push_back(instanceRange.offset / sizeof(InstanceData) + i);
+                for (UINT i = 0; i < n; ++i)
+                {
+                    if (lightBoundingVolume.Intersects(worldBoundingSpheres[base + i]))
+                        indices.push_back(base + i);
                 }
 
                 UINT offset = frameResource.PushInstanceIndices(indices);
