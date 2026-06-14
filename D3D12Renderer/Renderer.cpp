@@ -2046,22 +2046,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     UINT worstIndexCapacity = static_cast<UINT>(data.size()) * (1 + m_sceneManager.GetDirectionalLights().size() * MAX_CASCADES + m_sceneManager.GetPointLights().size() + m_sceneManager.GetSpotLights().size() + 1);
     frameResource.EnsureInstanceIndexCapacity(worstIndexCapacity);
 
-    std::vector<BoundingSphere> worldBoundingSpheres(data.size());
-
-    for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
-    {
-        const BoundingSphere& local = m_sceneManager.GetMesh(meshHandle)->GetBoundingSphere();
-
-        const auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
-        const UINT base = instanceRange.offset / sizeof(InstanceData);
-        const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
-        for (UINT i = 0; i < n; ++i)
-        {
-            const auto& instanceData = i < instanceRange.forwardCount ? bucket.forward[i] : bucket.deferred[i - instanceRange.forwardCount];
-            XMMATRIX world = XMMatrixTranspose(XMLoadFloat4x4(&instanceData.world));
-            local.Transform(worldBoundingSpheres[base + i], world);
-        }
-    }
+    const auto& worldBoundingSpheres = m_sceneManager.GetWorldBoundingSpheres();
 
     {
         // Main camera
@@ -2070,12 +2055,12 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         m_cameraVisibleIndexRange.clear();
 
         m_visibleCount = 0;
-        for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
+
+        for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
         {
             std::vector<UINT32> forward;
             std::vector<UINT32> deferred;
 
-            const auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
             const UINT base = instanceRange.offset / sizeof(InstanceData);
             const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
@@ -2108,11 +2093,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
             for (UINT arrayIndex = 0; arrayIndex < MAX_CASCADES; ++arrayIndex)
             {
-                for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
+                for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
                 {
                     std::vector<UINT32> indices;
 
-                    auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
                     const UINT base = instanceRange.offset / sizeof(InstanceData);
                     const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
@@ -2134,11 +2118,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
             light.ResetVisibleIndexRange();
 
-            for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
+            for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
             {
                 std::vector<UINT32> indices;
 
-                auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
                 const UINT base = instanceRange.offset / sizeof(InstanceData);
                 const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
@@ -2159,11 +2142,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
             light.ResetVisibleIndexRange();
 
-            for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
+            for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
             {
                 std::vector<UINT32> indices;
 
-                auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
                 const UINT base = instanceRange.offset / sizeof(InstanceData);
                 const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
@@ -2191,7 +2173,6 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             if (pEntity->meshRenderer.has_value())
             {
                 auto meshHandle = pEntity->meshRenderer->mesh;
-                auto instanceRange = m_sceneManager.GetInstanceRange(meshHandle);
 
                 UINT index = m_sceneManager.GetEntityIndex(m_selected);
 
@@ -2253,7 +2234,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
                 pCommandList->SetGraphicsRootConstantBufferView(1, pLight->GetCameraUploadAllocation(j).gpuPtr);
 
-                for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
+                for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
                 {
                     VisibleRange visibleRange = pLight->GetVisibleIndexRange(meshHandle, j);
                     DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), visibleRange);
@@ -2312,7 +2293,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         pCommandList->SetGraphicsRootConstantBufferView(1, m_cameraUploadAllocation.gpuPtr);
 
-        for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
+        for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
         {
             VisibleRange visibleRange = m_cameraVisibleIndexRange[meshHandle].second;
             DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), visibleRange);
@@ -2395,7 +2376,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->SetGraphicsRootConstantBufferView(1, m_cameraUploadAllocation.gpuPtr);
         pCommandList->SetGraphicsRootConstantBufferView(2, m_shadowUploadAllocation.gpuPtr);
 
-        for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
+        for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
         {
             VisibleRange visibleRange = m_cameraVisibleIndexRange[meshHandle].first;
             DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), visibleRange);
@@ -2482,7 +2463,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             pCommandList->SetGraphicsRootConstantBufferView(1, m_cameraUploadAllocation.gpuPtr);
 
             // 선택된 Entity들에 대해서만 draw call을 호출해야 함 (나중에는 여러 Entity를 다중 선택할 수도 있어야 함)
-            for (const auto& [meshHandle, bucket] : m_sceneManager.GetBuckets())
+            for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
                 DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), m_selectedVisibleIndexRange[meshHandle]);
         }
     }

@@ -11,6 +11,7 @@
 #include <variant>
 #include <vector>
 
+#include <DirectXCollision.h>
 #include <DirectXMath.h>
 #include <basetsd.h>
 #include <d3d12.h>
@@ -340,6 +341,7 @@ public:
         UINT i = 0;
 
         std::vector<InstanceData> ret;
+        m_worldBoundingSpheres.resize(m_entities.GetCount());
 
         for (const auto& [meshHandle, bucket] : m_buckets)
         {
@@ -359,17 +361,26 @@ public:
             ret.insert(ret.end(), deferred.begin(), deferred.end());
 
             currentOffset += (range.forwardCount + range.deferredCount) * sizeof(InstanceData);
+
+            // Compute per-instance world bounding sphere
+            const DirectX::BoundingSphere& local = GetMesh(meshHandle)->GetBoundingSphere();
+
+            const UINT base = range.offset / sizeof(InstanceData);
+            const UINT n = range.forwardCount + range.deferredCount;
+            for (UINT i = 0; i < n; ++i)
+            {
+                const auto& instanceData = i < range.forwardCount ? forward[i] : deferred[i - range.forwardCount];
+                DirectX::XMMATRIX world = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&instanceData.world));
+                local.Transform(m_worldBoundingSpheres[base + i], world);
+            }
         }
 
         return ret;
     }
 
-    InstanceRange GetInstanceRange(MeshHandle mesh) const
+    const std::unordered_map<MeshHandle, InstanceRange>& GetInstanceRanges() const
     {
-        auto it = m_instanceRanges.find(mesh);
-        assert(it != m_instanceRanges.end());
-
-        return it->second;
+        return m_instanceRanges;
     }
 
     UINT GetEntityIndex(EntityHandle entity) const
@@ -380,9 +391,9 @@ public:
         return it->second;
     }
 
-    const std::unordered_map<MeshHandle, MeshBucket>& GetBuckets() const
+    const std::vector<DirectX::BoundingSphere>& GetWorldBoundingSpheres() const
     {
-        return m_buckets;
+        return m_worldBoundingSpheres;
     }
 
     DirectionalLightHandle AddDirectionalLight(
@@ -726,6 +737,8 @@ private:
     std::unordered_map<MeshHandle, InstanceRange> m_instanceRanges;
 
     std::unordered_map<EntityHandle, UINT> m_entityIndex;
+
+    std::vector<DirectX::BoundingSphere> m_worldBoundingSpheres;
 
     SlotMap<Material> m_materials;
     std::unordered_map<AssetID, MaterialHandle> m_materialRegistry;
