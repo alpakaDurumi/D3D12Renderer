@@ -2061,7 +2061,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             std::vector<UINT32> forward;
             std::vector<UINT32> deferred;
 
-            const UINT base = instanceRange.offset / sizeof(InstanceData);
+            const UINT base = instanceRange.baseIndex;
             const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
             for (UINT i = 0; i < n; ++i)
@@ -2097,7 +2097,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
                 {
                     std::vector<UINT32> indices;
 
-                    const UINT base = instanceRange.offset / sizeof(InstanceData);
+                    const UINT base = instanceRange.baseIndex;
                     const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
                     for (UINT i = 0; i < n; ++i)
@@ -2122,7 +2122,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             {
                 std::vector<UINT32> indices;
 
-                const UINT base = instanceRange.offset / sizeof(InstanceData);
+                const UINT base = instanceRange.baseIndex;
                 const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
                 for (UINT i = 0; i < n; ++i)
@@ -2146,7 +2146,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             {
                 std::vector<UINT32> indices;
 
-                const UINT base = instanceRange.offset / sizeof(InstanceData);
+                const UINT base = instanceRange.baseIndex;
                 const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
                 for (UINT i = 0; i < n; ++i)

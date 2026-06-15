@@ -36,7 +36,7 @@
 
 struct InstanceRange
 {
-    UINT offset; // offset in instance buffer
+    UINT baseIndex;
     UINT forwardCount;
     UINT deferredCount;
 };
@@ -335,10 +335,7 @@ public:
             }
         }
 
-        UINT currentOffset = 0;
-
-        // InstanceData도 버켓에 담긴 순으로 flat array만들고, 드로우 콜도 그냥 버켓 순으로 해버리기?
-        UINT i = 0;
+        UINT currentIndex = 0;
 
         std::vector<InstanceData> ret;
         m_worldBoundingSpheres.resize(m_entities.GetCount());
@@ -347,31 +344,37 @@ public:
         {
             const auto& [forward, deferred] = bucket;
 
-            for (const auto& entityHandle : temp[meshHandle].first)
-                m_entityIndex[entityHandle] = i++;
-            for (const auto& entityHandle : temp[meshHandle].second)
-                m_entityIndex[entityHandle] = i++;
-
             InstanceRange& range = m_instanceRanges[meshHandle];
-            range.offset = currentOffset;
+            range.baseIndex = currentIndex;
             range.forwardCount = static_cast<UINT>(forward.size());
             range.deferredCount = static_cast<UINT>(deferred.size());
 
             ret.insert(ret.end(), forward.begin(), forward.end());
             ret.insert(ret.end(), deferred.begin(), deferred.end());
 
-            currentOffset += (range.forwardCount + range.deferredCount) * sizeof(InstanceData);
+            currentIndex += range.forwardCount + range.deferredCount;
 
             // Compute per-instance world bounding sphere
             const DirectX::BoundingSphere& local = GetMesh(meshHandle)->GetBoundingSphere();
 
-            const UINT base = range.offset / sizeof(InstanceData);
-            const UINT n = range.forwardCount + range.deferredCount;
-            for (UINT i = 0; i < n; ++i)
+            const UINT base = range.baseIndex;
+
+            const auto& owners = temp[meshHandle]; // EntityHandles that use meshHandle
+
+            for (UINT k = 0; k < range.forwardCount; ++k)
             {
-                const auto& instanceData = i < range.forwardCount ? forward[i] : deferred[i - range.forwardCount];
-                DirectX::XMMATRIX world = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&instanceData.world));
-                local.Transform(m_worldBoundingSpheres[base + i], world);
+                const UINT index = base + k;
+                DirectX::XMMATRIX world = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&forward[k].world));
+                local.Transform(m_worldBoundingSpheres[index], world);
+                m_entityIndex[owners.first[k]] = index;
+            }
+
+            for (UINT k = 0; k < range.deferredCount; ++k)
+            {
+                const UINT index = base + range.forwardCount + k;
+                DirectX::XMMATRIX world = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&deferred[k].world));
+                local.Transform(m_worldBoundingSpheres[index], world);
+                m_entityIndex[owners.second[k]] = index;
             }
         }
 
