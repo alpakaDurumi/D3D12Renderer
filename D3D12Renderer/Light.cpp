@@ -227,10 +227,9 @@ const VisibleRange& DirectionalLight::GetVisibleIndexRange(MeshHandle meshHandle
     return it->second;
 }
 
-void DirectionalLight::SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex)
+void DirectionalLight::SetVisibleIndexRange(MeshHandle meshHandle, VisibleRange visibleRange, UINT arrayIndex)
 {
-    m_visibleIndexRange[arrayIndex][meshHandle].offset = offset;
-    m_visibleIndexRange[arrayIndex][meshHandle].count = count;
+    m_visibleIndexRange[arrayIndex][meshHandle] = visibleRange;
 }
 
 void DirectionalLight::ResetVisibleIndexRange()
@@ -311,10 +310,9 @@ const VisibleRange& PointLight::GetVisibleIndexRange(MeshHandle meshHandle, UINT
     return it->second;
 }
 
-void PointLight::SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex)
+void PointLight::SetVisibleIndexRange(MeshHandle meshHandle, VisibleRange visibleRange, UINT arrayIndex)
 {
-    m_visibleIndexRange[meshHandle].offset = offset;
-    m_visibleIndexRange[meshHandle].count = count;
+    m_visibleIndexRange[meshHandle] = visibleRange;
 }
 
 void PointLight::ResetVisibleIndexRange()
@@ -380,10 +378,9 @@ const VisibleRange& SpotLight::GetVisibleIndexRange(MeshHandle meshHandle, UINT 
     return it->second;
 }
 
-void SpotLight::SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex)
+void SpotLight::SetVisibleIndexRange(MeshHandle meshHandle, VisibleRange visibleRange, UINT arrayIndex)
 {
-    m_visibleIndexRange[meshHandle].offset = offset;
-    m_visibleIndexRange[meshHandle].count = count;
+    m_visibleIndexRange[meshHandle] = visibleRange;
 }
 
 void SpotLight::ResetVisibleIndexRange()

@@ -64,7 +64,7 @@ public:
     void InitLightCbv(ID3D12Device* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr);
 
     virtual const VisibleRange& GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex = 0) const = 0;
-    virtual void SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex = 0) = 0;
+    virtual void SetVisibleIndexRange(MeshHandle meshHandle, VisibleRange visibleRange, UINT arrayIndex = 0) = 0;
     virtual void ResetVisibleIndexRange() = 0;
 
     virtual std::vector<GpuResource> TakeResources();
@@ -104,7 +104,7 @@ public:
     virtual void SetRange(float range) override;
 
     const VisibleRange& GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex) const override;
-    void SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex) override;
+    void SetVisibleIndexRange(MeshHandle meshHandle, VisibleRange visibleRange, UINT arrayIndex) override;
     void ResetVisibleIndexRange() override;
 
     const std::array<DirectX::BoundingOrientedBox, MAX_CASCADES>& GetBoundingBoxes() const;
@@ -135,7 +135,7 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle(UINT index) const;
 
     const VisibleRange& GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex = 0) const override;
-    void SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex = 0) override;
+    void SetVisibleIndexRange(MeshHandle meshHandle, VisibleRange visibleRange, UINT arrayIndex = 0) override;
     void ResetVisibleIndexRange() override;
 
     const DirectX::BoundingSphere& GetBoundingSphere() const;
@@ -165,7 +165,7 @@ public:
     void SetAngles(float outerAngle, float innerAngle);
 
     const VisibleRange& GetVisibleIndexRange(MeshHandle meshHandle, UINT arrayIndex = 0) const override;
-    void SetVisibleIndexRange(MeshHandle meshHandle, UINT offset, UINT count, UINT arrayIndex = 0) override;
+    void SetVisibleIndexRange(MeshHandle meshHandle, VisibleRange visibleRange, UINT arrayIndex = 0) override;
     void ResetVisibleIndexRange() override;
 
     const DirectX::BoundingFrustum& GetBoundingFrustum() const;

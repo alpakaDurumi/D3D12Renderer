@@ -2048,6 +2048,23 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
     const auto& worldBoundingSpheres = m_sceneManager.GetWorldBoundingSpheres();
 
+    auto cullRange = [&worldBoundingSpheres, &frameResource](const auto& volume, UINT begin, UINT end)
+        {
+            std::vector<UINT32> indices;
+
+            for (UINT i = begin; i < end; ++i)
+            {
+                if(volume.Intersects(worldBoundingSpheres[i]))
+                    indices.push_back(i);
+            }
+
+            VisibleRange range = {};
+            range.offset = frameResource.PushInstanceIndices(indices);
+            range.count = static_cast<UINT>(indices.size());
+
+            return range;
+        };
+
     {
         // Main camera
         auto frustum = m_camera.GetWorldFrustum();
@@ -2058,30 +2075,12 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
         {
-            std::vector<UINT32> forward;
-            std::vector<UINT32> deferred;
-
             const UINT base = instanceRange.baseIndex;
-            const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
-            for (UINT i = 0; i < n; ++i)
-            {
-                if (frustum.Intersects(worldBoundingSpheres[base + i]))
-                {
-                    if (i < instanceRange.forwardCount)
-                        forward.push_back(base + i);
-                    else
-                        deferred.push_back(base + i);
-                }
-            }
+            m_cameraVisibleIndexRange[meshHandle].first = cullRange(frustum, base, base + instanceRange.forwardCount);
+            m_cameraVisibleIndexRange[meshHandle].second = cullRange(frustum, base + instanceRange.forwardCount, base + instanceRange.forwardCount + instanceRange.deferredCount);
 
-            m_cameraVisibleIndexRange[meshHandle].first.offset = frameResource.PushInstanceIndices(forward);
-            m_cameraVisibleIndexRange[meshHandle].first.count = static_cast<UINT>(forward.size());
-
-            m_cameraVisibleIndexRange[meshHandle].second.offset = frameResource.PushInstanceIndices(deferred);
-            m_cameraVisibleIndexRange[meshHandle].second.count = static_cast<UINT>(deferred.size());
-
-            m_visibleCount += static_cast<UINT>(forward.size() + deferred.size());
+            m_visibleCount += m_cameraVisibleIndexRange[meshHandle].first.count + m_cameraVisibleIndexRange[meshHandle].second.count;
         }
 
         // Lights
@@ -2095,19 +2094,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             {
                 for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
                 {
-                    std::vector<UINT32> indices;
-
                     const UINT base = instanceRange.baseIndex;
-                    const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
-                    for (UINT i = 0; i < n; ++i)
-                    {
-                        if (lightBoundingVolumes[arrayIndex].Intersects(worldBoundingSpheres[base + i]))
-                            indices.push_back(base + i);
-                    }
-
-                    UINT offset = frameResource.PushInstanceIndices(indices);
-                    light.SetVisibleIndexRange(meshHandle, offset, static_cast<UINT>(indices.size()), arrayIndex);
+                    VisibleRange visibleRange = cullRange(lightBoundingVolumes[arrayIndex], base, base + instanceRange.forwardCount + instanceRange.deferredCount);
+                    light.SetVisibleIndexRange(meshHandle, visibleRange, arrayIndex);
                 }
             }
         }
@@ -2120,19 +2110,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
             for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
             {
-                std::vector<UINT32> indices;
-
                 const UINT base = instanceRange.baseIndex;
-                const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
-                for (UINT i = 0; i < n; ++i)
-                {
-                    if (lightBoundingVolume.Intersects(worldBoundingSpheres[base + i]))
-                        indices.push_back(base + i);
-                }
-
-                UINT offset = frameResource.PushInstanceIndices(indices);
-                light.SetVisibleIndexRange(meshHandle, offset, static_cast<UINT>(indices.size()));
+                VisibleRange visibleRange = cullRange(lightBoundingVolume, base, base + instanceRange.forwardCount + instanceRange.deferredCount);
+                light.SetVisibleIndexRange(meshHandle, visibleRange);
             }
         }
 
@@ -2144,19 +2125,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
             for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
             {
-                std::vector<UINT32> indices;
-
                 const UINT base = instanceRange.baseIndex;
-                const UINT n = instanceRange.forwardCount + instanceRange.deferredCount;
 
-                for (UINT i = 0; i < n; ++i)
-                {
-                    if (lightBoundingVolume.Intersects(worldBoundingSpheres[base + i]))
-                        indices.push_back(base + i);
-                }
-
-                UINT offset = frameResource.PushInstanceIndices(indices);
-                light.SetVisibleIndexRange(meshHandle, offset, static_cast<UINT>(indices.size()));
+                VisibleRange visibleRange = cullRange(lightBoundingVolume, base, base + instanceRange.forwardCount + instanceRange.deferredCount);
+                light.SetVisibleIndexRange(meshHandle, visibleRange);
             }
         }
     }
@@ -2236,7 +2208,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
                 for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
                 {
-                    VisibleRange visibleRange = pLight->GetVisibleIndexRange(meshHandle, j);
+                    const VisibleRange& visibleRange = pLight->GetVisibleIndexRange(meshHandle, j);
                     DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), visibleRange);
                 }
             }
