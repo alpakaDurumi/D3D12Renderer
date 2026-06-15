@@ -206,6 +206,7 @@ private:
     void PreparePointLight(PointLight& light);
     void PrepareSpotLight(SpotLight& light);
     void UpdateConstantBuffers(FrameResource& frameResource);
+    void UploadInstanceData(FrameResource& frameResource);
 
     // Render
     void PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList);
