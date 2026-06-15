@@ -205,8 +205,8 @@ private:
     void PrepareDirectionalLight(DirectionalLight& light, const std::vector<DirectX::BoundingSphere>& cascadeSpheres);
     void PreparePointLight(PointLight& light);
     void PrepareSpotLight(SpotLight& light);
-    void UpdateConstantBuffers(FrameResource& frameResource);
-    void UploadInstanceData(FrameResource& frameResource);
+    void UpdateConstantBuffers();
+    void UploadInstanceData();
 
     // Render
     void PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList);

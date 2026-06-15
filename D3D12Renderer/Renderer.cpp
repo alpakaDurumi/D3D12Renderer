@@ -561,15 +561,12 @@ void Renderer::Update()
 
     float alpha = std::clamp(static_cast<float>(accumulated.count()) / fixedDt.count(), 0.0f, 1.0f);
 
-    // 이번에 드로우할 프레임에 대해 constant buffers 업데이트
-    FrameResource& frameResource = m_frameResources[m_frameIndex];
-
     PrepareConstantData(alpha);
-    UpdateConstantBuffers(frameResource);
+    UpdateConstantBuffers();
 
     m_inputManager.ResetPressedFlags();
 
-    UploadInstanceData(frameResource);
+    UploadInstanceData();
 }
 
 // Render the scene.
@@ -1927,8 +1924,10 @@ void Renderer::PrepareSpotLight(SpotLight& light)
     light.SetBoundingFrustum(boundingFrustum);
 }
 
-void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
+void Renderer::UpdateConstantBuffers()
 {
+    FrameResource& frameResource = m_frameResources[m_frameIndex];
+
     frameResource.ResetUploadAllocator();
 
     m_cameraUploadAllocation = frameResource.PushConstantData(&m_cameraConstantData, sizeof(CameraConstantData));
@@ -1959,8 +1958,10 @@ void Renderer::UpdateConstantBuffers(FrameResource& frameResource)
         processLight(light, SPOT_LIGHT_ARRAY_SIZE);
 }
 
-void Renderer::UploadInstanceData(FrameResource& frameResource)
+void Renderer::UploadInstanceData()
 {
+    FrameResource& frameResource = m_frameResources[m_frameIndex];
+
     frameResource.ResetInstanceOffsetBytes();
 
     auto data = m_sceneManager.GatherInstances();
