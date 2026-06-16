@@ -2012,7 +2012,7 @@ void Renderer::UploadInstanceData()
     {
         const auto& lightBoundingVolumes = light.GetBoundingBoxes();
 
-        light.ResetVisibleIndexRange();
+        light.ResetVisibleRange();
 
         for (UINT arrayIndex = 0; arrayIndex < MAX_CASCADES; ++arrayIndex)
         {
@@ -2021,7 +2021,7 @@ void Renderer::UploadInstanceData()
                 const UINT base = instanceRange.baseIndex;
 
                 VisibleRange visibleRange = cullRange(lightBoundingVolumes[arrayIndex], base, base + instanceRange.forwardCount + instanceRange.deferredCount);
-                light.SetVisibleIndexRange(meshHandle, visibleRange, arrayIndex);
+                light.SetVisibleRange(meshHandle, visibleRange, arrayIndex);
             }
         }
     }
@@ -2030,14 +2030,14 @@ void Renderer::UploadInstanceData()
     {
         const BoundingSphere& lightBoundingVolume = light.GetBoundingSphere();
 
-        light.ResetVisibleIndexRange();
+        light.ResetVisibleRange();
 
         for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
         {
             const UINT base = instanceRange.baseIndex;
 
             VisibleRange visibleRange = cullRange(lightBoundingVolume, base, base + instanceRange.forwardCount + instanceRange.deferredCount);
-            light.SetVisibleIndexRange(meshHandle, visibleRange);
+            light.SetVisibleRange(meshHandle, visibleRange);
         }
     }
 
@@ -2045,14 +2045,14 @@ void Renderer::UploadInstanceData()
     {
         const BoundingFrustum& lightBoundingVolume = light.GetBoundingFrustum();
 
-        light.ResetVisibleIndexRange();
+        light.ResetVisibleRange();
 
         for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
         {
             const UINT base = instanceRange.baseIndex;
 
             VisibleRange visibleRange = cullRange(lightBoundingVolume, base, base + instanceRange.forwardCount + instanceRange.deferredCount);
-            light.SetVisibleIndexRange(meshHandle, visibleRange);
+            light.SetVisibleRange(meshHandle, visibleRange);
         }
     }
 
@@ -2178,9 +2178,11 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         m_currentPSOKey.psName = L"PointLightShadowPS.hlsl";
         auto* pointShadowPSO = GetPipelineState(m_currentPSOKey);
 
-        auto processLight = [&](Light* pLight, bool isPointLight, UINT& lightIdx)
+        auto processLight = [&](Light* pLight, UINT& lightIdx)
         {
-            if (isPointLight)
+            auto type = pLight->GetType();
+
+            if (type == LightType::POINT)
                 pCommandList->SetGraphicsRoot32BitConstant(4, lightIdx, 0);
 
             // Render each entry of shadow map.
@@ -2189,7 +2191,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             {
                 auto shadowMapDsvHandle = pLight->GetDsvHandle(j);
 
-                if (isPointLight)
+                if (type == LightType::POINT)
                 {
                     auto rtvHandle = static_cast<PointLight*>(pLight)->GetRtvHandle(j);
                     pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &shadowMapDsvHandle);
@@ -2205,13 +2207,13 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
                 pCommandList->ClearDepthStencilView(shadowMapDsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, nullptr);
 
-                pCommandList->SetPipelineState(isPointLight ? pointShadowPSO : shadowPSO);
+                pCommandList->SetPipelineState(type == LightType::POINT ? pointShadowPSO : shadowPSO);
 
                 pCommandList->SetGraphicsRootConstantBufferView(1, pLight->GetCameraUploadAllocation(j).gpuPtr);
 
                 for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
                 {
-                    const VisibleRange& visibleRange = pLight->GetVisibleIndexRange(meshHandle, j);
+                    const VisibleRange& visibleRange = pLight->GetVisibleRange(meshHandle, type == LightType::DIRECTIONAL ? j : 0);
                     DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), visibleRange);
                 }
             }
@@ -2221,17 +2223,11 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
         UINT lightIdx = 0;
         for (auto& light : m_sceneManager.GetDirectionalLights())
-        {
-            processLight(&light, false, lightIdx);
-        }
+            processLight(&light, lightIdx);
         for (auto& light : m_sceneManager.GetPointLights())
-        {
-            processLight(&light, true, lightIdx);
-        }
+            processLight(&light, lightIdx);
         for (auto& light : m_sceneManager.GetSpotLights())
-        {
-            processLight(&light, false, lightIdx);
-        }
+            processLight(&light, lightIdx);
     }
 
     // GBuffer pass
