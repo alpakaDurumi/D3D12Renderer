@@ -1973,13 +1973,13 @@ void Renderer::UploadInstanceData()
 
     const auto& worldBoundingSpheres = m_sceneManager.GetWorldBoundingSpheres();
 
-    auto cullRange = [&worldBoundingSpheres, &frameResource](const auto& volume, UINT begin, UINT end)
+    auto cullRange = [&worldBoundingSpheres, &frameResource](UINT begin, UINT end, const auto& tester)
     {
         std::vector<UINT32> indices;
 
         for (UINT i = begin; i < end; ++i)
         {
-            if (volume.Intersects(worldBoundingSpheres[i]))
+            if (tester(worldBoundingSpheres[i]))
                 indices.push_back(i);
         }
 
@@ -1990,19 +1990,31 @@ void Renderer::UploadInstanceData()
         return range;
     };
 
+    auto frustumSphereTester = [](const XMVECTOR* pPlanes, const BoundingSphere& sphere)
+    {
+        return sphere.ContainedBy(pPlanes[0], pPlanes[1], pPlanes[2], pPlanes[3], pPlanes[4], pPlanes[5]) != DirectX::DISJOINT;
+    };
+
     // Main camera
     auto frustum = m_camera.GetWorldFrustum();
+    XMVECTOR cameraPlanes[6] = {};
+    frustum.GetPlanes(&cameraPlanes[0], &cameraPlanes[1], &cameraPlanes[2], &cameraPlanes[3], &cameraPlanes[4], &cameraPlanes[5]);
 
     m_cameraVisibleIndexRange.clear();
 
     m_visibleCount = 0;
 
+    auto cameraTester = [&](const BoundingSphere& sphere)
+    {
+        return frustumSphereTester(cameraPlanes, sphere);
+    };
+
     for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
     {
         const UINT base = instanceRange.baseIndex;
 
-        m_cameraVisibleIndexRange[meshHandle].first = cullRange(frustum, base, base + instanceRange.forwardCount);
-        m_cameraVisibleIndexRange[meshHandle].second = cullRange(frustum, base + instanceRange.forwardCount, base + instanceRange.forwardCount + instanceRange.deferredCount);
+        m_cameraVisibleIndexRange[meshHandle].first = cullRange(base, base + instanceRange.forwardCount, cameraTester);
+        m_cameraVisibleIndexRange[meshHandle].second = cullRange(base + instanceRange.forwardCount, base + instanceRange.forwardCount + instanceRange.deferredCount, cameraTester);
 
         m_visibleCount += m_cameraVisibleIndexRange[meshHandle].first.count + m_cameraVisibleIndexRange[meshHandle].second.count;
     }
@@ -2020,7 +2032,8 @@ void Renderer::UploadInstanceData()
             {
                 const UINT base = instanceRange.baseIndex;
 
-                VisibleRange visibleRange = cullRange(lightBoundingVolumes[arrayIndex], base, base + instanceRange.forwardCount + instanceRange.deferredCount);
+                VisibleRange visibleRange = cullRange(base, base + instanceRange.forwardCount + instanceRange.deferredCount, [&](const BoundingSphere& sphere)
+                                                      { return lightBoundingVolumes[arrayIndex].Intersects(sphere); });
                 light.SetVisibleRange(meshHandle, visibleRange, arrayIndex);
             }
         }
@@ -2036,7 +2049,8 @@ void Renderer::UploadInstanceData()
         {
             const UINT base = instanceRange.baseIndex;
 
-            VisibleRange visibleRange = cullRange(lightBoundingVolume, base, base + instanceRange.forwardCount + instanceRange.deferredCount);
+            VisibleRange visibleRange = cullRange(base, base + instanceRange.forwardCount + instanceRange.deferredCount, [&](const BoundingSphere& sphere)
+                                                  { return lightBoundingVolume.Intersects(sphere); });
             light.SetVisibleRange(meshHandle, visibleRange);
         }
     }
@@ -2047,11 +2061,19 @@ void Renderer::UploadInstanceData()
 
         light.ResetVisibleRange();
 
+        XMVECTOR spotPlanes[6] = {};
+        lightBoundingVolume.GetPlanes(&spotPlanes[0], &spotPlanes[1], &spotPlanes[2], &spotPlanes[3], &spotPlanes[4], &spotPlanes[5]);
+
+        auto spotLightTester = [&](const BoundingSphere& sphere)
+        {
+            return frustumSphereTester(spotPlanes, sphere);
+        };
+
         for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
         {
             const UINT base = instanceRange.baseIndex;
 
-            VisibleRange visibleRange = cullRange(lightBoundingVolume, base, base + instanceRange.forwardCount + instanceRange.deferredCount);
+            VisibleRange visibleRange = cullRange(base, base + instanceRange.forwardCount + instanceRange.deferredCount, spotLightTester);
             light.SetVisibleRange(meshHandle, visibleRange);
         }
     }
