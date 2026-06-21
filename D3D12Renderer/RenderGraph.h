@@ -7,6 +7,7 @@
 #include <string>
 #include <tuple>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <basetsd.h>
@@ -40,11 +41,11 @@ public:
     RGBuffer RegisterBuffer(
         const std::string& name,
         bool isPerFrame,
-        std::function<std::vector<ID3D12Resource*>()> provider)
+        std::function<std::vector<ID3D12Resource*>()>&& provider)
     {
         auto idx = RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, {});
         m_bufferGroups[idx].isDynamic = true;
-        m_bufferGroups[idx].provider = provider;
+        m_bufferGroups[idx].provider = std::move(provider);
         return {idx};
     }
 
@@ -65,12 +66,12 @@ public:
         bool isPerFrame,
         TextureResourceUsage initialUsage,
         UINT subresourceCount,
-        std::function<std::vector<ID3D12Resource*>()> provider)
+        std::function<std::vector<ID3D12Resource*>()>&& provider)
     {
         auto idx = RegisterHelper(name, isPerFrame, m_textureGroups, m_textureMap, initialUsage);
         m_textureGroups[idx].isDynamic = true;
         m_textureGroups[idx].subresourceCount = subresourceCount;
-        m_textureGroups[idx].provider = provider;
+        m_textureGroups[idx].provider = std::move(provider);
         return {idx};
     }
 
