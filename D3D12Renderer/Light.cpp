@@ -9,6 +9,35 @@
 using namespace DirectX;
 using namespace D3DHelper;
 
+static UINT16 GetRequiredArraySize(LightType type)
+{
+    switch (type)
+    {
+    case LightType::DIRECTIONAL:
+        return MAX_CASCADES;
+    case LightType::POINT:
+        return POINT_LIGHT_ARRAY_SIZE;
+    case LightType::SPOT:
+        return SPOT_LIGHT_ARRAY_SIZE;
+    default:
+        return -1;
+    }
+}
+
+static UINT GetBoundingVolumeCount(LightType type)
+{
+    switch (type)
+    {
+    case LightType::DIRECTIONAL:
+        return MAX_CASCADES;
+    case LightType::POINT:
+    case LightType::SPOT:
+        return 1;
+    default:
+        return -1;
+    }
+}
+
 Light::Light(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,
@@ -41,6 +70,8 @@ Light::Light(
     m_cameraConstantData.resize(arraySize);
     m_cameraUploadAllocations.resize(arraySize);
     m_lightConstantData.type = static_cast<UINT32>(m_type);
+
+    m_visibleRanges.resize(GetBoundingVolumeCount(m_type));
 }
 
 LightType Light::GetType() const
@@ -157,26 +188,32 @@ void Light::InitLightCbv(ID3D12Device* pDevice, D3D12_GPU_VIRTUAL_ADDRESS gpuPtr
     m_lightCbv.Init(pDevice, gpuPtr, sizeof(LightConstantData));
 }
 
+const VisibleRange& Light::GetVisibleRange(MeshHandle meshHandle, UINT arrayIndex) const
+{
+    const auto& umap = m_visibleRanges[arrayIndex];
+
+    auto it = umap.find(meshHandle);
+    assert(it != umap.end());
+
+    return it->second;
+}
+
+void Light::SetVisibleRange(MeshHandle meshHandle, VisibleRange visibleRange, UINT arrayIndex)
+{
+    m_visibleRanges[arrayIndex][meshHandle] = visibleRange;
+}
+
+void Light::ResetVisibleRange()
+{
+    for (auto& umap : m_visibleRanges)
+        umap.clear();
+}
+
 std::vector<GpuResource> Light::TakeResources()
 {
     std::vector<GpuResource> ret;
     ret.push_back(std::move(m_depthBuffer));
     return ret;
-}
-
-UINT16 Light::GetRequiredArraySize(LightType type)
-{
-    switch (type)
-    {
-    case LightType::DIRECTIONAL:
-        return MAX_CASCADES;
-    case LightType::POINT:
-        return POINT_LIGHT_ARRAY_SIZE;
-    case LightType::SPOT:
-        return SPOT_LIGHT_ARRAY_SIZE;
-    default:
-        return -1;
-    }
 }
 
 DirectionalLight::DirectionalLight(
@@ -215,6 +252,16 @@ void DirectionalLight::SetPosition(XMVECTOR pos)
 void DirectionalLight::SetRange(float range)
 {
     assert(false);
+}
+
+const std::array<BoundingOrientedBox, MAX_CASCADES>& DirectionalLight::GetBoundingBoxes() const
+{
+    return m_boundingBoxes;
+}
+
+void DirectionalLight::SetBoundingBox(UINT arrayIndex, const BoundingOrientedBox& boundingBox)
+{
+    m_boundingBoxes[arrayIndex] = boundingBox;
 }
 
 PointLight::PointLight(
@@ -271,6 +318,16 @@ D3D12_CPU_DESCRIPTOR_HANDLE PointLight::GetRtvHandle(UINT index) const
     return m_rtvs[index].GetHandle();
 }
 
+const BoundingSphere& PointLight::GetBoundingSphere() const
+{
+    return m_boundingSphere;
+}
+
+void PointLight::SetBoundingSphere(const BoundingSphere& boundingSphere)
+{
+    m_boundingSphere = boundingSphere;
+}
+
 std::vector<GpuResource> PointLight::TakeResources()
 {
     auto ret = Light::TakeResources();
@@ -309,4 +366,14 @@ void SpotLight::SetAngles(float outerAngleDegree, float innerAngleDegree)
 
     if ((m_lightConstantData.cosInnerAngle - m_lightConstantData.cosOuterAngle) < minDiff)
         m_lightConstantData.cosOuterAngle = m_lightConstantData.cosInnerAngle - minDiff;
+}
+
+const BoundingFrustum& SpotLight::GetBoundingFrustum() const
+{
+    return m_boundingFrustum;
+}
+
+void SpotLight::SetBoundingFrustum(const BoundingFrustum& boundingFrustum)
+{
+    m_boundingFrustum = boundingFrustum;
 }

@@ -2,8 +2,6 @@
 
 #include "D3DHelper.h"
 
-#include <cstring>
-
 #include <winerror.h>
 
 #include <DirectXTex.h>
@@ -360,8 +358,8 @@ void UpdateSubresources(
             for (UINT y = 0; y < pNumRows[i]; ++y)
             {
                 std::memcpy(pIntermediateSlice + rowPitch * y,
-                       pSrcSlice + pSrcData[i].RowPitch * LONG_PTR(y),
-                       pRowSizeInBytes[i]);
+                            pSrcSlice + pSrcData[i].RowPitch * LONG_PTR(y),
+                            pRowSizeInBytes[i]);
             }
         }
     }

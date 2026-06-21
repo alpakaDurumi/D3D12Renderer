@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cassert>
-#include <functional>
 #include <iterator>
 #include <memory>
 #include <optional>
@@ -12,6 +11,7 @@
 #include <variant>
 #include <vector>
 
+#include <DirectXCollision.h>
 #include <DirectXMath.h>
 #include <basetsd.h>
 #include <d3d12.h>
@@ -34,27 +34,9 @@
 #include "Utility.h"
 #include "View.h"
 
-template <>
-struct std::hash<MeshHandle>
-{
-    std::size_t operator()(const MeshHandle& h) const
-    {
-        return (static_cast<UINT64>(h.index) << 32) | static_cast<UINT64>(h.generation);
-    }
-};
-
-template <>
-struct std::hash<EntityHandle>
-{
-    std::size_t operator()(const EntityHandle& h) const
-    {
-        return (static_cast<UINT64>(h.index) << 32) | static_cast<UINT64>(h.generation);
-    }
-};
-
 struct InstanceRange
 {
-    UINT offset; // offset in instance buffer
+    UINT baseIndex;
     UINT forwardCount;
     UINT deferredCount;
 };
@@ -246,9 +228,12 @@ public:
         return m_meshes.Get(handle);
     }
 
-    MeshHandle GetMeshHandle(const AssetID& id)
+    MeshHandle GetMeshHandle(const AssetID& id) const
     {
-        return m_meshRegistry[id];
+        auto it = m_meshRegistry.find(id);
+        assert(it != m_meshRegistry.end());
+
+        return it->second;
     }
 
     void RegisterMesh(MeshHandle handle, const AssetID& id)
@@ -274,9 +259,12 @@ public:
         return m_materials.Get(handle);
     }
 
-    MaterialHandle GetMaterialHandle(const AssetID& id)
+    MaterialHandle GetMaterialHandle(const AssetID& id) const
     {
-        return m_materialRegistry[id];
+        auto it = m_materialRegistry.find(id);
+        assert(it != m_materialRegistry.end());
+
+        return it->second;
     }
 
     void RegisterMaterial(MaterialHandle handle, const AssetID& id)
@@ -318,7 +306,9 @@ public:
             bucket.deferred.clear();
         }
         m_instanceRanges.clear();
-        m_entityIndexInBucket.clear(); // 실제로 entity dense array에 변화가 있을 때만 clear하거나, 구조를 개선하기.
+        m_entityIndex.clear();
+
+        std::unordered_map<MeshHandle, std::pair<std::vector<EntityHandle>, std::vector<EntityHandle>>> temp;
 
         for (const auto& entity : m_entities.GetDense())
         {
@@ -335,67 +325,78 @@ public:
 
             if (renderingPath == RenderingPath::FORWARD)
             {
-                m_entityIndexInBucket[entity.selfHandle] = static_cast<UINT>(m_buckets[meshHandle].forward.size());
                 m_buckets[meshHandle].forward.push_back(data);
+                temp[meshHandle].first.push_back(entity.selfHandle);
             }
             else
             {
-                m_entityIndexInBucket[entity.selfHandle] = static_cast<UINT>(m_buckets[meshHandle].deferred.size());
                 m_buckets[meshHandle].deferred.push_back(data);
+                temp[meshHandle].second.push_back(entity.selfHandle);
             }
         }
 
-        for (const auto& entity : m_entities.GetDense())
-        {
-            if (!entity.meshRenderer.has_value())
-                continue;
+        UINT currentIndex = 0;
 
-            auto meshHandle = entity.meshRenderer->mesh;
-            auto matHandle = entity.meshRenderer->material;
-
-            auto renderingPath = GetMaterial(matHandle)->GetRenderingPath();
-
-            if (renderingPath == RenderingPath::DEFERRED)
-                m_entityIndexInBucket[entity.selfHandle] += static_cast<UINT>(m_buckets[meshHandle].forward.size());
-        }
-
-        UINT currentOffset = 0;
-
-        // InstanceData도 버켓에 담긴 순으로 flat array만들고, 드로우 콜도 그냥 버켓 순으로 해버리기?
-
-        std::vector<InstanceData> temp;
+        std::vector<InstanceData> ret;
+        m_worldBoundingSpheres.resize(m_entities.GetCount());
 
         for (const auto& [meshHandle, bucket] : m_buckets)
         {
             const auto& [forward, deferred] = bucket;
 
             InstanceRange& range = m_instanceRanges[meshHandle];
-            range.offset = currentOffset;
+            range.baseIndex = currentIndex;
             range.forwardCount = static_cast<UINT>(forward.size());
             range.deferredCount = static_cast<UINT>(deferred.size());
 
-            temp.insert(temp.end(), forward.begin(), forward.end());
-            temp.insert(temp.end(), deferred.begin(), deferred.end());
+            ret.insert(ret.end(), forward.begin(), forward.end());
+            ret.insert(ret.end(), deferred.begin(), deferred.end());
 
-            currentOffset += (range.forwardCount + range.deferredCount) * sizeof(InstanceData);
+            currentIndex += range.forwardCount + range.deferredCount;
+
+            // Compute per-instance world bounding sphere
+            const DirectX::BoundingSphere& local = GetMesh(meshHandle)->GetBoundingSphere();
+
+            const UINT base = range.baseIndex;
+
+            const auto& owners = temp[meshHandle]; // EntityHandles that use meshHandle
+
+            for (UINT k = 0; k < range.forwardCount; ++k)
+            {
+                const UINT index = base + k;
+                DirectX::XMMATRIX world = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&forward[k].world));
+                local.Transform(m_worldBoundingSpheres[index], world);
+                m_entityIndex[owners.first[k]] = index;
+            }
+
+            for (UINT k = 0; k < range.deferredCount; ++k)
+            {
+                const UINT index = base + range.forwardCount + k;
+                DirectX::XMMATRIX world = DirectX::XMMatrixTranspose(DirectX::XMLoadFloat4x4(&deferred[k].world));
+                local.Transform(m_worldBoundingSpheres[index], world);
+                m_entityIndex[owners.second[k]] = index;
+            }
         }
 
-        return temp;
+        return ret;
     }
 
-    InstanceRange GetInstanceRange(MeshHandle mesh)
+    const std::unordered_map<MeshHandle, InstanceRange>& GetInstanceRanges() const
     {
-        return m_instanceRanges[mesh];
+        return m_instanceRanges;
     }
 
-    UINT GetEntityIndexInBucket(EntityHandle entity)
+    UINT GetEntityIndex(EntityHandle entity) const
     {
-        return m_entityIndexInBucket[entity];
+        auto it = m_entityIndex.find(entity);
+        assert(it != m_entityIndex.end());
+
+        return it->second;
     }
 
-    const std::unordered_map<MeshHandle, MeshBucket>& GetBuckets() const
+    const std::vector<DirectX::BoundingSphere>& GetWorldBoundingSpheres() const
     {
-        return m_buckets;
+        return m_worldBoundingSpheres;
     }
 
     DirectionalLightHandle AddDirectionalLight(
@@ -738,7 +739,9 @@ private:
 
     std::unordered_map<MeshHandle, InstanceRange> m_instanceRanges;
 
-    std::unordered_map<EntityHandle, UINT> m_entityIndexInBucket;
+    std::unordered_map<EntityHandle, UINT> m_entityIndex;
+
+    std::vector<DirectX::BoundingSphere> m_worldBoundingSpheres;
 
     SlotMap<Material> m_materials;
     std::unordered_map<AssetID, MaterialHandle> m_materialRegistry;

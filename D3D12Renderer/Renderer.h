@@ -2,7 +2,6 @@
 
 #include <array>
 #include <chrono>
-#include <ratio>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -34,6 +33,7 @@
 #include "Texture.h"
 #include "UploadAllocation.h"
 #include "View.h"
+#include "VisibleRange.h"
 
 struct GeometryData;
 class DescriptorAllocation;
@@ -152,8 +152,12 @@ private:
     // Scene control
     SceneManager m_sceneManager;
     EntityHandle m_selected;
+    std::unordered_map<MeshHandle, VisibleRange> m_selectedVisibleIndexRange;
 
     std::vector<EntityHandle> m_previewRotations;
+
+    std::unordered_map<MeshHandle, std::pair<VisibleRange, VisibleRange>> m_cameraVisibleIndexRange; // first: forward, second: deferred
+    UINT m_visibleCount = 0;
 
     // Shadows
     D3D12_VIEWPORT m_shadowMapViewport;
@@ -201,7 +205,8 @@ private:
     void PrepareDirectionalLight(DirectionalLight& light, const std::vector<DirectX::BoundingSphere>& cascadeSpheres);
     void PreparePointLight(PointLight& light);
     void PrepareSpotLight(SpotLight& light);
-    void UpdateConstantBuffers(FrameResource& frameResource);
+    void UpdateConstantBuffers();
+    void UploadInstanceData();
 
     // Render
     void PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList);
@@ -209,8 +214,7 @@ private:
     void ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID3D12GraphicsCommandList7* pCommandList);
     ID3D12PipelineState* GetPipelineState(const PSOKey& psoKey);
     const std::vector<char>& GetShaderBlobRef(const ShaderKey& shaderKey) const;
-    void DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshhandle, PassType passType, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
-    void DrawEntity(ID3D12GraphicsCommandList* pCommandList, EntityHandle entityHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceBufferBase);
+    void DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceIndexVA, VisibleRange visibleRange);
 
     // Synchronization
     void WaitForGpu();

@@ -1,13 +1,13 @@
 #include "SharedConfig.h"
 
 // SRV for lights
-Texture2DArray<float> g_directionalShadowMaps[] : register(t0, space1);
-TextureCube<float> g_PointShadowMaps[] : register(t0, space2);
-Texture2D<float> g_SpotShadowMaps[] : register(t0, space3);
+Texture2DArray<float> g_directionalShadowMaps[] : register(t0, space2);
+TextureCube<float> g_PointShadowMaps[] : register(t0, space3);
+Texture2D<float> g_SpotShadowMaps[] : register(t0, space4);
 
 // GBuffers & depth buffer
-Texture2D g_gBuffers[NUM_GBUFFER_SLOTS] : register(t0, space4);
-Texture2D g_depthBuffer : register(t0, space5);
+Texture2D g_gBuffers[NUM_GBUFFER_SLOTS] : register(t0, space5);
+Texture2D g_depthBuffer : register(t0, space6);
 
 // Static comparison samplers for shadow mapping
 SamplerComparisonState g_comparisonSampler0 : register(s0, space1);

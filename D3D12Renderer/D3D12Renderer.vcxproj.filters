@@ -126,6 +126,9 @@
     <ClCompile Include="ImGuiDescriptorAllocation.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="SceneHandles.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -277,6 +280,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ImGuiDescriptorAllocation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VisibleRange.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

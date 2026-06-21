@@ -2,6 +2,8 @@
 
 #include "Camera.h"
 
+#include <DirectXCollision.h>
+
 using namespace DirectX;
 
 Camera::Camera(XMFLOAT3 initialPosition)
@@ -64,9 +66,24 @@ XMMATRIX Camera::GetViewMatrix() const
     return XMMatrixLookToLH(pos, forward, up);
 }
 
+// Return reverse-z projection matrix.
 XMMATRIX Camera::GetProjectionMatrix(bool usePerspectiveProjection) const
 {
     return usePerspectiveProjection ? XMMatrixPerspectiveFovLH(m_verticalFov, m_aspectRatio, m_farPlane, m_nearPlane) : XMMatrixOrthographicLH(2 * m_aspectRatio, 2.0f, m_farPlane, m_nearPlane);
+}
+
+// Create bounding frustum of view frustum and transform to world space.
+// Uses a standard projection matrix, not a reverse-z projection matrix.
+BoundingFrustum Camera::GetWorldFrustum() const
+{
+    BoundingFrustum boundingFrustum;
+    XMMATRIX projection = XMMatrixPerspectiveFovLH(m_verticalFov, m_aspectRatio, m_nearPlane, m_farPlane);
+    BoundingFrustum::CreateFromMatrix(boundingFrustum, projection);
+
+    XMMATRIX inverseView = XMMatrixInverse(nullptr, GetViewMatrix());
+    boundingFrustum.Transform(boundingFrustum, inverseView);
+
+    return boundingFrustum;
 }
 
 void Camera::SetCurrentPosition(const XMVECTOR& pos)

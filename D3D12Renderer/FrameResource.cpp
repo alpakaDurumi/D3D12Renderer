@@ -14,8 +14,10 @@ using namespace D3DHelper;
 
 FrameResource::~FrameResource()
 {
-    if (m_instanceBufferBegin)
-        m_instanceUploadBuffer.Get()->Unmap(0, nullptr);
+    if (m_instanceDataBegin)
+        m_instanceDataUploadBuffer.Get()->Unmap(0, nullptr);
+    if (m_instanceIndexBegin)
+        m_instanceIndexUploadBuffer.Get()->Unmap(0, nullptr);
 }
 
 void FrameResource::Init(
@@ -80,10 +82,12 @@ void FrameResource::Init(
     m_toneMappedBufferRtv = RenderTargetView(std::move(toneMappedBufferRtvAllocation));
     CreateToneMappedBuffer(sceneWidth, sceneHeight);
 
-    // Create Upload buffer
-    m_instanceUploadBuffer = Buffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, D3D12_HEAP_TYPE_UPLOAD);
+    // Create Upload buffers
     D3D12_RANGE readRange = {0, 0};
-    ThrowIfFailed(m_instanceUploadBuffer.Get()->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
+    m_instanceDataUploadBuffer = Buffer(m_pDevice, sizeof(InstanceData) * m_instanceDataCapacity, D3D12_HEAP_TYPE_UPLOAD);
+    ThrowIfFailed(m_instanceDataUploadBuffer.Get()->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceDataBegin)));
+    m_instanceIndexUploadBuffer = Buffer(m_pDevice, sizeof(UINT32) * m_instanceIndexCapacity, D3D12_HEAP_TYPE_UPLOAD);
+    ThrowIfFailed(m_instanceIndexUploadBuffer.Get()->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceIndexBegin)));
 
     m_uploadAllocator.Init(pDevice);
 }
@@ -287,35 +291,63 @@ D3D12_GPU_DESCRIPTOR_HANDLE FrameResource::GetToneMappedBufferSrvHandle() const
     return m_toneMappedBufferSrv.GetGpuHandle();
 }
 
-// Instance data
-void FrameResource::ResetInstanceOffsetByte()
+// Instance buffers
+void FrameResource::ResetInstanceOffsetBytes()
 {
-    m_instanceOffsetByte = 0;
+    m_instanceDataOffsetByte = 0;
+    m_instanceIndexOffsetByte = 0;
 }
 
-void FrameResource::EnsureInstanceCapacity(UINT requiredSize)
+void FrameResource::EnsureInstanceDataCapacity(UINT requiredSize)
 {
-    if (m_instanceCapacity < requiredSize)
+    if (m_instanceDataCapacity < requiredSize)
     {
-        m_instanceUploadBuffer.Get()->Unmap(0, nullptr);
+        m_instanceDataUploadBuffer.Get()->Unmap(0, nullptr);
 
-        m_instanceCapacity = Utility::CeilPowerOfTwo(requiredSize);
+        m_instanceDataCapacity = Utility::CeilPowerOfTwo(requiredSize);
 
-        m_instanceUploadBuffer = Buffer(m_pDevice, sizeof(InstanceData) * m_instanceCapacity, D3D12_HEAP_TYPE_UPLOAD);
+        m_instanceDataUploadBuffer = Buffer(m_pDevice, sizeof(InstanceData) * m_instanceDataCapacity, D3D12_HEAP_TYPE_UPLOAD);
         D3D12_RANGE readRange = {0, 0};
-        ThrowIfFailed(m_instanceUploadBuffer.Get()->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceBufferBegin)));
+        ThrowIfFailed(m_instanceDataUploadBuffer.Get()->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceDataBegin)));
     }
 }
 
-void FrameResource::PushInstanceData(std::vector<InstanceData>& data)
+void FrameResource::PushInstanceData(const std::vector<InstanceData>& data)
 {
-    memcpy(m_instanceBufferBegin + m_instanceOffsetByte, data.data(), sizeof(InstanceData) * data.size());
-    m_instanceOffsetByte += sizeof(InstanceData) * static_cast<UINT>(data.size());
+    std::memcpy(m_instanceDataBegin + m_instanceDataOffsetByte, data.data(), sizeof(InstanceData) * data.size());
+    m_instanceDataOffsetByte += sizeof(InstanceData) * static_cast<UINT>(data.size());
 }
 
-D3D12_GPU_VIRTUAL_ADDRESS FrameResource::GetInstanceBufferVirtualAddress() const
+D3D12_GPU_VIRTUAL_ADDRESS FrameResource::GetInstanceDataVA() const
 {
-    return m_instanceUploadBuffer.Get()->GetGPUVirtualAddress();
+    return m_instanceDataUploadBuffer.Get()->GetGPUVirtualAddress();
+}
+
+void FrameResource::EnsureInstanceIndexCapacity(UINT requiredSize)
+{
+    if (m_instanceIndexCapacity < requiredSize)
+    {
+        m_instanceIndexUploadBuffer.Get()->Unmap(0, nullptr);
+
+        m_instanceIndexCapacity = Utility::CeilPowerOfTwo(requiredSize);
+
+        m_instanceIndexUploadBuffer = Buffer(m_pDevice, sizeof(UINT32) * m_instanceIndexCapacity, D3D12_HEAP_TYPE_UPLOAD);
+        D3D12_RANGE readRange = {0, 0};
+        ThrowIfFailed(m_instanceIndexUploadBuffer.Get()->Map(0, &readRange, reinterpret_cast<void**>(&m_instanceIndexBegin)));
+    }
+}
+
+UINT FrameResource::PushInstanceIndices(const std::vector<UINT32>& indices)
+{
+    UINT ret = m_instanceIndexOffsetByte;
+    std::memcpy(m_instanceIndexBegin + m_instanceIndexOffsetByte, indices.data(), sizeof(UINT32) * indices.size());
+    m_instanceIndexOffsetByte += sizeof(UINT32) * static_cast<UINT>(indices.size());
+    return ret;
+}
+
+D3D12_GPU_VIRTUAL_ADDRESS FrameResource::GetInstanceIndexVA() const
+{
+    return m_instanceIndexUploadBuffer.Get()->GetGPUVirtualAddress();
 }
 
 // Transient upload
