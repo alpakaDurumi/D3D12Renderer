@@ -133,6 +133,12 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="ShaderCompile.targets" />
+    <None Include="POM.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shadow.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Win32Application.h">

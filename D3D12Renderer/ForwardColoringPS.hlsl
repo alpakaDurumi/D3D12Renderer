@@ -1,26 +1,11 @@
 #include "SharedConfig.h"
+#include "POM.hlsli"
+#include "Shadow.hlsli"
 
 Texture2D g_textures[] : register(t0, space1);
 
-// SRV for lights
-Texture2DArray<float> g_directionalShadowMaps[] : register(t0, space2);
-TextureCube<float> g_PointShadowMaps[] : register(t0, space3);
-Texture2D<float> g_SpotShadowMaps[] : register(t0, space4);
-
 // Dynamic samplers for ordinary texture sampling
 SamplerState g_samplers[] : register(s0, space0);
-
-// Static comparison samplers for shadow mapping
-SamplerComparisonState g_comparisonSampler0 : register(s0, space1);
-SamplerComparisonState g_comparisonSampler1 : register(s1, space1);
-
-static const float2 vogelDisk[16] =
-{
-    float2(-0.1328, 0.1651), float2(0.3341, 0.0735), float2(-0.4042, -0.3150), float2(0.5055, -0.4124),
-    float2(-0.1985, 0.5855), float2(0.1245, -0.7340), float2(-0.6401, 0.4578), float2(0.8123, 0.1901),
-    float2(-0.6254, -0.6654), float2(0.1254, 0.9412), float2(0.4512, -0.8521), float2(-0.9254, 0.1254),
-    float2(0.8521, 0.4512), float2(-0.4512, -0.9254), float2(0.1254, -0.1254), float2(0.9412, -0.1254)
-};
 
 struct PSInput
 {
@@ -40,11 +25,6 @@ cbuffer CameraConstantBuffer : register(b0, space0)
     float4x4 projection;
     float4x4 invView;
     float4x4 invProj;
-}
-
-cbuffer ShadowConstantBuffer : register(b1, space0)
-{
-    float cascadeSplits[MAX_CASCADES];
 }
 
 cbuffer GlobalConstants : register(b2, space0)
@@ -77,146 +57,6 @@ struct LightConstants
     float lightIntensity;
 };
 ConstantBuffer<LightConstants> LightConstantBuffers[] : register(b0, space2);
-
-// Parallax Occlusion Mapping
-float2 ParallaxMapping(float2 texCoord, float3 toCamera, uint heightMapIdx, uint heightMapSamplerIdx)
-{
-    static const float heightScale = 0.02f;
-    
-    // Set numLayers based on view direction
-    static const float minLayers = 8.0f;
-    static const float maxLayers = 32.0f;
-    const float numLayers = lerp(maxLayers, minLayers, abs(dot(float3(0.0f, 0.0f, 1.0f), toCamera)));
-    
-    float layerStep = 1.0f / numLayers;
-    
-    // Texture coord offset per layer
-    // xy / z = offset / (1.0 * heightScale)
-    float2 deltaTexCoord = toCamera.xy / max(toCamera.z, 0.001f) * heightScale / numLayers;
-    
-    float2 currentTexCoord = texCoord;
-    float2 dx = ddx(currentTexCoord);
-    float2 dy = ddy(currentTexCoord);
-    
-    float currentHeightMapValue = 1.0f - g_textures[heightMapIdx].SampleGrad(g_samplers[heightMapSamplerIdx], currentTexCoord, dx, dy).r;
-    float currentLayerHeight = 0.0f;
-    
-    float2 prevTexCoord = currentTexCoord;
-    float prevHeightMapValue = currentHeightMapValue;
-    float prevLayerHeight = currentLayerHeight;
-    
-    [loop]
-    while (currentLayerHeight < 1.0f && currentLayerHeight < currentHeightMapValue)
-    {
-        prevTexCoord = currentTexCoord;
-        prevHeightMapValue = currentHeightMapValue;
-        prevLayerHeight = currentLayerHeight;
-        
-        currentTexCoord -= deltaTexCoord;
-        currentHeightMapValue = 1.0f - g_textures[heightMapIdx].SampleGrad(g_samplers[heightMapSamplerIdx], currentTexCoord, dx, dy).r;
-        currentLayerHeight += layerStep;
-    }
-    
-    // Interpolate
-    float diffAfter = currentLayerHeight - currentHeightMapValue;
-    float diffBefore = prevHeightMapValue - prevLayerHeight;
-    
-    // Eliminate divide by zero
-    float weight = saturate(diffBefore / max(diffAfter + diffBefore, 0.00001f));
-    float2 interpolatedTexCoord = lerp(prevTexCoord, currentTexCoord, weight);
-    
-    return interpolatedTexCoord;
-}
-
-// Determine which index to use and alpha for interpolation.
-void CalcCSMIndex(float distView, out uint index, out float alpha)
-{
-    static const float overlapScale = 0.1f;
-    float overlap;
-    for (index = 0; index < MAX_CASCADES - 1; ++index)
-    {
-        overlap = (cascadeSplits[index + 1] - cascadeSplits[index]) * overlapScale;
-        if (distView < cascadeSplits[index] + overlap)
-        {
-            break;
-        }
-    }
-    
-    alpha = smoothstep(cascadeSplits[index] - overlap, cascadeSplits[index] + overlap, distView);
-}
-
-float PCFDirectional(uint idxInArray, uint csmIdx, float filterSize, float2 texCoord, float compareValue, float2x2 rot)
-{
-    float shadowFactor = 0.0f;
-        
-    uint width, height, elements;
-    g_directionalShadowMaps[idxInArray].GetDimensions(width, height, elements);
-    float dx = filterSize / width;
-        
-    [unroll]
-    for (uint j = 0; j < 16; ++j)
-    {
-        float2 rotated = mul(vogelDisk[j], rot);
-        float2 offset = rotated * dx;
-        shadowFactor += g_directionalShadowMaps[idxInArray].SampleCmpLevelZero(g_comparisonSampler0, float3(texCoord + offset, float(csmIdx)), compareValue);
-    }
-    
-    shadowFactor /= 16.0f;
-    
-    return shadowFactor;
-}
-
-float PCFPoint(uint idxInArray, float filterSize, float3 lightToPixel, float compareValue, float2x2 rot)
-{
-    float shadowFactor = 0.0f;
-    
-    uint width, height;
-    g_PointShadowMaps[idxInArray].GetDimensions(width, height);
-    float dx = filterSize / width;
-    
-    float3 up = abs(lightToPixel.y) < 0.999f ? float3(0.0f, 1.0f, 0.0f) : float3(0.0f, 0.0f, -1.0f);
-    float3 T = normalize(cross(up, lightToPixel));
-    float3 B = cross(T, lightToPixel);
-    
-    [unroll]
-    for (uint j = 0; j < 16; ++j)
-    {
-        float2 rotated = mul(vogelDisk[j], rot);
-        float3 offset = (T * rotated.x + B * rotated.y) * dx;
-        shadowFactor += g_PointShadowMaps[idxInArray].SampleCmpLevelZero(g_comparisonSampler1, lightToPixel + offset, compareValue);
-    }
-    
-    shadowFactor /= 16.0f;
-    
-    return shadowFactor;
-}
-
-float PCFSpot(uint idxInArray, float filterSize, float2 texCoord, float compareValue, float2x2 rot)
-{
-    float shadowFactor = 0.0f;
-        
-    uint width, height;
-    g_SpotShadowMaps[idxInArray].GetDimensions(width, height);
-    float dx = filterSize / width;
-        
-    [unroll]
-    for (uint j = 0; j < 16; ++j)
-    {
-        float2 rotated = mul(vogelDisk[j], rot);
-        float2 offset = rotated * dx;
-        shadowFactor += g_SpotShadowMaps[idxInArray].SampleCmpLevelZero(g_comparisonSampler0, texCoord + offset, compareValue);
-    }
-    
-    shadowFactor /= 16.0f;
-    
-    return shadowFactor;
-}
-
-// https://blog.demofox.org/2022/01/01/interleaved-gradient-noise-a-different-kind-of-low-discrepancy-sequence/
-float InterleavedGradientNoise(float2 pixPos)
-{
-    return frac(52.9829189f * frac(dot(pixPos, float2(0.06711056f, 0.00583715f))));
-}
 
 // Shading in world space
 // TODO : ambient add multiple times, fix this.
@@ -287,7 +127,7 @@ float4 main(PSInput input) : SV_TARGET
     float3 toCameraWorld = normalize(cameraPos - input.posWorld);
     float3 toCameraTangent = normalize(mul(toCameraWorld, iiTBN));
     
-    float2 texCoord = ParallaxMapping(input.texCoord * heightMapScale, toCameraTangent, heightMapIdx, heightMapSamplerIdx);
+    float2 texCoord = ParallaxMapping(input.texCoord * heightMapScale, toCameraTangent, g_textures[heightMapIdx], g_samplers[heightMapSamplerIdx]);
     float2 albedoTexCoord = texCoord * albedoScale / heightMapScale;
     float2 normalMapTexCoord = texCoord * normalMapScale / heightMapScale;
     

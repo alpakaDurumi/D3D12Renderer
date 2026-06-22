@@ -211,8 +211,10 @@
     <ClCompile Include="Win32Application.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="POM.hlsli" />
     <None Include="packages.config" />
     <None Include="ShaderCompile.targets" />
+    <None Include="Shadow.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Aliases.h" />
