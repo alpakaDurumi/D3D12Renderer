@@ -80,6 +80,19 @@ struct AssetTexture
 class SceneManager
 {
 public:
+    SceneManager(const SceneManager&) = delete;
+    SceneManager& operator=(const SceneManager&) = delete;
+    SceneManager(SceneManager&&) = delete;
+    SceneManager& operator=(SceneManager&&) = delete;
+
+    SceneManager() = default;
+    ~SceneManager() = default;
+
+    void Init(ID3D12Device10* pDevice)
+    {
+        m_pDevice = pDevice;
+    }
+
     EntityHandle AddEntity(const std::string& name)
     {
         auto handle = m_entities.Add(Entity());
@@ -212,12 +225,11 @@ public:
     }
 
     MeshHandle AddMesh(
-        ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         TransientUploadAllocator& allocator,
         const GeometryData& data)
     {
-        auto handle = m_meshes.Add(Mesh(pDevice, pCommandList, allocator, data));
+        auto handle = m_meshes.Add(Mesh(m_pDevice, pCommandList, allocator, data));
         m_meshRegistry[data.name] = handle;
         GetMesh(handle)->SetMaterial(GetMaterialHandle("builtin://material/default"));
         return handle;
@@ -400,14 +412,13 @@ public:
     }
 
     DirectionalLightHandle AddDirectionalLight(
-        ID3D12Device10* pDevice,
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
         DescriptorAllocation&& cbvAllocation,
         UINT shadowMapResolution)
     {
         return m_directionalLights.Add(DirectionalLight(
-            pDevice,
+            m_pDevice,
             std::move(dsvAllocation),
             std::move(srvAllocation),
             std::move(cbvAllocation),
@@ -415,7 +426,6 @@ public:
     }
 
     PointLightHandle AddPointLight(
-        ID3D12Device10* pDevice,
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
         DescriptorAllocation&& cbvAllocation,
@@ -423,7 +433,7 @@ public:
         UINT shadowMapResolution)
     {
         return m_pointLights.Add(PointLight(
-            pDevice,
+            m_pDevice,
             std::move(dsvAllocation),
             std::move(srvAllocation),
             std::move(cbvAllocation),
@@ -432,14 +442,13 @@ public:
     }
 
     SpotLightHandle AddSpotLight(
-        ID3D12Device10* pDevice,
         DescriptorAllocation&& dsvAllocation,
         DescriptorAllocation&& srvAllocation,
         DescriptorAllocation&& cbvAllocation,
         UINT shadowMapResolution)
     {
         return m_spotLights.Add(SpotLight(
-            pDevice,
+            m_pDevice,
             std::move(dsvAllocation),
             std::move(srvAllocation),
             std::move(cbvAllocation),
@@ -502,7 +511,6 @@ public:
     }
 
     AssetTextureHandle AddAssetTexture(
-        ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& srvAllocation,
         TransientUploadAllocator& uploadAllocator,
@@ -511,12 +519,12 @@ public:
         UINT height)
     {
         auto resourceDesc = D3DHelper::GetTexture2DDesc(width, height, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM);
-        Texture texture(pDevice, resourceDesc, D3D12_BARRIER_LAYOUT_COPY_DEST, nullptr, D3D12_HEAP_TYPE_DEFAULT);
+        Texture texture(m_pDevice, resourceDesc, D3D12_BARRIER_LAYOUT_COPY_DEST, nullptr, D3D12_HEAP_TYPE_DEFAULT);
 
         // Calculate required size for data upload
         D3D12_RESOURCE_DESC desc = texture.Get()->GetDesc();
         UINT64 requiredSize = 0;
-        pDevice->GetCopyableFootprints(&desc, 0, 1, 0, nullptr, nullptr, nullptr, &requiredSize);
+        m_pDevice->GetCopyableFootprints(&desc, 0, 1, 0, nullptr, nullptr, nullptr, &requiredSize);
 
         auto uploadAllocation = uploadAllocator.Allocate(requiredSize, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
 
@@ -525,7 +533,7 @@ public:
         textureData.RowPitch = width * 4; // 4 bytes per pixel (RGBA)
         textureData.SlicePitch = textureData.RowPitch * height;
 
-        D3DHelper::UpdateSubresources(pDevice, pCommandList, texture.Get(), uploadAllocation.pResource, uploadAllocation.offset, uploadAllocation.cpuPtr, 0, 1, &textureData);
+        D3DHelper::UpdateSubresources(m_pDevice, pCommandList, texture.Get(), uploadAllocation.pResource, uploadAllocation.offset, uploadAllocation.cpuPtr, 0, 1, &textureData);
 
         D3D12_TEXTURE_BARRIER barrier1 = {
             D3D12_BARRIER_SYNC_COPY,
@@ -548,13 +556,12 @@ public:
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         srvDesc.Texture2D.MipLevels = 1;
 
-        ShaderResourceView srv(pDevice, texture.Get(), srvDesc, std::move(srvAllocation));
+        ShaderResourceView srv(m_pDevice, texture.Get(), srvDesc, std::move(srvAllocation));
 
         return m_assetTextures.Add(AssetTexture{std::move(texture), std::move(srv)});
     }
 
     AssetTextureHandle AddAssetTexture(
-        ID3D12Device10* pDevice,
         ID3D12GraphicsCommandList7* pCommandList,
         DescriptorAllocation&& srvAllocation,
         TransientUploadAllocator& uploadAllocator,
@@ -590,7 +597,7 @@ public:
         // LoadDDSTextureFromFile creates a resource with an initial state of D3D12_RESOURCE_STATE_COMMON
         // It corresponds to D3D12_BARRIER_LAYOUT_COMMON in Enhanced Barriers context
         D3DHelper::ThrowIfFailed(DirectX::LoadDDSTextureFromFile(
-            pDevice,
+            m_pDevice,
             ddsFilePath.c_str(),
             &resource,
             ddsData,
@@ -617,11 +624,11 @@ public:
 
         // Calculate required size for data upload
         UINT64 requiredSize = 0;
-        pDevice->GetCopyableFootprints(&desc, 0, numSubresources, 0, nullptr, nullptr, nullptr, &requiredSize);
+        m_pDevice->GetCopyableFootprints(&desc, 0, numSubresources, 0, nullptr, nullptr, nullptr, &requiredSize);
 
         auto uploadAllocation = uploadAllocator.Allocate(requiredSize, D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
 
-        D3DHelper::UpdateSubresources(pDevice, pCommandList, texture.Get(), uploadAllocation.pResource, uploadAllocation.offset, uploadAllocation.cpuPtr, 0, numSubresources, subresources.data());
+        D3DHelper::UpdateSubresources(m_pDevice, pCommandList, texture.Get(), uploadAllocation.pResource, uploadAllocation.offset, uploadAllocation.cpuPtr, 0, numSubresources, subresources.data());
 
         D3D12_TEXTURE_BARRIER barrier1 = {
             D3D12_BARRIER_SYNC_COPY,
@@ -686,7 +693,7 @@ public:
             srvDesc.Texture3D.MipLevels = desc.MipLevels;
         }
 
-        ShaderResourceView srv(pDevice, texture.Get(), srvDesc, std::move(srvAllocation));
+        ShaderResourceView srv(m_pDevice, texture.Get(), srvDesc, std::move(srvAllocation));
 
         return m_assetTextures.Add(AssetTexture{std::move(texture), std::move(srv)});
     }
@@ -768,4 +775,6 @@ private:
         GpuResource resource;
     };
     std::queue<DeferredResource> m_deletionQueue;
+
+    ID3D12Device10* m_pDevice = nullptr;
 };

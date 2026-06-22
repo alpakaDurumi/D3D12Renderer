@@ -225,27 +225,7 @@ private:
     MaterialHandle CreateMaterial(const AssetID& id);
     MaterialHandle CloneMaterial(MaterialHandle src);
 
-    MeshHandle CreateMesh(ID3D12GraphicsCommandList7* pCommandList, TransientUploadAllocator& allocator, const GeometryData& data);
-
     DirectionalLightHandle CreateDirectionalLight();
     PointLightHandle CreatePointLight();
     SpotLightHandle CreateSpotLight();
-
-    AssetTextureHandle CreateAssetTexture(
-        ID3D12GraphicsCommandList7* pCommandList,
-        DescriptorAllocation&& allocation,
-        TransientUploadAllocator& uploadAllocator,
-        const std::vector<UINT8>& textureSrc,
-        UINT width,
-        UINT height);
-
-    AssetTextureHandle CreateAssetTexture(
-        ID3D12GraphicsCommandList7* pCommandList,
-        DescriptorAllocation&& allocation,
-        TransientUploadAllocator& uploadAllocator,
-        const std::wstring& filePath,
-        bool isSRGB,
-        bool useBlockCompress,
-        bool flipImage,
-        bool isCubeMap);
 };
