@@ -19,7 +19,7 @@ float4 main(MeshPSInput input) : SV_TARGET
 
     uint csmIdx;
     float alpha;
-    CalcCSMIndex(input.pos.w, csmIdx, alpha);   // SV_POSITION.w means view space distance.
+    CalcCSMIndex(input.pos.w, csmIdx, alpha); // SV_POSITION.w means view space distance.
     
     // Pass random rotation to PCF based on IGN
     float noise = InterleavedGradientNoise(input.pos.xy);
@@ -42,21 +42,19 @@ float4 main(MeshPSInput input) : SV_TARGET
         {
             // First cascade
             {
-                float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[csmIdx]);
-                lightScreen.xyz /= lightScreen.w;
-                float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
+                float2 lightTexCoord;
+                float z = WorldToShadowUV(input.posWorld, light.viewProjection[csmIdx], lightTexCoord);
         
-                shadowFactor = PCFDirectional(light.idxInArray, csmIdx, filterSize, lightTexCoord, lightScreen.z, rot);
+                shadowFactor = PCFDirectional(light.idxInArray, csmIdx, filterSize, lightTexCoord, z, rot);
             }
         
             // Second cascade. Only apply when overlapping can occur.
             if (csmIdx < MAX_CASCADES - 1)
             {
-                float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[csmIdx + 1]);
-                lightScreen.xyz /= lightScreen.w;
-                float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
+                float2 lightTexCoord;
+                float z = WorldToShadowUV(input.posWorld, light.viewProjection[csmIdx + 1], lightTexCoord);
         
-                float t = PCFDirectional(light.idxInArray, csmIdx + 1, filterSize, lightTexCoord, lightScreen.z, rot);
+                float t = PCFDirectional(light.idxInArray, csmIdx + 1, filterSize, lightTexCoord, z, rot);
                 shadowFactor = lerp(shadowFactor, t, alpha);
             }
             
@@ -72,8 +70,7 @@ float4 main(MeshPSInput input) : SV_TARGET
             
             float3 toLightWorld = normalize(light.lightPos - input.posWorld);
             
-            float factor = CalcAttenuation(dist, light.range) *
-                PCFPoint(light.idxInArray, filterSize, -toLightWorld, normalizedDist, rot);
+            float factor = CalcAttenuation(dist, light.range) * PCFPoint(light.idxInArray, filterSize, -toLightWorld, normalizedDist, rot);
             
             total += PhongReflection(light, toLightWorld, toCameraWorld, factor, data.albedo.rgb, data.normalWorld, data.ambient.rgb, data.specular.rgb, data.shininess);
         }
@@ -86,11 +83,10 @@ float4 main(MeshPSInput input) : SV_TARGET
             float distAtt = CalcAttenuation(dist, light.range);
             float angularAtt = CalcAngularAttenuation(light, -toLightWorld);
             
-            float4 lightScreen = mul(float4(input.posWorld, 1.0f), light.viewProjection[0]);
-            lightScreen.xyz /= lightScreen.w;
-            float2 lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
+            float2 lightTexCoord;
+            float z = WorldToShadowUV(input.posWorld, light.viewProjection[0], lightTexCoord);
             
-            float factor = distAtt * angularAtt * PCFSpot(light.idxInArray, filterSize, lightTexCoord, lightScreen.z, rot);
+            float factor = distAtt * angularAtt * PCFSpot(light.idxInArray, filterSize, lightTexCoord, z, rot);
             
             total += PhongReflection(light, toLightWorld, toCameraWorld, factor, data.albedo.rgb, data.normalWorld, data.ambient.rgb, data.specular.rgb, data.shininess);
         }

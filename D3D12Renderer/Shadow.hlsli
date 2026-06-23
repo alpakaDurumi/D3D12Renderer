@@ -47,6 +47,15 @@ void CalcCSMIndex(float distView, out uint index, out float alpha)
     alpha = smoothstep(cascadeSplits[index] - overlap, cascadeSplits[index] + overlap, distView);
 }
 
+// Return clip-space depth, output shadowMap UV
+float WorldToShadowUV(float3 posWorld, float4x4 viewProjection, out float2 lightTexCoord)
+{
+    float4 lightScreen = mul(float4(posWorld, 1.0f), viewProjection);
+    lightScreen.xyz /= lightScreen.w;
+    lightTexCoord = float2((lightScreen.x + 1.0f) * 0.5f, 1.0f - (lightScreen.y + 1.0f) * 0.5f);
+    return lightScreen.z;
+}
+
 float PCFDirectional(uint idxInArray, uint csmIdx, float filterSize, float2 texCoord, float compareValue, float2x2 rot)
 {
     float shadowFactor = 0.0f;
