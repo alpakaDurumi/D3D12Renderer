@@ -212,6 +212,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="PSInput.hlsli" />
+    <None Include="SurfaceData.hlsli" />
     <None Include="LightConstants.hlsli" />
     <None Include="Lighting.hlsli" />
     <None Include="POM.hlsli" />
