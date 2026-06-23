@@ -1,5 +1,6 @@
 #include "PSInput.hlsli"
 #include "SurfaceData.hlsli"
+#include "CameraConstants.hlsli"
 
 struct GBufferOutput
 {
@@ -8,15 +9,6 @@ struct GBufferOutput
     float4 materialAmbient : SV_Target2;
     float4 materialSpecular : SV_Target3;
 };
-
-cbuffer CameraConstantBuffer : register(b0, space0)
-{
-    float3 cameraPos;
-    float4x4 view;
-    float4x4 projection;
-    float4x4 invView;
-    float4x4 invProj;
-}
 
 GBufferOutput main(MeshPSInput input)
 {

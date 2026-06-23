@@ -151,6 +151,9 @@
     <None Include="PSInput.hlsli">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="CameraConstants.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Win32Application.h">

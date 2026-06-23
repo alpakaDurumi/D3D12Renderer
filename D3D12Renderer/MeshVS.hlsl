@@ -1,4 +1,5 @@
 #include "PSInput.hlsli"
+#include "CameraConstants.hlsli"
 
 struct InstanceData
 {
@@ -17,15 +18,6 @@ struct VSInput
     float3 normal : NORMAL;
     uint instanceIndex : INSTANCE_INDEX;
 };
-
-cbuffer CameraConstantBuffer : register(b0, space0)
-{
-    float3 cameraPos;
-    float4x4 view;
-    float4x4 projection;
-    float4x4 invView;
-    float4x4 invProj;
-}
 
 MeshPSInput main(VSInput input)
 {

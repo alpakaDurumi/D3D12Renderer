@@ -211,6 +211,7 @@
     <ClCompile Include="Win32Application.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="CameraConstants.hlsli" />
     <None Include="PSInput.hlsli" />
     <None Include="SurfaceData.hlsli" />
     <None Include="LightConstants.hlsli" />

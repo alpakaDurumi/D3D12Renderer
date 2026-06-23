@@ -3,19 +3,11 @@
 #include "Lighting.hlsli"
 #include "LightConstants.hlsli"
 #include "PSInput.hlsli"
+#include "CameraConstants.hlsli"
 
 // GBuffers & depth buffer
 Texture2D g_gBuffers[NUM_GBUFFER_SLOTS] : register(t0, space5);
 Texture2D g_depthBuffer : register(t0, space6);
-
-cbuffer CameraConstantBuffer : register(b0, space0)
-{
-    float3 cameraPos;
-    float4x4 view;
-    float4x4 projection;
-    float4x4 invView;
-    float4x4 invProj;
-}
 
 cbuffer GlobalConstants : register(b2, space0)
 {
