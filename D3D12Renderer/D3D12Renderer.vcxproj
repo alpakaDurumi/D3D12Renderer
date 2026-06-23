@@ -211,6 +211,8 @@
     <ClCompile Include="Win32Application.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="LightConstants.hlsli" />
+    <None Include="Lighting.hlsli" />
     <None Include="POM.hlsli" />
     <None Include="packages.config" />
     <None Include="ShaderCompile.targets" />

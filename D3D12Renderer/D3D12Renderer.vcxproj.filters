@@ -136,7 +136,13 @@
     <None Include="POM.hlsli">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="Lighting.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
     <None Include="Shadow.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="LightConstants.hlsli">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>
