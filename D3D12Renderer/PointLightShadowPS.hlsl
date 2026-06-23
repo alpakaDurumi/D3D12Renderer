@@ -1,11 +1,6 @@
+#include "PSInput.hlsli"
 #include "SharedConfig.h"
 #include "LightConstants.hlsli"
-
-struct PSInput
-{
-    float4 pos : SV_POSITION;
-    float3 posWorld : POSITION;
-};
 
 cbuffer IdxConstant : register(b3, space0)
 {
@@ -13,7 +8,7 @@ cbuffer IdxConstant : register(b3, space0)
 };
 
 // Render linear distance.
-float4 main(PSInput input) : SV_TARGET
+float4 main(MeshPSInput input) : SV_TARGET
 {
     float dist = distance(input.posWorld, LightConstantBuffers[currentLightIdx].lightPos);
     float normalizedDist = dist / LightConstantBuffers[currentLightIdx].range;

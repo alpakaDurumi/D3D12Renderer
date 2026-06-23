@@ -1,3 +1,5 @@
+#include "PSInput.hlsli"
+
 struct InstanceData
 {
     float4x4 world;
@@ -16,19 +18,6 @@ struct VSInput
     uint instanceIndex : INSTANCE_INDEX;
 };
 
-struct PSInput
-{
-    float4 pos : SV_POSITION;
-    float3 posWorld : POSITION;
-#ifndef DEPTH_ONLY
-    float2 texCoord : TEXCOORD0;
-    float3 tangentWorld : TANGENT;
-    float3 normalWorld : NORMAL;
-    nointerpolation float tangentW : TEXCOORD1; // Do not interpolate w component of tangent vector.
-    nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
-#endif  // DEPTH_ONLY
-};
-
 cbuffer CameraConstantBuffer : register(b0, space0)
 {
     float3 cameraPos;
@@ -38,9 +27,9 @@ cbuffer CameraConstantBuffer : register(b0, space0)
     float4x4 invProj;
 }
 
-PSInput main(VSInput input)
+MeshPSInput main(VSInput input)
 {
-    PSInput output;
+    MeshPSInput output;
     
     InstanceData instanceData = g_instanceData[input.instanceIndex];
     

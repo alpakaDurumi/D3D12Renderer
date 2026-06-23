@@ -1,17 +1,13 @@
-Texture2D<float> g_selectionMask : register(t0, space7);
+#include "PSInput.hlsli"
 
-struct PSInput
-{
-    float4 pos : SV_POSITION;
-    float2 texCoord : TEXCOORD;
-};
+Texture2D<float> g_selectionMask : register(t0, space7);
 
 cbuffer OutlineConstantBuffer : register(b4, space0)
 {
     int thickness;
 }
 
-float4 main(PSInput input) : SV_TARGET
+float4 main(FullScreenPSInput input) : SV_TARGET
 {
     int2 coord = int2(input.pos.xy);
     for (int dx = -thickness; dx <= thickness; ++dx)

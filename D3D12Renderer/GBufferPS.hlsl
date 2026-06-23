@@ -1,20 +1,10 @@
+#include "PSInput.hlsli"
 #include "POM.hlsli"
 
 Texture2D g_textures[] : register(t0, space1);
 
 // Dynamic samplers for ordinary texture sampling
 SamplerState g_samplers[] : register(s0, space0);
-
-struct PSInput
-{
-    float4 pos : SV_POSITION;
-    float3 posWorld : POSITION;
-    float2 texCoord : TEXCOORD0;
-    float3 tangentWorld : TANGENT;
-    float3 normalWorld : NORMAL;
-    nointerpolation float tangentW : TEXCOORD1; // Do not interpolate w component of tangent vector.
-    nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
-};
 
 struct GBufferOutput
 {
@@ -45,7 +35,7 @@ struct MaterialConstants
 
 ConstantBuffer<MaterialConstants> MaterialConstantBuffers[] : register(b0, space1);
 
-GBufferOutput main(PSInput input)
+GBufferOutput main(MeshPSInput input)
 {
     GBufferOutput output;
     

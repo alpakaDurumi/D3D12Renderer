@@ -3,22 +3,12 @@
 #include "Shadow.hlsli"
 #include "Lighting.hlsli"
 #include "LightConstants.hlsli"
+#include "PSInput.hlsli"
 
 Texture2D g_textures[] : register(t0, space1);
 
 // Dynamic samplers for ordinary texture sampling
 SamplerState g_samplers[] : register(s0, space0);
-
-struct PSInput
-{
-    float4 pos : SV_POSITION;
-    float3 posWorld : POSITION;
-    float2 texCoord : TEXCOORD0;
-    float3 tangentWorld : TANGENT;
-    float3 normalWorld : NORMAL;
-    nointerpolation float tangentW : TEXCOORD1;     // Do not interpolate w component of tangent vector.
-    nointerpolation uint materialIndex : INSTANCE_MATERIAL_INDEX;
-};
 
 cbuffer CameraConstantBuffer : register(b0, space0)
 {
@@ -45,7 +35,7 @@ struct MaterialConstants
 };
 ConstantBuffer<MaterialConstants> MaterialConstantBuffers[] : register(b0, space1);
 
-float4 main(PSInput input) : SV_TARGET
+float4 main(MeshPSInput input) : SV_TARGET
 {
     uint materialIdx = input.materialIndex;
     

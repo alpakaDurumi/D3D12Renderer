@@ -82,7 +82,7 @@
       <PdbFlag Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)PointLightShadowPS.pdb"</PdbFlag>
       <PdbFlag Condition="'$(Configuration)'=='Release'"></PdbFlag>
 
-      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)PointLightShadowPS.cso"</Command>
+      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 -D DEPTH_ONLY=1 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)PointLightShadowPS.cso"</Command>
 
       <Outputs Condition="'$(Configuration)'!='Release'">
         $(ShaderOutDir)PointLightShadowPS.cso;
@@ -169,7 +169,7 @@
       <PdbFlag Condition="'$(Configuration)'!='Release'">-Fd "$(ShaderPdbDir)SelectionMaskPS.pdb"</PdbFlag>
       <PdbFlag Condition="'$(Configuration)'=='Release'"></PdbFlag>
 
-      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)SelectionMaskPS.cso"</Command>
+      <Command>"$(DxcExe)" "%(FullPath)" -E main -T ps_6_0 -D DEPTH_ONLY=1 $(DxcCommonFlags) $(DxcConfigFlags) %(PdbFlag) -Fo "$(ShaderOutDir)SelectionMaskPS.cso"</Command>
 
       <Outputs Condition="'$(Configuration)'!='Release'">
         $(ShaderOutDir)SelectionMaskPS.cso;

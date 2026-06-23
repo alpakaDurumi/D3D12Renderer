@@ -2,16 +2,11 @@
 #include "Shadow.hlsli"
 #include "Lighting.hlsli"
 #include "LightConstants.hlsli"
+#include "PSInput.hlsli"
 
 // GBuffers & depth buffer
 Texture2D g_gBuffers[NUM_GBUFFER_SLOTS] : register(t0, space5);
 Texture2D g_depthBuffer : register(t0, space6);
-
-struct PSInput
-{
-    float4 pos : SV_POSITION;
-    float2 texCoord : TEXCOORD;
-};
 
 cbuffer CameraConstantBuffer : register(b0, space0)
 {
@@ -27,7 +22,7 @@ cbuffer GlobalConstants : register(b2, space0)
     uint numLights;
 };
 
-float4 main(PSInput input) : SV_TARGET
+float4 main(FullScreenPSInput input) : SV_TARGET
 {
     // Sample GBuffers
     int2 texCoord = int2(input.pos.xy);
