@@ -1,17 +1,11 @@
+#include "CameraConstants.hlsli"
 #include "PSInput.hlsli"
-#include "SharedConfig.h"
-#include "LightConstants.hlsli"
-
-cbuffer IdxConstant : register(b3, space0)
-{
-    uint currentLightIdx;
-};
 
 // Render linear distance.
 float4 main(MeshPSInput input) : SV_TARGET
 {
-    float dist = distance(input.posWorld, LightConstantBuffers[currentLightIdx].lightPos);
-    float normalizedDist = dist / LightConstantBuffers[currentLightIdx].range;
+    float dist = distance(input.posWorld, cameraPos);
+    float normalizedDist = dist / farPlane;
     
     // Software slope-scaled bias
     // In original depth bias caculating logic : Bias = (float)DepthBias * 2**(exponent(max z in primitive) - r) + SlopeScaledDepthBias * MaxDepthSlope;

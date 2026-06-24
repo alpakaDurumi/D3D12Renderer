@@ -123,11 +123,17 @@ UINT Light::GetIdxInArray() const
 
 void Light::SetPosition(XMFLOAT3 pos)
 {
+    for(auto& cd : m_cameraConstantData)
+        cd.cameraPos = pos;
+
     m_lightConstantData.lightPos = pos;
 }
 
 void Light::SetPosition(XMVECTOR pos)
 {
+    for (auto& cd : m_cameraConstantData)
+        cd.SetPos(pos);
+
     m_lightConstantData.SetPos(pos);
 }
 
@@ -143,6 +149,9 @@ void Light::SetDirection(XMVECTOR dir)
 
 void Light::SetRange(float range)
 {
+    for (auto& cd : m_cameraConstantData)
+        cd.farPlane = range;
+
     m_lightConstantData.range = range;
 }
 

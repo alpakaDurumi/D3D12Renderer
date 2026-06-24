@@ -21,12 +21,12 @@ struct ConstantData
 struct CameraConstantData : public ConstantData<CameraConstantData>
 {
     DirectX::XMFLOAT3 cameraPos;
-    float padding0;
+    float farPlane;
     DirectX::XMFLOAT4X4 view;
     DirectX::XMFLOAT4X4 projection;
     DirectX::XMFLOAT4X4 invView;
     DirectX::XMFLOAT4X4 invProj;
-    float padding1[60];
+    float padding[60];
 
     void SetPos(DirectX::XMVECTOR pos);
     void SetView(DirectX::XMMATRIX view);

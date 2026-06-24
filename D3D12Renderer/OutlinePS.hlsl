@@ -3,7 +3,7 @@
 Texture2D<float> g_selectionMask : register(t0, space7);
 Texture2D<float> g_horizontalDilatedMask : register(t1, space7);
 
-cbuffer OutlineConstantBuffer : register(b4, space0)
+cbuffer OutlineConstantBuffer : register(b3, space0)
 {
     int thickness;
 }
