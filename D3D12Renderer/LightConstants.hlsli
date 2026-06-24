@@ -10,7 +10,7 @@ struct LightConstants
     float cosOuterAngle;
     float3 lightColor;
     float cosInnerAngle;
-    float4x4 viewProjection[POINT_LIGHT_ARRAY_SIZE];
+    float4x4 viewProjection[MAX_CASCADES];
     uint type;
     uint idxInArray;
     float lightIntensity;

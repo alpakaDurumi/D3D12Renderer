@@ -51,7 +51,7 @@ public:
     virtual void SetDirection(DirectX::XMVECTOR dir);
     virtual void SetRange(float range);
 
-    void SetViewProjection(DirectX::XMMATRIX view, DirectX::XMMATRIX projection, UINT idx);
+    virtual void SetViewProjection(DirectX::XMMATRIX view, DirectX::XMMATRIX projection, UINT idx);
 
     void SetIdxInArray(UINT idxInArray);
 
@@ -125,6 +125,8 @@ public:
 
     void SetDirection(DirectX::XMFLOAT3 dir) override;
     void SetDirection(DirectX::XMVECTOR dir) override;
+
+    void SetViewProjection(DirectX::XMMATRIX view, DirectX::XMMATRIX projection, UINT idx) override;
 
     ID3D12Resource* GetRenderTarget() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle(UINT index) const;

@@ -317,6 +317,12 @@ void PointLight::SetDirection(XMVECTOR dir)
     assert(false);
 }
 
+void PointLight::SetViewProjection(DirectX::XMMATRIX view, DirectX::XMMATRIX projection, UINT idx)
+{
+    m_cameraConstantData[idx].SetView(view);
+    m_cameraConstantData[idx].SetProjection(projection);
+}
+
 ID3D12Resource* PointLight::GetRenderTarget() const
 {
     return m_renderTarget.Get();

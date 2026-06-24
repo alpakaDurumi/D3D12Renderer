@@ -41,11 +41,11 @@ struct LightConstantData : public ConstantData<LightConstantData>
     float cosOuterAngle;
     DirectX::XMFLOAT3 lightColor = DirectX::XMFLOAT3(1.0f, 1.0f, 1.0f);
     float cosInnerAngle;
-    DirectX::XMFLOAT4X4 viewProjection[POINT_LIGHT_ARRAY_SIZE];
+    DirectX::XMFLOAT4X4 viewProjection[MAX_CASCADES];
     UINT type;
     UINT idxInArray;
     float lightIntensity = 1.0f;
-    float padding[17];
+    float padding[49];
 
     void SetPos(DirectX::XMVECTOR pos);
     void SetLightDir(DirectX::XMVECTOR lightDir);
