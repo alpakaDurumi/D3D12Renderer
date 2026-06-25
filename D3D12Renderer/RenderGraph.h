@@ -4,6 +4,7 @@
 #include <array>
 #include <cassert>
 #include <functional>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -305,6 +306,21 @@ public:
                         }
                     }
                 }
+            }
+        }
+
+        // Round-trip check
+        RGTexture toneMappedBuffer = GetRGTexture("ToneMappedBuffer"); // TODO: Generalize with expectedEndLayout that provided from RegisterTexture
+
+        for (UINT i = 0; i < m_textureGroups.size(); ++i)
+        {
+            const auto& group = m_textureGroups[i];
+
+            for (UINT j = 0; j < group.subresourceCount; ++j)
+            {
+                D3D12_BARRIER_LAYOUT target = i == toneMappedBuffer.index ? D3D12_BARRIER_LAYOUT_SHADER_RESOURCE : group.initialUsage.layout;
+                if (currentTextureUsages[i][j].layout != target)
+                    throw std::runtime_error("Render Graph round-trip validation failed.");
             }
         }
     }
