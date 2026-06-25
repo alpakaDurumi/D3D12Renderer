@@ -2185,7 +2185,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Shadow map pass");
 
-        ApplyPassBarriers(m_renderGraph, PassType::SHADOW_MAP, BarrierTiming::PRE_PASS, pCommandList);
+        ApplyPassBarriers(PassType::SHADOW_MAP, BarrierTiming::PRE_PASS, pCommandList);
 
         pCommandList->RSSetViewports(1, &m_shadowMapViewport);
         pCommandList->RSSetScissorRects(1, &m_shadowMapScissorRect);
@@ -2247,14 +2247,14 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         for (auto& light : m_sceneManager.GetSpotLights())
             processLight(&light);
 
-        ApplyPassBarriers(m_renderGraph, PassType::SHADOW_MAP, BarrierTiming::POST_PASS, pCommandList);
+        ApplyPassBarriers(PassType::SHADOW_MAP, BarrierTiming::POST_PASS, pCommandList);
     }
 
     // GBuffer pass
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"GBuffer pass");
 
-        ApplyPassBarriers(m_renderGraph, PassType::GBUFFER, BarrierTiming::PRE_PASS, pCommandList);
+        ApplyPassBarriers(PassType::GBUFFER, BarrierTiming::PRE_PASS, pCommandList);
 
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
@@ -2290,14 +2290,14 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), visibleRange);
         }
 
-        ApplyPassBarriers(m_renderGraph, PassType::GBUFFER, BarrierTiming::POST_PASS, pCommandList);
+        ApplyPassBarriers(PassType::GBUFFER, BarrierTiming::POST_PASS, pCommandList);
     }
 
     // Deferred Lighting pass
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Deferred Lighting pass");
 
-        ApplyPassBarriers(m_renderGraph, PassType::DEFERRED_LIGHTING, BarrierTiming::PRE_PASS, pCommandList);
+        ApplyPassBarriers(PassType::DEFERRED_LIGHTING, BarrierTiming::PRE_PASS, pCommandList);
 
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
@@ -2326,14 +2326,14 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         pCommandList->DrawInstanced(3, 1, 0, 0);
 
-        ApplyPassBarriers(m_renderGraph, PassType::DEFERRED_LIGHTING, BarrierTiming::POST_PASS, pCommandList);
+        ApplyPassBarriers(PassType::DEFERRED_LIGHTING, BarrierTiming::POST_PASS, pCommandList);
     }
 
     // Forward Coloring pass
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Forward coloring pass");
 
-        ApplyPassBarriers(m_renderGraph, PassType::FORWARD_COLORING, BarrierTiming::PRE_PASS, pCommandList);
+        ApplyPassBarriers(PassType::FORWARD_COLORING, BarrierTiming::PRE_PASS, pCommandList);
 
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
@@ -2359,7 +2359,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), visibleRange);
         }
 
-        ApplyPassBarriers(m_renderGraph, PassType::FORWARD_COLORING, BarrierTiming::POST_PASS, pCommandList);
+        ApplyPassBarriers(PassType::FORWARD_COLORING, BarrierTiming::POST_PASS, pCommandList);
     }
 
     bool selectionExists = !(m_selected.index == UINT_MAX && m_selected.generation == 0);
@@ -2368,7 +2368,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Selection mask pass");
 
-        ApplyPassBarriers(m_renderGraph, PassType::SELECTION_MASK, BarrierTiming::PRE_PASS, pCommandList);
+        ApplyPassBarriers(PassType::SELECTION_MASK, BarrierTiming::PRE_PASS, pCommandList);
 
         if (selectionExists)
         {
@@ -2396,14 +2396,14 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
                 DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), m_selectedVisibleIndexRange[meshHandle]);
         }
 
-        ApplyPassBarriers(m_renderGraph, PassType::SELECTION_MASK, BarrierTiming::POST_PASS, pCommandList);
+        ApplyPassBarriers(PassType::SELECTION_MASK, BarrierTiming::POST_PASS, pCommandList);
     }
 
     // Horizontal dilate pass
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Horizontal dilate pass");
 
-        ApplyPassBarriers(m_renderGraph, PassType::HORIZONTAL_DILATE, BarrierTiming::PRE_PASS, pCommandList);
+        ApplyPassBarriers(PassType::HORIZONTAL_DILATE, BarrierTiming::PRE_PASS, pCommandList);
 
         if (selectionExists)
         {
@@ -2428,14 +2428,14 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             pCommandList->DrawInstanced(3, 1, 0, 0);
         }
 
-        ApplyPassBarriers(m_renderGraph, PassType::HORIZONTAL_DILATE, BarrierTiming::POST_PASS, pCommandList);
+        ApplyPassBarriers(PassType::HORIZONTAL_DILATE, BarrierTiming::POST_PASS, pCommandList);
     }
 
     // Outline drawing pass
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Outline drawing pass");
 
-        ApplyPassBarriers(m_renderGraph, PassType::OUTLINE_DRAWING, BarrierTiming::PRE_PASS, pCommandList);
+        ApplyPassBarriers(PassType::OUTLINE_DRAWING, BarrierTiming::PRE_PASS, pCommandList);
 
         if (selectionExists)
         {
@@ -2456,14 +2456,14 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             pCommandList->DrawInstanced(3, 1, 0, 0);
         }
 
-        ApplyPassBarriers(m_renderGraph, PassType::OUTLINE_DRAWING, BarrierTiming::POST_PASS, pCommandList);
+        ApplyPassBarriers(PassType::OUTLINE_DRAWING, BarrierTiming::POST_PASS, pCommandList);
     }
 
     // Tone mapping pass
     {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Tone mapping pass");
 
-        ApplyPassBarriers(m_renderGraph, PassType::TONEMAP, BarrierTiming::PRE_PASS, pCommandList);
+        ApplyPassBarriers(PassType::TONEMAP, BarrierTiming::PRE_PASS, pCommandList);
 
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
@@ -2481,7 +2481,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         pCommandList->DrawInstanced(3, 1, 0, 0);
 
-        ApplyPassBarriers(m_renderGraph, PassType::TONEMAP, BarrierTiming::POST_PASS, pCommandList);
+        ApplyPassBarriers(PassType::TONEMAP, BarrierTiming::POST_PASS, pCommandList);
     }
 }
 
@@ -2499,14 +2499,14 @@ void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList* pCommandList)
     pCommandList->SetGraphicsRootDescriptorTable(12, m_samplerDescriptorHeap->GetGPUDescriptorHandleForHeapStart()); // Root parameter 12
 }
 
-void Renderer::ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, BarrierTiming timing, ID3D12GraphicsCommandList7* pCommandList)
+void Renderer::ApplyPassBarriers(PassType passType, BarrierTiming timing, ID3D12GraphicsCommandList7* pCommandList)
 {
     std::vector<D3D12_BUFFER_BARRIER> bufferBarriers;
     std::vector<D3D12_TEXTURE_BARRIER> textureBarriers;
 
-    for (const auto& barrier : renderGraph.GetCompiledBufferBarriers(passType, timing))
+    for (const auto& barrier : m_renderGraph.GetCompiledBufferBarriers(passType, timing))
     {
-        auto pResources = renderGraph.GetResources(barrier.buffer, m_frameIndex);
+        auto pResources = m_renderGraph.GetResources(barrier.buffer, m_frameIndex);
         for (const auto& pResource : pResources)
         {
             D3D12_BUFFER_BARRIER b = {
@@ -2521,9 +2521,9 @@ void Renderer::ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, Ba
         }
     }
 
-    for (const auto& barrier : renderGraph.GetCompiledTextureBarrier(passType, timing))
+    for (const auto& barrier : m_renderGraph.GetCompiledTextureBarrier(passType, timing))
     {
-        auto pResources = renderGraph.GetResources(barrier.texture, m_frameIndex);
+        auto pResources = m_renderGraph.GetResources(barrier.texture, m_frameIndex);
         for (const auto& pResource : pResources)
         {
             D3D12_TEXTURE_BARRIER b = {
