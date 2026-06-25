@@ -149,11 +149,13 @@ public:
         return ResolveHelper(texture.index, elementIndex, frameIndex, m_textureGroups);
     }
 
+    // Return {MipLevels, ArraySize, PlaneCount}
     std::tuple<UINT, UINT, UINT> GetResourceDimension(ID3D12Device* pDevice, RGTexture texture) const
     {
-        auto desc = m_textureGroups[texture.index].pResources.front()->GetDesc();
+        const auto desc = m_textureGroups[texture.index].pResources.front()->GetDesc();
+        UINT arraySize = desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? 1 : desc.DepthOrArraySize;
         UINT8 planeCount = D3DHelper::GetFormatPlaneCount(pDevice, desc.Format);
-        return {desc.MipLevels, desc.DepthOrArraySize, planeCount};
+        return {desc.MipLevels, arraySize, planeCount};
     }
 
     UINT GetElementCount(RGBuffer buffer) const
@@ -374,7 +376,7 @@ private:
         }
         else
         {
-            const auto [mipLevels, depthOrArraySize, planeCount] = GetResourceDimension(m_pDevice, texture);
+            const auto [mipLevels, arraySize, planeCount] = GetResourceDimension(m_pDevice, texture);
 
             for (UINT plane = FirstPlane; plane < FirstPlane + NumPlanes; ++plane)
             {
@@ -382,7 +384,7 @@ private:
                 {
                     for (UINT mip = IndexOrFirstMipLevel; mip < IndexOrFirstMipLevel + NumMipLevels; ++mip)
                     {
-                        UINT subresourceIndex = D3DHelper::CalcSubresourceIndex(mip, array, plane, mipLevels, depthOrArraySize);
+                        UINT subresourceIndex = D3DHelper::CalcSubresourceIndex(mip, array, plane, mipLevels, arraySize);
                         indices.push_back(subresourceIndex);
                     }
                 }
