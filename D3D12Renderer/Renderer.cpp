@@ -2191,12 +2191,16 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
     BindDescriptorTables(pCommandList);
 
-    // Shadow map pass
+    auto executePass = [&](PassType passType, const wchar_t* passName, auto&& draw)
     {
-        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Shadow map pass");
+        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, passName);
+        ApplyPassBarriers(passType, BarrierTiming::PRE_PASS, pCommandList);
+        draw();
+        ApplyPassBarriers(passType, BarrierTiming::POST_PASS, pCommandList);
+    };
 
-        ApplyPassBarriers(PassType::SHADOW_MAP, BarrierTiming::PRE_PASS, pCommandList);
-
+    executePass(PassType::SHADOW_MAP, L"Shadow map pass", [&]
+                {
         pCommandList->RSSetViewports(1, &m_shadowMapViewport);
         pCommandList->RSSetScissorRects(1, &m_shadowMapScissorRect);
 
@@ -2255,17 +2259,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         for (auto& light : m_sceneManager.GetPointLights())
             processLight(&light);
         for (auto& light : m_sceneManager.GetSpotLights())
-            processLight(&light);
+            processLight(&light); });
 
-        ApplyPassBarriers(PassType::SHADOW_MAP, BarrierTiming::POST_PASS, pCommandList);
-    }
-
-    // GBuffer pass
-    {
-        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"GBuffer pass");
-
-        ApplyPassBarriers(PassType::GBUFFER, BarrierTiming::PRE_PASS, pCommandList);
-
+    executePass(PassType::GBUFFER, L"GBuffer pass", [&]
+                {
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -2298,17 +2295,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         {
             VisibleRange visibleRange = m_cameraVisibleIndexRange[meshHandle].second;
             DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), visibleRange);
-        }
+        } });
 
-        ApplyPassBarriers(PassType::GBUFFER, BarrierTiming::POST_PASS, pCommandList);
-    }
-
-    // Deferred Lighting pass
-    {
-        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Deferred Lighting pass");
-
-        ApplyPassBarriers(PassType::DEFERRED_LIGHTING, BarrierTiming::PRE_PASS, pCommandList);
-
+    executePass(PassType::DEFERRED_LIGHTING, L"Deferred Lighting pass", [&]
+                {
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -2334,17 +2324,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->SetGraphicsRootConstantBufferView(2, m_shadowUploadAllocation.gpuPtr);
 
         pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        pCommandList->DrawInstanced(3, 1, 0, 0);
+        pCommandList->DrawInstanced(3, 1, 0, 0); });
 
-        ApplyPassBarriers(PassType::DEFERRED_LIGHTING, BarrierTiming::POST_PASS, pCommandList);
-    }
-
-    // Forward Coloring pass
-    {
-        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Forward coloring pass");
-
-        ApplyPassBarriers(PassType::FORWARD_COLORING, BarrierTiming::PRE_PASS, pCommandList);
-
+    executePass(PassType::FORWARD_COLORING, L"Forward coloring pass", [&]
+                {
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -2367,19 +2350,12 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         {
             VisibleRange visibleRange = m_cameraVisibleIndexRange[meshHandle].first;
             DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), visibleRange);
-        }
-
-        ApplyPassBarriers(PassType::FORWARD_COLORING, BarrierTiming::POST_PASS, pCommandList);
-    }
+        } });
 
     bool selectionExists = !(m_selected.index == UINT_MAX && m_selected.generation == 0);
 
-    // Selection mask pass
-    {
-        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Selection mask pass");
-
-        ApplyPassBarriers(PassType::SELECTION_MASK, BarrierTiming::PRE_PASS, pCommandList);
-
+    executePass(PassType::SELECTION_MASK, L"Selection mask pass", [&]
+                {
         if (selectionExists)
         {
             pCommandList->RSSetViewports(1, &m_viewport);
@@ -2404,17 +2380,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             // 선택된 Entity들에 대해서만 draw call을 호출해야 함 (나중에는 여러 Entity를 다중 선택할 수도 있어야 함)
             for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
                 DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), m_selectedVisibleIndexRange[meshHandle]);
-        }
+        } });
 
-        ApplyPassBarriers(PassType::SELECTION_MASK, BarrierTiming::POST_PASS, pCommandList);
-    }
-
-    // Horizontal dilate pass
-    {
-        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Horizontal dilate pass");
-
-        ApplyPassBarriers(PassType::HORIZONTAL_DILATE, BarrierTiming::PRE_PASS, pCommandList);
-
+    executePass(PassType::HORIZONTAL_DILATE, L"Horizontal dilate pass", [&]
+                {
         if (selectionExists)
         {
             pCommandList->RSSetViewports(1, &m_viewport);
@@ -2436,17 +2405,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
             pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             pCommandList->DrawInstanced(3, 1, 0, 0);
-        }
+        } });
 
-        ApplyPassBarriers(PassType::HORIZONTAL_DILATE, BarrierTiming::POST_PASS, pCommandList);
-    }
-
-    // Outline drawing pass
-    {
-        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Outline drawing pass");
-
-        ApplyPassBarriers(PassType::OUTLINE_DRAWING, BarrierTiming::PRE_PASS, pCommandList);
-
+    executePass(PassType::OUTLINE_DRAWING, L"Outline drawing pass", [&]
+                {
         if (selectionExists)
         {
             pCommandList->RSSetViewports(1, &m_viewport);
@@ -2464,17 +2426,10 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
             pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             pCommandList->DrawInstanced(3, 1, 0, 0);
-        }
+        } });
 
-        ApplyPassBarriers(PassType::OUTLINE_DRAWING, BarrierTiming::POST_PASS, pCommandList);
-    }
-
-    // Tone mapping pass
-    {
-        PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, L"Tone mapping pass");
-
-        ApplyPassBarriers(PassType::TONEMAP, BarrierTiming::PRE_PASS, pCommandList);
-
+    executePass(PassType::TONEMAP, L"Tone mapping pass", [&]
+                {
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -2489,10 +2444,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
         pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        pCommandList->DrawInstanced(3, 1, 0, 0);
-
-        ApplyPassBarriers(PassType::TONEMAP, BarrierTiming::POST_PASS, pCommandList);
-    }
+        pCommandList->DrawInstanced(3, 1, 0, 0); });
 }
 
 void Renderer::BindDescriptorTables(ID3D12GraphicsCommandList* pCommandList)
