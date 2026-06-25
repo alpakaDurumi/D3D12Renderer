@@ -215,42 +215,13 @@ public:
             {
                 auto& latestUsages = currentTextureUsages[texture.index];
 
-                const auto& [IndexOrFirstMipLevel, NumMipLevels, FirstArraySlice, NumArraySlices, FirstPlane, NumPlanes] = range;
-
-                if (IndexOrFirstMipLevel == 0xffff'ffff && NumMipLevels == 0)
+                for (UINT i : ExpandSubresourceRange(texture, range))
                 {
-                    UINT subresourceCount = m_textureGroups[texture.index].subresourceCount;
-
-                    for (UINT i = 0; i < subresourceCount; ++i)
+                    if (latestUsages[i] != usage)
                     {
-                        if (latestUsages[i] != usage)
-                        {
-                            CompiledTextureBarrier barrier = {texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0}};
-                            latestUsages[i] = usage;
-                            node.texturePreBarriers.push_back(barrier);
-                        }
-                    }
-                }
-                else
-                {
-                    const auto [mipLevels, depthOrArraySize, planeCount] = GetResourceDimension(m_pDevice, texture);
-
-                    for (UINT plane = FirstPlane; plane < FirstPlane + NumPlanes; ++plane)
-                    {
-                        for (UINT array = FirstArraySlice; array < FirstArraySlice + NumArraySlices; ++array)
-                        {
-                            for (UINT mip = IndexOrFirstMipLevel; mip < IndexOrFirstMipLevel + NumMipLevels; ++mip)
-                            {
-                                UINT subresourceIndex = D3DHelper::CalcSubresourceIndex(mip, array, plane, mipLevels, depthOrArraySize);
-
-                                if (latestUsages[subresourceIndex] != usage)
-                                {
-                                    CompiledTextureBarrier barrier = {texture, latestUsages[subresourceIndex], usage, {subresourceIndex, 0, 0, 0, 0, 0}};
-                                    latestUsages[subresourceIndex] = usage;
-                                    node.texturePreBarriers.push_back(barrier);
-                                }
-                            }
-                        }
+                        CompiledTextureBarrier barrier = {texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0}};
+                        latestUsages[i] = usage;
+                        node.texturePreBarriers.push_back(barrier);
                     }
                 }
             }
@@ -268,42 +239,13 @@ public:
             {
                 auto& latestUsages = currentTextureUsages[texture.index];
 
-                const auto& [IndexOrFirstMipLevel, NumMipLevels, FirstArraySlice, NumArraySlices, FirstPlane, NumPlanes] = range;
-
-                if (IndexOrFirstMipLevel == 0xffff'ffff && NumMipLevels == 0)
+                for (UINT i : ExpandSubresourceRange(texture, range))
                 {
-                    UINT subresourceCount = m_textureGroups[texture.index].subresourceCount;
-
-                    for (UINT i = 0; i < subresourceCount; ++i)
+                    if (latestUsages[i] != usage)
                     {
-                        if (latestUsages[i] != usage)
-                        {
-                            CompiledTextureBarrier barrier = {texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0}};
-                            latestUsages[i] = usage;
-                            node.texturePostBarriers.push_back(barrier);
-                        }
-                    }
-                }
-                else
-                {
-                    const auto [mipLevels, depthOrArraySize, planeCount] = GetResourceDimension(m_pDevice, texture);
-
-                    for (UINT plane = FirstPlane; plane < FirstPlane + NumPlanes; ++plane)
-                    {
-                        for (UINT array = FirstArraySlice; array < FirstArraySlice + NumArraySlices; ++array)
-                        {
-                            for (UINT mip = IndexOrFirstMipLevel; mip < IndexOrFirstMipLevel + NumMipLevels; ++mip)
-                            {
-                                UINT subresourceIndex = D3DHelper::CalcSubresourceIndex(mip, array, plane, mipLevels, depthOrArraySize);
-
-                                if (latestUsages[subresourceIndex] != usage)
-                                {
-                                    CompiledTextureBarrier barrier = {texture, latestUsages[subresourceIndex], usage, {subresourceIndex, 0, 0, 0, 0, 0}};
-                                    latestUsages[subresourceIndex] = usage;
-                                    node.texturePostBarriers.push_back(barrier);
-                                }
-                            }
-                        }
+                        CompiledTextureBarrier barrier = {texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0}};
+                        latestUsages[i] = usage;
+                        node.texturePostBarriers.push_back(barrier);
                     }
                 }
             }
@@ -407,6 +349,47 @@ private:
         UINT idx = isPerFrame ? elementIndex * FrameCount + frameIndex : elementIndex;
 
         return groups[index].pResources[idx];
+    }
+
+    std::vector<UINT> ExpandSubresourceRange(RGTexture texture, D3D12_BARRIER_SUBRESOURCE_RANGE range) const
+    {
+        std::vector<UINT> indices;
+
+        const UINT subresourceCount = m_textureGroups[texture.index].subresourceCount;
+
+        const auto& [IndexOrFirstMipLevel, NumMipLevels, FirstArraySlice, NumArraySlices, FirstPlane, NumPlanes] = range;
+
+        if (NumMipLevels == 0)
+        {
+            if (IndexOrFirstMipLevel == 0xffff'ffff)
+            {
+                indices.resize(subresourceCount);
+                for (UINT i = 0; i < subresourceCount; ++i)
+                    indices[i] = i;
+            }
+            else
+            {
+                indices.push_back(IndexOrFirstMipLevel);
+            }
+        }
+        else
+        {
+            const auto [mipLevels, depthOrArraySize, planeCount] = GetResourceDimension(m_pDevice, texture);
+
+            for (UINT plane = FirstPlane; plane < FirstPlane + NumPlanes; ++plane)
+            {
+                for (UINT array = FirstArraySlice; array < FirstArraySlice + NumArraySlices; ++array)
+                {
+                    for (UINT mip = IndexOrFirstMipLevel; mip < IndexOrFirstMipLevel + NumMipLevels; ++mip)
+                    {
+                        UINT subresourceIndex = D3DHelper::CalcSubresourceIndex(mip, array, plane, mipLevels, depthOrArraySize);
+                        indices.push_back(subresourceIndex);
+                    }
+                }
+            }
+        }
+
+        return indices;
     }
 
     std::vector<ResourceGroup> m_bufferGroups;
