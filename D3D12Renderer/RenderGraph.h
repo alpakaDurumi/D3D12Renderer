@@ -19,6 +19,12 @@
 #include "RenderGraphNode.h"
 #include "RendererConfig.h"
 
+enum class BarrierTiming
+{
+    PRE_PASS,
+    POST_PASS
+};
+
 class RenderGraph
 {
 public:
@@ -200,7 +206,7 @@ public:
             {
                 CompiledBufferBarrier barrier = {buffer, currentBufferUsages[buffer.index], usage};
                 currentBufferUsages[buffer.index] = usage;
-                node.bufferBarriers.push_back(barrier);
+                node.bufferPreBarriers.push_back(barrier);
             }
 
             // Process texture inputs
@@ -220,7 +226,7 @@ public:
                         {
                             CompiledTextureBarrier barrier = {texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0}};
                             latestUsages[i] = usage;
-                            node.textureBarriers.push_back(barrier);
+                            node.texturePreBarriers.push_back(barrier);
                         }
                     }
                 }
@@ -240,7 +246,7 @@ public:
                                 {
                                     CompiledTextureBarrier barrier = {texture, latestUsages[subresourceIndex], usage, {subresourceIndex, 0, 0, 0, 0, 0}};
                                     latestUsages[subresourceIndex] = usage;
-                                    node.textureBarriers.push_back(barrier);
+                                    node.texturePreBarriers.push_back(barrier);
                                 }
                             }
                         }
@@ -251,7 +257,9 @@ public:
             // Process buffer outputs
             for (auto& [buffer, usage] : node.bufferOutputs)
             {
+                CompiledBufferBarrier barrier = {buffer, currentBufferUsages[buffer.index], usage};
                 currentBufferUsages[buffer.index] = usage;
+                node.bufferPostBarriers.push_back(barrier);
             }
 
             // Process texture outputs
@@ -267,7 +275,12 @@ public:
 
                     for (UINT i = 0; i < subresourceCount; ++i)
                     {
-                        latestUsages[i] = usage;
+                        if (latestUsages[i] != usage)
+                        {
+                            CompiledTextureBarrier barrier = {texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0}};
+                            latestUsages[i] = usage;
+                            node.texturePostBarriers.push_back(barrier);
+                        }
                     }
                 }
                 else
@@ -284,7 +297,9 @@ public:
 
                                 if (latestUsages[subresourceIndex] != usage)
                                 {
+                                    CompiledTextureBarrier barrier = {texture, latestUsages[subresourceIndex], usage, {subresourceIndex, 0, 0, 0, 0, 0}};
                                     latestUsages[subresourceIndex] = usage;
+                                    node.texturePostBarriers.push_back(barrier);
                                 }
                             }
                         }
@@ -294,14 +309,16 @@ public:
         }
     }
 
-    const std::vector<CompiledBufferBarrier>& GetCompiledBufferBarriers(PassType passType) const
+    const std::vector<CompiledBufferBarrier>& GetCompiledBufferBarriers(PassType passType, BarrierTiming timing) const
     {
-        return m_nodes[static_cast<UINT>(passType)].bufferBarriers;
+        UINT pass = static_cast<UINT>(passType);
+        return timing == BarrierTiming::PRE_PASS ? m_nodes[pass].bufferPreBarriers : m_nodes[pass].bufferPostBarriers;
     }
 
-    const std::vector<CompiledTextureBarrier>& GetCompiledTextureBarrier(PassType passType) const
+    const std::vector<CompiledTextureBarrier>& GetCompiledTextureBarrier(PassType passType, BarrierTiming timing) const
     {
-        return m_nodes[static_cast<UINT>(passType)].textureBarriers;
+        UINT pass = static_cast<UINT>(passType);
+        return timing == BarrierTiming::PRE_PASS ? m_nodes[pass].texturePreBarriers : m_nodes[pass].texturePostBarriers;
     }
 
     std::array<RenderGraphNode, static_cast<std::size_t>(PassType::NUM_PASS_TYPES)> m_nodes;
