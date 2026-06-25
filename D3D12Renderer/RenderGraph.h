@@ -4,6 +4,7 @@
 #include <array>
 #include <cassert>
 #include <functional>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -19,6 +20,12 @@
 #include "RenderGraphNode.h"
 #include "RendererConfig.h"
 
+enum class BarrierTiming
+{
+    PRE_PASS,
+    POST_PASS
+};
+
 class RenderGraph
 {
 public:
@@ -33,7 +40,7 @@ public:
         const std::string& name,
         bool isPerFrame)
     {
-        auto idx = RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, {});
+        auto idx = RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, D3D12_BARRIER_LAYOUT_UNDEFINED);
         m_bufferGroups[idx].isDynamic = false;
         return {idx};
     }
@@ -43,7 +50,7 @@ public:
         bool isPerFrame,
         std::function<std::vector<ID3D12Resource*>()>&& provider)
     {
-        auto idx = RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, {});
+        auto idx = RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, D3D12_BARRIER_LAYOUT_UNDEFINED);
         m_bufferGroups[idx].isDynamic = true;
         m_bufferGroups[idx].provider = std::move(provider);
         return {idx};
@@ -52,10 +59,10 @@ public:
     RGTexture RegisterTexture(
         const std::string& name,
         bool isPerFrame,
-        TextureResourceUsage initialUsage,
+        D3D12_BARRIER_LAYOUT initialLayout,
         UINT subresourceCount)
     {
-        auto idx = RegisterHelper(name, isPerFrame, m_textureGroups, m_textureMap, initialUsage);
+        auto idx = RegisterHelper(name, isPerFrame, m_textureGroups, m_textureMap, initialLayout);
         m_textureGroups[idx].isDynamic = false;
         m_textureGroups[idx].subresourceCount = subresourceCount;
         return {idx};
@@ -64,11 +71,11 @@ public:
     RGTexture RegisterTexture(
         const std::string& name,
         bool isPerFrame,
-        TextureResourceUsage initialUsage,
+        D3D12_BARRIER_LAYOUT initialLayout,
         UINT subresourceCount,
         std::function<std::vector<ID3D12Resource*>()>&& provider)
     {
-        auto idx = RegisterHelper(name, isPerFrame, m_textureGroups, m_textureMap, initialUsage);
+        auto idx = RegisterHelper(name, isPerFrame, m_textureGroups, m_textureMap, initialLayout);
         m_textureGroups[idx].isDynamic = true;
         m_textureGroups[idx].subresourceCount = subresourceCount;
         m_textureGroups[idx].provider = std::move(provider);
@@ -142,11 +149,13 @@ public:
         return ResolveHelper(texture.index, elementIndex, frameIndex, m_textureGroups);
     }
 
+    // Return {MipLevels, ArraySize, PlaneCount}
     std::tuple<UINT, UINT, UINT> GetResourceDimension(ID3D12Device* pDevice, RGTexture texture) const
     {
-        auto desc = m_textureGroups[texture.index].pResources.front()->GetDesc();
+        const auto desc = m_textureGroups[texture.index].pResources.front()->GetDesc();
+        UINT arraySize = desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? 1 : desc.DepthOrArraySize;
         UINT8 planeCount = D3DHelper::GetFormatPlaneCount(pDevice, desc.Format);
-        return {desc.MipLevels, desc.DepthOrArraySize, planeCount};
+        return {desc.MipLevels, arraySize, planeCount};
     }
 
     UINT GetElementCount(RGBuffer buffer) const
@@ -169,142 +178,87 @@ public:
         return {m_textureMap.at(name)};
     }
 
-    void Compile()
+    void Compile(const std::vector<PassType>& order)
     {
-        std::vector<BufferResourceUsage> currentBufferUsages(m_bufferGroups.size());
+        std::vector<BufferResourceUsage> currentBufferUsages(m_bufferGroups.size(), {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS});
 
-        // Use initialLayout when using newly created resources.
-        // For existing resources, use values queried from m_frameEndUsage.
         std::vector<std::vector<TextureResourceUsage>> currentTextureUsages(m_textureGroups.size());
         for (UINT i = 0; i < m_textureGroups.size(); ++i)
         {
             auto& group = m_textureGroups[i];
-            UINT subresourceCount = group.subresourceCount;
-            currentTextureUsages[i] = std::vector<TextureResourceUsage>(subresourceCount, group.initialUsage);
+            currentTextureUsages[i].assign(group.subresourceCount, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, group.initialLayout});
         }
 
-        std::vector<PassType> defaultOrder = {
-            PassType::SHADOW_MAP,
-            PassType::GBUFFER,
-            PassType::DEFERRED_LIGHTING,
-            PassType::FORWARD_COLORING,
-            PassType::SELECTION_MASK,
-            PassType::HORIZONTAL_DILATE,
-            PassType::OUTLINE_DRAWING,
-            PassType::TONEMAP};
-
-        // Compile graph
-        for (const PassType& passType : defaultOrder)
+        auto processBufferBarriers = [&](RenderGraphNode& node, BarrierTiming timing)
         {
-            auto& node = m_nodes[static_cast<UINT>(passType)];
+            const auto& src = timing == BarrierTiming::PRE_PASS ? node.bufferInputs : node.bufferOutputs;
+            auto& dest = timing == BarrierTiming::PRE_PASS ? node.bufferPreBarriers : node.bufferPostBarriers;
 
-            // Process buffer inputs
-            for (auto& [buffer, usage] : node.bufferInputs)
+            for (const auto& [buffer, usage] : src)
             {
                 CompiledBufferBarrier barrier = {buffer, currentBufferUsages[buffer.index], usage};
                 currentBufferUsages[buffer.index] = usage;
-                node.bufferBarriers.push_back(barrier);
+                dest.push_back(barrier);
             }
+        };
 
-            // Process texture inputs
-            for (auto& [texture, usage, range] : node.textureInputs)
+        auto processTextureBarriers = [&](RenderGraphNode& node, BarrierTiming timing)
+        {
+            const auto& src = timing == BarrierTiming::PRE_PASS ? node.textureInputs : node.textureOutputs;
+            auto& dest = timing == BarrierTiming::PRE_PASS ? node.texturePreBarriers : node.texturePostBarriers;
+
+            for (const auto& [texture, usage, range] : src)
             {
                 auto& latestUsages = currentTextureUsages[texture.index];
 
-                const auto& [IndexOrFirstMipLevel, NumMipLevels, FirstArraySlice, NumArraySlices, FirstPlane, NumPlanes] = range;
-
-                if (IndexOrFirstMipLevel == 0xffff'ffff && NumMipLevels == 0)
+                for (UINT i : ExpandSubresourceRange(texture, range))
                 {
-                    UINT subresourceCount = m_textureGroups[texture.index].subresourceCount;
-
-                    for (UINT i = 0; i < subresourceCount; ++i)
+                    if (latestUsages[i] != usage)
                     {
-                        if (latestUsages[i] != usage)
-                        {
-                            CompiledTextureBarrier barrier = {texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0}};
-                            latestUsages[i] = usage;
-                            node.textureBarriers.push_back(barrier);
-                        }
-                    }
-                }
-                else
-                {
-                    const auto [mipLevels, depthOrArraySize, planeCount] = GetResourceDimension(m_pDevice, texture);
-
-                    for (UINT plane = FirstPlane; plane < FirstPlane + NumPlanes; ++plane)
-                    {
-                        for (UINT array = FirstArraySlice; array < FirstArraySlice + NumArraySlices; ++array)
-                        {
-                            for (UINT mip = IndexOrFirstMipLevel; mip < IndexOrFirstMipLevel + NumMipLevels; ++mip)
-                            {
-                                UINT subresourceIndex = D3DHelper::CalcSubresourceIndex(mip, array, plane, mipLevels, depthOrArraySize);
-
-                                if (latestUsages[subresourceIndex] != usage)
-                                {
-                                    CompiledTextureBarrier barrier = {texture, latestUsages[subresourceIndex], usage, {subresourceIndex, 0, 0, 0, 0, 0}};
-                                    latestUsages[subresourceIndex] = usage;
-                                    node.textureBarriers.push_back(barrier);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Process buffer outputs
-            for (auto& [buffer, usage] : node.bufferOutputs)
-            {
-                currentBufferUsages[buffer.index] = usage;
-            }
-
-            // Process texture outputs
-            for (auto& [texture, usage, range] : node.textureOutputs)
-            {
-                auto& latestUsages = currentTextureUsages[texture.index];
-
-                const auto& [IndexOrFirstMipLevel, NumMipLevels, FirstArraySlice, NumArraySlices, FirstPlane, NumPlanes] = range;
-
-                if (IndexOrFirstMipLevel == 0xffff'ffff && NumMipLevels == 0)
-                {
-                    UINT subresourceCount = m_textureGroups[texture.index].subresourceCount;
-
-                    for (UINT i = 0; i < subresourceCount; ++i)
-                    {
+                        CompiledTextureBarrier barrier = {texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0}};
                         latestUsages[i] = usage;
+                        dest.push_back(barrier);
                     }
                 }
-                else
-                {
-                    const auto [mipLevels, depthOrArraySize, planeCount] = GetResourceDimension(m_pDevice, texture);
+            }
+        };
 
-                    for (UINT plane = FirstPlane; plane < FirstPlane + NumPlanes; ++plane)
-                    {
-                        for (UINT array = FirstArraySlice; array < FirstArraySlice + NumArraySlices; ++array)
-                        {
-                            for (UINT mip = IndexOrFirstMipLevel; mip < IndexOrFirstMipLevel + NumMipLevels; ++mip)
-                            {
-                                UINT subresourceIndex = D3DHelper::CalcSubresourceIndex(mip, array, plane, mipLevels, depthOrArraySize);
+        // Compile graph
+        for (const PassType& passType : order)
+        {
+            auto& node = m_nodes[static_cast<UINT>(passType)];
+            processBufferBarriers(node, BarrierTiming::PRE_PASS);
+            processTextureBarriers(node, BarrierTiming::PRE_PASS);
+            processBufferBarriers(node, BarrierTiming::POST_PASS);
+            processTextureBarriers(node, BarrierTiming::POST_PASS);
+        }
 
-                                if (latestUsages[subresourceIndex] != usage)
-                                {
-                                    latestUsages[subresourceIndex] = usage;
-                                }
-                            }
-                        }
-                    }
-                }
+        // Round-trip check
+        RGTexture toneMappedBuffer = GetRGTexture("ToneMappedBuffer"); // TODO: Generalize with expectedEndLayout that provided from RegisterTexture
+
+        for (UINT i = 0; i < m_textureGroups.size(); ++i)
+        {
+            const auto& group = m_textureGroups[i];
+
+            for (UINT j = 0; j < group.subresourceCount; ++j)
+            {
+                D3D12_BARRIER_LAYOUT target = i == toneMappedBuffer.index ? D3D12_BARRIER_LAYOUT_SHADER_RESOURCE : group.initialLayout;
+                if (currentTextureUsages[i][j].layout != target)
+                    throw std::runtime_error("Render Graph round-trip validation failed.");
             }
         }
     }
 
-    const std::vector<CompiledBufferBarrier>& GetCompiledBufferBarriers(PassType passType) const
+    const std::vector<CompiledBufferBarrier>& GetCompiledBufferBarriers(PassType passType, BarrierTiming timing) const
     {
-        return m_nodes[static_cast<UINT>(passType)].bufferBarriers;
+        UINT pass = static_cast<UINT>(passType);
+        return timing == BarrierTiming::PRE_PASS ? m_nodes[pass].bufferPreBarriers : m_nodes[pass].bufferPostBarriers;
     }
 
-    const std::vector<CompiledTextureBarrier>& GetCompiledTextureBarrier(PassType passType) const
+    const std::vector<CompiledTextureBarrier>& GetCompiledTextureBarrier(PassType passType, BarrierTiming timing) const
     {
-        return m_nodes[static_cast<UINT>(passType)].textureBarriers;
+        UINT pass = static_cast<UINT>(passType);
+        return timing == BarrierTiming::PRE_PASS ? m_nodes[pass].texturePreBarriers : m_nodes[pass].texturePostBarriers;
     }
 
     std::array<RenderGraphNode, static_cast<std::size_t>(PassType::NUM_PASS_TYPES)> m_nodes;
@@ -319,7 +273,7 @@ private:
 
         UINT subresourceCount;
 
-        TextureResourceUsage initialUsage;
+        D3D12_BARRIER_LAYOUT initialLayout;
 
         std::function<std::vector<ID3D12Resource*>()> provider;
     };
@@ -329,14 +283,14 @@ private:
         bool isPerFrame,
         std::vector<ResourceGroup>& groups,
         std::unordered_map<std::string, UINT>& map,
-        TextureResourceUsage initialUsage)
+        D3D12_BARRIER_LAYOUT initialLayout)
     {
         UINT ret = static_cast<UINT>(groups.size());
 
         ResourceGroup newEntry;
         newEntry.elementCount = 0;
         newEntry.isPerFrame = isPerFrame;
-        newEntry.initialUsage = initialUsage;
+        newEntry.initialLayout = initialLayout;
         groups.push_back(newEntry);
 
         map[name] = ret;
@@ -377,6 +331,47 @@ private:
         UINT idx = isPerFrame ? elementIndex * FrameCount + frameIndex : elementIndex;
 
         return groups[index].pResources[idx];
+    }
+
+    std::vector<UINT> ExpandSubresourceRange(RGTexture texture, D3D12_BARRIER_SUBRESOURCE_RANGE range) const
+    {
+        std::vector<UINT> indices;
+
+        const UINT subresourceCount = m_textureGroups[texture.index].subresourceCount;
+
+        const auto& [IndexOrFirstMipLevel, NumMipLevels, FirstArraySlice, NumArraySlices, FirstPlane, NumPlanes] = range;
+
+        if (NumMipLevels == 0)
+        {
+            if (IndexOrFirstMipLevel == 0xffff'ffff)
+            {
+                indices.resize(subresourceCount);
+                for (UINT i = 0; i < subresourceCount; ++i)
+                    indices[i] = i;
+            }
+            else
+            {
+                indices.push_back(IndexOrFirstMipLevel);
+            }
+        }
+        else
+        {
+            const auto [mipLevels, arraySize, planeCount] = GetResourceDimension(m_pDevice, texture);
+
+            for (UINT plane = FirstPlane; plane < FirstPlane + NumPlanes; ++plane)
+            {
+                for (UINT array = FirstArraySlice; array < FirstArraySlice + NumArraySlices; ++array)
+                {
+                    for (UINT mip = IndexOrFirstMipLevel; mip < IndexOrFirstMipLevel + NumMipLevels; ++mip)
+                    {
+                        UINT subresourceIndex = D3DHelper::CalcSubresourceIndex(mip, array, plane, mipLevels, arraySize);
+                        indices.push_back(subresourceIndex);
+                    }
+                }
+            }
+        }
+
+        return indices;
     }
 
     std::vector<ResourceGroup> m_bufferGroups;

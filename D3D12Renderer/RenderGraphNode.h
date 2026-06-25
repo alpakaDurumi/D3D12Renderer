@@ -97,6 +97,8 @@ public:
     std::vector<std::tuple<RGTexture, TextureResourceUsage, D3D12_BARRIER_SUBRESOURCE_RANGE>> textureInputs;
     std::vector<std::tuple<RGTexture, TextureResourceUsage, D3D12_BARRIER_SUBRESOURCE_RANGE>> textureOutputs;
 
-    std::vector<CompiledBufferBarrier> bufferBarriers;
-    std::vector<CompiledTextureBarrier> textureBarriers;
+    std::vector<CompiledBufferBarrier> bufferPreBarriers;
+    std::vector<CompiledBufferBarrier> bufferPostBarriers;
+    std::vector<CompiledTextureBarrier> texturePreBarriers;
+    std::vector<CompiledTextureBarrier> texturePostBarriers;
 };

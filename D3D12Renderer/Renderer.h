@@ -211,7 +211,7 @@ private:
     // Render
     void PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList);
     void BindDescriptorTables(ID3D12GraphicsCommandList* pCommandList);
-    void ApplyPassBarriers(RenderGraph& renderGraph, PassType passType, ID3D12GraphicsCommandList7* pCommandList);
+    void ApplyPassBarriers(PassType passType, BarrierTiming timing, ID3D12GraphicsCommandList7* pCommandList);
     ID3D12PipelineState* GetPipelineState(const PSOKey& psoKey);
     const std::vector<char>& GetShaderBlobRef(const ShaderKey& shaderKey) const;
     void DrawMesh(ID3D12GraphicsCommandList* pCommandList, MeshHandle meshHandle, D3D12_GPU_VIRTUAL_ADDRESS instanceIndexVA, VisibleRange visibleRange);
