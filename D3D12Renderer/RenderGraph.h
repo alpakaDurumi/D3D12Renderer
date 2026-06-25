@@ -171,7 +171,7 @@ public:
 
     void Compile()
     {
-        std::vector<BufferResourceUsage> currentBufferUsages(m_bufferGroups.size());
+        std::vector<BufferResourceUsage> currentBufferUsages(m_bufferGroups.size(), {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS});
 
         // Use initialLayout when using newly created resources.
         // For existing resources, use values queried from m_frameEndUsage.
