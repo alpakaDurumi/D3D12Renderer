@@ -1253,8 +1253,18 @@ void Renderer::LoadAssets()
         pToneMappedBuffers[i] = m_frameResources[i].GetToneMappedBuffer();
     m_renderGraph.AddElement(toneMappedBuffer, pToneMappedBuffers);
 
+    const std::vector<PassType> defaultOrder = {
+        PassType::SHADOW_MAP,
+        PassType::GBUFFER,
+        PassType::DEFERRED_LIGHTING,
+        PassType::FORWARD_COLORING,
+        PassType::SELECTION_MASK,
+        PassType::HORIZONTAL_DILATE,
+        PassType::OUTLINE_DRAWING,
+        PassType::TONEMAP};
+
     PrepareRenderGraph();
-    m_renderGraph.Compile();
+    m_renderGraph.Compile(defaultOrder);
 }
 
 // Setup Dear ImGui context

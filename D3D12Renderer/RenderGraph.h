@@ -178,7 +178,7 @@ public:
         return {m_textureMap.at(name)};
     }
 
-    void Compile()
+    void Compile(const std::vector<PassType>& order)
     {
         std::vector<BufferResourceUsage> currentBufferUsages(m_bufferGroups.size(), {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS});
 
@@ -189,18 +189,8 @@ public:
             currentTextureUsages[i].assign(group.subresourceCount, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, group.initialLayout});
         }
 
-        std::vector<PassType> defaultOrder = {
-            PassType::SHADOW_MAP,
-            PassType::GBUFFER,
-            PassType::DEFERRED_LIGHTING,
-            PassType::FORWARD_COLORING,
-            PassType::SELECTION_MASK,
-            PassType::HORIZONTAL_DILATE,
-            PassType::OUTLINE_DRAWING,
-            PassType::TONEMAP};
-
         // Compile graph
-        for (const PassType& passType : defaultOrder)
+        for (const PassType& passType : order)
         {
             auto& node = m_nodes[static_cast<UINT>(passType)];
 
