@@ -189,58 +189,48 @@ public:
             currentTextureUsages[i].assign(group.subresourceCount, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, group.initialLayout});
         }
 
+        auto processBufferBarriers = [&](RenderGraphNode& node, BarrierTiming timing)
+        {
+            const auto& src = timing == BarrierTiming::PRE_PASS ? node.bufferInputs : node.bufferOutputs;
+            auto& dest = timing == BarrierTiming::PRE_PASS ? node.bufferPreBarriers : node.bufferPostBarriers;
+
+            for (const auto& [buffer, usage] : src)
+            {
+                CompiledBufferBarrier barrier = {buffer, currentBufferUsages[buffer.index], usage};
+                currentBufferUsages[buffer.index] = usage;
+                dest.push_back(barrier);
+            }
+        };
+
+        auto processTextureBarriers = [&](RenderGraphNode& node, BarrierTiming timing)
+        {
+            const auto& src = timing == BarrierTiming::PRE_PASS ? node.textureInputs : node.textureOutputs;
+            auto& dest = timing == BarrierTiming::PRE_PASS ? node.texturePreBarriers : node.texturePostBarriers;
+
+            for (const auto& [texture, usage, range] : src)
+            {
+                auto& latestUsages = currentTextureUsages[texture.index];
+
+                for (UINT i : ExpandSubresourceRange(texture, range))
+                {
+                    if (latestUsages[i] != usage)
+                    {
+                        CompiledTextureBarrier barrier = {texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0}};
+                        latestUsages[i] = usage;
+                        dest.push_back(barrier);
+                    }
+                }
+            }
+        };
+
         // Compile graph
         for (const PassType& passType : order)
         {
             auto& node = m_nodes[static_cast<UINT>(passType)];
-
-            // Process buffer inputs
-            for (auto& [buffer, usage] : node.bufferInputs)
-            {
-                CompiledBufferBarrier barrier = {buffer, currentBufferUsages[buffer.index], usage};
-                currentBufferUsages[buffer.index] = usage;
-                node.bufferPreBarriers.push_back(barrier);
-            }
-
-            // Process texture inputs
-            for (auto& [texture, usage, range] : node.textureInputs)
-            {
-                auto& latestUsages = currentTextureUsages[texture.index];
-
-                for (UINT i : ExpandSubresourceRange(texture, range))
-                {
-                    if (latestUsages[i] != usage)
-                    {
-                        CompiledTextureBarrier barrier = {texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0}};
-                        latestUsages[i] = usage;
-                        node.texturePreBarriers.push_back(barrier);
-                    }
-                }
-            }
-
-            // Process buffer outputs
-            for (auto& [buffer, usage] : node.bufferOutputs)
-            {
-                CompiledBufferBarrier barrier = {buffer, currentBufferUsages[buffer.index], usage};
-                currentBufferUsages[buffer.index] = usage;
-                node.bufferPostBarriers.push_back(barrier);
-            }
-
-            // Process texture outputs
-            for (auto& [texture, usage, range] : node.textureOutputs)
-            {
-                auto& latestUsages = currentTextureUsages[texture.index];
-
-                for (UINT i : ExpandSubresourceRange(texture, range))
-                {
-                    if (latestUsages[i] != usage)
-                    {
-                        CompiledTextureBarrier barrier = {texture, latestUsages[i], usage, {i, 0, 0, 0, 0, 0}};
-                        latestUsages[i] = usage;
-                        node.texturePostBarriers.push_back(barrier);
-                    }
-                }
-            }
+            processBufferBarriers(node, BarrierTiming::PRE_PASS);
+            processTextureBarriers(node, BarrierTiming::PRE_PASS);
+            processBufferBarriers(node, BarrierTiming::POST_PASS);
+            processTextureBarriers(node, BarrierTiming::POST_PASS);
         }
 
         // Round-trip check
