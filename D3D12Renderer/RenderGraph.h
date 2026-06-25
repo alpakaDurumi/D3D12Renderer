@@ -173,14 +173,11 @@ public:
     {
         std::vector<BufferResourceUsage> currentBufferUsages(m_bufferGroups.size(), {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS});
 
-        // Use initialLayout when using newly created resources.
-        // For existing resources, use values queried from m_frameEndUsage.
         std::vector<std::vector<TextureResourceUsage>> currentTextureUsages(m_textureGroups.size());
         for (UINT i = 0; i < m_textureGroups.size(); ++i)
         {
             auto& group = m_textureGroups[i];
-            UINT subresourceCount = group.subresourceCount;
-            currentTextureUsages[i] = std::vector<TextureResourceUsage>(subresourceCount, group.initialUsage);
+            currentTextureUsages[i].assign(group.subresourceCount, group.initialUsage);
         }
 
         std::vector<PassType> defaultOrder = {
