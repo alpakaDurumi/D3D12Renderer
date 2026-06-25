@@ -1141,7 +1141,7 @@ void Renderer::LoadAssets()
     RGTexture sceneColorBuffer0 = m_renderGraph.RegisterTexture(
         "SceneColorBuffer0",
         true,
-        {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetSceneColorBuffer(0)));
     std::vector<ID3D12Resource*> pSceneColorBuffers0(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
@@ -1151,7 +1151,7 @@ void Renderer::LoadAssets()
     RGTexture sceneColorBuffer1 = m_renderGraph.RegisterTexture(
         "SceneColorBuffer1",
         true,
-        {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetSceneColorBuffer(1)));
     std::vector<ID3D12Resource*> pSceneColorBuffers1(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
@@ -1161,14 +1161,14 @@ void Renderer::LoadAssets()
     RGTexture depthStencilBuffer = m_renderGraph.RegisterTexture(
         "DepthStencilBuffer",
         false,
-        {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE},
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
         GetSubresourceCount(m_device.Get(), m_depthStencilBuffer.Get()));
     m_renderGraph.AddElement(depthStencilBuffer, {m_depthStencilBuffer.Get()});
 
     RGTexture gBuffer = m_renderGraph.RegisterTexture(
         "GBuffer",
         true,
-        {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetGBuffer(GBufferSlot::ALBEDO)));
     for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
     {
@@ -1181,7 +1181,7 @@ void Renderer::LoadAssets()
     RGTexture selectionMask = m_renderGraph.RegisterTexture(
         "SelectionMask",
         true,
-        {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetSelectionMask()));
     std::vector<ID3D12Resource*> pSelectionMasks(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
@@ -1191,7 +1191,7 @@ void Renderer::LoadAssets()
     RGTexture horizontalDilatedMask = m_renderGraph.RegisterTexture(
         "HorizontalDilatedMask",
         true,
-        {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetHorizontalDilatedMask()));
     std::vector<ID3D12Resource*> pHorizontalDilatedMasks(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)
@@ -1201,7 +1201,7 @@ void Renderer::LoadAssets()
     m_renderGraph.RegisterTexture(
         "DirectionalLight",
         false,
-        {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE},
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
         GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, MAX_CASCADES, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
         [this]()
         {
@@ -1216,7 +1216,7 @@ void Renderer::LoadAssets()
     m_renderGraph.RegisterTexture(
         "PointLight",
         false,
-        {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
         GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET)),
         [this]()
         {
@@ -1231,7 +1231,7 @@ void Renderer::LoadAssets()
     m_renderGraph.RegisterTexture(
         "SpotLight",
         false,
-        {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE},
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
         GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, SPOT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
         [this]()
         {
@@ -1246,7 +1246,7 @@ void Renderer::LoadAssets()
     RGTexture toneMappedBuffer = m_renderGraph.RegisterTexture(
         "ToneMappedBuffer",
         true,
-        {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_RENDER_TARGET},
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
         GetSubresourceCount(m_device.Get(), m_frameResources.front().GetToneMappedBuffer()));
     std::vector<ID3D12Resource*> pToneMappedBuffers(FrameCount);
     for (UINT i = 0; i < FrameCount; ++i)

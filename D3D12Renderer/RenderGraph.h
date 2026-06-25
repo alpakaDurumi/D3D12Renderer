@@ -40,7 +40,7 @@ public:
         const std::string& name,
         bool isPerFrame)
     {
-        auto idx = RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, {});
+        auto idx = RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, D3D12_BARRIER_LAYOUT_UNDEFINED);
         m_bufferGroups[idx].isDynamic = false;
         return {idx};
     }
@@ -50,7 +50,7 @@ public:
         bool isPerFrame,
         std::function<std::vector<ID3D12Resource*>()>&& provider)
     {
-        auto idx = RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, {});
+        auto idx = RegisterHelper(name, isPerFrame, m_bufferGroups, m_bufferMap, D3D12_BARRIER_LAYOUT_UNDEFINED);
         m_bufferGroups[idx].isDynamic = true;
         m_bufferGroups[idx].provider = std::move(provider);
         return {idx};
@@ -59,10 +59,10 @@ public:
     RGTexture RegisterTexture(
         const std::string& name,
         bool isPerFrame,
-        TextureResourceUsage initialUsage,
+        D3D12_BARRIER_LAYOUT initialLayout,
         UINT subresourceCount)
     {
-        auto idx = RegisterHelper(name, isPerFrame, m_textureGroups, m_textureMap, initialUsage);
+        auto idx = RegisterHelper(name, isPerFrame, m_textureGroups, m_textureMap, initialLayout);
         m_textureGroups[idx].isDynamic = false;
         m_textureGroups[idx].subresourceCount = subresourceCount;
         return {idx};
@@ -71,11 +71,11 @@ public:
     RGTexture RegisterTexture(
         const std::string& name,
         bool isPerFrame,
-        TextureResourceUsage initialUsage,
+        D3D12_BARRIER_LAYOUT initialLayout,
         UINT subresourceCount,
         std::function<std::vector<ID3D12Resource*>()>&& provider)
     {
-        auto idx = RegisterHelper(name, isPerFrame, m_textureGroups, m_textureMap, initialUsage);
+        auto idx = RegisterHelper(name, isPerFrame, m_textureGroups, m_textureMap, initialLayout);
         m_textureGroups[idx].isDynamic = true;
         m_textureGroups[idx].subresourceCount = subresourceCount;
         m_textureGroups[idx].provider = std::move(provider);
@@ -184,7 +184,7 @@ public:
         for (UINT i = 0; i < m_textureGroups.size(); ++i)
         {
             auto& group = m_textureGroups[i];
-            currentTextureUsages[i].assign(group.subresourceCount, group.initialUsage);
+            currentTextureUsages[i].assign(group.subresourceCount, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, group.initialLayout});
         }
 
         std::vector<PassType> defaultOrder = {
@@ -318,7 +318,7 @@ public:
 
             for (UINT j = 0; j < group.subresourceCount; ++j)
             {
-                D3D12_BARRIER_LAYOUT target = i == toneMappedBuffer.index ? D3D12_BARRIER_LAYOUT_SHADER_RESOURCE : group.initialUsage.layout;
+                D3D12_BARRIER_LAYOUT target = i == toneMappedBuffer.index ? D3D12_BARRIER_LAYOUT_SHADER_RESOURCE : group.initialLayout;
                 if (currentTextureUsages[i][j].layout != target)
                     throw std::runtime_error("Render Graph round-trip validation failed.");
             }
@@ -349,7 +349,7 @@ private:
 
         UINT subresourceCount;
 
-        TextureResourceUsage initialUsage;
+        D3D12_BARRIER_LAYOUT initialLayout;
 
         std::function<std::vector<ID3D12Resource*>()> provider;
     };
@@ -359,14 +359,14 @@ private:
         bool isPerFrame,
         std::vector<ResourceGroup>& groups,
         std::unordered_map<std::string, UINT>& map,
-        TextureResourceUsage initialUsage)
+        D3D12_BARRIER_LAYOUT initialLayout)
     {
         UINT ret = static_cast<UINT>(groups.size());
 
         ResourceGroup newEntry;
         newEntry.elementCount = 0;
         newEntry.isPerFrame = isPerFrame;
-        newEntry.initialUsage = initialUsage;
+        newEntry.initialLayout = initialLayout;
         groups.push_back(newEntry);
 
         map[name] = ret;
