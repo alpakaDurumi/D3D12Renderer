@@ -428,8 +428,14 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
-# Ignore Asset directory. Assets will be provided from outside, not github
+# CMake build output
+/build*/
+
+# Local CMake presets
+CMakeUserPresets.json
+
+# Asset directory. Assets will be provided from outside, not github
 [Aa]ssets/
 
-# Ignore local claude settings
+# Local claude settings
 .claude/settings.local.json
