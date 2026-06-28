@@ -7,7 +7,9 @@
 #include <ratio>
 #include <thread>
 
+#if defined(_DEBUG)
 #include <dxgidebug.h>
+#endif // _DEBUG
 #include <shlobj.h>
 
 #include <imgui.h>
