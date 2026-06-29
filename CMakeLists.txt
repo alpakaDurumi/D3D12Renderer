@@ -48,6 +48,15 @@ set(BUILD_DX11 OFF)
 set(BC_USE_OPENMP ON)
 FetchContent_MakeAvailable(DirectXTex)
 
+# DirectXTex builds with /Wall, which makes clang emit -Wpadded.
+# The #pragma warning(disable: 4820) that hides it is MSVC-only, and
+# the corresponding suppressor for clang has not been set.
+# It has been fixed in microsoft/DirectXTex PR #709 but not yet in a release.
+# Drop this once we update to a newer DirectXTex version that includes it.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    target_compile_options(DirectXTex PRIVATE -Wno-padded)
+endif()
+
 FetchContent_Declare(
     DirectX12Agility
     URL https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/1.717.1-preview
