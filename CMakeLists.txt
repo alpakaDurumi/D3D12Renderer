@@ -14,8 +14,10 @@ set(CMAKE_EXE_LINKER_FLAGS_RELEASE_PIX "${CMAKE_EXE_LINKER_FLAGS_RELEASE}" CACHE
 set(CMAKE_MAP_IMPORTED_CONFIG_RELEASE_PIX Release)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND WIN32)
-    cmake_path(GET CMAKE_CXX_COMPILER PARENT_PATH _llvm_bin)
-    set(OpenMP_libomp_LIBRARY "${_llvm_bin}/../lib/libomp.lib")
+    if(NOT DEFINED OpenMP_libomp_LIBRARY)
+        cmake_path(GET CMAKE_CXX_COMPILER PARENT_PATH _llvm_bin)
+        set(OpenMP_libomp_LIBRARY "${_llvm_bin}/../lib/libomp.lib")
+    endif()
     if(NOT EXISTS "${OpenMP_libomp_LIBRARY}")
         message(FATAL_ERROR
             "libomp.lib not found at ${OpenMP_libomp_LIBRARY}. "
