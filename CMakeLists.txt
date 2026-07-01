@@ -13,10 +13,10 @@ set(CMAKE_CXX_FLAGS_RELEASE_PIX "${CMAKE_CXX_FLAGS_RELEASE}" CACHE STRING "" FOR
 set(CMAKE_EXE_LINKER_FLAGS_RELEASE_PIX "${CMAKE_EXE_LINKER_FLAGS_RELEASE}" CACHE STRING "" FORCE)
 set(CMAKE_MAP_IMPORTED_CONFIG_RELEASE_PIX Release)
 
+cmake_path(GET CMAKE_CXX_COMPILER PARENT_PATH _compiler_bin)
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND WIN32)
     if(NOT DEFINED OpenMP_libomp_LIBRARY)
-        cmake_path(GET CMAKE_CXX_COMPILER PARENT_PATH _llvm_bin)
-        set(OpenMP_libomp_LIBRARY "${_llvm_bin}/../lib/libomp.lib")
+        set(OpenMP_libomp_LIBRARY "${_compiler_bin}/../lib/libomp.lib")
     endif()
     if(NOT EXISTS "${OpenMP_libomp_LIBRARY}")
         message(FATAL_ERROR
@@ -181,6 +181,15 @@ add_custom_command(
         ${winpixeventruntime_SOURCE_DIR}/bin/x64/WinPixEventRuntime.dll
         $<TARGET_FILE_DIR:D3D12Renderer>
 )
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND WIN32)
+    add_custom_command(
+        TARGET D3D12Renderer POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${_compiler_bin}/libomp.dll
+            $<TARGET_FILE_DIR:D3D12Renderer>
+    )
+endif()
 
 target_compile_definitions(
     D3D12Renderer
