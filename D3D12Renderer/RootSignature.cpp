@@ -149,6 +149,8 @@ void RootSignature::InitStaticSampler(
             samplerDesc.Filter = D3D12_FILTER_ANISOTROPIC;
             samplerDesc.MaxAnisotropy = 16;
             break;
+        case TextureFiltering::NUM_TEXTURE_FILTERINGS:
+            throw std::logic_error("TextureFiltering::NUM_TEXTURE_FILTERINGS is not a valid value.");
         }
     }
 
@@ -179,6 +181,8 @@ void RootSignature::InitStaticSampler(
         samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
         samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
         break;
+    case TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES:
+        throw std::logic_error("TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES is not a valid value.");
     }
 
     samplerDesc.MipLODBias = 0;

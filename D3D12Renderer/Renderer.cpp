@@ -97,6 +97,8 @@ static D3D12_SAMPLER_DESC GetSamplerDesc(
         desc.Filter = D3D12_FILTER_ANISOTROPIC;
         desc.MaxAnisotropy = 16;
         break;
+    case TextureFiltering::NUM_TEXTURE_FILTERINGS:
+        throw std::logic_error("TextureFiltering::NUM_TEXTURE_FILTERINGS is not a valid value.");
     }
 
     switch (addressingMode)
@@ -126,6 +128,8 @@ static D3D12_SAMPLER_DESC GetSamplerDesc(
         desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
         desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
         break;
+    case TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES:
+        throw std::logic_error("TextureAddressingMode::NUM_TEXTURE_ADDRESSING_MODES is not a valid value.");
     }
 
     desc.MipLODBias = 0;
@@ -2606,6 +2610,8 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
             depthStencilDesc.DepthEnable = FALSE;
             depthStencilDesc.StencilEnable = FALSE;
             break;
+        case PassType::NUM_PASS_TYPES:
+            throw std::logic_error("PassType::NUM_PASS_TYPES is not a valid value.");
         }
 
         // Describe and create the graphics pipeline state object (PSO).
@@ -2689,6 +2695,8 @@ ID3D12PipelineState* Renderer::GetPipelineState(const PSOKey& psoKey)
             psoDesc.NumRenderTargets = 1;
             psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
             break;
+        case PassType::NUM_PASS_TYPES:
+            throw std::logic_error("PassType::NUM_PASS_TYPES is not a valid value.");
         }
 
         psoDesc.SampleDesc = {1, 0};
