@@ -12,17 +12,13 @@ class InputManager
 public:
     void SetKeyDown(VKCode key)
     {
-        if (key < 256)
-        {
-            m_keyDown[key] = true;
-            m_keyPressed[key] = true;
-        }
+        m_keyDown[key] = true;
+        m_keyPressed[key] = true;
     }
 
     void SetKeyUp(VKCode key)
     {
-        if (key < 256)
-            m_keyDown[key] = false;
+        m_keyDown[key] = false;
     }
 
     bool IsKeyDown(VKCode key) const
