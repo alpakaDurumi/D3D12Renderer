@@ -1,0 +1,10 @@
+Diagnostics:
+  ClangTidy:
+    Add: [bugprone-*]
+    Remove:
+      - bugprone-easily-swappable-parameters
+      - bugprone-switch-missing-default-case
+  Includes:
+    IgnoreHeader: [ 'pch\.h' ]
+CompileFlags:
+  CompilationDatabase: build
