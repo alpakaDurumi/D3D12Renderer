@@ -279,10 +279,11 @@ get_property(shader_outputs GLOBAL PROPERTY SHADER_OUTPUTS)
 
 add_custom_target(
     Shaders
-    ALL
     DEPENDS
     ${shader_outputs}
 )
+
+add_dependencies(D3D12Renderer Shaders)
 
 add_custom_command(
     TARGET D3D12Renderer POST_BUILD
