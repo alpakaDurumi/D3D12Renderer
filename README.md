@@ -4,15 +4,15 @@ Custom 3D rendering engine using Direct3D 12, C++17 and Win32 API
 
 ## Used
 
-### Served as Nuget
+### Packages
 
-|Package|Version|
-|--|--|
-|directxmath|2024.10.15.1|
-|directxtex_desktop_win10|2025.10.28.1|
-|Microsoft.Direct3D.D3D12|1.717.1-preview|
-|Microsoft.Direct3D.DXC|1.8.2505.32|
-|WinPixEventRuntime|1.0.240308001|
+| Package                  | Version         |
+| ------------------------ | --------------- |
+| directxmath              | 2024.10.15.1    |
+| directxtex_desktop_win10 | 2025.10.28.1    |
+| Microsoft.Direct3D.D3D12 | 1.717.1-preview |
+| Microsoft.Direct3D.DXC   | 1.8.2505.32     |
+| WinPixEventRuntime       | 1.0.240308001   |
 
 ### Included files or codes
 
@@ -29,15 +29,25 @@ Custom 3D rendering engine using Direct3D 12, C++17 and Win32 API
 
 ### Prerequisites
 
-- Platform toolset v143
-- Windows SDK 10.0.19041.0 or later
+- CMake 3.26+
+- Windows SDK
+- Visual Studio 2022 Build Tools with the "Desktop development with C++" workload
+- Microsoft Visual C++ Redistributable (x64)
+- LLVM, Ninja (If you use provided presets)
 - This project uses the **preview release** of the D3D12 Agility SDK to use *Enhanced Barriers*, and it can only be loaded when **Windows Developer Mode** is enabled. To enable Developer Mode, open Settings and search for 'Developer Mode', then turn it on.
+- Download assets from [here](https://drive.google.com/drive/folders/1CGZupYVKDUj7CQFzVJCZiTwuaJ--kPri?usp=sharing) and copy `assets` folder to repo root directory.
 
 ### Instructions
 
-1. Download assets from [here](https://drive.google.com/drive/folders/1CGZupYVKDUj7CQFzVJCZiTwuaJ--kPri?usp=sharing)
-2. copy `assets` folder to solution root directory
-3. Open `D3D12Renderer.sln` solution and build the project (Debug/Release/Release_PIX)
+Quick start:
+
+```bash
+cmake --preset clang-cl
+cmake --build --preset release
+```
+
+- You can choose another build presets: `debug`, `release-pix`
+- You can also use any generator or compiler for your preference.
 
 ## References
 

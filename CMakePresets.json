@@ -1,0 +1,36 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 26,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "clang-cl",
+            "displayName": "Clang-cl (Ninja Multi-Config)",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER": "clang-cl"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "debug",
+            "configurePreset": "clang-cl",
+            "configuration": "Debug"
+        },
+        {
+            "name": "release",
+            "configurePreset": "clang-cl",
+            "configuration": "Release"
+        },
+        {
+            "name": "release-pix",
+            "configurePreset": "clang-cl",
+            "configuration": "Release_PIX"
+        }
+    ]
+}
