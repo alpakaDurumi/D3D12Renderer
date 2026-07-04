@@ -1,0 +1,58 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 26,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER": "clang-cl"
+            }
+        },
+        {
+            "name": "default",
+            "inherits": "base"
+        },
+        {
+            "name": "dev",
+            "inherits": "base",
+            "cacheVariables": {
+                "ENGINE_DEBUG_LAYER": true
+            }
+        },
+        {
+            "name": "dev-gbv",
+            "inherits": "dev",
+            "cacheVariables": {
+                "ENGINE_GPU_BASED_VALIDATION": true
+            }
+        },
+        {
+            "name": "pix",
+            "inherits": "base",
+            "cacheVariables": {
+                "ENGINE_SHADER_DEBUG": true,
+                "ENGINE_PIX": true
+            }
+        }
+    ],
+    "buildPresets": [
+        { "name": "debug",   "hidden": true, "configuration": "Debug" },
+        { "name": "release", "hidden": true, "configuration": "Release" },
+
+        { "name": "default-debug",   "configurePreset": "default", "inherits": "debug" },
+        { "name": "default-release", "configurePreset": "default", "inherits": "release" },
+        { "name": "dev-debug",       "configurePreset": "dev",     "inherits": "debug" },
+        { "name": "dev-release",     "configurePreset": "dev",     "inherits": "release" },
+        { "name": "dev-gbv-debug",   "configurePreset": "dev-gbv", "inherits": "debug" },
+        { "name": "dev-gbv-release", "configurePreset": "dev-gbv", "inherits": "release" },
+        { "name": "pix-debug",       "configurePreset": "pix",     "inherits": "debug" },
+        { "name": "pix-release",     "configurePreset": "pix",     "inherits": "release" }
+    ]
+}

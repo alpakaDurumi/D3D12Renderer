@@ -171,7 +171,7 @@ void Camera::Pan(XMINT2 mouseMove)
     XMVECTOR rot = XMLoadFloat4(&m_rotation);
     XMVECTOR localUp = XMVector3Rotate(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), rot);
 
-    pos += -localUp * mouseMove.y * panSensitivity;
+    pos += XMVectorScale(localUp, -mouseMove.y * panSensitivity);
 
     XMStoreFloat3(&m_currPosition, pos);
 }
