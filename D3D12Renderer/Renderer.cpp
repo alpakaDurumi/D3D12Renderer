@@ -7,9 +7,9 @@
 #include <ratio>
 #include <thread>
 
-#if defined(_DEBUG)
+#if defined(ENGINE_DEBUG_LAYER)
 #include <dxgidebug.h>
-#endif // _DEBUG
+#endif // ENGINE_DEBUG_LAYER
 #include <shlobj.h>
 
 #include <imgui.h>
@@ -759,14 +759,16 @@ void Renderer::LoadPipeline()
 {
     UINT dxgiFactoryFlags = 0;
 
-#if defined(_DEBUG)
+#if defined(ENGINE_DEBUG_LAYER)
     // Enable the D3D12 debug layer and GBV
     {
         ComPtr<ID3D12Debug1> debugController;
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
         {
             debugController->EnableDebugLayer();
+#if defined(ENGINE_GPU_BASED_VALIDATION)
             debugController->SetEnableGPUBasedValidation(TRUE);
+#endif // ENGINE_GPU_BASED_VALIDATION
         }
     }
 
@@ -781,7 +783,7 @@ void Renderer::LoadPipeline()
 
     // Set the DXGI factory debug flag
     dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
-#endif
+#endif // ENGINE_DEBUG_LAYER
 
     // Create factory
     ComPtr<IDXGIFactory4> factory;
@@ -809,7 +811,7 @@ void Renderer::LoadPipeline()
             IID_PPV_ARGS(&m_device)));
     }
 
-#if defined(_DEBUG)
+#if defined(ENGINE_DEBUG_LAYER)
     // Use ID3D12InfoQueue
     // This querying is only successful when the debug layer is enabled.
     ComPtr<ID3D12InfoQueue> d3d12InfoQueue;
@@ -819,7 +821,7 @@ void Renderer::LoadPipeline()
         ThrowIfFailed(d3d12InfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE));
         ThrowIfFailed(d3d12InfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, TRUE));
     }
-#endif
+#endif // ENGINE_DEBUG_LAYER
 
     // Check Enhanced barriers support
     D3D12_FEATURE_DATA_D3D12_OPTIONS12 options12 = {};

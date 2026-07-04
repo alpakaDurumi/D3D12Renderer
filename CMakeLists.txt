@@ -7,13 +7,10 @@ project(
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(CMAKE_CONFIGURATION_TYPES AND NOT "Release_PIX" IN_LIST CMAKE_CONFIGURATION_TYPES)
-    list(APPEND CMAKE_CONFIGURATION_TYPES Release_PIX)
-endif()
-
-set(CMAKE_CXX_FLAGS_RELEASE_PIX "${CMAKE_CXX_FLAGS_RELEASE}" CACHE STRING "" FORCE)
-set(CMAKE_EXE_LINKER_FLAGS_RELEASE_PIX "${CMAKE_EXE_LINKER_FLAGS_RELEASE}" CACHE STRING "" FORCE)
-set(CMAKE_MAP_IMPORTED_CONFIG_RELEASE_PIX Release)
+set(ENGINE_DEBUG_LAYER          OFF CACHE BOOL "D3D12/DXGI debug layer")
+set(ENGINE_GPU_BASED_VALIDATION OFF CACHE BOOL "GPU Based Validation")
+set(ENGINE_SHADER_DEBUG         OFF CACHE BOOL "DXC shader debug flags")
+set(ENGINE_PIX                  OFF CACHE BOOL "WinPixEventRuntime")
 
 cmake_path(GET CMAKE_CXX_COMPILER PARENT_PATH _compiler_bin)
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND WIN32)
@@ -165,7 +162,6 @@ target_include_directories(
     D3D12Renderer/imgui
     D3D12Renderer/imgui/backends
     D3D12Renderer/DDSTextureLoader
-    ${winpixeventruntime_SOURCE_DIR}/Include/WinPixEventRuntime
 )
 
 add_custom_command(
@@ -175,13 +171,6 @@ add_custom_command(
         ${directx12agility_SOURCE_DIR}/build/native/bin/x64/D3D12Core.dll
         ${directx12agility_SOURCE_DIR}/build/native/bin/x64/d3d12SDKLayers.dll
         $<TARGET_FILE_DIR:D3D12Renderer>/D3D12
-)
-
-add_custom_command(
-    TARGET D3D12Renderer POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E $<IF:$<CONFIG:Release_PIX>,copy_if_different,true>
-        ${winpixeventruntime_SOURCE_DIR}/bin/x64/WinPixEventRuntime.dll
-        $<TARGET_FILE_DIR:D3D12Renderer>
 )
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND WIN32)
@@ -198,7 +187,6 @@ target_compile_definitions(
     PRIVATE
     UNICODE
     _UNICODE
-    $<$<CONFIG:Release_PIX>:USE_PIX>
 )
 
 target_compile_options(
@@ -213,13 +201,49 @@ target_link_libraries(
     d3d12
     dxgi
     winmm
-    $<$<CONFIG:Debug>:dxguid>
     OpenMP::OpenMP_CXX
     
     DirectXMath
     DirectXTex
-    $<$<CONFIG:Release_PIX>:${winpixeventruntime_SOURCE_DIR}/bin/x64/WinPixEventRuntime.lib>
 )
+
+if(ENGINE_DEBUG_LAYER)
+    target_compile_definitions(D3D12Renderer PRIVATE ENGINE_DEBUG_LAYER)
+    target_link_libraries(D3D12Renderer PRIVATE dxguid)
+endif()
+
+if(ENGINE_GPU_BASED_VALIDATION)
+    target_compile_definitions(D3D12Renderer PRIVATE ENGINE_GPU_BASED_VALIDATION)
+endif()
+
+if(ENGINE_SHADER_DEBUG)
+    set(DXC_CONFIG -Od -Zi)
+else()
+    set(DXC_CONFIG -O3)
+endif()
+
+if(ENGINE_PIX)
+    target_compile_definitions(D3D12Renderer PRIVATE USE_PIX)
+
+    target_include_directories(
+        D3D12Renderer
+        PRIVATE
+        ${winpixeventruntime_SOURCE_DIR}/Include/WinPixEventRuntime
+    )
+
+    target_link_libraries(
+        D3D12Renderer
+        PRIVATE
+        ${winpixeventruntime_SOURCE_DIR}/bin/x64/WinPixEventRuntime.lib
+    )
+
+    add_custom_command(
+        TARGET D3D12Renderer POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${winpixeventruntime_SOURCE_DIR}/bin/x64/WinPixEventRuntime.dll
+            $<TARGET_FILE_DIR:D3D12Renderer>
+    )
+endif()
 
 set(SHADER_SRC ${CMAKE_CURRENT_SOURCE_DIR}/D3D12Renderer)
 set(SHADER_CSO_OUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders)
@@ -227,27 +251,32 @@ set(SHADER_PDB_OUT ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/intermediate/pdb)
 set(SHADER_DEP_OUT ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/intermediate/dep)
 
 set(DXC_COMMON -nologo -HV 2016 -I ${SHADER_SRC})
-set(DXC_CONFIG $<$<NOT:$<CONFIG:Release>>:-Od> $<$<NOT:$<CONFIG:Release>>:-Zi> $<$<CONFIG:Release>:-O3>)
 
 function(compile_shader)
     cmake_parse_arguments(ARG "" "SOURCE;OUTPUT;PROFILE" "DEFINES" ${ARGN})
-    
+
     set(define_flags "")
     foreach(d IN LISTS ARG_DEFINES)
         list(APPEND define_flags -D ${d})
     endforeach()
 
+    set(pdb_byproduct "")
+    set(pdb_flags "")
+    if(ENGINE_SHADER_DEBUG)
+        set(pdb_byproduct ${SHADER_PDB_OUT}/${ARG_OUTPUT}.pdb)
+        set(pdb_flags -Fd ${SHADER_PDB_OUT}/${ARG_OUTPUT}.pdb)
+    endif()
+
     add_custom_command(
         OUTPUT ${SHADER_CSO_OUT}/${ARG_OUTPUT}.cso
-        BYPRODUCTS $<$<NOT:$<CONFIG:Release>>:${SHADER_PDB_OUT}/${ARG_OUTPUT}.pdb>
+        BYPRODUCTS ${pdb_byproduct}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADER_CSO_OUT} ${SHADER_PDB_OUT} ${SHADER_DEP_OUT}
         COMMAND ${DXC_EXE} ${SHADER_SRC}/${ARG_SOURCE}.hlsl
             -E main -T ${ARG_PROFILE}
             ${define_flags}
             ${DXC_COMMON}
             ${DXC_CONFIG}
-            $<$<NOT:$<CONFIG:Release>>:-Fd>
-            $<$<NOT:$<CONFIG:Release>>:${SHADER_PDB_OUT}/${ARG_OUTPUT}.pdb>
+            ${pdb_flags}
             -Fo ${SHADER_CSO_OUT}/${ARG_OUTPUT}.cso
         COMMAND ${DXC_EXE} ${SHADER_SRC}/${ARG_SOURCE}.hlsl
             -E main -T ${ARG_PROFILE}

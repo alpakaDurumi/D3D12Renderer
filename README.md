@@ -46,8 +46,24 @@ cmake --preset clang-cl
 cmake --build --preset release
 ```
 
-- You can choose another build presets: `debug`, `release-pix`
+- You can choose `debug` build preset.
 - You can also use any generator or compiler for your preference.
+
+#### Options
+
+All options default to `OFF` and are independent of the build configuration (Debug/Release). Set them at **configure** time:
+
+```bash
+cmake --preset clang-cl -DENGINE_DEBUG_LAYER=ON -DENGINE_PIX=ON
+cmake --build --preset release
+```
+
+| Option                        | Effect                                                                                 |
+| ----------------------------- | -------------------------------------------------------------------------------------- |
+| `ENGINE_DEBUG_LAYER`          | Enables the D3D12/DXGI debug layer and info-queues                                     |
+| `ENGINE_GPU_BASED_VALIDATION` | Enables GPU-based validation (GBV). It only works when `ENGINE_DEBUG_LAYER` is enabled |
+| `ENGINE_SHADER_DEBUG`         | Compiles shaders without optimization and with debug info, emits PDBs                  |
+| `ENGINE_PIX`                  | Enables WinPixEventRuntime markers for PIX captures                                    |
 
 ## References
 

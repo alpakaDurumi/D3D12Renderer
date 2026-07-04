@@ -26,11 +26,6 @@
             "name": "release",
             "configurePreset": "clang-cl",
             "configuration": "Release"
-        },
-        {
-            "name": "release-pix",
-            "configurePreset": "clang-cl",
-            "configuration": "Release_PIX"
         }
     ]
 }
