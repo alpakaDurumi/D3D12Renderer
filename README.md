@@ -37,25 +37,37 @@ Custom 3D rendering engine using Direct3D 12, C++17 and Win32 API
 - This project uses the **preview release** of the D3D12 Agility SDK to use *Enhanced Barriers*, and it can only be loaded when **Windows Developer Mode** is enabled. To enable Developer Mode, open Settings and search for 'Developer Mode', then turn it on.
 - Download assets from [here](https://drive.google.com/drive/folders/1CGZupYVKDUj7CQFzVJCZiTwuaJ--kPri?usp=sharing) and copy `assets` folder to repo root directory.
 
-### Instructions
-
-Quick start:
+### Quick start
 
 ```bash
-cmake --preset clang-cl
-cmake --build --preset release
+cmake --preset default
+cmake --build build --config=Release
 ```
 
-- You can choose `debug` build preset.
-- You can also use any generator or compiler for your preference.
+- Configure with one of the config presets below, then build `Debug` or `Release`
+- You can also use any generator or compiler for your preference
 
-#### Options
+### Configure presets
 
-All options default to `OFF` and are independent of the build configuration (Debug/Release). Set them at **configure** time:
+| Preset    | Options enabled                                     |
+| --------- | --------------------------------------------------- |
+| `default` | (none)                                              |
+| `dev`     | `ENGINE_DEBUG_LAYER`                                |
+| `dev-gbv` | `ENGINE_DEBUG_LAYER`, `ENGINE_GPU_BASED_VALIDATION` |
+| `pix`     | `ENGINE_SHADER_DEBUG`, `ENGINE_PIX`                 |
+
+- All provided configure presets use `Ninja Multi-Config` + `clang-cl`
+
+> I've also made **build presets** for *CMake Tools* users
+
+### Options
+
+- All options default to `OFF` and are independent of the build configuration (Debug/Release)
+- The presets above bundle common sets
+- You can also set any combination at configure time:
 
 ```bash
-cmake --preset clang-cl -DENGINE_DEBUG_LAYER=ON -DENGINE_PIX=ON
-cmake --build --preset release
+cmake --preset default -DENGINE_DEBUG_LAYER=ON -DENGINE_PIX=ON
 ```
 
 | Option                        | Effect                                                                                 |
