@@ -107,14 +107,14 @@ bool CheckTearingSupport()
 D3D12_CPU_DESCRIPTOR_HANDLE GetCpuDescriptorHandle(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, INT offsetInDescriptors, INT descriptorIncrementSize)
 {
     D3D12_CPU_DESCRIPTOR_HANDLE ret = handle;
-    ret.ptr += SIZE_T(INT64(offsetInDescriptors) * INT64(descriptorIncrementSize));
+    ret.ptr += static_cast<SIZE_T>(offsetInDescriptors) * descriptorIncrementSize;
     return ret;
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE GetGpuDescriptorHandle(const D3D12_GPU_DESCRIPTOR_HANDLE& handle, INT offsetInDescriptors, INT descriptorIncrementSize)
 {
     D3D12_GPU_DESCRIPTOR_HANDLE ret = handle;
-    ret.ptr += UINT64(offsetInDescriptors) * UINT64(descriptorIncrementSize);
+    ret.ptr += static_cast<UINT64>(offsetInDescriptors) * descriptorIncrementSize;
     return ret;
 }
 
@@ -348,17 +348,17 @@ void UpdateSubresources(
     {
         auto pIntermediateStart = static_cast<UINT8*>(intermediateCpuPtr) + pLayouts[i].Offset;
         auto rowPitch = pLayouts[i].Footprint.RowPitch;
-        auto slicePitch = SIZE_T(pLayouts[i].Footprint.RowPitch) * SIZE_T(pNumRows[i]);
+        auto slicePitch = static_cast<UINT64>(rowPitch) * pNumRows[i];
         // Each depth (slice)
         for (UINT z = 0; z < pLayouts[i].Footprint.Depth; ++z)
         {
-            auto pIntermediateSlice = static_cast<UINT8*>(pIntermediateStart) + slicePitch * z;
-            auto pSrcSlice = static_cast<const UINT8*>(pSrcData[i].pData) + pSrcData[i].SlicePitch * LONG_PTR(z);
+            auto pIntermediateSlice = pIntermediateStart + slicePitch * z;
+            auto pSrcSlice = static_cast<const UINT8*>(pSrcData[i].pData) + pSrcData[i].SlicePitch * z;
             // Each Row
             for (UINT y = 0; y < pNumRows[i]; ++y)
             {
-                std::memcpy(pIntermediateSlice + rowPitch * y,
-                            pSrcSlice + pSrcData[i].RowPitch * LONG_PTR(y),
+                std::memcpy(pIntermediateSlice + static_cast<std::size_t>(rowPitch) * y,
+                            pSrcSlice + pSrcData[i].RowPitch * y,
                             pRowSizeInBytes[i]);
             }
         }
