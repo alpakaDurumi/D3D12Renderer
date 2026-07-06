@@ -17,8 +17,8 @@ void GetHardwareAdapter(_In_ IDXGIFactory1* pFactory, _Outptr_result_maybenull_ 
 
 bool CheckTearingSupport();
 
-D3D12_CPU_DESCRIPTOR_HANDLE GetCpuDescriptorHandle(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, INT offsetInDescriptors, INT descriptorIncrementSize);
-D3D12_GPU_DESCRIPTOR_HANDLE GetGpuDescriptorHandle(const D3D12_GPU_DESCRIPTOR_HANDLE& handle, INT offsetInDescriptors, INT descriptorIncrementSize);
+D3D12_CPU_DESCRIPTOR_HANDLE GetCpuDescriptorHandle(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, UINT offsetInDescriptors, UINT descriptorIncrementSize);
+D3D12_GPU_DESCRIPTOR_HANDLE GetGpuDescriptorHandle(const D3D12_GPU_DESCRIPTOR_HANDLE& handle, UINT offsetInDescriptors, UINT descriptorIncrementSize);
 
 void DowngradeDescriptorRanges(const D3D12_DESCRIPTOR_RANGE1* src, UINT NumDescriptorRanges, D3D12_DESCRIPTOR_RANGE* dst);
 void DowngradeRootDescriptor(const D3D12_ROOT_DESCRIPTOR1* src, D3D12_ROOT_DESCRIPTOR* dst);

@@ -104,14 +104,14 @@ bool CheckTearingSupport()
     return allowTearing == TRUE;
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE GetCpuDescriptorHandle(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, INT offsetInDescriptors, INT descriptorIncrementSize)
+D3D12_CPU_DESCRIPTOR_HANDLE GetCpuDescriptorHandle(const D3D12_CPU_DESCRIPTOR_HANDLE& handle, UINT offsetInDescriptors, UINT descriptorIncrementSize)
 {
     D3D12_CPU_DESCRIPTOR_HANDLE ret = handle;
     ret.ptr += static_cast<SIZE_T>(offsetInDescriptors) * descriptorIncrementSize;
     return ret;
 }
 
-D3D12_GPU_DESCRIPTOR_HANDLE GetGpuDescriptorHandle(const D3D12_GPU_DESCRIPTOR_HANDLE& handle, INT offsetInDescriptors, INT descriptorIncrementSize)
+D3D12_GPU_DESCRIPTOR_HANDLE GetGpuDescriptorHandle(const D3D12_GPU_DESCRIPTOR_HANDLE& handle, UINT offsetInDescriptors, UINT descriptorIncrementSize)
 {
     D3D12_GPU_DESCRIPTOR_HANDLE ret = handle;
     ret.ptr += static_cast<UINT64>(offsetInDescriptors) * descriptorIncrementSize;
