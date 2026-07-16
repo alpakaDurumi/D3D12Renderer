@@ -181,6 +181,14 @@ public:
         pEntity->transform->Apply(s, eulerRad, t);
     }
 
+    void SetForward(EntityHandle eh, const DirectX::XMFLOAT3& forward)
+    {
+        auto* pEntity = m_entities.Get(eh);
+        if (!pEntity->transform.has_value())
+            assert(false);
+        pEntity->transform->SetForward(forward);
+    }
+
     void SetMesh(EntityHandle eh, MeshHandle mh)
     {
         auto* pEntity = m_entities.Get(eh);

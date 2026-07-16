@@ -53,9 +53,7 @@ public:
 
     UINT GetIdxInArray() const;
 
-    virtual void SetPosition(DirectX::XMFLOAT3 pos);
     virtual void SetPosition(DirectX::XMVECTOR pos);
-    virtual void SetDirection(DirectX::XMFLOAT3 dir);
     virtual void SetDirection(DirectX::XMVECTOR dir);
     virtual void SetRange(float range);
 
@@ -103,14 +101,6 @@ public:
         DescriptorAllocation&& cbvAllocation,
         UINT shadowMapResolution);
 
-    virtual DirectX::XMVECTOR GetPosition() const override;
-    virtual float GetRange() const override;
-
-    void SetPosition(DirectX::XMFLOAT3 pos) override;
-    void SetPosition(DirectX::XMVECTOR pos) override;
-
-    virtual void SetRange(float range) override;
-
     const std::array<DirectX::BoundingOrientedBox, MAX_CASCADES>& GetBoundingBoxes() const;
     void SetBoundingBox(UINT arrayIndex, const DirectX::BoundingOrientedBox& boundingBox);
 
@@ -128,11 +118,6 @@ public:
         DescriptorAllocation&& cbvAllocation,
         DescriptorAllocation&& rtvAllocation,
         UINT shadowMapResolution);
-
-    DirectX::XMVECTOR GetDirection() const override;
-
-    void SetDirection(DirectX::XMFLOAT3 dir) override;
-    void SetDirection(DirectX::XMVECTOR dir) override;
 
     void SetViewProjection(DirectX::XMMATRIX view, DirectX::XMMATRIX projection, UINT idx) override;
 

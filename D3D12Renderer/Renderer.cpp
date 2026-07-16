@@ -1121,24 +1121,24 @@ void Renderer::LoadAssets()
     auto hDirectionalLight = m_sceneManager.AddEntity("DirectionalLight");
     auto hDirectionalLightComponent = CreateDirectionalLight();
     m_sceneManager.AddComponent(hDirectionalLight, hDirectionalLightComponent);
-    auto* pDirectionalLight = m_sceneManager.Get(hDirectionalLightComponent);
-    pDirectionalLight->SetDirection(XMFLOAT3(-1.0f, -1.0f, 1.0f));
+    m_sceneManager.AddTransform(hDirectionalLight);
+    m_sceneManager.SetForward(hDirectionalLight, XMFLOAT3(-1.0f, -1.0f, 1.0f));
 
     auto hPointLight = m_sceneManager.AddEntity("PointLight");
     auto hPointLightComponent = CreatePointLight();
     m_sceneManager.AddComponent(hPointLight, hPointLightComponent);
     auto* pPointLight = m_sceneManager.Get(hPointLightComponent);
-    pPointLight->SetPosition(XMFLOAT3(0.0f, 4.0f, 3.0f));
     pPointLight->SetRange(30.0f);
+    m_sceneManager.AddTransform(hPointLight, XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, 4.0f, 3.0f));
 
     auto hSpotLight = m_sceneManager.AddEntity("SpotLight");
     auto hSpotLightComponent = CreateSpotLight();
     m_sceneManager.AddComponent(hSpotLight, hSpotLightComponent);
     auto* pSpotLight = m_sceneManager.Get(hSpotLightComponent);
-    pSpotLight->SetPosition(XMFLOAT3(0.0f, 10.0f, -5.0f));
-    pSpotLight->SetDirection(XMFLOAT3(0.0f, -1.0f, 1.0f));
     pSpotLight->SetRange(50.0f);
     pSpotLight->SetAngles(50.0f, 10.0f);
+    m_sceneManager.AddTransform(hSpotLight, XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, 10.0f, -5.0f));
+    m_sceneManager.SetForward(hSpotLight, XMFLOAT3(0.0f, -1.0f, 1.0f));
 
     // Execute commands for loading assets and update signaled fence value
     m_frameResources[m_frameIndex].UpdateSignaledFenceValue(m_commandQueue.ExecuteCommandLists(pCommandAllocator, pCommandList));
@@ -1730,12 +1730,6 @@ void Renderer::PrepareConstantData(float alpha)
     m_cameraConstantData.SetView(m_camera.GetViewMatrix());
     m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());
 
-    // Light
-    // XMVECTOR lightDir = m_lights[0]->GetDirection();
-    // XMMATRIX rot = XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), 0.001f);
-    // XMVECTOR rotated = XMVector3Transform(lightDir, rot);
-    // m_lights[0]->SetDirection(rotated);
-
     // Pre-calculate common data for CSM.
     std::vector<BoundingSphere> cascadeSpheres = CalcCascadeSpheres();
 
@@ -1772,6 +1766,21 @@ void Renderer::PrepareTransform(Entity& entity, XMMATRIX& accumulated, float alp
 
     XMMATRIX world = localRenderTransform * accumulated;
     entity.transform->SetWorldRenderTransform(world);
+
+    // If Light component exists, set position and direction
+    if (entity.light.has_value())
+    {
+        auto lightHandle = entity.light.value();
+
+        std::visit(
+            [&](auto&& handle)
+            {
+                auto pLight = m_sceneManager.Get(handle);
+                pLight->SetPosition(world.r[3]);
+                pLight->SetDirection(XMVector3Normalize(world.r[2]));
+            },
+            lightHandle);
+    }
 
     for (auto& child : entity.children)
         PrepareTransform(*m_sceneManager.Get(child), world, alpha);

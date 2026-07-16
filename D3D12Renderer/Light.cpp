@@ -121,25 +121,12 @@ UINT Light::GetIdxInArray() const
     return m_lightConstantData.idxInArray;
 }
 
-void Light::SetPosition(XMFLOAT3 pos)
-{
-    for(auto& cd : m_cameraConstantData)
-        cd.cameraPos = pos;
-
-    m_lightConstantData.lightPos = pos;
-}
-
 void Light::SetPosition(XMVECTOR pos)
 {
     for (auto& cd : m_cameraConstantData)
         cd.SetPos(pos);
 
     m_lightConstantData.SetPos(pos);
-}
-
-void Light::SetDirection(XMFLOAT3 dir)
-{
-    SetDirection(XMVectorSet(dir.x, dir.y, dir.z, 0.0f));
 }
 
 void Light::SetDirection(XMVECTOR dir)
@@ -236,33 +223,6 @@ DirectionalLight::DirectionalLight(
     m_srv.Init(pDevice, m_depthBuffer.Get(), GetSrvDesc2DArray(DXGI_FORMAT_R32_FLOAT, 1, MAX_CASCADES));
 }
 
-XMVECTOR DirectionalLight::GetPosition() const
-{
-    assert(false);
-    return XMVectorZero();
-}
-
-float DirectionalLight::GetRange() const
-{
-    assert(false);
-    return 0.0f;
-}
-
-void DirectionalLight::SetPosition(XMFLOAT3 pos)
-{
-    assert(false);
-}
-
-void DirectionalLight::SetPosition(XMVECTOR pos)
-{
-    assert(false);
-}
-
-void DirectionalLight::SetRange(float range)
-{
-    assert(false);
-}
-
 const std::array<BoundingOrientedBox, MAX_CASCADES>& DirectionalLight::GetBoundingBoxes() const
 {
     return m_boundingBoxes;
@@ -299,22 +259,6 @@ PointLight::PointLight(
 
     // Init SRV for render target we've created just before. NOT for depth buffer!
     m_srv.Init(pDevice, m_renderTarget.Get(), GetSrvDescCube(DXGI_FORMAT_R32_FLOAT, 1));
-}
-
-XMVECTOR PointLight::GetDirection() const
-{
-    assert(false);
-    return XMVectorZero();
-}
-
-void PointLight::SetDirection(XMFLOAT3 dir)
-{
-    assert(false);
-}
-
-void PointLight::SetDirection(XMVECTOR dir)
-{
-    assert(false);
 }
 
 void PointLight::SetViewProjection(DirectX::XMMATRIX view, DirectX::XMMATRIX projection, UINT idx)

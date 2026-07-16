@@ -157,6 +157,25 @@ public:
         return {pitch, yaw, roll};
     }
 
+    void SetForward(const DirectX::XMFLOAT3& forward)
+    {
+        DirectX::XMVECTOR from = DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+        DirectX::XMVECTOR to = DirectX::XMVector3Normalize(DirectX::XMLoadFloat3(&forward));
+
+        DirectX::XMVECTOR cross = DirectX::XMVector3Cross(from, to);
+        float dot = DirectX::XMVectorGetX(DirectX::XMVector3Dot(from, to));
+
+        DirectX::XMVECTOR q;
+
+        if (dot < -0.999999f)
+            q = DirectX::XMQuaternionRotationRollPitchYaw(0.0f, DirectX::XM_PI, 0.0f);
+        else
+            q = DirectX::XMQuaternionNormalize(DirectX::XMVectorSetW(cross, 1.0f + dot));
+
+        DirectX::XMStoreFloat4(&m_prevR, q);
+        DirectX::XMStoreFloat4(&m_currR, q);
+    }
+
 private:
     DirectX::XMFLOAT3 m_prevS, m_currS;
     DirectX::XMFLOAT4 m_prevR, m_currR;
