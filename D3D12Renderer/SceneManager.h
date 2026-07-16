@@ -21,6 +21,7 @@
 #include <DDSTextureLoader12.h>
 
 #include "Aliases.h"
+#include "D3DHelper.h"
 #include "GeometryData.h"
 #include "InstanceData.h"
 #include "Light.h"
