@@ -1,3 +1,6 @@
+# ==============================================================================
+# Project & global config
+# ==============================================================================
 cmake_minimum_required(VERSION 3.26)
 
 project(
@@ -7,11 +10,7 @@ project(
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(ENGINE_DEBUG_LAYER          OFF CACHE BOOL "D3D12/DXGI debug layer")
-set(ENGINE_GPU_BASED_VALIDATION OFF CACHE BOOL "GPU Based Validation")
-set(ENGINE_SHADER_DEBUG         OFF CACHE BOOL "DXC shader debug flags")
-set(ENGINE_PIX                  OFF CACHE BOOL "WinPixEventRuntime")
-
+# OpenMP
 cmake_path(GET CMAKE_CXX_COMPILER PARENT_PATH _compiler_bin)
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND WIN32)
     if(NOT DEFINED OpenMP_libomp_LIBRARY)
@@ -27,6 +26,9 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND WIN32)
 endif()
 find_package(OpenMP REQUIRED)
 
+# ==============================================================================
+# Dependencies
+# ==============================================================================
 include(FetchContent)
 
 FetchContent_Declare(
@@ -79,6 +81,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(WinPixEventRuntime)
 
+# ==============================================================================
+# Main target (D3D12Renderer)
+# ==============================================================================
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/bin)
 
 add_executable(
@@ -164,24 +169,6 @@ target_include_directories(
     D3D12Renderer/DDSTextureLoader
 )
 
-add_custom_command(
-    TARGET D3D12Renderer POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:D3D12Renderer>/D3D12
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${directx12agility_SOURCE_DIR}/build/native/bin/x64/D3D12Core.dll
-        ${directx12agility_SOURCE_DIR}/build/native/bin/x64/d3d12SDKLayers.dll
-        $<TARGET_FILE_DIR:D3D12Renderer>/D3D12
-)
-
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND WIN32)
-    add_custom_command(
-        TARGET D3D12Renderer POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${_compiler_bin}/libomp.dll
-            $<TARGET_FILE_DIR:D3D12Renderer>
-    )
-endif()
-
 target_compile_definitions(
     D3D12Renderer
     PRIVATE
@@ -206,6 +193,14 @@ target_link_libraries(
     DirectXMath
     DirectXTex
 )
+
+# ==============================================================================
+# Options
+# ==============================================================================
+set(ENGINE_DEBUG_LAYER          OFF CACHE BOOL "D3D12/DXGI debug layer")
+set(ENGINE_GPU_BASED_VALIDATION OFF CACHE BOOL "GPU Based Validation")
+set(ENGINE_SHADER_DEBUG         OFF CACHE BOOL "DXC shader debug flags")
+set(ENGINE_PIX                  OFF CACHE BOOL "WinPixEventRuntime")
 
 if(ENGINE_DEBUG_LAYER)
     target_compile_definitions(D3D12Renderer PRIVATE ENGINE_DEBUG_LAYER)
@@ -236,15 +231,11 @@ if(ENGINE_PIX)
         PRIVATE
         ${winpixeventruntime_SOURCE_DIR}/bin/x64/WinPixEventRuntime.lib
     )
-
-    add_custom_command(
-        TARGET D3D12Renderer POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${winpixeventruntime_SOURCE_DIR}/bin/x64/WinPixEventRuntime.dll
-            $<TARGET_FILE_DIR:D3D12Renderer>
-    )
 endif()
 
+# ==============================================================================
+# Shaders
+# ==============================================================================
 set(SHADER_SRC ${CMAKE_CURRENT_SOURCE_DIR}/D3D12Renderer)
 set(SHADER_CSO_OUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders)
 set(SHADER_PDB_OUT ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/intermediate/pdb)
@@ -314,6 +305,9 @@ add_custom_target(
 
 add_dependencies(D3D12Renderer Shaders)
 
+# ==============================================================================
+# Post-build
+# ==============================================================================
 add_custom_command(
     TARGET D3D12Renderer POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
@@ -321,3 +315,30 @@ add_custom_command(
         $<TARGET_FILE_DIR:D3D12Renderer>/assets
     COMMENT "Copying assets"
 )
+
+add_custom_command(
+    TARGET D3D12Renderer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:D3D12Renderer>/D3D12
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${directx12agility_SOURCE_DIR}/build/native/bin/x64/D3D12Core.dll
+        ${directx12agility_SOURCE_DIR}/build/native/bin/x64/d3d12SDKLayers.dll
+        $<TARGET_FILE_DIR:D3D12Renderer>/D3D12
+)
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND WIN32)
+    add_custom_command(
+        TARGET D3D12Renderer POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${_compiler_bin}/libomp.dll
+            $<TARGET_FILE_DIR:D3D12Renderer>
+    )
+endif()
+
+if(ENGINE_PIX)
+    add_custom_command(
+        TARGET D3D12Renderer POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${winpixeventruntime_SOURCE_DIR}/bin/x64/WinPixEventRuntime.dll
+            $<TARGET_FILE_DIR:D3D12Renderer>
+    )
+endif()
