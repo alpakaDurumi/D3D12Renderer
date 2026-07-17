@@ -170,6 +170,14 @@ target_compile_features(
     cxx_std_17
 )
 
+if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    # MSVC and clang-cl
+    target_compile_options(D3D12Renderer PRIVATE /W4 /permissive-)
+else()
+    # gcc++, clang++
+    target_compile_options(D3D12Renderer PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
 target_include_directories(
     D3D12Renderer
     SYSTEM
@@ -184,12 +192,6 @@ target_compile_definitions(
     PRIVATE
     UNICODE
     _UNICODE
-)
-
-target_compile_options(
-    D3D12Renderer
-    PRIVATE
-    $<$<CXX_COMPILER_ID:MSVC>:/permissive->
 )
 
 target_link_libraries(
