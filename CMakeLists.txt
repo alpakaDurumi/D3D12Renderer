@@ -81,6 +81,47 @@ endif()
 find_program(DXC_EXE NAMES dxc PATHS ${dxc_SOURCE_DIR}/bin/x64 NO_DEFAULT_PATH REQUIRED)
 
 # ==============================================================================
+# Third-party libraries
+# ==============================================================================
+
+# ImGui
+add_library(
+    ImGui
+    STATIC
+    D3D12Renderer/imgui/imgui_demo.cpp
+    D3D12Renderer/imgui/imgui_draw.cpp
+    D3D12Renderer/imgui/imgui_tables.cpp
+    D3D12Renderer/imgui/imgui_widgets.cpp
+    D3D12Renderer/imgui/imgui.cpp
+    D3D12Renderer/imgui/backends/imgui_impl_dx12.cpp
+    D3D12Renderer/imgui/backends/imgui_impl_win32.cpp
+)
+
+target_include_directories(
+    ImGui
+    SYSTEM
+    PUBLIC
+    D3D12Renderer/imgui
+    D3D12Renderer/imgui/backends
+)
+
+# DDSTextureLoader
+add_library(
+    DDSTextureLoader
+    STATIC
+    D3D12Renderer/DDSTextureLoader/DDSTextureLoader12.cpp
+)
+
+target_include_directories(
+    DDSTextureLoader
+    SYSTEM
+    PUBLIC
+    D3D12Renderer/DDSTextureLoader
+    ${directx12agility_SOURCE_DIR}/build/native/include
+    ${directx12agility_SOURCE_DIR}/build/native/include/d3dx12
+)
+
+# ==============================================================================
 # Main target (D3D12Renderer)
 # ==============================================================================
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/bin)
@@ -115,29 +156,6 @@ add_executable(
     D3D12Renderer/Utility.cpp
     D3D12Renderer/View.cpp
     D3D12Renderer/Win32Application.cpp
-
-    D3D12Renderer/imgui/imgui_demo.cpp
-    D3D12Renderer/imgui/imgui_draw.cpp
-    D3D12Renderer/imgui/imgui_tables.cpp
-    D3D12Renderer/imgui/imgui_widgets.cpp
-    D3D12Renderer/imgui/imgui.cpp
-    D3D12Renderer/imgui/backends/imgui_impl_dx12.cpp
-    D3D12Renderer/imgui/backends/imgui_impl_win32.cpp
-
-    D3D12Renderer/DDSTextureLoader/DDSTextureLoader12.cpp
-)
-
-set_source_files_properties(
-    D3D12Renderer/imgui/imgui_demo.cpp
-    D3D12Renderer/imgui/imgui_draw.cpp
-    D3D12Renderer/imgui/imgui_tables.cpp
-    D3D12Renderer/imgui/imgui_widgets.cpp
-    D3D12Renderer/imgui/imgui.cpp
-    D3D12Renderer/imgui/backends/imgui_impl_dx12.cpp
-    D3D12Renderer/imgui/backends/imgui_impl_win32.cpp
-    D3D12Renderer/DDSTextureLoader/DDSTextureLoader12.cpp
-    PROPERTIES
-    SKIP_PRECOMPILE_HEADERS ON
 )
 
 target_precompile_headers(
@@ -159,15 +177,6 @@ target_include_directories(
     PRIVATE
     ${directx12agility_SOURCE_DIR}/build/native/include
     ${directx12agility_SOURCE_DIR}/build/native/include/d3dx12
-)
-
-target_include_directories(
-    D3D12Renderer
-    SYSTEM
-    PRIVATE
-    D3D12Renderer/imgui
-    D3D12Renderer/imgui/backends
-    D3D12Renderer/DDSTextureLoader
 )
 
 target_compile_definitions(
@@ -193,6 +202,9 @@ target_link_libraries(
     
     DirectXMath
     DirectXTex
+
+    ImGui
+    DDSTextureLoader
 )
 
 # ==============================================================================
