@@ -35,19 +35,39 @@ FetchContent_Declare(
     DirectXMath
     URL https://github.com/microsoft/DirectXMath/archive/refs/tags/oct2024.zip
     URL_HASH SHA256=b215087ddd085381839c6fc6f51185579f3a1c55804190b2ccc5969e9520b0bd
+    SYSTEM
 )
-FetchContent_MakeAvailable(DirectXMath)
 
 FetchContent_Declare(
     DirectXTex
     URL https://github.com/microsoft/DirectXTex/archive/refs/tags/oct2025.zip
     URL_HASH SHA256=e2204b0532c2df2cfa80f6550726d07905bc5107c40b31291c7b84a3522192cb
+    SYSTEM
 )
 set(BUILD_TOOLS OFF)
 set(BUILD_SAMPLE OFF)
 set(BUILD_DX11 OFF)
 set(BC_USE_OPENMP ON)
-FetchContent_MakeAvailable(DirectXTex)
+
+FetchContent_Declare(
+    DirectX12Agility
+    URL https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/1.717.1-preview
+    URL_HASH SHA256=f052df9437c7e47cdb428ffb597481fe55a480c8968b0056159fe3a195c277e4
+)
+
+FetchContent_Declare(
+    DXC
+    URL https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2505.1/dxc_2025_07_14.zip
+    URL_HASH SHA256=9ad895a6b039e3a8f8c22a1009f866800b840a74b50db9218d13319e215ea8a4
+)
+
+FetchContent_Declare(
+    WinPixEventRuntime
+    URL https://www.nuget.org/api/v2/package/WinPixEventRuntime/1.0.240308001
+    URL_HASH SHA256=726acc93d6968e2146261a1e415521747d50ad69894c2b42b5d0d4c29fd66ec4
+)
+
+FetchContent_MakeAvailable(DirectXMath DirectXTex DirectX12Agility DXC WinPixEventRuntime)
 
 # DirectXTex builds with /Wall, which makes clang emit -Wpadded.
 # The #pragma warning(disable: 4820) that hides it is MSVC-only, and
@@ -58,28 +78,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_options(DirectXTex PRIVATE -Wno-padded)
 endif()
 
-FetchContent_Declare(
-    DirectX12Agility
-    URL https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/1.717.1-preview
-    URL_HASH SHA256=f052df9437c7e47cdb428ffb597481fe55a480c8968b0056159fe3a195c277e4
-)
-FetchContent_MakeAvailable(DirectX12Agility)
-
-FetchContent_Declare(
-    DXC
-    URL https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2505.1/dxc_2025_07_14.zip
-    URL_HASH SHA256=9ad895a6b039e3a8f8c22a1009f866800b840a74b50db9218d13319e215ea8a4
-)
-FetchContent_MakeAvailable(DXC)
-
 find_program(DXC_EXE NAMES dxc PATHS ${dxc_SOURCE_DIR}/bin/x64 NO_DEFAULT_PATH REQUIRED)
-
-FetchContent_Declare(
-    WinPixEventRuntime
-    URL https://www.nuget.org/api/v2/package/WinPixEventRuntime/1.0.240308001
-    URL_HASH SHA256=726acc93d6968e2146261a1e415521747d50ad69894c2b42b5d0d4c29fd66ec4
-)
-FetchContent_MakeAvailable(WinPixEventRuntime)
 
 # ==============================================================================
 # Main target (D3D12Renderer)
@@ -155,6 +154,7 @@ target_compile_features(
 
 target_include_directories(
     D3D12Renderer
+    SYSTEM
     BEFORE
     PRIVATE
     ${directx12agility_SOURCE_DIR}/build/native/include
@@ -163,6 +163,7 @@ target_include_directories(
 
 target_include_directories(
     D3D12Renderer
+    SYSTEM
     PRIVATE
     D3D12Renderer/imgui
     D3D12Renderer/imgui/backends
@@ -222,6 +223,7 @@ if(ENGINE_PIX)
 
     target_include_directories(
         D3D12Renderer
+        SYSTEM
         PRIVATE
         ${winpixeventruntime_SOURCE_DIR}/Include/WinPixEventRuntime
     )
