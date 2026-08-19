@@ -2265,7 +2265,6 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             ++lightIdx;
         };
 
-        UINT lightIdx = 0;
         for (auto& light : m_sceneManager.GetDirectionalLights())
             processLight(&light);
         for (auto& light : m_sceneManager.GetPointLights())
