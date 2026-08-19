@@ -422,7 +422,8 @@ D3D12_BARRIER_GROUP GlobalBarrierGroup(UINT32 numBarriers, D3D12_GLOBAL_BARRIER*
 
 UINT8 GetFormatPlaneCount(ID3D12Device* pDevice, DXGI_FORMAT format)
 {
-    D3D12_FEATURE_DATA_FORMAT_INFO formatInfo = {format};
+    D3D12_FEATURE_DATA_FORMAT_INFO formatInfo = {};
+    formatInfo.Format = format;
     if (FAILED(pDevice->CheckFeatureSupport(D3D12_FEATURE_FORMAT_INFO, &formatInfo, sizeof(formatInfo))))
     {
         return 0;
