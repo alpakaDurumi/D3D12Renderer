@@ -189,7 +189,13 @@ void Renderer::SetPix()
     if (GetModuleHandleW(L"WinPixGpuCapturer.dll") == 0)
     {
         std::wstring path = GetLatestWinPixGpuCapturerPath_Cpp17();
-        HMODULE hPixModule = LoadLibraryW(path.c_str());
+        if (LoadLibraryW(path.c_str()) == NULL)
+        {
+            DWORD err = GetLastError();
+            WCHAR buf[128];
+            swprintf_s(buf, L"LoadLibraryW() failed. GetLastError=%lu\n", err);
+            OutputDebugStringW(buf);
+        }
     }
 }
 
