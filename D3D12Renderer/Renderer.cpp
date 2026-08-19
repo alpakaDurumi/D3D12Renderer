@@ -186,7 +186,7 @@ void Renderer::SetWarp(bool value)
 
 void Renderer::SetPix()
 {
-    if (GetModuleHandleW(L"WinPixGpuCapturer.dll") == 0)
+    if (GetModuleHandleW(L"WinPixGpuCapturer.dll") == NULL)
     {
         std::wstring path = GetLatestWinPixGpuCapturerPath_Cpp17();
         if (LoadLibraryW(path.c_str()) == NULL)
