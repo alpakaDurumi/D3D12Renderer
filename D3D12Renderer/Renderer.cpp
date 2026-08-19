@@ -19,9 +19,7 @@
 
 #include "D3DHelper.h"
 #include "DescriptorAllocation.h"
-#include "GeometryData.h"
 #include "GeometryGenerator.h"
-#include "InstanceData.h"
 #include "Light.h"
 #include "Material.h"
 #include "Mesh.h"
