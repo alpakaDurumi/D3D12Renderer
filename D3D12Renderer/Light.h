@@ -32,7 +32,15 @@ protected:
         UINT shadowMapResolution,
         LightType type);
 
+    virtual ~Light() = default;
+    
+    Light(Light&&) = default;
+    Light& operator=(Light&&) = default;
+
 public:
+    Light(const Light&) = delete;
+    Light& operator=(const Light&) = delete;
+
     LightType GetType() const;
     ID3D12Resource* GetDepthBuffer() const;
     UINT16 GetArraySize() const;
