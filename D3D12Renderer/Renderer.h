@@ -125,7 +125,7 @@ private:
     // Pipeline
     RootSignature m_rootSignature;
     std::unordered_map<PSOKey, Microsoft::WRL::ComPtr<ID3D12PipelineState>> m_pipelineStates;
-    PSOKey m_currentPSOKey = {PassType::FORWARD_COLORING};
+    PSOKey m_currentPSOKey = {PassType::FORWARD_COLORING, L"", L""};
     std::vector<D3D12_INPUT_ELEMENT_DESC> m_inputLayout;
     std::unordered_map<ShaderKey, std::vector<char>> m_shaderBlobs;
     RenderGraph m_renderGraph;
