@@ -2,8 +2,6 @@
 
 #include "Win32Application.h"
 
-#include <locale>
-
 #include <hidusage.h>
 #include <timeapi.h>
 #include <windowsx.h>
@@ -17,9 +15,6 @@
 int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
     ParseCommandLineArgs(pRenderer, lpCmdLine);
-
-    // Set locale for converting between multi-byte character and wide character (e.g. std::mbstowcs)
-    std::setlocale(LC_ALL, ".UTF8");
 
     // Register the window class
     WNDCLASSEXW windowClass = {};
