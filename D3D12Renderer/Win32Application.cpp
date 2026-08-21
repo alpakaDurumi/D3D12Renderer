@@ -22,7 +22,7 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
     std::setlocale(LC_ALL, ".UTF8");
 
     // Register the window class
-    WNDCLASSEXW windowClass = {0};
+    WNDCLASSEXW windowClass = {};
     windowClass.cbSize = sizeof(WNDCLASSEXW);
     windowClass.style = CS_HREDRAW | CS_VREDRAW;
     windowClass.lpfnWndProc = WndProc;

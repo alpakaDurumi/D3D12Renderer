@@ -8,7 +8,7 @@
 using namespace D3DHelper;
 
 DescriptorAllocation::DescriptorAllocation()
-    : m_descriptor{0}
+    : m_descriptor{}
     , m_offsetInHeap(0)
     , m_numHandles(0)
     , m_descriptorSize(0)
