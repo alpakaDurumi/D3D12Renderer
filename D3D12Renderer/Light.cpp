@@ -45,9 +45,9 @@ Light::Light(
     DescriptorAllocation&& cbvAllocation,
     UINT shadowMapResolution,
     LightType type)
-    : m_srv(std::move(srvAllocation))
-    , m_lightCbv(std::move(cbvAllocation))
+    : m_lightCbv(std::move(cbvAllocation))
     , m_type(type)
+    , m_srv(std::move(srvAllocation))
 {
     const UINT16 arraySize = GetRequiredArraySize(m_type);
 
