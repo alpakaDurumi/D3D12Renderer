@@ -91,7 +91,7 @@ void DescriptorAllocation::Free()
 D3D12_CPU_DESCRIPTOR_HANDLE DescriptorAllocation::GetDescriptorHandle(UINT32 offsetInBlock) const
 {
     assert(offsetInBlock < m_numHandles);
-    return {m_descriptor.ptr + (m_descriptorSize * offsetInBlock)};
+    return {m_descriptor.ptr + static_cast<SIZE_T>(m_descriptorSize) * offsetInBlock};
 }
 
 UINT32 DescriptorAllocation::GetOffset() const
