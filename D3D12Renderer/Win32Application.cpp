@@ -256,7 +256,15 @@ LRESULT CALLBACK Win32Application::WndProc(HWND hWnd, UINT message, WPARAM wPara
 void Win32Application::ParseCommandLineArgs(Renderer* pRenderer, LPWSTR lpCmdLine)
 {
     int argc;
-    WCHAR** argv = CommandLineToArgvW(lpCmdLine, &argc);
+    LPWSTR* argv = CommandLineToArgvW(lpCmdLine, &argc);
+    if (argv == NULL)
+    {
+        DWORD err = GetLastError();
+        WCHAR buf[128];
+        swprintf_s(buf, L"CommandLineToArgvW() failed. GetLastError=%lu\n", err);
+        OutputDebugStringW(buf);
+        return;
+    }
 
     UINT width = 0;
     UINT height = 0;
