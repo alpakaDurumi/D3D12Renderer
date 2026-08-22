@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SharedConfig.h"
+#include "../SharedConfig.h"
 
 // SRV for lights
 Texture2DArray<float> g_directionalShadowMaps[] : register(t0, space2);

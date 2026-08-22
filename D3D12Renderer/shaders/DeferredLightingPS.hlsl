@@ -1,25 +1,43 @@
-#include "SharedConfig.h"
+#include "../SharedConfig.h"
 #include "Shadow.hlsli"
 #include "Lighting.hlsli"
 #include "LightConstants.hlsli"
 #include "PSInput.hlsli"
-#include "SurfaceData.hlsli"
 #include "CameraConstants.hlsli"
+
+// GBuffers & depth buffer
+Texture2D g_gBuffers[NUM_GBUFFER_SLOTS] : register(t0, space5);
+Texture2D g_depthBuffer : register(t0, space6);
 
 cbuffer GlobalConstants : register(b2, space0)
 {
     uint numLights;
 };
 
-float4 main(MeshPSInput input) : SV_TARGET
+float4 main(FullScreenPSInput input) : SV_TARGET
 {
-    SurfaceData data = CalcSurfaceData(input, cameraPos);
+    // Sample GBuffers
+    int2 texCoord = int2(input.pos.xy);
     
-    float3 toCameraWorld = normalize(cameraPos - input.posWorld);
-
+    float3 texColor = g_gBuffers[GBUFFER_SLOT_ALBEDO].Load(int3(texCoord, 0)).rgb;
+    float4 temp = g_gBuffers[GBUFFER_SLOT_NORMAL].Load(int3(texCoord, 0));
+    float3 normalWorld = temp.xyz;
+    float shininess = temp.w;
+    float3 materialAmbient = g_gBuffers[GBUFFER_SLOT_MAT_AMBIENT].Load(int3(texCoord, 0)).rgb;
+    float3 materialSpecular = g_gBuffers[GBUFFER_SLOT_MAT_SPECULAR].Load(int3(texCoord, 0)).rgb;
+    
+    // reconstruct world position
+    float depth = g_depthBuffer.Load(int3(texCoord, 0)).r;
+    float4 ndc = float4(input.texCoord.x * 2.0f - 1.0f, 1.0f - input.texCoord.y * 2.0f, depth, 1.0f);
+    float4 posView = mul(ndc, invProj);
+    posView /= posView.w; // perspective division
+    float3 posWorld = mul(posView, invView).xyz;
+    
+    float3 toCameraWorld = normalize(cameraPos - posWorld);
+    
     uint csmIdx;
     float alpha;
-    CalcCSMIndex(input.pos.w, csmIdx, alpha); // SV_POSITION.w means view space distance.
+    CalcCSMIndex(posView.z, csmIdx, alpha);
     
     // Pass random rotation to PCF based on IGN
     float noise = InterleavedGradientNoise(input.pos.xy);
@@ -43,7 +61,7 @@ float4 main(MeshPSInput input) : SV_TARGET
             // First cascade
             {
                 float2 lightTexCoord;
-                float z = WorldToShadowUV(input.posWorld, light.viewProjection[csmIdx], lightTexCoord);
+                float z = WorldToShadowUV(posWorld, light.viewProjection[csmIdx], lightTexCoord);
         
                 shadowFactor = PCFDirectional(light.idxInArray, csmIdx, filterSize, lightTexCoord, z, rot);
             }
@@ -52,7 +70,7 @@ float4 main(MeshPSInput input) : SV_TARGET
             if (csmIdx < MAX_CASCADES - 1)
             {
                 float2 lightTexCoord;
-                float z = WorldToShadowUV(input.posWorld, light.viewProjection[csmIdx + 1], lightTexCoord);
+                float z = WorldToShadowUV(posWorld, light.viewProjection[csmIdx + 1], lightTexCoord);
         
                 float t = PCFDirectional(light.idxInArray, csmIdx + 1, filterSize, lightTexCoord, z, rot);
                 shadowFactor = lerp(shadowFactor, t, alpha);
@@ -60,35 +78,35 @@ float4 main(MeshPSInput input) : SV_TARGET
             
             // Shading in world space
             float3 toLightWorld = -light.lightDir;
-            total += PhongReflection(light, toLightWorld, toCameraWorld, shadowFactor, data.albedo.rgb, data.normalWorld, data.ambient.rgb, data.specular.rgb, data.shininess);
+            total += PhongReflection(light, toLightWorld, toCameraWorld, shadowFactor, texColor, normalWorld, materialAmbient, materialSpecular, shininess);
         }
         // Point
         else if (light.type == LIGHT_TYPE_POINT)
         {
-            float dist = distance(light.lightPos, input.posWorld);
+            float dist = distance(light.lightPos, posWorld);
             float normalizedDist = dist / light.range;
             
-            float3 toLightWorld = normalize(light.lightPos - input.posWorld);
+            float3 toLightWorld = normalize(light.lightPos - posWorld);
             
             float factor = CalcAttenuation(dist, light.range) * PCFPoint(light.idxInArray, filterSize, -toLightWorld, normalizedDist, rot);
             
-            total += PhongReflection(light, toLightWorld, toCameraWorld, factor, data.albedo.rgb, data.normalWorld, data.ambient.rgb, data.specular.rgb, data.shininess);
+            total += PhongReflection(light, toLightWorld, toCameraWorld, factor, texColor, normalWorld, materialAmbient, materialSpecular, shininess);
         }
         // Spot
         else if (light.type == LIGHT_TYPE_SPOT)
         {
-            float3 toLightWorld = normalize(light.lightPos - input.posWorld);
-            float dist = distance(light.lightPos, input.posWorld);
+            float3 toLightWorld = normalize(light.lightPos - posWorld);
+            float dist = distance(light.lightPos, posWorld);
 
             float distAtt = CalcAttenuation(dist, light.range);
             float angularAtt = CalcAngularAttenuation(light, -toLightWorld);
             
             float2 lightTexCoord;
-            float z = WorldToShadowUV(input.posWorld, light.viewProjection[0], lightTexCoord);
+            float z = WorldToShadowUV(posWorld, light.viewProjection[0], lightTexCoord);
             
             float factor = distAtt * angularAtt * PCFSpot(light.idxInArray, filterSize, lightTexCoord, z, rot);
             
-            total += PhongReflection(light, toLightWorld, toCameraWorld, factor, data.albedo.rgb, data.normalWorld, data.ambient.rgb, data.specular.rgb, data.shininess);
+            total += PhongReflection(light, toLightWorld, toCameraWorld, factor, texColor, normalWorld, materialAmbient, materialSpecular, shininess);
         }
     }
     

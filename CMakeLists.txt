@@ -252,7 +252,7 @@ endif()
 # ==============================================================================
 # Shaders
 # ==============================================================================
-set(SHADER_SRC ${CMAKE_CURRENT_SOURCE_DIR}/D3D12Renderer)
+set(SHADER_SRC ${CMAKE_CURRENT_SOURCE_DIR}/D3D12Renderer/shaders)
 set(SHADER_CSO_OUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders)
 set(SHADER_PDB_OUT ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/intermediate/pdb)
 set(SHADER_DEP_OUT ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/intermediate/dep)
