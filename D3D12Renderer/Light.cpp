@@ -99,22 +99,9 @@ D3D12_CPU_DESCRIPTOR_HANDLE Light::GetSrvHandle() const
     return m_srv.GetHandle();
 }
 
-float Light::GetRange() const
-{
-    return m_lightConstantData.range;
-}
-
 UINT Light::GetIdxInArray() const
 {
     return m_lightConstantData.idxInArray;
-}
-
-void Light::SetRange(float range)
-{
-    for (auto& cd : m_cameraConstantData)
-        cd.farPlane = range;
-
-    m_lightConstantData.range = range;
 }
 
 void Light::SetViewProjection(XMMATRIX view, XMMATRIX projection, UINT idx)
@@ -198,6 +185,13 @@ void Light::SetPositionConstants(XMVECTOR pos)
 void Light::SetDirectionConstants(XMVECTOR dir)
 {
     m_lightConstantData.SetLightDir(dir);
+}
+
+void Light::SetRangeConstants(float range)
+{
+    for (auto& cd : m_cameraConstantData)
+        cd.farPlane = range;
+    m_lightConstantData.range = range;
 }
 
 DirectionalLight::DirectionalLight(
@@ -367,6 +361,16 @@ std::vector<GpuResource> PointLight::TakeResources()
     return ret;
 }
 
+float PointLight::GetRange() const
+{
+    return m_lightConstantData.range;
+}
+
+void PointLight::SetRange(float range)
+{
+    SetRangeConstants(range);
+}
+
 SpotLight::SpotLight(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,
@@ -426,4 +430,14 @@ void SpotLight::SetAngles(float outerAngleDegree, float innerAngleDegree)
 const BoundingFrustum& SpotLight::GetBoundingFrustum() const
 {
     return m_boundingFrustum;
+}
+
+float SpotLight::GetRange() const
+{
+    return m_lightConstantData.range;
+}
+
+void SpotLight::SetRange(float range)
+{
+    SetRangeConstants(range);
 }

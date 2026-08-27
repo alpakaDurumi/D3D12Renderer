@@ -47,13 +47,9 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetDsvHandle(UINT index) const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetSrvHandle() const;
 
-    virtual float GetRange() const;
-
     UINT GetIdxInArray() const;
 
     virtual void SetWorldTransform(DirectX::XMMATRIX world) = 0;
-    virtual void SetRange(float range);
-
     virtual void SetViewProjection(DirectX::XMMATRIX view, DirectX::XMMATRIX projection, UINT idx);
 
     void SetIdxInArray(UINT idxInArray);
@@ -75,6 +71,7 @@ public:
 protected:
     void SetPositionConstants(DirectX::XMVECTOR pos);
     void SetDirectionConstants(DirectX::XMVECTOR dir);
+    void SetRangeConstants(float range);
 
     std::vector<CameraConstantData> m_cameraConstantData;
     std::vector<UploadAllocation> m_cameraUploadAllocations; // transient, for single frame
@@ -133,6 +130,9 @@ public:
 
     virtual std::vector<GpuResource> TakeResources() override;
 
+    float GetRange() const;
+    void SetRange(float range);
+
 private:
     Texture m_renderTarget;
     std::array<RenderTargetView, POINT_LIGHT_ARRAY_SIZE> m_rtvs;
@@ -157,6 +157,9 @@ public:
     void SetAngles(float outerAngle, float innerAngle);
 
     const DirectX::BoundingFrustum& GetBoundingFrustum() const;
+
+    float GetRange() const;
+    void SetRange(float range);
 
 private:
     float m_outerAngle;
