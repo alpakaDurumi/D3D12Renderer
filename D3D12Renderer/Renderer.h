@@ -35,10 +35,6 @@
 #include "View.h"
 #include "VisibleRange.h"
 
-class DirectionalLight;
-class PointLight;
-class SpotLight;
-
 class Renderer
 {
 public:
@@ -198,9 +194,6 @@ private:
     void FixedUpdate(std::chrono::nanoseconds fixedDt);
     void PrepareConstantData(float alpha);
     std::vector<DirectX::BoundingSphere> CalcCascadeSpheres();
-    void PrepareDirectionalLight(DirectionalLight& light, const std::vector<DirectX::BoundingSphere>& cascadeSpheres);
-    void PreparePointLight(PointLight& light);
-    void PrepareSpotLight(SpotLight& light);
     void UpdateConstantBuffers();
     void UploadInstanceData();
 

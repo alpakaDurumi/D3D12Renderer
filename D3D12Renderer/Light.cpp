@@ -99,18 +99,6 @@ D3D12_CPU_DESCRIPTOR_HANDLE Light::GetSrvHandle() const
     return m_srv.GetHandle();
 }
 
-XMVECTOR Light::GetPosition() const
-{
-    XMVECTOR p = XMLoadFloat3(&m_lightConstantData.lightPos);
-    return XMVectorSetW(p, 1.0f);
-}
-
-XMVECTOR Light::GetDirection() const
-{
-    XMVECTOR d = XMLoadFloat3(&m_lightConstantData.lightDir);
-    return XMVectorSetW(d, 0.0f);
-}
-
 float Light::GetRange() const
 {
     return m_lightConstantData.range;
@@ -228,14 +216,61 @@ void DirectionalLight::SetWorldTransform(XMMATRIX world)
     SetDirectionConstants(XMVector3Normalize(world.r[2]));
 }
 
+void DirectionalLight::SetShadowContext(XMVECTOR cameraPos, float cameraFar, UINT shadowMapResolution, const std::vector<BoundingSphere>& cascadeSpheres)
+{
+    static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+    XMVECTOR dir = XMLoadFloat3(&m_lightConstantData.lightDir);
+
+    for (UINT i = 0; i < MAX_CASCADES; ++i)
+    {
+        XMVECTOR center = XMLoadFloat3(&cascadeSpheres[i].Center);
+        float radius = cascadeSpheres[i].Radius;
+
+        XMVECTOR viewOriginToCenter = center - cameraPos;
+
+        // Calculate view/projection matrix fit to light frustum
+
+        // Orthogonal projection of (center - view origin) onto lightDir.
+        // This represents where the view origin is located relative to the center on the light's Z-axis.
+        float d = XMVectorGetX(XMVector3Dot(viewOriginToCenter, dir));
+
+        XMMATRIX view = XMMatrixLookToLH(center, dir, up);
+        // Near Plane : Set to (view origin - sceneRadius) in Light Space.
+        //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
+        // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
+        // Argument for NearZ and FarZ are swapped because of reverse-z
+        float nearZ = -d - cameraFar;
+        float farZ = radius;
+        XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, farZ, nearZ);
+
+        // Apply texel-sized increments to eliminate shadow shimmering.
+        XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+        shadowOrigin = XMVector4Transform(shadowOrigin, view * projection);
+        shadowOrigin = XMVectorScale(shadowOrigin, 1.0f / XMVectorGetW(shadowOrigin)); // Perspective divide. Can be ommitted if it uses orthographic projection.
+        // [-1, 1] -> [-resolution / 2, resolution / 2]
+        shadowOrigin = XMVectorScale(shadowOrigin, static_cast<float>(shadowMapResolution) * 0.5f); // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
+
+        // Calculate diff and apply as translation matrix.
+        XMVECTOR roundedOrigin = XMVectorRound(shadowOrigin);
+        XMVECTOR diff = roundedOrigin - shadowOrigin;
+        diff = XMVectorScale(diff, 2.0f / static_cast<float>(shadowMapResolution)); // Since diff is texel scale, it should be transformed to NDC scale.
+        XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
+
+        SetViewProjection(view, projection * fix, i);
+
+        // Set bounding box
+        BoundingOrientedBox boundingBox(
+            {0.0f, 0.0f, (nearZ + farZ) * 0.5f},
+            {radius, radius, (farZ - nearZ) * 0.5f},
+            {0.0f, 0.0f, 0.0f, 1.0f});
+        boundingBox.Transform(m_boundingBoxes[i], XMMatrixInverse(nullptr, view));
+    }
+}
+
 const std::array<BoundingOrientedBox, MAX_CASCADES>& DirectionalLight::GetBoundingBoxes() const
 {
     return m_boundingBoxes;
-}
-
-void DirectionalLight::SetBoundingBox(UINT arrayIndex, const BoundingOrientedBox& boundingBox)
-{
-    m_boundingBoxes[arrayIndex] = boundingBox;
 }
 
 PointLight::PointLight(
@@ -271,6 +306,39 @@ void PointLight::SetWorldTransform(XMMATRIX world)
     SetPositionConstants(world.r[3]);
 }
 
+void PointLight::SetShadowContext(float cameraNear)
+{
+    XMVECTOR pos = XMVectorSetW(XMLoadFloat3(&m_lightConstantData.lightPos), 1.0f);
+
+    // +X, -X, +Y, -Y, +Z, -Z
+    static const XMVECTOR Directions[6] = {
+        {1.0f, 0.0f, 0.0f, 0.0f},
+        {-1.0f, 0.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f, 0.0f},
+        {0.0f, -1.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, -1.0f, 0.0f}};
+    static const XMVECTOR Ups[6] = {
+        {0.0f, 1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, -1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f, 0.0f}};
+
+    // Set FOV as 90 degree
+    XMMATRIX projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.0f, m_lightConstantData.range, cameraNear);
+
+    for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
+    {
+        XMMATRIX view = XMMatrixLookToLH(pos, Directions[i], Ups[i]);
+        SetViewProjection(view, projection, i);
+    }
+
+    // Set bounding sphere
+    m_boundingSphere = BoundingSphere(m_lightConstantData.lightPos, m_lightConstantData.range);
+}
+
 void PointLight::SetViewProjection(XMMATRIX view, XMMATRIX projection, UINT idx)
 {
     m_cameraConstantData[idx].SetView(view);
@@ -290,11 +358,6 @@ D3D12_CPU_DESCRIPTOR_HANDLE PointLight::GetRtvHandle(UINT index) const
 const BoundingSphere& PointLight::GetBoundingSphere() const
 {
     return m_boundingSphere;
-}
-
-void PointLight::SetBoundingSphere(const BoundingSphere& boundingSphere)
-{
-    m_boundingSphere = boundingSphere;
 }
 
 std::vector<GpuResource> PointLight::TakeResources()
@@ -322,6 +385,23 @@ void SpotLight::SetWorldTransform(XMMATRIX world)
     SetDirectionConstants(XMVector3Normalize(world.r[2]));
 }
 
+void SpotLight::SetShadowContext(float cameraNear)
+{
+    static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+    XMVECTOR pos = XMVectorSetW(XMLoadFloat3(&m_lightConstantData.lightPos), 1.0f);
+    XMVECTOR dir = XMLoadFloat3(&m_lightConstantData.lightDir);
+
+    XMMATRIX view = XMMatrixLookToLH(pos, dir, up);
+    XMMATRIX projection = XMMatrixPerspectiveFovLH(m_outerAngle, 1.0f, m_lightConstantData.range, cameraNear);
+    SetViewProjection(view, projection, 0);
+
+    // Set bounding frustum
+    XMMATRIX proj = XMMatrixPerspectiveFovLH(m_outerAngle, 1.0f, cameraNear, m_lightConstantData.range);
+    BoundingFrustum::CreateFromMatrix(m_boundingFrustum, proj);
+    m_boundingFrustum.Transform(m_boundingFrustum, XMMatrixInverse(nullptr, view));
+}
+
 float SpotLight::GetOuterAngle() const
 {
     return m_outerAngle;
@@ -346,9 +426,4 @@ void SpotLight::SetAngles(float outerAngleDegree, float innerAngleDegree)
 const BoundingFrustum& SpotLight::GetBoundingFrustum() const
 {
     return m_boundingFrustum;
-}
-
-void SpotLight::SetBoundingFrustum(const BoundingFrustum& boundingFrustum)
-{
-    m_boundingFrustum = boundingFrustum;
 }

@@ -33,7 +33,7 @@ protected:
         LightType type);
 
     virtual ~Light() = default;
-    
+
     Light(Light&&) = default;
     Light& operator=(Light&&) = default;
 
@@ -47,8 +47,6 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetDsvHandle(UINT index) const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetSrvHandle() const;
 
-    virtual DirectX::XMVECTOR GetPosition() const;
-    virtual DirectX::XMVECTOR GetDirection() const;
     virtual float GetRange() const;
 
     UINT GetIdxInArray() const;
@@ -104,9 +102,9 @@ public:
         UINT shadowMapResolution);
 
     void SetWorldTransform(DirectX::XMMATRIX world) override;
+    void SetShadowContext(DirectX::XMVECTOR cameraPos, float cameraFar, UINT shadowMapResolution, const std::vector<DirectX::BoundingSphere>& cascadeSpheres);
 
     const std::array<DirectX::BoundingOrientedBox, MAX_CASCADES>& GetBoundingBoxes() const;
-    void SetBoundingBox(UINT arrayIndex, const DirectX::BoundingOrientedBox& boundingBox);
 
 private:
     std::array<DirectX::BoundingOrientedBox, MAX_CASCADES> m_boundingBoxes;
@@ -124,6 +122,7 @@ public:
         UINT shadowMapResolution);
 
     void SetWorldTransform(DirectX::XMMATRIX world) override;
+    void SetShadowContext(float cameraNear);
 
     void SetViewProjection(DirectX::XMMATRIX view, DirectX::XMMATRIX projection, UINT idx) override;
 
@@ -131,7 +130,6 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle(UINT index) const;
 
     const DirectX::BoundingSphere& GetBoundingSphere() const;
-    void SetBoundingSphere(const DirectX::BoundingSphere& boundingSphere);
 
     virtual std::vector<GpuResource> TakeResources() override;
 
@@ -153,12 +151,12 @@ public:
         UINT shadowMapResolution);
 
     void SetWorldTransform(DirectX::XMMATRIX world) override;
+    void SetShadowContext(float cameraNear);
 
     float GetOuterAngle() const;
     void SetAngles(float outerAngle, float innerAngle);
 
     const DirectX::BoundingFrustum& GetBoundingFrustum() const;
-    void SetBoundingFrustum(const DirectX::BoundingFrustum& boundingFrustum);
 
 private:
     float m_outerAngle;

@@ -1729,21 +1729,21 @@ void Renderer::PrepareConstantData(float alpha)
     UINT idx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        PrepareDirectionalLight(light, cascadeSpheres);
+        light.SetShadowContext(m_camera.GetRenderPosition(), m_camera.GetFarPlane(), m_shadowMapResolution, cascadeSpheres);
         light.SetIdxInArray(idx);
         ++idx;
     }
     idx = 0;
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        PreparePointLight(light);
+        light.SetShadowContext(m_camera.GetNearPlane());
         light.SetIdxInArray(idx);
         ++idx;
     }
     idx = 0;
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        PrepareSpotLight(light);
+        light.SetShadowContext(m_camera.GetNearPlane());
         light.SetIdxInArray(idx);
         ++idx;
     }
@@ -1807,114 +1807,6 @@ std::vector<BoundingSphere> Renderer::CalcCascadeSpheres()
     }
 
     return frustumBSs;
-}
-
-void Renderer::PrepareDirectionalLight(DirectionalLight& light, const std::vector<BoundingSphere>& cascadeSpheres)
-{
-    static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-
-    XMVECTOR cameraPos = m_camera.GetRenderPosition();
-    XMVECTOR dir = light.GetDirection();
-
-    for (UINT i = 0; i < MAX_CASCADES; ++i)
-    {
-        XMVECTOR center = XMLoadFloat3(&cascadeSpheres[i].Center);
-        float radius = cascadeSpheres[i].Radius;
-
-        XMVECTOR viewOriginToCenter = center - cameraPos;
-
-        // Calculate view/projection matrix fit to light frustum
-
-        // Orthogonal projection of (center - view origin) onto lightDir.
-        // This represents where the view origin is located relative to the center on the light's Z-axis.
-        float d = XMVectorGetX(XMVector3Dot(viewOriginToCenter, dir));
-
-        XMMATRIX view = XMMatrixLookToLH(center, dir, up);
-        // Near Plane : Set to (view origin - sceneRadius) in Light Space.
-        //              This ensures all shadow casters within 'sceneRadius' behind the camera are captured.
-        // Far Plane :  Set to 'radius' to cover the entire bounding sphere of the view frustum.
-        // Argument for NearZ and FarZ are swapped because of reverse-z
-        float nearZ = -d - m_camera.GetFarPlane();
-        float farZ = radius;
-        XMMATRIX projection = XMMatrixOrthographicLH(2 * radius, 2 * radius, farZ, nearZ);
-
-        // Apply texel-sized increments to eliminate shadow shimmering.
-        XMVECTOR shadowOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
-        shadowOrigin = XMVector4Transform(shadowOrigin, view * projection);
-        shadowOrigin = XMVectorScale(shadowOrigin, 1.0f / XMVectorGetW(shadowOrigin)); // Perspective divide. Can be ommitted if it uses orthographic projection.
-        // [-1, 1] -> [-resolution / 2, resolution / 2]
-        shadowOrigin = XMVectorScale(shadowOrigin, m_shadowMapResolution * 0.5f); // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
-
-        // Calculate diff and apply as translation matrix.
-        XMVECTOR roundedOrigin = XMVectorRound(shadowOrigin);
-        XMVECTOR diff = roundedOrigin - shadowOrigin;
-        diff = XMVectorScale(diff, 2.0f / m_shadowMapResolution); // Since diff is texel scale, it should be transformed to NDC scale.
-        XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
-
-        light.SetViewProjection(view, projection * fix, i);
-
-        // Set bounding box
-        BoundingOrientedBox boundingBox(
-            {0.0f, 0.0f, (nearZ + farZ) * 0.5f},
-            {radius, radius, (farZ - nearZ) * 0.5f},
-            {0.0f, 0.0f, 0.0f, 1.0f});
-        XMMATRIX inverseView = XMMatrixInverse(nullptr, view);
-        boundingBox.Transform(boundingBox, inverseView);
-        light.SetBoundingBox(i, boundingBox);
-    }
-}
-
-void Renderer::PreparePointLight(PointLight& light)
-{
-    XMVECTOR pos = light.GetPosition();
-
-    // +X, -X, +Y, -Y, +Z, -Z
-    static const XMVECTOR Directions[6] = {
-        {1.0f, 0.0f, 0.0f, 0.0f},
-        {-1.0f, 0.0f, 0.0f, 0.0f},
-        {0.0f, 1.0f, 0.0f, 0.0f},
-        {0.0f, -1.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 1.0f, 0.0f},
-        {0.0f, 0.0f, -1.0f, 0.0f}};
-    static const XMVECTOR Ups[6] = {
-        {0.0f, 1.0f, 0.0f, 0.0f},
-        {0.0f, 1.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, -1.0f, 0.0f},
-        {0.0f, 0.0f, 1.0f, 0.0f},
-        {0.0f, 1.0f, 0.0f, 0.0f},
-        {0.0f, 1.0f, 0.0f, 0.0f}};
-
-    // Set FOV as 90 degree
-    XMMATRIX projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.0f, light.GetRange(), m_camera.GetNearPlane());
-
-    for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
-    {
-        XMMATRIX view = XMMatrixLookToLH(pos, Directions[i], Ups[i]);
-        light.SetViewProjection(view, projection, i);
-    }
-
-    // Set bounding sphere
-    XMFLOAT3 temp;
-    XMStoreFloat3(&temp, pos);
-    BoundingSphere lightBoundingVolume(temp, light.GetRange());
-    light.SetBoundingSphere(lightBoundingVolume);
-}
-
-void Renderer::PrepareSpotLight(SpotLight& light)
-{
-    static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-
-    XMMATRIX view = XMMatrixLookToLH(light.GetPosition(), light.GetDirection(), up);
-    XMMATRIX projection = XMMatrixPerspectiveFovLH(light.GetOuterAngle(), 1.0f, light.GetRange(), m_camera.GetNearPlane());
-    light.SetViewProjection(view, projection, 0);
-
-    // Set bounding frustum
-    XMMATRIX proj = XMMatrixPerspectiveFovLH(light.GetOuterAngle(), 1.0f, m_camera.GetNearPlane(), light.GetRange());
-    BoundingFrustum boundingFrustum;
-    BoundingFrustum::CreateFromMatrix(boundingFrustum, proj);
-    XMMATRIX inverseView = XMMatrixInverse(nullptr, view);
-    boundingFrustum.Transform(boundingFrustum, inverseView);
-    light.SetBoundingFrustum(boundingFrustum);
 }
 
 void Renderer::UpdateConstantBuffers()
