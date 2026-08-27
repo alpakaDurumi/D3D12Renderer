@@ -1715,14 +1715,7 @@ void Renderer::FixedUpdate(std::chrono::nanoseconds fixedDt)
 void Renderer::PrepareConstantData(float alpha)
 {
     // Transforms
-    for (auto& entity : m_sceneManager.GetEntities())
-    {
-        if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
-        {
-            XMMATRIX accumulated = XMMatrixIdentity();
-            PrepareTransform(entity, accumulated, alpha);
-        }
-    }
+    m_sceneManager.UpdateWorldTransforms(alpha);
 
     // Main Camera
     m_camera.UpdateRenderState(alpha);
@@ -1754,36 +1747,6 @@ void Renderer::PrepareConstantData(float alpha)
         light.SetIdxInArray(idx);
         ++idx;
     }
-}
-
-void Renderer::PrepareTransform(Entity& entity, XMMATRIX& accumulated, float alpha)
-{
-    if (!entity.transform.has_value())
-        return;
-
-    entity.transform->UpdateLocalRenderState(alpha);
-    XMMATRIX localRenderTransform = XMLoadFloat4x4(&entity.transform->GetLocalRenderTransform());
-
-    XMMATRIX world = localRenderTransform * accumulated;
-    entity.transform->SetWorldRenderTransform(world);
-
-    // If Light component exists, set position and direction
-    if (entity.light.has_value())
-    {
-        auto lightHandle = entity.light.value();
-
-        std::visit(
-            [&](auto&& handle)
-            {
-                auto pLight = m_sceneManager.Get(handle);
-                pLight->SetPosition(world.r[3]);
-                pLight->SetDirection(XMVector3Normalize(world.r[2]));
-            },
-            lightHandle);
-    }
-
-    for (auto& child : entity.children)
-        PrepareTransform(*m_sceneManager.Get(child), world, alpha);
 }
 
 std::vector<BoundingSphere> Renderer::CalcCascadeSpheres()

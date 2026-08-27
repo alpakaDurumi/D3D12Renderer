@@ -197,7 +197,6 @@ private:
     // Update
     void FixedUpdate(std::chrono::nanoseconds fixedDt);
     void PrepareConstantData(float alpha);
-    void PrepareTransform(Entity& entity, DirectX::XMMATRIX& accumulated, float alpha);
     std::vector<DirectX::BoundingSphere> CalcCascadeSpheres();
     void PrepareDirectionalLight(DirectionalLight& light, const std::vector<DirectX::BoundingSphere>& cascadeSpheres);
     void PreparePointLight(PointLight& light);

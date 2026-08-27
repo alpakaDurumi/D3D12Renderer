@@ -181,6 +181,18 @@ public:
         pEntity->transform->Apply(s, eulerRad, t);
     }
 
+    void UpdateWorldTransforms(float alpha)
+    {
+        for (auto& entity : m_entities.GetDense())
+        {
+            if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
+            {
+                DirectX::XMMATRIX accumulated = DirectX::XMMatrixIdentity();
+                UpdateWorldTransform(entity, accumulated, alpha);
+            }
+        }
+    }
+
     void SetForward(EntityHandle eh, const DirectX::XMFLOAT3& forward)
     {
         auto* pEntity = m_entities.Get(eh);
@@ -746,6 +758,36 @@ private:
     void Remove(SpotLightHandle handle)
     {
         m_spotLights.Remove(handle);
+    }
+
+    void UpdateWorldTransform(Entity& entity, DirectX::XMMATRIX& accumulated, float alpha)
+    {
+        if (!entity.transform.has_value())
+            return;
+
+        entity.transform->UpdateLocalRenderState(alpha);
+        DirectX::XMMATRIX localRenderTransform = DirectX::XMLoadFloat4x4(&entity.transform->GetLocalRenderTransform());
+
+        DirectX::XMMATRIX world = localRenderTransform * accumulated;
+        entity.transform->SetWorldRenderTransform(world);
+
+        // If Light component exists, set position and direction
+        if (entity.light.has_value())
+        {
+            auto lightHandle = entity.light.value();
+
+            std::visit(
+                [&](auto&& handle)
+                {
+                    auto pLight = Get(handle);
+                    pLight->SetPosition(world.r[3]);
+                    pLight->SetDirection(DirectX::XMVector3Normalize(world.r[2]));
+                },
+                lightHandle);
+        }
+
+        for (auto& child : entity.children)
+            UpdateWorldTransform(*Get(child), world, alpha);
     }
 
     SlotMap<Mesh> m_meshes;
