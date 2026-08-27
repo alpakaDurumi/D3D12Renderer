@@ -121,19 +121,6 @@ UINT Light::GetIdxInArray() const
     return m_lightConstantData.idxInArray;
 }
 
-void Light::SetPosition(XMVECTOR pos)
-{
-    for (auto& cd : m_cameraConstantData)
-        cd.SetPos(pos);
-
-    m_lightConstantData.SetPos(pos);
-}
-
-void Light::SetDirection(XMVECTOR dir)
-{
-    m_lightConstantData.SetLightDir(dir);
-}
-
 void Light::SetRange(float range)
 {
     for (auto& cd : m_cameraConstantData)
@@ -212,6 +199,19 @@ std::vector<GpuResource> Light::TakeResources()
     return ret;
 }
 
+void Light::SetPositionConstants(XMVECTOR pos)
+{
+    for (auto& cd : m_cameraConstantData)
+        cd.SetPos(pos);
+
+    m_lightConstantData.SetPos(pos);
+}
+
+void Light::SetDirectionConstants(XMVECTOR dir)
+{
+    m_lightConstantData.SetLightDir(dir);
+}
+
 DirectionalLight::DirectionalLight(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,
@@ -221,6 +221,11 @@ DirectionalLight::DirectionalLight(
     : Light(pDevice, std::move(dsvAllocation), std::move(srvAllocation), std::move(cbvAllocation), shadowMapResolution, LightType::DIRECTIONAL)
 {
     m_srv.Init(pDevice, m_depthBuffer.Get(), GetSrvDesc2DArray(DXGI_FORMAT_R32_FLOAT, 1, MAX_CASCADES));
+}
+
+void DirectionalLight::SetWorldTransform(XMMATRIX world)
+{
+    SetDirectionConstants(XMVector3Normalize(world.r[2]));
 }
 
 const std::array<BoundingOrientedBox, MAX_CASCADES>& DirectionalLight::GetBoundingBoxes() const
@@ -261,7 +266,12 @@ PointLight::PointLight(
     m_srv.Init(pDevice, m_renderTarget.Get(), GetSrvDescCube(DXGI_FORMAT_R32_FLOAT, 1));
 }
 
-void PointLight::SetViewProjection(DirectX::XMMATRIX view, DirectX::XMMATRIX projection, UINT idx)
+void PointLight::SetWorldTransform(XMMATRIX world)
+{
+    SetPositionConstants(world.r[3]);
+}
+
+void PointLight::SetViewProjection(XMMATRIX view, XMMATRIX projection, UINT idx)
 {
     m_cameraConstantData[idx].SetView(view);
     m_cameraConstantData[idx].SetProjection(projection);
@@ -304,6 +314,12 @@ SpotLight::SpotLight(
 {
     m_srv.Init(pDevice, m_depthBuffer.Get(), GetSrvDesc(DXGI_FORMAT_R32_FLOAT, 1));
     SetAngles(45.0f, 20.0f); // Set default angle
+}
+
+void SpotLight::SetWorldTransform(XMMATRIX world)
+{
+    SetPositionConstants(world.r[3]);
+    SetDirectionConstants(XMVector3Normalize(world.r[2]));
 }
 
 float SpotLight::GetOuterAngle() const

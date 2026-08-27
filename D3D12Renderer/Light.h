@@ -53,8 +53,7 @@ public:
 
     UINT GetIdxInArray() const;
 
-    virtual void SetPosition(DirectX::XMVECTOR pos);
-    virtual void SetDirection(DirectX::XMVECTOR dir);
+    virtual void SetWorldTransform(DirectX::XMMATRIX world) = 0;
     virtual void SetRange(float range);
 
     virtual void SetViewProjection(DirectX::XMMATRIX view, DirectX::XMMATRIX projection, UINT idx);
@@ -76,6 +75,9 @@ public:
     virtual std::vector<GpuResource> TakeResources();
 
 protected:
+    void SetPositionConstants(DirectX::XMVECTOR pos);
+    void SetDirectionConstants(DirectX::XMVECTOR dir);
+
     std::vector<CameraConstantData> m_cameraConstantData;
     std::vector<UploadAllocation> m_cameraUploadAllocations; // transient, for single frame
 
@@ -101,6 +103,8 @@ public:
         DescriptorAllocation&& cbvAllocation,
         UINT shadowMapResolution);
 
+    void SetWorldTransform(DirectX::XMMATRIX world) override;
+
     const std::array<DirectX::BoundingOrientedBox, MAX_CASCADES>& GetBoundingBoxes() const;
     void SetBoundingBox(UINT arrayIndex, const DirectX::BoundingOrientedBox& boundingBox);
 
@@ -118,6 +122,8 @@ public:
         DescriptorAllocation&& cbvAllocation,
         DescriptorAllocation&& rtvAllocation,
         UINT shadowMapResolution);
+
+    void SetWorldTransform(DirectX::XMMATRIX world) override;
 
     void SetViewProjection(DirectX::XMMATRIX view, DirectX::XMMATRIX projection, UINT idx) override;
 
@@ -145,6 +151,8 @@ public:
         DescriptorAllocation&& srvAllocation,
         DescriptorAllocation&& cbvAllocation,
         UINT shadowMapResolution);
+
+    void SetWorldTransform(DirectX::XMMATRIX world) override;
 
     float GetOuterAngle() const;
     void SetAngles(float outerAngle, float innerAngle);

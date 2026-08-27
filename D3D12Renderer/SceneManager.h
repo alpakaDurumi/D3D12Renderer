@@ -779,9 +779,7 @@ private:
             std::visit(
                 [&](auto&& handle)
                 {
-                    auto pLight = Get(handle);
-                    pLight->SetPosition(world.r[3]);
-                    pLight->SetDirection(DirectX::XMVector3Normalize(world.r[2]));
+                    Get(handle)->SetWorldTransform(world);
                 },
                 lightHandle);
         }
