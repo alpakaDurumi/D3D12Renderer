@@ -35,12 +35,9 @@
 #include "View.h"
 #include "VisibleRange.h"
 
-struct GeometryData;
-class DescriptorAllocation;
 class DirectionalLight;
 class PointLight;
 class SpotLight;
-class TransientUploadAllocator;
 
 class Renderer
 {
