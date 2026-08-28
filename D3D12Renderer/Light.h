@@ -68,6 +68,9 @@ public:
 
     virtual std::vector<GpuResource> TakeResources();
 
+    UINT GetShadowMapResolution() const;
+    virtual void ChangeShadowMapResolution(ID3D12Device10* pDevice, UINT shadowMapResolution);
+
 protected:
     void SetPositionConstants(DirectX::XMVECTOR pos);
     void SetDirectionConstants(DirectX::XMVECTOR dir);
@@ -86,6 +89,11 @@ protected:
     ShaderResourceView m_srv;
 
     std::vector<std::unordered_map<MeshHandle, VisibleRange>> m_visibleRanges;
+
+    UINT m_shadowMapResolution;
+
+private:
+    void CreateDepthStencilBuffers(ID3D12Device10* pDevice);
 };
 
 class DirectionalLight : public Light
@@ -99,9 +107,11 @@ public:
         UINT shadowMapResolution);
 
     void SetWorldTransform(DirectX::XMMATRIX world) override;
-    void SetShadowContext(DirectX::XMVECTOR cameraPos, float cameraFar, UINT shadowMapResolution, const std::vector<DirectX::BoundingSphere>& cascadeSpheres);
+    void SetShadowContext(DirectX::XMVECTOR cameraPos, float cameraFar, const std::vector<DirectX::BoundingSphere>& cascadeSpheres);
 
     const std::array<DirectX::BoundingOrientedBox, MAX_CASCADES>& GetBoundingBoxes() const;
+
+    void ChangeShadowMapResolution(ID3D12Device10* pDevice, UINT shadowMapResolution) override;
 
 private:
     std::array<DirectX::BoundingOrientedBox, MAX_CASCADES> m_boundingBoxes;
@@ -130,10 +140,14 @@ public:
 
     virtual std::vector<GpuResource> TakeResources() override;
 
+    void ChangeShadowMapResolution(ID3D12Device10* pDevice, UINT shadowMapResolution) override;
+
     float GetRange() const;
     void SetRange(float range);
 
 private:
+    void CreateRenderTargets(ID3D12Device10* pDevice);
+
     Texture m_renderTarget;
     std::array<RenderTargetView, POINT_LIGHT_ARRAY_SIZE> m_rtvs;
 
@@ -157,6 +171,8 @@ public:
     void SetAngles(float outerAngle, float innerAngle);
 
     const DirectX::BoundingFrustum& GetBoundingFrustum() const;
+
+    void ChangeShadowMapResolution(ID3D12Device10* pDevice, UINT shadowMapResolution) override;
 
     float GetRange() const;
     void SetRange(float range);

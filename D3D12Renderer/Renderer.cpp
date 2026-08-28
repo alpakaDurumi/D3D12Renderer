@@ -6,6 +6,7 @@
 #include <fstream>
 #include <ratio>
 #include <thread>
+#include <variant>
 
 #if defined(ENGINE_DEBUG_LAYER)
 #include <dxgidebug.h>
@@ -533,6 +534,7 @@ void Renderer::BuildImGuiFrame()
         auto* pEntity = m_sceneManager.Get(m_selected);
         if (pEntity)
         {
+            // Transform component
             if (pEntity->transform.has_value())
             {
                 auto& transform = pEntity->transform.value();
@@ -550,6 +552,49 @@ void Renderer::BuildImGuiFrame()
                 XMFLOAT3 t = transform.GetTranslation();
                 if (ImGui::DragFloat3("Translation", &t.x))
                     transform.SetTranslation(t);
+            }
+
+            // Light component
+            if (pEntity->light.has_value())
+            {
+                auto lightHandle = pEntity->light.value();
+
+                const char* items[] = {"512", "1024", "2048", "4096"};
+
+                // Get current shadow map resolution and use it as preview value
+                UINT currentResolution = 0;
+                std::visit(
+                    [&](auto&& handle)
+                    { currentResolution = m_sceneManager.Get(handle)->GetShadowMapResolution(); },
+                    lightHandle);
+
+                char buffer[5];
+                snprintf(buffer, sizeof(buffer), "%d", currentResolution);
+
+                if (ImGui::BeginCombo("Shadow Map Resolution", buffer))
+                {
+                    for (int n = 0; n < IM_ARRAYSIZE(items); ++n)
+                    {
+                        const bool is_selected = static_cast<UINT>(std::stoi(items[n])) == currentResolution;
+                        if (ImGui::Selectable(items[n], is_selected))
+                        {
+                            std::visit(
+                                [&](auto&& handle)
+                                {
+                                    auto* pLight = m_sceneManager.Get(handle);
+                                    auto resources = pLight->TakeResources();
+                                    m_sceneManager.EnqueueResourceDeletion(resources);
+                                    pLight->ChangeShadowMapResolution(m_device.Get(), static_cast<UINT>(std::stoi(items[n])));
+                                },
+                                lightHandle);
+                        }
+
+                        // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                        if (is_selected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
             }
         }
 
@@ -1729,7 +1774,7 @@ void Renderer::PrepareConstantData(float alpha)
     UINT idx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        light.SetShadowContext(m_camera.GetRenderPosition(), m_camera.GetFarPlane(), m_shadowMapResolution, cascadeSpheres);
+        light.SetShadowContext(m_camera.GetRenderPosition(), m_camera.GetFarPlane(), cascadeSpheres);
         light.SetIdxInArray(idx);
         ++idx;
     }
@@ -2077,9 +2122,6 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
     executePass(PassType::SHADOW_MAP, L"Shadow map pass", [&]
                 {
-        pCommandList->RSSetViewports(1, &m_shadowMapViewport);
-        pCommandList->RSSetScissorRects(1, &m_shadowMapScissorRect);
-
         // Pre-query PSOs
         m_currentPSOKey.passType = PassType::SHADOW_MAP;
         m_currentPSOKey.vsName = L"MeshVS.hlsl";
@@ -2092,6 +2134,12 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         auto processLight = [&](Light* pLight)
         {
             auto type = pLight->GetType();
+
+            auto resolution = pLight->GetShadowMapResolution();
+            m_shadowMapViewport = {0.0f, 0.0f, static_cast<float>(resolution), static_cast<float>(resolution), 0.0f, 1.0f};
+            m_shadowMapScissorRect = {0, 0, static_cast<LONG>(resolution), static_cast<LONG>(resolution)};
+            pCommandList->RSSetViewports(1, &m_shadowMapViewport);
+            pCommandList->RSSetScissorRects(1, &m_shadowMapScissorRect);
 
             // Render each entry of shadow map.
             UINT16 arraySize = pLight->GetArraySize();

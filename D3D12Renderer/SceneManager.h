@@ -105,6 +105,14 @@ public:
         return handle;
     }
 
+    void EnqueueResourceDeletion(std::vector<GpuResource>& resources)
+    {
+        m_deferred.insert(
+            m_deferred.end(),
+            std::make_move_iterator(resources.begin()),
+            std::make_move_iterator(resources.end()));
+    }
+
     void Remove(EntityHandle handle)
     {
         if (!m_entities.IsValid(handle))
@@ -121,10 +129,7 @@ public:
                 [&](auto&& handle)
                 {
                     auto resources = Get(handle)->TakeResources();
-                    m_deferred.insert(
-                        m_deferred.end(),
-                        std::make_move_iterator(resources.begin()),
-                        std::make_move_iterator(resources.end()));
+                    EnqueueResourceDeletion(resources);
                     Remove(handle);
                 },
                 lightHandle);

@@ -48,6 +48,7 @@ Light::Light(
     : m_lightCbv(std::move(cbvAllocation))
     , m_type(type)
     , m_srv(std::move(srvAllocation))
+    , m_shadowMapResolution(shadowMapResolution)
 {
     const UINT16 arraySize = GetRequiredArraySize(m_type);
 
@@ -56,16 +57,7 @@ Light::Light(
     for (UINT i = 0; i < arraySize; ++i)
         m_dsvs[i] = DepthStencilView(std::move(dsvAllocs[i]));
 
-    const auto clearValue = CreateClearValue(DXGI_FORMAT_D32_FLOAT, 0.0f, 0);
-
-    // Create depth buffer, init DSVs
-    m_depthBuffer = Texture(
-        pDevice,
-        GetTexture2DDesc(shadowMapResolution, shadowMapResolution, arraySize, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
-        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
-        &clearValue);
-    for (UINT i = 0; i < arraySize; ++i)
-        m_dsvs[i].Init(pDevice, m_depthBuffer.Get(), GetDsvDesc2DArray(DXGI_FORMAT_D32_FLOAT, i));
+    CreateDepthStencilBuffers(pDevice);
 
     m_cameraConstantData.resize(arraySize);
     m_cameraUploadAllocations.resize(arraySize);
@@ -174,6 +166,17 @@ std::vector<GpuResource> Light::TakeResources()
     return ret;
 }
 
+UINT Light::GetShadowMapResolution() const
+{
+    return m_shadowMapResolution;
+}
+
+void Light::ChangeShadowMapResolution(ID3D12Device10* pDevice, UINT shadowMapResolution)
+{
+    m_shadowMapResolution = shadowMapResolution;
+    CreateDepthStencilBuffers(pDevice);
+}
+
 void Light::SetPositionConstants(XMVECTOR pos)
 {
     for (auto& cd : m_cameraConstantData)
@@ -194,6 +197,21 @@ void Light::SetRangeConstants(float range)
     m_lightConstantData.range = range;
 }
 
+// Create depth buffer, init DSVs
+void Light::CreateDepthStencilBuffers(ID3D12Device10* pDevice)
+{
+    const auto clearValue = CreateClearValue(DXGI_FORMAT_D32_FLOAT, 0.0f, 0);
+    const UINT16 arraySize = GetRequiredArraySize(m_type);
+
+    m_depthBuffer = Texture(
+        pDevice,
+        GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, arraySize, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
+        &clearValue);
+    for (UINT i = 0; i < arraySize; ++i)
+        m_dsvs[i].Init(pDevice, m_depthBuffer.Get(), GetDsvDesc2DArray(DXGI_FORMAT_D32_FLOAT, i));
+}
+
 DirectionalLight::DirectionalLight(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,
@@ -210,7 +228,7 @@ void DirectionalLight::SetWorldTransform(XMMATRIX world)
     SetDirectionConstants(XMVector3Normalize(world.r[2]));
 }
 
-void DirectionalLight::SetShadowContext(XMVECTOR cameraPos, float cameraFar, UINT shadowMapResolution, const std::vector<BoundingSphere>& cascadeSpheres)
+void DirectionalLight::SetShadowContext(XMVECTOR cameraPos, float cameraFar, const std::vector<BoundingSphere>& cascadeSpheres)
 {
     static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
@@ -243,12 +261,12 @@ void DirectionalLight::SetShadowContext(XMVECTOR cameraPos, float cameraFar, UIN
         shadowOrigin = XMVector4Transform(shadowOrigin, view * projection);
         shadowOrigin = XMVectorScale(shadowOrigin, 1.0f / XMVectorGetW(shadowOrigin)); // Perspective divide. Can be ommitted if it uses orthographic projection.
         // [-1, 1] -> [-resolution / 2, resolution / 2]
-        shadowOrigin = XMVectorScale(shadowOrigin, static_cast<float>(shadowMapResolution) * 0.5f); // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
+        shadowOrigin = XMVectorScale(shadowOrigin, static_cast<float>(m_shadowMapResolution) * 0.5f); // Scaling based on shadow map resolution. We only need to scale it. No need to offset.
 
         // Calculate diff and apply as translation matrix.
         XMVECTOR roundedOrigin = XMVectorRound(shadowOrigin);
         XMVECTOR diff = roundedOrigin - shadowOrigin;
-        diff = XMVectorScale(diff, 2.0f / static_cast<float>(shadowMapResolution)); // Since diff is texel scale, it should be transformed to NDC scale.
+        diff = XMVectorScale(diff, 2.0f / static_cast<float>(m_shadowMapResolution)); // Since diff is texel scale, it should be transformed to NDC scale.
         XMMATRIX fix = XMMatrixTranslation(XMVectorGetX(diff), XMVectorGetY(diff), 0.0f);
 
         SetViewProjection(view, projection * fix, i);
@@ -267,6 +285,12 @@ const std::array<BoundingOrientedBox, MAX_CASCADES>& DirectionalLight::GetBoundi
     return m_boundingBoxes;
 }
 
+void DirectionalLight::ChangeShadowMapResolution(ID3D12Device10* pDevice, UINT shadowMapResolution)
+{
+    Light::ChangeShadowMapResolution(pDevice, shadowMapResolution);
+    m_srv.Init(pDevice, m_depthBuffer.Get(), GetSrvDesc2DArray(DXGI_FORMAT_R32_FLOAT, 1, MAX_CASCADES));
+}
+
 PointLight::PointLight(
     ID3D12Device10* pDevice,
     DescriptorAllocation&& dsvAllocation,
@@ -280,19 +304,7 @@ PointLight::PointLight(
     for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
         m_rtvs[i] = RenderTargetView(std::move(rtvAllocs[i]));
 
-    auto clearValue = CreateClearValue(DXGI_FORMAT_R32_FLOAT, 1.0f, 0.0f, 0.0f, 0.0f);
-
-    // Create render target, init RTVs
-    m_renderTarget = Texture(
-        pDevice,
-        GetTexture2DDesc(shadowMapResolution, shadowMapResolution, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET),
-        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-        &clearValue);
-    for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
-        m_rtvs[i].Init(pDevice, m_renderTarget.Get(), GetRtvDesc2DArray(DXGI_FORMAT_R32_FLOAT, 0, i, 1));
-
-    // Init SRV for render target we've created just before. NOT for depth buffer!
-    m_srv.Init(pDevice, m_renderTarget.Get(), GetSrvDescCube(DXGI_FORMAT_R32_FLOAT, 1));
+    CreateRenderTargets(pDevice);
 }
 
 void PointLight::SetWorldTransform(XMMATRIX world)
@@ -361,6 +373,12 @@ std::vector<GpuResource> PointLight::TakeResources()
     return ret;
 }
 
+void PointLight::ChangeShadowMapResolution(ID3D12Device10* pDevice, UINT shadowMapResolution)
+{
+    Light::ChangeShadowMapResolution(pDevice, shadowMapResolution);
+    CreateRenderTargets(pDevice);
+}
+
 float PointLight::GetRange() const
 {
     return m_lightConstantData.range;
@@ -369,6 +387,23 @@ float PointLight::GetRange() const
 void PointLight::SetRange(float range)
 {
     SetRangeConstants(range);
+}
+
+// Create render targets, init RTVs
+void PointLight::CreateRenderTargets(ID3D12Device10* pDevice)
+{
+    const auto clearValue = CreateClearValue(DXGI_FORMAT_R32_FLOAT, 1.0f, 0.0f, 0.0f, 0.0f);
+
+    m_renderTarget = Texture(
+        pDevice,
+        GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET),
+        D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+        &clearValue);
+    for (UINT i = 0; i < POINT_LIGHT_ARRAY_SIZE; ++i)
+        m_rtvs[i].Init(pDevice, m_renderTarget.Get(), GetRtvDesc2DArray(DXGI_FORMAT_R32_FLOAT, 0, i, 1));
+
+    // Init SRV for render target we've created just before. NOT for depth buffer!
+    m_srv.Init(pDevice, m_renderTarget.Get(), GetSrvDescCube(DXGI_FORMAT_R32_FLOAT, 1));
 }
 
 SpotLight::SpotLight(
@@ -430,6 +465,12 @@ void SpotLight::SetAngles(float outerAngleDegree, float innerAngleDegree)
 const BoundingFrustum& SpotLight::GetBoundingFrustum() const
 {
     return m_boundingFrustum;
+}
+
+void SpotLight::ChangeShadowMapResolution(ID3D12Device10* pDevice, UINT shadowMapResolution)
+{
+    Light::ChangeShadowMapResolution(pDevice, shadowMapResolution);
+    m_srv.Init(pDevice, m_depthBuffer.Get(), GetSrvDesc(DXGI_FORMAT_R32_FLOAT, 1));
 }
 
 float SpotLight::GetRange() const
