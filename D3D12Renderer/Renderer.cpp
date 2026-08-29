@@ -348,7 +348,37 @@ void Renderer::BuildImGuiFrame()
     static double fps = 0.0;
     static double frameTime = 0.0;
 
-    // ImGui::ShowDemoWindow(); // Show demo window! :)
+    // Menu
+    if (ImGui::BeginMainMenuBar())
+    {
+        if (ImGui::BeginMenu("Add"))
+        {
+            if (ImGui::MenuItem("Cube"))
+            {
+                auto hMesh = m_sceneManager.GetMeshHandle("builtin://mesh/cube");
+                auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
+                auto hMat = CloneMaterial(hTemplateMat);
+
+                auto hCube = m_sceneManager.AddEntity("New Cube");
+                m_sceneManager.AddTransform(hCube);
+                m_sceneManager.SetMesh(hCube, hMesh);
+                m_sceneManager.SetMaterial(hCube, hMat);
+            }
+            if (ImGui::MenuItem("Sphere"))
+            {
+                auto hMesh = m_sceneManager.GetMeshHandle("builtin://mesh/sphere");
+                auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
+                auto hMat = CloneMaterial(hTemplateMat);
+
+                auto hSphere = m_sceneManager.AddEntity("New Sphere");
+                m_sceneManager.AddTransform(hSphere);
+                m_sceneManager.SetMesh(hSphere, hMesh);
+                m_sceneManager.SetMaterial(hSphere, hMat);
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::EndMainMenuBar();
+    }
 
     // ImGuiID string is hashed and stored in the INI file.
     // Changing it will invalidate any previously saved settings associated with it.
@@ -481,18 +511,6 @@ void Renderer::BuildImGuiFrame()
                     ImGui::SetItemDefaultFocus();
             }
             ImGui::EndCombo();
-        }
-
-        if (ImGui::Button("Add Cube"))
-        {
-            auto hMesh = m_sceneManager.GetMeshHandle("builtin://mesh/cube");
-            auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
-            auto hMat = CloneMaterial(hTemplateMat);
-
-            auto hCube = m_sceneManager.AddEntity("New Cube");
-            m_sceneManager.AddTransform(hCube);
-            m_sceneManager.SetMesh(hCube, hMesh);
-            m_sceneManager.SetMaterial(hCube, hMat);
         }
 
         if (ImGui::Button("Reset Layout"))
