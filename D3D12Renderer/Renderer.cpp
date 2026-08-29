@@ -1038,10 +1038,6 @@ void Renderer::LoadAssets()
     m_scissorRect = {0, 0, static_cast<LONG>(m_sceneWidth), static_cast<LONG>(m_sceneHeight)};
     m_camera.SetAspectRatio(static_cast<float>(m_sceneWidth) / static_cast<float>(m_sceneHeight));
 
-    // Set viewport and scissorRect for shadow mapping
-    m_shadowMapViewport = {0.0f, 0.0f, static_cast<float>(m_shadowMapResolution), static_cast<float>(m_shadowMapResolution), 0.0f, 1.0f};
-    m_shadowMapScissorRect = {0, 0, static_cast<LONG>(m_shadowMapResolution), static_cast<LONG>(m_shadowMapResolution)};
-
     // Get command allocator and list for loading assets
     auto [pCommandAllocator, pCommandList] = m_commandQueue.GetAvailableCommandList();
 
@@ -2135,6 +2131,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         {
             auto type = pLight->GetType();
 
+            // Set viewport and scissorRect for shadow mapping
             auto resolution = pLight->GetShadowMapResolution();
             m_shadowMapViewport = {0.0f, 0.0f, static_cast<float>(resolution), static_cast<float>(resolution), 0.0f, 1.0f};
             m_shadowMapScissorRect = {0, 0, static_cast<LONG>(resolution), static_cast<LONG>(resolution)};
