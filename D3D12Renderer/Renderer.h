@@ -155,7 +155,7 @@ private:
     // Shadows
     D3D12_VIEWPORT m_shadowMapViewport;
     D3D12_RECT m_shadowMapScissorRect;
-    UINT m_shadowMapResolution = 2048;
+    UINT m_defaultShadowMapResolution = 2048;
     ShadowConstantData m_shadowConstantData;
     UploadAllocation m_shadowUploadAllocation;
 

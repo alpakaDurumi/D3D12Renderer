@@ -1255,7 +1255,7 @@ void Renderer::LoadAssets()
         "DirectionalLight",
         false,
         D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
-        GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, MAX_CASCADES, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
+        GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_defaultShadowMapResolution, m_defaultShadowMapResolution, MAX_CASCADES, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
         [this]()
         {
             auto& lights = m_sceneManager.GetDirectionalLights();
@@ -1270,7 +1270,7 @@ void Renderer::LoadAssets()
         "PointLight",
         false,
         D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-        GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET)),
+        GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_defaultShadowMapResolution, m_defaultShadowMapResolution, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET)),
         [this]()
         {
             auto& lights = m_sceneManager.GetPointLights();
@@ -1285,7 +1285,7 @@ void Renderer::LoadAssets()
         "SpotLight",
         false,
         D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
-        GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_shadowMapResolution, m_shadowMapResolution, SPOT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
+        GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_defaultShadowMapResolution, m_defaultShadowMapResolution, SPOT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
         [this]()
         {
             auto& lights = m_sceneManager.GetSpotLights();
@@ -2692,7 +2692,7 @@ DirectionalLightHandle Renderer::CreateDirectionalLight()
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV].Allocate(MAX_CASCADES),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
-        m_shadowMapResolution);
+        m_defaultShadowMapResolution);
 }
 
 PointLightHandle Renderer::CreatePointLight()
@@ -2702,7 +2702,7 @@ PointLightHandle Renderer::CreatePointLight()
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(POINT_LIGHT_ARRAY_SIZE),
-        m_shadowMapResolution);
+        m_defaultShadowMapResolution);
 }
 
 SpotLightHandle Renderer::CreateSpotLight()
@@ -2711,5 +2711,5 @@ SpotLightHandle Renderer::CreateSpotLight()
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_DSV].Allocate(SPOT_LIGHT_ARRAY_SIZE),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
         m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
-        m_shadowMapResolution);
+        m_defaultShadowMapResolution);
 }
