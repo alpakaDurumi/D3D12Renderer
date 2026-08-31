@@ -258,7 +258,7 @@ void Renderer::ProcessInput()
     if (m_inputManager.IsKeyPressed('F') && !(m_selected.index == UINT_MAX && m_selected.generation == 0))
     {
         auto* pEntity = m_sceneManager.Get(m_selected);
-        auto pos = pEntity->transform->GetTranslation();
+        auto pos = pEntity->transform.GetTranslation();
 
         m_camera.SetCurrentPosition(XMLoadFloat3(&pos) - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
 
@@ -360,7 +360,6 @@ void Renderer::BuildImGuiFrame()
                 auto hMat = CloneMaterial(hTemplateMat);
 
                 auto hCube = m_sceneManager.AddEntity("New Cube");
-                m_sceneManager.AddTransform(hCube);
                 m_sceneManager.SetMesh(hCube, hMesh);
                 m_sceneManager.SetMaterial(hCube, hMat);
             }
@@ -371,7 +370,6 @@ void Renderer::BuildImGuiFrame()
                 auto hMat = CloneMaterial(hTemplateMat);
 
                 auto hSphere = m_sceneManager.AddEntity("New Sphere");
-                m_sceneManager.AddTransform(hSphere);
                 m_sceneManager.SetMesh(hSphere, hMesh);
                 m_sceneManager.SetMaterial(hSphere, hMat);
             }
@@ -553,9 +551,8 @@ void Renderer::BuildImGuiFrame()
         if (pEntity)
         {
             // Transform component
-            if (pEntity->transform.has_value())
             {
-                auto& transform = pEntity->transform.value();
+                auto& transform = pEntity->transform;
 
                 XMFLOAT3 s = transform.GetScale();
                 if (ImGui::DragFloat3("Scale", &s.x))
@@ -1151,18 +1148,17 @@ void Renderer::LoadAssets()
 
     // Add Entities
     auto hPlane = m_sceneManager.AddEntity("Plane");
-    m_sceneManager.AddTransform(hPlane, XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
+    m_sceneManager.ApplyTransform(hPlane, XMFLOAT3(1000.0f, 0.5f, 1000.0f), XMFLOAT3(), XMFLOAT3(0.0f, -5.0f, 0.0f));
     m_sceneManager.SetMesh(hPlane, hCubeMesh);
     m_sceneManager.SetMaterial(hPlane, hPlaneMat);
 
     auto hFolder = m_sceneManager.AddEntity("Folder");
-    m_sceneManager.AddTransform(hFolder);
     for (UINT i = 0; i < 10; i++)
     {
         for (UINT j = 0; j < 10; j++)
         {
             auto hCube = m_sceneManager.AddEntity("Cube");
-            m_sceneManager.AddTransform(hCube, XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 5.0f) * 4.0f, j * 4.0f, 10.0f));
+            m_sceneManager.ApplyTransform(hCube, XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3((i - 5.0f) * 4.0f, j * 4.0f, 10.0f));
             m_sceneManager.SetMesh(hCube, hCubeMesh);
             m_sceneManager.SetMaterial(hCube, hBaseMat);
 
@@ -1172,7 +1168,7 @@ void Renderer::LoadAssets()
     }
 
     auto hSphere = m_sceneManager.AddEntity("Sphere");
-    m_sceneManager.AddTransform(hSphere, XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
+    m_sceneManager.ApplyTransform(hSphere, XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, -3.5f, 0.0f));
     m_sceneManager.SetMesh(hSphere, hSphereMesh);
     m_sceneManager.SetMaterial(hSphere, hBaseMat);
 
@@ -1180,7 +1176,6 @@ void Renderer::LoadAssets()
     auto hDirectionalLight = m_sceneManager.AddEntity("DirectionalLight");
     auto hDirectionalLightComponent = CreateDirectionalLight();
     m_sceneManager.AddComponent(hDirectionalLight, hDirectionalLightComponent);
-    m_sceneManager.AddTransform(hDirectionalLight);
     m_sceneManager.SetForward(hDirectionalLight, XMFLOAT3(-1.0f, -1.0f, 1.0f));
 
     auto hPointLight = m_sceneManager.AddEntity("PointLight");
@@ -1188,7 +1183,7 @@ void Renderer::LoadAssets()
     m_sceneManager.AddComponent(hPointLight, hPointLightComponent);
     auto* pPointLight = m_sceneManager.Get(hPointLightComponent);
     pPointLight->SetRange(30.0f);
-    m_sceneManager.AddTransform(hPointLight, XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, 4.0f, 3.0f));
+    m_sceneManager.ApplyTransform(hPointLight, XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, 4.0f, 3.0f));
 
     auto hSpotLight = m_sceneManager.AddEntity("SpotLight");
     auto hSpotLightComponent = CreateSpotLight();
@@ -1196,7 +1191,7 @@ void Renderer::LoadAssets()
     auto* pSpotLight = m_sceneManager.Get(hSpotLightComponent);
     pSpotLight->SetRange(50.0f);
     pSpotLight->SetAngles(50.0f, 10.0f);
-    m_sceneManager.AddTransform(hSpotLight, XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, 10.0f, -5.0f));
+    m_sceneManager.ApplyTransform(hSpotLight, XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(), XMFLOAT3(0.0f, 10.0f, -5.0f));
     m_sceneManager.SetForward(hSpotLight, XMFLOAT3(0.0f, -1.0f, 1.0f));
 
     // Execute commands for loading assets and update signaled fence value
@@ -1756,18 +1751,14 @@ void Renderer::FixedUpdate(std::chrono::nanoseconds fixedDt)
     static float rotationSpeed = 1.0f; // unit : rad/s
 
     for (auto& entity : m_sceneManager.GetEntities())
-    {
-        if (!entity.transform.has_value())
-            continue;
-        entity.transform->SnapshotState();
-    }
+        entity.transform.SnapshotState();
 
     for (auto& handle : m_previewRotations)
     {
         auto* pEntity = m_sceneManager.Get(handle);
         if (pEntity == nullptr)
             continue;
-        pEntity->transform->Apply(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
+        pEntity->transform.Apply(XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, rotationSpeed * fixedDtSec, 0.0f), XMFLOAT3());
     }
 }
 

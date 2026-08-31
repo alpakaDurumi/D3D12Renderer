@@ -67,7 +67,7 @@ struct Entity
     EntityHandle parent;
     std::vector<EntityHandle> children;
 
-    std::optional<Transform> transform;
+    Transform transform;
     std::optional<MeshRenderer> meshRenderer;
     std::optional<LightHandle> light;
 };
@@ -160,30 +160,10 @@ public:
         pChild->parent = parent;
     }
 
-    void AddTransform(EntityHandle eh)
-    {
-        auto* pEntity = m_entities.Get(eh);
-        if (pEntity->transform.has_value())
-            assert(false);
-
-        pEntity->transform.emplace();
-    }
-
-    void AddTransform(EntityHandle eh, const DirectX::XMFLOAT3& s, const DirectX::XMFLOAT3& eulerRad, const DirectX::XMFLOAT3& t)
-    {
-        auto* pEntity = m_entities.Get(eh);
-        if (pEntity->transform.has_value())
-            assert(false);
-
-        pEntity->transform.emplace(s, eulerRad, t);
-    }
-
     void ApplyTransform(EntityHandle eh, const DirectX::XMFLOAT3& s, const DirectX::XMFLOAT3& eulerRad, const DirectX::XMFLOAT3& t)
     {
         auto* pEntity = m_entities.Get(eh);
-        if (!pEntity->transform.has_value())
-            assert(false);
-        pEntity->transform->Apply(s, eulerRad, t);
+        pEntity->transform.Apply(s, eulerRad, t);
     }
 
     void UpdateWorldTransforms(float alpha)
@@ -201,9 +181,7 @@ public:
     void SetForward(EntityHandle eh, const DirectX::XMFLOAT3& forward)
     {
         auto* pEntity = m_entities.Get(eh);
-        if (!pEntity->transform.has_value())
-            assert(false);
-        pEntity->transform->SetForward(forward);
+        pEntity->transform.SetForward(forward);
     }
 
     void SetMesh(EntityHandle eh, MeshHandle mh)
@@ -357,7 +335,7 @@ public:
             auto matHandle = entity.meshRenderer->material;
 
             auto matIdx = m_materials.GetDenseIndex(matHandle);
-            auto data = BuildInstanceData(entity.transform->GetWorldRenderTransform(), matIdx);
+            auto data = BuildInstanceData(entity.transform.GetWorldRenderTransform(), matIdx);
 
             auto renderingPath = GetMaterial(matHandle)->GetRenderingPath();
 
@@ -767,14 +745,11 @@ private:
 
     void UpdateWorldTransform(Entity& entity, DirectX::XMMATRIX& accumulated, float alpha)
     {
-        if (!entity.transform.has_value())
-            return;
-
-        entity.transform->UpdateLocalRenderState(alpha);
-        DirectX::XMMATRIX localRenderTransform = DirectX::XMLoadFloat4x4(&entity.transform->GetLocalRenderTransform());
+        entity.transform.UpdateLocalRenderState(alpha);
+        DirectX::XMMATRIX localRenderTransform = DirectX::XMLoadFloat4x4(&entity.transform.GetLocalRenderTransform());
 
         DirectX::XMMATRIX world = localRenderTransform * accumulated;
-        entity.transform->SetWorldRenderTransform(world);
+        entity.transform.SetWorldRenderTransform(world);
 
         // If Light component exists, set position and direction
         if (entity.light.has_value())
