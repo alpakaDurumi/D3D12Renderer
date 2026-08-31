@@ -441,27 +441,6 @@ void SpotLight::SetShadowContext(float cameraNear)
     m_boundingFrustum.Transform(m_boundingFrustum, XMMatrixInverse(nullptr, view));
 }
 
-float SpotLight::GetOuterAngle() const
-{
-    return m_outerAngle;
-}
-
-void SpotLight::SetAngles(float outerAngleDegree, float innerAngleDegree)
-{
-    assert(outerAngleDegree >= innerAngleDegree);
-
-    m_outerAngle = XMConvertToRadians(outerAngleDegree);
-    m_innerAngle = XMConvertToRadians(innerAngleDegree);
-    // We need cosine value that calculated from half angle.
-    m_lightConstantData.cosOuterAngle = std::cos(m_outerAngle * 0.5f);
-    m_lightConstantData.cosInnerAngle = std::cos(m_innerAngle * 0.5f);
-
-    const float minDiff = 0.01f;
-
-    if ((m_lightConstantData.cosInnerAngle - m_lightConstantData.cosOuterAngle) < minDiff)
-        m_lightConstantData.cosOuterAngle = m_lightConstantData.cosInnerAngle - minDiff;
-}
-
 const BoundingFrustum& SpotLight::GetBoundingFrustum() const
 {
     return m_boundingFrustum;
@@ -481,4 +460,30 @@ float SpotLight::GetRange() const
 void SpotLight::SetRange(float range)
 {
     SetRangeConstants(range);
+}
+
+float SpotLight::GetOuterAngle() const
+{
+    return m_outerAngle;
+}
+
+float SpotLight::GetInnerAngle() const
+{
+    return m_innerAngle;
+}
+
+void SpotLight::SetAngles(float outerAngleDegree, float innerAngleDegree)
+{
+    assert(outerAngleDegree >= innerAngleDegree);
+
+    m_outerAngle = XMConvertToRadians(outerAngleDegree);
+    m_innerAngle = XMConvertToRadians(innerAngleDegree);
+    // We need cosine value that calculated from half angle.
+    m_lightConstantData.cosOuterAngle = std::cos(m_outerAngle * 0.5f);
+    m_lightConstantData.cosInnerAngle = std::cos(m_innerAngle * 0.5f);
+
+    const float minDiff = 0.01f;
+
+    if ((m_lightConstantData.cosInnerAngle - m_lightConstantData.cosOuterAngle) < minDiff)
+        m_lightConstantData.cosOuterAngle = m_lightConstantData.cosInnerAngle - minDiff;
 }

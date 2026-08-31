@@ -167,15 +167,16 @@ public:
     void SetWorldTransform(DirectX::XMMATRIX world) override;
     void SetShadowContext(float cameraNear);
 
-    float GetOuterAngle() const;
-    void SetAngles(float outerAngle, float innerAngle);
-
     const DirectX::BoundingFrustum& GetBoundingFrustum() const;
 
     void ChangeShadowMapResolution(ID3D12Device10* pDevice, UINT shadowMapResolution) override;
 
     float GetRange() const;
     void SetRange(float range);
+
+    float GetOuterAngle() const;
+    float GetInnerAngle() const;
+    void SetAngles(float outerAngle, float innerAngle);
 
 private:
     float m_outerAngle;
