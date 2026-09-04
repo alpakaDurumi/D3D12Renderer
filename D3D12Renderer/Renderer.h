@@ -4,6 +4,7 @@
 #include <chrono>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -144,7 +145,7 @@ private:
 
     // Scene control
     SceneManager m_sceneManager;
-    EntityHandle m_selected;
+    std::unordered_set<EntityHandle> m_selected;
     std::unordered_map<MeshHandle, VisibleRange> m_selectedVisibleIndexRange;
 
     std::vector<EntityHandle> m_previewRotations;
@@ -188,7 +189,7 @@ private:
     void ResizeSceneResolution(UINT width, UINT height);
     void SetFpsCap(std::string fps);
     void SetTextureFiltering(TextureFiltering filtering);
-    void RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete, bool& selectionChanged);
+    void RenderEntityNode(const Entity& entity, bool& del, bool& selectionChanged);
 
     // Update
     void FixedUpdate(std::chrono::nanoseconds fixedDt);
