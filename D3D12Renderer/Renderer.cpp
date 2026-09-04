@@ -255,9 +255,10 @@ void Renderer::ProcessInput()
     }
 
     // Focus
-    if (m_inputManager.IsKeyPressed('F') && !(m_selected.index == UINT_MAX && m_selected.generation == 0))
+    // TODO: focus with average position of selected entities
+    if (m_inputManager.IsKeyPressed('F') && !m_selected.empty())
     {
-        auto* pEntity = m_sceneManager.Get(m_selected);
+        auto* pEntity = m_sceneManager.Get(*m_selected.begin()); // Use first entity's position for now
         auto pos = pEntity->transform.GetTranslation();
 
         m_camera.SetCurrentPosition(XMLoadFloat3(&pos) - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
@@ -527,29 +528,29 @@ void Renderer::BuildImGuiFrame()
 
         ImGui::Begin("Hierarchy");
 
-        EntityHandle toDelete;
-
-        if (ImGui::IsKeyPressed(ImGuiKey_Delete))
-            toDelete = m_selected;
+        bool del = false;
 
         for (const auto& entity : m_sceneManager.GetEntities())
         {
-            if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
-                RenderEntityNode(entity, m_selected, toDelete, selectionChanged);
+            if (entity.parent.Empty())
+                RenderEntityNode(entity, del, selectionChanged);
         }
 
-        m_sceneManager.Remove(toDelete);
-        if (m_selected == toDelete)
-            m_selected = {};
+        if (del || ImGui::IsKeyPressed(ImGuiKey_Delete))
+        {
+            for (const auto& handle : m_selected)
+                m_sceneManager.Remove(handle);
+            m_selected.clear();
+        }
 
         ImGui::End();
 
         // Inspector
         ImGui::Begin("Inspector");
 
-        auto* pEntity = m_sceneManager.Get(m_selected);
-        if (pEntity)
+        if (!m_selected.empty())
         {
+            auto* pEntity = m_sceneManager.Get(*m_selected.begin()); // Use first entity's position for now
             // Transform component
             {
                 auto& transform = pEntity->transform;
@@ -1687,9 +1688,9 @@ void Renderer::SetTextureFiltering(TextureFiltering filtering)
     }
 }
 
-void Renderer::RenderEntityNode(const Entity& entity, EntityHandle& selected, EntityHandle& toDelete, bool& selectionChanged)
+void Renderer::RenderEntityNode(const Entity& entity, bool& del, bool& selectionChanged)
 {
-    bool isSelected = (entity.selfHandle == selected);
+    bool isSelected = m_selected.find(entity.selfHandle) != m_selected.end();
 
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth;
     if (entity.children.empty())
@@ -1700,22 +1701,42 @@ void Renderer::RenderEntityNode(const Entity& entity, EntityHandle& selected, En
     UINT64 id = (static_cast<UINT64>(entity.selfHandle.index) << 32) | entity.selfHandle.generation;
     bool isExpanded = ImGui::TreeNodeEx(reinterpret_cast<void*>(id), flags, "%s", entity.name.c_str());
 
-    if (ImGui::IsItemClicked() && selected != entity.selfHandle)
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
     {
-        selected = entity.selfHandle;
+        if (ImGui::GetIO().KeyCtrl)
+        {
+            if (isSelected)
+                m_selected.erase(entity.selfHandle);
+            else
+                m_selected.insert(entity.selfHandle);
+        }
+        else
+        {
+            m_selected.clear();
+            m_selected.insert(entity.selfHandle);
+        }
         selectionChanged = true;
+    }
+
+    if(ImGui::IsItemClicked(ImGuiMouseButton_Right))
+    {
+        if(!isSelected)
+        {
+            m_selected.clear();
+            m_selected.insert(entity.selfHandle);
+        }
     }
 
     if (ImGui::BeginPopupContextItem())
     {
         if (ImGui::MenuItem("Delete"))
-            toDelete = entity.selfHandle;
+            del = true;
         ImGui::EndPopup();
     }
     if (!(flags & ImGuiTreeNodeFlags_NoTreePushOnOpen) && isExpanded)
     {
         for (auto c : entity.children)
-            RenderEntityNode(*m_sceneManager.Get(c), selected, toDelete, selectionChanged);
+            RenderEntityNode(*m_sceneManager.Get(c), del, selectionChanged);
         ImGui::TreePop();
     }
 }
@@ -2013,26 +2034,28 @@ void Renderer::UploadInstanceData()
         }
     }
 
-    // Push indices of selected entities (one entity for now)
+    // Push indices of selected entities
     m_selectedVisibleIndexRange.clear();
 
-    bool selectionExists = !(m_selected.index == UINT_MAX && m_selected.generation == 0);
-    if (selectionExists)
+    std::unordered_map<MeshHandle, std::vector<UINT32>> grouped;
+
+    // Get indices of each selected entry
+    for (const auto& handle : m_selected)
     {
-        auto* pEntity = m_sceneManager.Get(m_selected);
+        auto* pEntity = m_sceneManager.Get(handle);
+        if (!pEntity->meshRenderer.has_value())
+            continue;
 
-        if (pEntity->meshRenderer.has_value())
-        {
-            auto meshHandle = pEntity->meshRenderer->mesh;
+        auto mesh = pEntity->meshRenderer->mesh;
+        auto idx = m_sceneManager.GetEntityIndex(handle);
+        grouped[mesh].push_back(idx);
+    }
 
-            UINT index = m_sceneManager.GetEntityIndex(m_selected);
-
-            std::vector<UINT32> indices;
-            indices.push_back(index);
-
-            m_selectedVisibleIndexRange[meshHandle].offset = frameResource.PushInstanceIndices(indices);
-            m_selectedVisibleIndexRange[meshHandle].count = 1;
-        }
+    // Set visibleRange about selected entities for each mesh
+    for (const auto& [meshHandle, indices] : grouped)
+    {
+        m_selectedVisibleIndexRange[meshHandle].offset = frameResource.PushInstanceIndices(indices);
+        m_selectedVisibleIndexRange[meshHandle].count = static_cast<UINT>(indices.size());
     }
 }
 
@@ -2281,11 +2304,11 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), visibleRange);
         } });
 
-    bool selectionExists = !(m_selected.index == UINT_MAX && m_selected.generation == 0);
+    bool needToDrawOutline = !m_selectedVisibleIndexRange.empty();
 
     executePass(PassType::SELECTION_MASK, L"Selection mask pass", [&]
                 {
-        if (selectionExists)
+        if (needToDrawOutline)
         {
             pCommandList->RSSetViewports(1, &m_viewport);
             pCommandList->RSSetScissorRects(1, &m_scissorRect);
@@ -2306,14 +2329,13 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
             pCommandList->SetGraphicsRootConstantBufferView(1, m_cameraUploadAllocation.gpuPtr);
 
-            // 선택된 Entity들에 대해서만 draw call을 호출해야 함 (나중에는 여러 Entity를 다중 선택할 수도 있어야 함)
             for (const auto& [meshHandle, instanceRange] : m_sceneManager.GetInstanceRanges())
                 DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), m_selectedVisibleIndexRange[meshHandle]);
         } });
 
     executePass(PassType::HORIZONTAL_DILATE, L"Horizontal dilate pass", [&]
                 {
-        if (selectionExists)
+        if (needToDrawOutline)
         {
             pCommandList->RSSetViewports(1, &m_viewport);
             pCommandList->RSSetScissorRects(1, &m_scissorRect);
@@ -2338,7 +2360,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
     executePass(PassType::OUTLINE_DRAWING, L"Outline drawing pass", [&]
                 {
-        if (selectionExists)
+        if (needToDrawOutline)
         {
             pCommandList->RSSetViewports(1, &m_viewport);
             pCommandList->RSSetScissorRects(1, &m_scissorRect);

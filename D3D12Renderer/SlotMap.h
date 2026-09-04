@@ -15,6 +15,11 @@ public:
         UINT index = UINT_MAX;
         UINT generation = 0;
 
+        bool Empty() const
+        {
+            return index == UINT_MAX && generation == 0;
+        }
+
         bool operator==(const Handle& other) const
         {
             return this->index == other.index &&

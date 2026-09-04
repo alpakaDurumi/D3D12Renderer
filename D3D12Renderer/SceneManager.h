@@ -170,7 +170,7 @@ public:
     {
         for (auto& entity : m_entities.GetDense())
         {
-            if (entity.parent.index == UINT_MAX && entity.parent.generation == 0)
+            if (entity.parent.Empty())
             {
                 DirectX::XMMATRIX accumulated = DirectX::XMMatrixIdentity();
                 UpdateWorldTransform(entity, accumulated, alpha);
