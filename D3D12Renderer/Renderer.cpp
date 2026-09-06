@@ -419,6 +419,9 @@ void Renderer::BuildImGuiFrame()
     {
         ImGui::Begin("Scene");
 
+        if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
+            m_selected.clear();
+
         static constexpr double DEBOUNCE_DELAY = 0.15; // 0.15 sec
 
         ImVec2 measured = ImGui::GetContentRegionAvail();
@@ -451,6 +454,9 @@ void Renderer::BuildImGuiFrame()
     // Test window
     {
         ImGui::Begin("Test");
+
+        if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
+            m_selected.clear();
 
         ++frameCounter;
 
@@ -524,11 +530,11 @@ void Renderer::BuildImGuiFrame()
 
     // Hierarchy window
     {
-        bool selectionChanged = false;
-
         ImGui::Begin("Hierarchy");
 
-        bool del = ImGui::IsKeyPressed(ImGuiKey_Delete);
+        bool selectionChanged = false;
+
+        bool del = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && ImGui::IsKeyPressed(ImGuiKey_Delete);
 
         for (const auto& entity : m_sceneManager.GetEntities())
         {
