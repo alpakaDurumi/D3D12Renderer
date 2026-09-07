@@ -420,7 +420,13 @@ void Renderer::BuildImGuiFrame()
         ImGui::Begin("Scene");
 
         if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
-            m_selected.clear();
+        {
+            if (!m_selected.empty())
+            {
+                m_selected.clear();
+                m_selectionChanged = true;
+            }
+        }
 
         static constexpr double DEBOUNCE_DELAY = 0.15; // 0.15 sec
 
@@ -456,7 +462,13 @@ void Renderer::BuildImGuiFrame()
         ImGui::Begin("Test");
 
         if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
-            m_selected.clear();
+        {
+            if (!m_selected.empty())
+            {
+                m_selected.clear();
+                m_selectionChanged = true;
+            }
+        }
 
         ++frameCounter;
 
@@ -532,96 +544,194 @@ void Renderer::BuildImGuiFrame()
     {
         ImGui::Begin("Hierarchy");
 
-        bool selectionChanged = false;
-
         bool del = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && ImGui::IsKeyPressed(ImGuiKey_Delete);
 
         for (const auto& entity : m_sceneManager.GetEntities())
-        {
             if (entity.parent.Empty())
-                RenderEntityNode(entity, del, selectionChanged);
-        }
+                RenderEntityNode(entity, del);
 
         if (del)
         {
-            for (const auto& handle : m_selected)
-                m_sceneManager.Remove(handle);
-            m_selected.clear();
+            if (!m_selected.empty())
+            {
+                for (const auto& handle : m_selected)
+                    m_sceneManager.Remove(handle);
+                m_selected.clear();
+                m_selectionChanged = true;
+            }
         }
 
         ImGui::End();
+    }
 
-        // Inspector
+    // Inspector
+    {
         ImGui::Begin("Inspector");
 
         if (!m_selected.empty())
         {
-            auto* pEntity = m_sceneManager.Get(*m_selected.begin()); // Use first entity's position for now
             // Transform component
+            // Drag editing is available only when a single entity is selected.
+            // On multi-selection every component becomes a text box that parses the typed value,
+            // even for components whose values are identical across the selection.
+
+            // get: Transform& -> XMFLOAT3
+            // set: (Transform&, const XMFLOAT3&) -> void
+            auto drawTransform = [&](const char* label, auto&& get, auto&& set)
             {
-                auto& transform = pEntity->transform;
+                auto it = m_selected.begin();
+                XMFLOAT3 common = get(m_sceneManager.Get(*it)->transform);
 
-                XMFLOAT3 s = transform.GetScale();
-                if (ImGui::DragFloat3("Scale", &s.x))
-                    transform.SetScale(s);
-
-                XMFLOAT3 eulerR = transform.GetEulerCache(selectionChanged);
-                if (ImGui::DragFloat3("Rotation", &eulerR.x))
+                if (m_selected.size() == 1)
                 {
-                    transform.SetRotation(eulerR);
+                    XMFLOAT3 v = common;
+                    if (ImGui::DragFloat3(label, &v.x))
+                        set(m_sceneManager.Get(*m_selected.begin())->transform, v);
+                    return;
                 }
 
-                XMFLOAT3 t = transform.GetTranslation();
-                if (ImGui::DragFloat3("Translation", &t.x))
-                    transform.SetTranslation(t);
-            }
+                bool mixed[3] = {false};
+                for (++it; it != m_selected.end(); ++it)
+                {
+                    XMFLOAT3 o = get(m_sceneManager.Get(*it)->transform);
+                    if (o.x != common.x) mixed[0] = true;
+                    if (o.y != common.y) mixed[1] = true;
+                    if (o.z != common.z) mixed[2] = true;
+                }
+
+                // Multi-selection: one text box per component
+                ImGui::BeginGroup();
+                ImGui::PushID(label);
+                ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
+
+                for (int i = 0; i < 3; ++i)
+                {
+                    ImGui::PushID(i);
+                    if (i > 0) ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+
+                    char buf[32] = "";
+                    if (mixed[i])
+                        snprintf(buf, sizeof(buf), "Multiple Values");
+                    else
+                        snprintf(buf, sizeof(buf), "%.3f", (&common.x)[i]);
+
+                    if (ImGui::InputText("", buf, sizeof(buf), ImGuiInputTextFlags_CharsScientific | ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
+                    {
+                        char* end = nullptr;
+                        float v = std::strtof(buf, &end);
+
+                        if (end != buf)
+                        {
+                            for (const auto& handle : m_selected)
+                            {
+                                auto& tr = m_sceneManager.Get(handle)->transform;
+                                XMFLOAT3 t = get(tr);
+                                (&t.x)[i] = v;
+                                set(tr, t);
+                            }
+                        }
+                    }
+
+                    ImGui::PopID();
+                    ImGui::PopItemWidth();
+                }
+
+                ImGui::PopID();
+                ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+                ImGui::TextUnformatted(label);
+                ImGui::EndGroup();
+            };
+
+            drawTransform("Scale",
+                [](Transform& tr){ return tr.GetScale(); },
+                [](Transform& tr, const XMFLOAT3& v) { tr.SetScale(v); });
+
+            drawTransform("Rotation",
+                [&](Transform& tr){ return tr.GetEulerCache(m_selectionChanged); },
+                [](Transform& tr, const XMFLOAT3& v){ tr.SetRotation(v); });
+
+            drawTransform("Translation",
+                [](Transform& tr){ return tr.GetTranslation(); },
+                [](Transform& tr, const XMFLOAT3& v){ tr.SetTranslation(v); });
 
             // Light component
-            if (pEntity->light.has_value())
+            bool allHaveLight = true;
+            for (const auto& handle : m_selected)
             {
-                auto lightHandle = pEntity->light.value();
+                if (!m_sceneManager.Get(handle)->light.has_value())
+                {
+                    allHaveLight = false;
+                    break;
+                }
+            }
+
+            if (allHaveLight)
+            {
+                auto getResolution = [&](EntityHandle handle)
+                {
+                    UINT resolution = 0;
+                    std::visit(
+                        [&](auto&& lh) { resolution = m_sceneManager.Get(lh)->GetShadowMapResolution(); },
+                        m_sceneManager.Get(handle)->light.value());
+                    return resolution;
+                };
+
+                // Take the first value as representative and check whether the selection is mixed
+                auto it = m_selected.begin();
+                UINT common = getResolution(*it);
+                bool mixed = false;
+                for (++it; it != m_selected.end(); ++it)
+                {
+                    if (getResolution(*it) != common)
+                    {
+                        mixed = true;
+                        break;
+                    }
+                }
+
+                char buf[16];
+                if (mixed)
+                    snprintf(buf, sizeof(buf), "Multiple Values");
+                else
+                    snprintf(buf, sizeof(buf), "%u", common);
 
                 const char* items[] = {"512", "1024", "2048", "4096"};
 
-                // Get current shadow map resolution and use it as preview value
-                UINT currentResolution = 0;
-                std::visit(
-                    [&](auto&& handle)
-                    { currentResolution = m_sceneManager.Get(handle)->GetShadowMapResolution(); },
-                    lightHandle);
-
-                char buffer[5];
-                snprintf(buffer, sizeof(buffer), "%d", currentResolution);
-
-                if (ImGui::BeginCombo("Shadow Map Resolution", buffer))
+                if (ImGui::BeginCombo("Shadow Map Resolution", buf))
                 {
                     for (int n = 0; n < IM_ARRAYSIZE(items); ++n)
                     {
-                        const bool is_selected = static_cast<UINT>(std::stoi(items[n])) == currentResolution;
-                        if (ImGui::Selectable(items[n], is_selected))
-                        {
-                            std::visit(
-                                [&](auto&& handle)
-                                {
-                                    auto* pLight = m_sceneManager.Get(handle);
-                                    auto resources = pLight->TakeResources();
-                                    m_sceneManager.EnqueueResourceDeletion(resources);
-                                    pLight->ChangeShadowMapResolution(m_device.Get(), static_cast<UINT>(std::stoi(items[n])));
-                                },
-                                lightHandle);
+                        const UINT resolution = static_cast<UINT>(std::stoi(items[n]));
+                        const bool isSelected = !mixed && resolution == common;               
+                        if (ImGui::Selectable(items[n], isSelected)) {
+                            for (const auto& handle : m_selected)
+                            {
+                                std::visit(
+                                    [&](auto&& lightHandle)
+                                    {
+                                        auto* pLight = m_sceneManager.Get(lightHandle);
+            
+                                        if (pLight->GetShadowMapResolution() == resolution) return;
+            
+                                        auto resources = pLight->TakeResources();
+                                        m_sceneManager.EnqueueResourceDeletion(resources);
+                                        pLight->ChangeShadowMapResolution(m_device.Get(), resolution);
+                                    },
+                                    m_sceneManager.Get(handle)->light.value());
+                            }
                         }
 
                         // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-                        if (is_selected)
+                        if (isSelected)
                             ImGui::SetItemDefaultFocus();
                     }
                     ImGui::EndCombo();
                 }
             }
         }
-
         ImGui::End();
     }
+    m_selectionChanged = false;
 }
 
 void Renderer::Update()
@@ -1694,7 +1804,7 @@ void Renderer::SetTextureFiltering(TextureFiltering filtering)
     }
 }
 
-void Renderer::RenderEntityNode(const Entity& entity, bool& del, bool& selectionChanged)
+void Renderer::RenderEntityNode(const Entity& entity, bool& del)
 {
     bool isSelected = m_selected.find(entity.selfHandle) != m_selected.end();
 
@@ -1715,13 +1825,17 @@ void Renderer::RenderEntityNode(const Entity& entity, bool& del, bool& selection
                 m_selected.erase(entity.selfHandle);
             else
                 m_selected.insert(entity.selfHandle);
+            m_selectionChanged = true;
         }
         else
         {
-            m_selected.clear();
-            m_selected.insert(entity.selfHandle);
+            if (!(isSelected && m_selected.size() == 1))
+            {
+                m_selected.clear();
+                m_selected.insert(entity.selfHandle);
+                m_selectionChanged = true;
+            }
         }
-        selectionChanged = true;
     }
 
     if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
@@ -1730,6 +1844,7 @@ void Renderer::RenderEntityNode(const Entity& entity, bool& del, bool& selection
         {
             m_selected.clear();
             m_selected.insert(entity.selfHandle);
+            m_selectionChanged = true;
         }
     }
 
@@ -1742,7 +1857,7 @@ void Renderer::RenderEntityNode(const Entity& entity, bool& del, bool& selection
     if (!(flags & ImGuiTreeNodeFlags_NoTreePushOnOpen) && isExpanded)
     {
         for (auto c : entity.children)
-            RenderEntityNode(*m_sceneManager.Get(c), del, selectionChanged);
+            RenderEntityNode(*m_sceneManager.Get(c), del);
         ImGui::TreePop();
     }
 }

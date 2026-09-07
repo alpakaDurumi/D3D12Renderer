@@ -147,6 +147,7 @@ private:
     SceneManager m_sceneManager;
     std::unordered_set<EntityHandle> m_selected;
     std::unordered_map<MeshHandle, VisibleRange> m_selectedVisibleIndexRange;
+    bool m_selectionChanged = false;
 
     std::vector<EntityHandle> m_previewRotations;
 
@@ -189,7 +190,7 @@ private:
     void ResizeSceneResolution(UINT width, UINT height);
     void SetFpsCap(std::string fps);
     void SetTextureFiltering(TextureFiltering filtering);
-    void RenderEntityNode(const Entity& entity, bool& del, bool& selectionChanged);
+    void RenderEntityNode(const Entity& entity, bool& del);
 
     // Update
     void FixedUpdate(std::chrono::nanoseconds fixedDt);
