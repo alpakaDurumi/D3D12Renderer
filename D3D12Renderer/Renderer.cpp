@@ -255,14 +255,20 @@ void Renderer::ProcessInput()
     }
 
     // Focus
-    // TODO: focus with average position of selected entities
     if (m_inputManager.IsKeyPressed('F') && !m_selected.empty())
     {
-        auto* pEntity = m_sceneManager.Get(*m_selected.begin()); // Use first entity's position for now
-        auto pos = pEntity->transform.GetTranslation();
+        XMVECTOR acc = XMVectorZero();
 
-        m_camera.SetCurrentPosition(XMLoadFloat3(&pos) - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
+        for (const auto& handle : m_selected)
+        {
+            XMFLOAT4X4 world = m_sceneManager.Get(handle)->transform.GetWorldRenderTransform();
+            acc += XMVectorSet(world._41, world._42, world._43, 0.0f);
+        }
 
+        XMVECTOR center = XMVectorScale(acc, 1.0f / static_cast<float>(m_selected.size()));
+        m_camera.SetCurrentPosition(center - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
+
+        XMStoreFloat3(&m_orbitPivot, center);
         m_orbitDistance = DEFAULT_FOCUS_DIST;
     }
 
