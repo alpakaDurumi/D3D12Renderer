@@ -426,13 +426,7 @@ void Renderer::BuildImGuiFrame()
         ImGui::Begin("Scene");
 
         if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().KeyAlt)
-        {
-            if (!m_selected.empty())
-            {
-                m_selected.clear();
-                m_selectionChanged = true;
-            }
-        }
+            ClearSelection();
 
         static constexpr double DEBOUNCE_DELAY = 0.15; // 0.15 sec
 
@@ -468,13 +462,7 @@ void Renderer::BuildImGuiFrame()
         ImGui::Begin("Test");
 
         if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
-        {
-            if (!m_selected.empty())
-            {
-                m_selected.clear();
-                m_selectionChanged = true;
-            }
-        }
+            ClearSelection();
 
         ++frameCounter;
 
@@ -558,13 +546,9 @@ void Renderer::BuildImGuiFrame()
 
         if (del)
         {
-            if (!m_selected.empty())
-            {
-                for (const auto& handle : m_selected)
-                    m_sceneManager.Remove(handle);
-                m_selected.clear();
-                m_selectionChanged = true;
-            }
+            for (const auto& handle : m_selected)
+                m_sceneManager.Remove(handle);
+            ClearSelection();
         }
 
         ImGui::End();
@@ -1826,33 +1810,13 @@ void Renderer::RenderEntityNode(const Entity& entity, bool& del)
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
     {
         if (ImGui::GetIO().KeyCtrl)
-        {
-            if (isSelected)
-                m_selected.erase(entity.selfHandle);
-            else
-                m_selected.insert(entity.selfHandle);
-            m_selectionChanged = true;
-        }
+            ToggleSelect(entity.selfHandle);
         else
-        {
-            if (!(isSelected && m_selected.size() == 1))
-            {
-                m_selected.clear();
-                m_selected.insert(entity.selfHandle);
-                m_selectionChanged = true;
-            }
-        }
+            SelectSingle(entity.selfHandle);
     }
 
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
-    {
-        if (!isSelected)
-        {
-            m_selected.clear();
-            m_selected.insert(entity.selfHandle);
-            m_selectionChanged = true;
-        }
-    }
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && !isSelected)
+        SelectSingle(entity.selfHandle);
 
     if (ImGui::BeginPopupContextItem())
     {
@@ -1866,6 +1830,31 @@ void Renderer::RenderEntityNode(const Entity& entity, bool& del)
             RenderEntityNode(*m_sceneManager.Get(c), del);
         ImGui::TreePop();
     }
+}
+
+void Renderer::ClearSelection()
+{
+    if (m_selected.empty()) return;
+
+    m_selected.clear();
+    m_selectionChanged = true;
+}
+
+void Renderer::SelectSingle(EntityHandle handle)
+{
+    if (m_selected.size() == 1 && *m_selected.begin() == handle) return;
+
+    m_selected.clear();
+    m_selected.insert(handle);
+    m_selectionChanged = true;
+}
+
+void Renderer::ToggleSelect(EntityHandle handle)
+{
+    if (!m_selected.insert(handle).second)
+        m_selected.erase(handle);
+
+    m_selectionChanged = true;
 }
 
 void Renderer::FixedUpdate(std::chrono::nanoseconds fixedDt)

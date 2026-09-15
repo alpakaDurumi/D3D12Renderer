@@ -192,6 +192,10 @@ private:
     void SetTextureFiltering(TextureFiltering filtering);
     void RenderEntityNode(const Entity& entity, bool& del);
 
+    void ClearSelection();
+    void SelectSingle(EntityHandle handle);
+    void ToggleSelect(EntityHandle handle);
+
     // Update
     void FixedUpdate(std::chrono::nanoseconds fixedDt);
     void PrepareConstantData(float alpha);
