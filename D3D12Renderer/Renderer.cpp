@@ -425,7 +425,7 @@ void Renderer::BuildImGuiFrame()
     {
         ImGui::Begin("Scene");
 
-        if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
+        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().KeyAlt)
         {
             if (!m_selected.empty())
             {
