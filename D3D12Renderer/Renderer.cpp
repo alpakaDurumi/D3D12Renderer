@@ -538,7 +538,7 @@ void Renderer::BuildImGuiFrame()
     {
         ImGui::Begin("Hierarchy");
 
-        bool del = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && ImGui::IsKeyPressed(ImGuiKey_Delete);
+        bool del = !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete);
 
         for (const auto& entity : m_sceneManager.GetEntities())
             if (entity.parent.Empty())
