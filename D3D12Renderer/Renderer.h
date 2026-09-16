@@ -36,6 +36,8 @@
 #include "View.h"
 #include "VisibleRange.h"
 
+struct ImGuiMultiSelectIO;
+
 class Renderer
 {
 public:
@@ -190,7 +192,8 @@ private:
     void ResizeSceneResolution(UINT width, UINT height);
     void SetFpsCap(std::string fps);
     void SetTextureFiltering(TextureFiltering filtering);
-    void RenderEntityNode(const Entity& entity, bool& del);
+    void RenderEntityNode(const Entity& entity, bool& del, std::vector<EntityHandle>& visibleOrder);
+    void ApplySelectionRequests(ImGuiMultiSelectIO* ms, const std::vector<EntityHandle>& visibleOrder);
 
     void ClearSelection();
     void SelectSingle(EntityHandle handle);

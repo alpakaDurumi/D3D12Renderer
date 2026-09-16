@@ -143,6 +143,19 @@ static D3D12_SAMPLER_DESC GetSamplerDesc(
     return desc;
 }
 
+// Pack an EntityHandle into the 64-bit value ImGui echoes back in selection requests
+static ImGuiSelectionUserData ToSelectionUserData(EntityHandle h)
+{
+    return static_cast<ImGuiSelectionUserData>((static_cast<UINT64>(h.index) << 32) | h.generation);
+}
+
+// Unpack a value from a selection request back into an EntityHandle
+static EntityHandle FromSelectionUserData(ImGuiSelectionUserData v)
+{
+    const UINT64 u = static_cast<UINT64>(v);
+    return EntityHandle{static_cast<UINT>(u >> 32), static_cast<UINT>(u)};
+}
+
 // Wrappers of callback functions for ImGui SRV descriptor
 void Renderer::ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
 {
@@ -540,9 +553,16 @@ void Renderer::BuildImGuiFrame()
 
         bool del = !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete);
 
+        std::vector<EntityHandle> visibleOrder;
+        ImGuiMultiSelectIO* ms = ImGui::BeginMultiSelect(ImGuiMultiSelectFlags_ClearOnClickVoid, static_cast<int>(m_selected.size()));
+        ApplySelectionRequests(ms, visibleOrder);
+
         for (const auto& entity : m_sceneManager.GetEntities())
             if (entity.parent.Empty())
-                RenderEntityNode(entity, del);
+                RenderEntityNode(entity, del, visibleOrder);
+
+        ms = ImGui::EndMultiSelect();
+        ApplySelectionRequests(ms, visibleOrder);
 
         if (del)
         {
@@ -1794,7 +1814,7 @@ void Renderer::SetTextureFiltering(TextureFiltering filtering)
     }
 }
 
-void Renderer::RenderEntityNode(const Entity& entity, bool& del)
+void Renderer::RenderEntityNode(const Entity& entity, bool& del, std::vector<EntityHandle>& visibleOrder)
 {
     bool isSelected = m_selected.find(entity.selfHandle) != m_selected.end();
 
@@ -1805,18 +1825,10 @@ void Renderer::RenderEntityNode(const Entity& entity, bool& del)
         flags |= ImGuiTreeNodeFlags_Selected;
 
     UINT64 id = (static_cast<UINT64>(entity.selfHandle.index) << 32) | entity.selfHandle.generation;
+
+    visibleOrder.push_back(entity.selfHandle);
+    ImGui::SetNextItemSelectionUserData(ToSelectionUserData(entity.selfHandle));
     bool isExpanded = ImGui::TreeNodeEx(reinterpret_cast<void*>(id), flags, "%s", entity.name.c_str());
-
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
-    {
-        if (ImGui::GetIO().KeyCtrl)
-            ToggleSelect(entity.selfHandle);
-        else
-            SelectSingle(entity.selfHandle);
-    }
-
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && !isSelected)
-        SelectSingle(entity.selfHandle);
 
     if (ImGui::BeginPopupContextItem())
     {
@@ -1827,9 +1839,49 @@ void Renderer::RenderEntityNode(const Entity& entity, bool& del)
     if (!(flags & ImGuiTreeNodeFlags_NoTreePushOnOpen) && isExpanded)
     {
         for (auto c : entity.children)
-            RenderEntityNode(*m_sceneManager.Get(c), del);
+            RenderEntityNode(*m_sceneManager.Get(c), del, visibleOrder);
         ImGui::TreePop();
     }
+}
+
+// Apply ImGui multi-select requests to m_selected, resolving ranges through the visible tree order
+void Renderer::ApplySelectionRequests(ImGuiMultiSelectIO* ms, const std::vector<EntityHandle>& visibleOrder)
+{
+    if (ms->Requests.empty())
+        return;
+
+    const auto before = m_selected;
+
+    for (const ImGuiSelectionRequest& req : ms->Requests)
+    {
+        if (req.Type == ImGuiSelectionRequestType_SetAll)
+        {
+            m_selected.clear();
+            if (req.Selected)
+                for (const auto& entity : m_sceneManager.GetEntities())
+                    m_selected.insert(entity.selfHandle);
+        }
+        else if (req.Type == ImGuiSelectionRequestType_SetRange)
+        {
+            auto first = std::find(visibleOrder.begin(), visibleOrder.end(), FromSelectionUserData(req.RangeFirstItem));
+            auto last = std::find(visibleOrder.begin(), visibleOrder.end(), FromSelectionUserData(req.RangeLastItem));
+            if (first == visibleOrder.end() || last == visibleOrder.end())
+                continue;
+            if (first > last)
+                std::swap(first, last);
+
+            for (auto it = first; it != std::next(last); ++it)
+            {
+                if (req.Selected)
+                    m_selected.insert(*it);
+                else
+                    m_selected.erase(*it);
+            }
+        }
+    }
+    // TODO: The current logic for detecting changes is quite naive and can be optimized.
+    if (m_selected != before)
+        m_selectionChanged = true;
 }
 
 void Renderer::ClearSelection()
