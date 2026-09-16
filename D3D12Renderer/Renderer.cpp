@@ -474,9 +474,6 @@ void Renderer::BuildImGuiFrame()
     {
         ImGui::Begin("Test");
 
-        if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
-            ClearSelection();
-
         ++frameCounter;
 
         elapsed += m_deltaTime;
