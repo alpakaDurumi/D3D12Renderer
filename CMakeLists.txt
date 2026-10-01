@@ -139,6 +139,7 @@ add_executable(
     D3D12Renderer/DescriptorAllocator.cpp
     D3D12Renderer/DescriptorAllocatorPage.cpp
     D3D12Renderer/DynamicDescriptorHeap.cpp
+    D3D12Renderer/EditorUI.cpp
     D3D12Renderer/FrameResource.cpp
     D3D12Renderer/GpuResource.cpp
     D3D12Renderer/ImGuiDescriptorAllocation.cpp

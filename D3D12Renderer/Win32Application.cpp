@@ -6,7 +6,6 @@
 #include <timeapi.h>
 #include <windowsx.h>
 
-#include <imgui_impl_dx12.h>
 #include <imgui_impl_win32.h>
 
 #include "Aliases.h"
@@ -114,14 +113,9 @@ int Win32Application::Run(Renderer* pRenderer, HINSTANCE hInstance, LPWSTR lpCmd
         if (!running)
             break;
 
-        // Start the Dear ImGui frame
-        ImGui_ImplDX12_NewFrame();
-        ImGui_ImplWin32_NewFrame();
-        ImGui::NewFrame();
-
-        pRenderer->BeginFrameTiming();
+        pRenderer->BeginFrame();
         pRenderer->ProcessInput();
-        pRenderer->BuildImGuiFrame();
+        pRenderer->PrepareUI();
         pRenderer->Update();
         pRenderer->Render();
         pRenderer->EndFrameTiming();

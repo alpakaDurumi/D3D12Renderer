@@ -6,7 +6,6 @@
 #include <fstream>
 #include <ratio>
 #include <thread>
-#include <variant>
 
 #if defined(ENGINE_DEBUG_LAYER)
 #include <dxgidebug.h>
@@ -15,8 +14,6 @@
 
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
-#include <imgui_impl_win32.h>
-#include <imgui_internal.h>
 
 #include "D3DHelper.h"
 #include "DescriptorAllocation.h"
@@ -143,19 +140,6 @@ static D3D12_SAMPLER_DESC GetSamplerDesc(
     return desc;
 }
 
-// Pack an EntityHandle into the 64-bit value ImGui echoes back in selection requests
-static ImGuiSelectionUserData ToSelectionUserData(EntityHandle h)
-{
-    return static_cast<ImGuiSelectionUserData>((static_cast<UINT64>(h.index) << 32) | h.generation);
-}
-
-// Unpack a value from a selection request back into an EntityHandle
-static EntityHandle FromSelectionUserData(ImGuiSelectionUserData v)
-{
-    const UINT64 u = static_cast<UINT64>(v);
-    return EntityHandle{static_cast<UINT>(u >> 32), static_cast<UINT>(u)};
-}
-
 // Wrappers of callback functions for ImGui SRV descriptor
 void Renderer::ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
 {
@@ -225,19 +209,35 @@ void Renderer::Init(UINT dpi)
     LoadPipeline();
     LoadAssets();
 
-    m_dpiScale = static_cast<float>(dpi) / USER_DEFAULT_SCREEN_DPI;
+    m_editorUI.Init(
+        m_device.Get(),
+        m_commandQueue.GetCommandQueue(),
+        FrameCount,
+        m_imguiDescriptorAllocator.GetDescriptorHeap(),
+        [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
+        {
+            return ImGuiSrvDescriptorAllocate(out_cpu_handle, out_gpu_handle);
+        },
+        [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
+        {
+            return ImGuiSrvDescriptorFree(cpu_handle, gpu_handle);
+        },
+        static_cast<float>(dpi) / USER_DEFAULT_SCREEN_DPI,
+        this,
+        &m_sceneManager);
 
-    InitImGui();
     m_prevTime = m_clock.now();
     m_deadLine = m_prevTime;
 }
 
-void Renderer::BeginFrameTiming()
+void Renderer::BeginFrame()
 {
     auto now = m_clock.now();
 
     m_deltaTime = now - m_prevTime;
     m_prevTime = now;
+
+    m_editorUI.BeginFrame();
 }
 
 void Renderer::ProcessInput()
@@ -268,17 +268,18 @@ void Renderer::ProcessInput()
     }
 
     // Focus
-    if (m_inputManager.IsKeyPressed('F') && !m_selected.empty())
+    const auto& selection = m_editorUI.GetSelection();
+    if (m_inputManager.IsKeyPressed('F') && !selection.empty())
     {
         XMVECTOR acc = XMVectorZero();
 
-        for (const auto& handle : m_selected)
+        for (const auto& handle : selection)
         {
             XMFLOAT4X4 world = m_sceneManager.Get(handle)->transform.GetWorldRenderTransform();
             acc += XMVectorSet(world._41, world._42, world._43, 0.0f);
         }
 
-        XMVECTOR center = XMVectorScale(acc, 1.0f / static_cast<float>(m_selected.size()));
+        XMVECTOR center = XMVectorScale(acc, 1.0f / static_cast<float>(selection.size()));
         m_camera.SetCurrentPosition(center - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
 
         XMStoreFloat3(&m_orbitPivot, center);
@@ -361,368 +362,9 @@ void Renderer::ProcessInput()
     m_camera.SnapshotState();
 }
 
-void Renderer::BuildImGuiFrame()
+void Renderer::PrepareUI()
 {
-    static UINT64 frameCounter = 0;
-    static std::chrono::nanoseconds elapsed = std::chrono::nanoseconds::zero();
-    static double fps = 0.0;
-    static double frameTime = 0.0;
-
-    // Menu
-    if (ImGui::BeginMainMenuBar())
-    {
-        if (ImGui::BeginMenu("Add"))
-        {
-            if (ImGui::MenuItem("Cube"))
-                SpawnPrimitive("builtin://mesh/cube", "New Cube");
-            if (ImGui::MenuItem("Sphere"))
-                SpawnPrimitive("builtin://mesh/sphere", "New Sphere");
-            ImGui::EndMenu();
-        }
-        ImGui::EndMainMenuBar();
-    }
-
-    // ImGuiID string is hashed and stored in the INI file.
-    // Changing it will invalidate any previously saved settings associated with it.
-    // Also, GetID uses Window ID Stack as seed.
-    ImGuiID dockSpaceId = ImGui::GetID("My Dockspace");
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
-
-    // Use DockBuilder API to set layout.
-    // if the INI file does not contain DockSpaceId information or if a layout reset has been requested.
-    if (ImGui::DockBuilderGetNode(dockSpaceId) == nullptr || m_resetLayout)
-    {
-        ImGui::DockBuilderAddNode(dockSpaceId, ImGuiDockNodeFlags_DockSpace);
-        ImGui::DockBuilderSetNodeSize(dockSpaceId, viewport->Size);
-
-        ImGuiID leftId = 0;
-        ImGuiID centerId = 0;
-        ImGui::DockBuilderSplitNode(dockSpaceId, ImGuiDir_Left, 0.20f, &leftId, &centerId);
-
-        ImGuiID leftTopId = 0;
-        ImGuiID leftBottomId = 0;
-        ImGui::DockBuilderSplitNode(leftId, ImGuiDir_Up, 0.50f, &leftTopId, &leftBottomId);
-
-        ImGuiID rightId = 0;
-        ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Right, 0.20f, &rightId, &centerId);
-
-        ImGui::DockBuilderDockWindow("Scene", centerId);
-        ImGui::DockBuilderDockWindow("Test", leftTopId);
-        ImGui::DockBuilderDockWindow("Hierarchy", leftBottomId);
-        ImGui::DockBuilderDockWindow("Inspector", rightId);
-
-        ImGui::DockBuilderFinish(dockSpaceId);
-
-        m_resetLayout = false;
-    }
-
-    ImGui::DockSpaceOverViewport(dockSpaceId, viewport, ImGuiDockNodeFlags_None);
-
-    // Scene window
-    {
-        ImGui::Begin("Scene");
-
-        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().KeyAlt)
-            ClearSelection();
-
-        static constexpr double DEBOUNCE_DELAY = 0.15; // 0.15 sec
-
-        ImVec2 measured = ImGui::GetContentRegionAvail();
-        if (measured.x >= 1.0f && measured.y >= 1.0f)
-        {
-            UINT width = static_cast<UINT>(measured.x);
-            UINT height = static_cast<UINT>(measured.y);
-
-            // If scene size changed
-            if (width != m_pendingSceneWidth || height != m_pendingSceneHeight)
-            {
-                m_pendingSceneWidth = width;
-                m_pendingSceneHeight = height;
-                m_lastResizeRequestTime = m_prevTime;
-            }
-            // If pending size not been applied yet, and debounce delay has passed
-            else if ((width != m_sceneWidth || height != m_sceneHeight) &&
-                     (std::chrono::duration<double>(m_prevTime - m_lastResizeRequestTime).count() >= DEBOUNCE_DELAY))
-            {
-                ResizeSceneResolution(width, height);
-            }
-
-            const auto srvGpuHandle = m_frameResources[m_frameIndex].GetToneMappedBufferSrvHandle();
-            ImGui::Image(static_cast<ImTextureID>(srvGpuHandle.ptr), measured);
-        }
-
-        ImGui::End();
-    }
-
-    // Test window
-    {
-        ImGui::Begin("Test");
-
-        ++frameCounter;
-
-        elapsed += m_deltaTime;
-        const double elapsedSeconds = std::chrono::duration<double>(elapsed).count();
-        if (elapsedSeconds >= 1.0)
-        {
-            fps = frameCounter / elapsedSeconds;
-            frameTime = 1000.0 / fps;
-
-            frameCounter = 0;
-            elapsed = std::chrono::nanoseconds::zero();
-        }
-
-        ImGui::Text("FPS: %.1f", fps);
-        ImGui::Text("Latency: %.3f", frameTime);
-
-        ImGui::Checkbox("vSync", &m_vSync);
-
-        const char* items0[] = {"Unlimited", "30", "60", "120", "144", "160", "240"};
-        static int item0_selected_idx = 0;
-
-        // FPS cap can be set when vSync enabled.
-        ImGui::BeginDisabled(m_vSync);
-        if (ImGui::BeginCombo("FPS Cap", items0[item0_selected_idx]))
-        {
-            for (int n = 0; n < IM_ARRAYSIZE(items0); ++n)
-            {
-                const bool is_selected = item0_selected_idx == n;
-                if (ImGui::Selectable(items0[n], is_selected))
-                {
-                    item0_selected_idx = n;
-                    SetFpsCap(std::string(items0[n]));
-                }
-            }
-            ImGui::EndCombo();
-        }
-        ImGui::EndDisabled();
-
-        const char* items[] = {"Point", "Bilinear", "AnisotropicX2", "AnisotropicX4", "AnisotropicX8", "AnisotropicX16"};
-        static int item_selected_idx = 5;
-
-        const char* combo_preview_value = items[item_selected_idx];
-        if (ImGui::BeginCombo("Texture Filtering", combo_preview_value))
-        {
-            for (int n = 0; n < IM_ARRAYSIZE(items); n++)
-            {
-                const bool is_selected = (item_selected_idx == n);
-                if (ImGui::Selectable(items[n], is_selected))
-                {
-                    item_selected_idx = n;
-                    SetTextureFiltering(static_cast<TextureFiltering>(n));
-                }
-
-                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-                if (is_selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndCombo();
-        }
-
-        if (ImGui::Button("Reset Layout"))
-        {
-            m_resetLayout = true;
-        }
-
-        ImGui::Text("Visible Count: %u", m_visibleCount);
-
-        ImGui::End();
-    }
-
-    // Hierarchy window
-    {
-        ImGui::Begin("Hierarchy");
-
-        bool del = !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete);
-
-        std::vector<EntityHandle> visibleOrder;
-        ImGuiMultiSelectIO* ms = ImGui::BeginMultiSelect(ImGuiMultiSelectFlags_ClearOnClickVoid, static_cast<int>(m_selected.size()));
-        ApplySelectionRequests(ms, visibleOrder);
-
-        for (const auto& entity : m_sceneManager.GetEntities())
-            if (entity.parent.Empty())
-                RenderEntityNode(entity, del, visibleOrder);
-
-        ms = ImGui::EndMultiSelect();
-        ApplySelectionRequests(ms, visibleOrder);
-
-        if (del)
-        {
-            for (const auto& handle : m_selected)
-                m_sceneManager.Remove(handle);
-            ClearSelection();
-        }
-
-        ImGui::End();
-    }
-
-    // Inspector
-    {
-        ImGui::Begin("Inspector");
-
-        if (!m_selected.empty())
-        {
-            // Transform component
-            // Drag editing is available only when a single entity is selected.
-            // On multi-selection every component becomes a text box that parses the typed value,
-            // even for components whose values are identical across the selection.
-
-            // get: Transform& -> XMFLOAT3
-            // set: (Transform&, const XMFLOAT3&) -> void
-            auto drawTransform = [&](const char* label, auto&& get, auto&& set)
-            {
-                auto it = m_selected.begin();
-                XMFLOAT3 common = get(m_sceneManager.Get(*it)->transform);
-
-                if (m_selected.size() == 1)
-                {
-                    XMFLOAT3 v = common;
-                    if (ImGui::DragFloat3(label, &v.x))
-                        set(m_sceneManager.Get(*m_selected.begin())->transform, v);
-                    return;
-                }
-
-                bool mixed[3] = {false};
-                for (++it; it != m_selected.end(); ++it)
-                {
-                    XMFLOAT3 o = get(m_sceneManager.Get(*it)->transform);
-                    if (o.x != common.x) mixed[0] = true;
-                    if (o.y != common.y) mixed[1] = true;
-                    if (o.z != common.z) mixed[2] = true;
-                }
-
-                // Multi-selection: one text box per component
-                ImGui::BeginGroup();
-                ImGui::PushID(label);
-                ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
-
-                for (int i = 0; i < 3; ++i)
-                {
-                    ImGui::PushID(i);
-                    if (i > 0) ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-
-                    char buf[32] = "";
-                    if (mixed[i])
-                        snprintf(buf, sizeof(buf), "Multiple Values");
-                    else
-                        snprintf(buf, sizeof(buf), "%.3f", (&common.x)[i]);
-
-                    if (ImGui::InputText("", buf, sizeof(buf), ImGuiInputTextFlags_CharsScientific | ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
-                    {
-                        char* end = nullptr;
-                        float v = std::strtof(buf, &end);
-
-                        if (end != buf)
-                        {
-                            for (const auto& handle : m_selected)
-                            {
-                                auto& tr = m_sceneManager.Get(handle)->transform;
-                                XMFLOAT3 t = get(tr);
-                                (&t.x)[i] = v;
-                                set(tr, t);
-                            }
-                        }
-                    }
-
-                    ImGui::PopID();
-                    ImGui::PopItemWidth();
-                }
-
-                ImGui::PopID();
-                ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-                ImGui::TextUnformatted(label);
-                ImGui::EndGroup();
-            };
-
-            drawTransform("Scale",
-                [](Transform& tr){ return tr.GetScale(); },
-                [](Transform& tr, const XMFLOAT3& v) { tr.SetScale(v); });
-
-            drawTransform("Rotation",
-                [&](Transform& tr){ return tr.GetEulerCache(m_selectionChanged); },
-                [](Transform& tr, const XMFLOAT3& v){ tr.SetRotation(v); });
-
-            drawTransform("Translation",
-                [](Transform& tr){ return tr.GetTranslation(); },
-                [](Transform& tr, const XMFLOAT3& v){ tr.SetTranslation(v); });
-
-            // Light component
-            bool allHaveLight = true;
-            for (const auto& handle : m_selected)
-            {
-                if (!m_sceneManager.Get(handle)->light.has_value())
-                {
-                    allHaveLight = false;
-                    break;
-                }
-            }
-
-            if (allHaveLight)
-            {
-                auto getResolution = [&](EntityHandle handle)
-                {
-                    UINT resolution = 0;
-                    std::visit(
-                        [&](auto&& lh) { resolution = m_sceneManager.Get(lh)->GetShadowMapResolution(); },
-                        m_sceneManager.Get(handle)->light.value());
-                    return resolution;
-                };
-
-                // Take the first value as representative and check whether the selection is mixed
-                auto it = m_selected.begin();
-                UINT common = getResolution(*it);
-                bool mixed = false;
-                for (++it; it != m_selected.end(); ++it)
-                {
-                    if (getResolution(*it) != common)
-                    {
-                        mixed = true;
-                        break;
-                    }
-                }
-
-                char buf[16];
-                if (mixed)
-                    snprintf(buf, sizeof(buf), "Multiple Values");
-                else
-                    snprintf(buf, sizeof(buf), "%u", common);
-
-                const char* items[] = {"512", "1024", "2048", "4096"};
-
-                if (ImGui::BeginCombo("Shadow Map Resolution", buf))
-                {
-                    for (int n = 0; n < IM_ARRAYSIZE(items); ++n)
-                    {
-                        const UINT resolution = static_cast<UINT>(std::stoi(items[n]));
-                        const bool isSelected = !mixed && resolution == common;               
-                        if (ImGui::Selectable(items[n], isSelected)) {
-                            for (const auto& handle : m_selected)
-                            {
-                                std::visit(
-                                    [&](auto&& lightHandle)
-                                    {
-                                        auto* pLight = m_sceneManager.Get(lightHandle);
-            
-                                        if (pLight->GetShadowMapResolution() == resolution) return;
-            
-                                        auto resources = pLight->TakeResources();
-                                        m_sceneManager.EnqueueResourceDeletion(resources);
-                                        pLight->ChangeShadowMapResolution(m_device.Get(), resolution);
-                                    },
-                                    m_sceneManager.Get(handle)->light.value());
-                            }
-                        }
-
-                        // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-                        if (isSelected)
-                            ImGui::SetItemDefaultFocus();
-                    }
-                    ImGui::EndCombo();
-                }
-            }
-        }
-        ImGui::End();
-    }
-    m_selectionChanged = false;
+    m_editorUI.BuildImGuiFrame();
 }
 
 void Renderer::Update()
@@ -850,10 +492,7 @@ void Renderer::Destroy()
     // cleaned up by the destructor.
     WaitForGpu();
 
-    // Shutdown ImGui
-    ImGui_ImplDX12_Shutdown();
-    ImGui_ImplWin32_Shutdown();
-    ImGui::DestroyContext();
+    m_editorUI.Destroy();
 }
 
 void Renderer::OnKeyDown(VKCode key)
@@ -923,8 +562,154 @@ void Renderer::OnResize(UINT width, UINT height)
 
 void Renderer::OnDpiChanged(UINT dpi)
 {
-    m_dpiScale = static_cast<float>(dpi) / USER_DEFAULT_SCREEN_DPI;
-    ImGui::GetStyle().FontScaleMain = m_dpiScale;
+    m_editorUI.SetDpiScale(static_cast<float>(dpi) / USER_DEFAULT_SCREEN_DPI);
+}
+
+EntityHandle Renderer::SpawnPrimitive(const AssetID& meshId, const std::string& name)
+{
+    auto hMesh = m_sceneManager.GetMeshHandle(meshId);
+    auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
+    auto hMat = CloneMaterial(hTemplateMat);
+
+    auto hEntity = m_sceneManager.AddEntity(name);
+    m_sceneManager.SetMesh(hEntity, hMesh);
+    m_sceneManager.SetMaterial(hEntity, hMat);
+
+    return hEntity;
+}
+
+void Renderer::ResizeSceneResolution(UINT width, UINT height)
+{
+    if (m_sceneWidth == width && m_sceneHeight == height)
+        return;
+
+    WaitForGpu();
+
+    m_sceneWidth = width;
+    m_sceneHeight = height;
+
+    m_viewport = {0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
+    m_scissorRect = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
+
+    m_camera.SetAspectRatio(static_cast<float>(width) / static_cast<float>(height));
+
+    for (UINT i = 0; i < FrameCount; i++)
+    {
+        auto& frameResource = m_frameResources[i];
+        frameResource.CreateSceneColorBuffers(width, height);
+        frameResource.CreateGBuffers(width, height);
+        frameResource.CreateMasks(width, height);
+        frameResource.CreateToneMappedBuffer(width, height);
+    }
+
+    // Recreate depth-stencil buffer, DSV, and SRV
+    auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
+    m_depthStencilBuffer = Texture(
+        m_device.Get(),
+        GetTexture2DDesc(width, height, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
+        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
+        &clearValue);
+    m_dsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT));
+    m_readOnlyDsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH));
+    m_depthSrv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1));
+
+    // Update registered info
+    auto sceneColorBuffer0 = m_renderGraph.GetRGTexture("SceneColorBuffer0");
+    std::vector<ID3D12Resource*> pSceneColorBuffers0(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pSceneColorBuffers0[i] = m_frameResources[i].GetSceneColorBuffer(0);
+    m_renderGraph.UpdateElement(sceneColorBuffer0, 0, pSceneColorBuffers0);
+
+    auto sceneColorBuffer1 = m_renderGraph.GetRGTexture("SceneColorBuffer1");
+    std::vector<ID3D12Resource*> pSceneColorBuffers1(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pSceneColorBuffers1[i] = m_frameResources[i].GetSceneColorBuffer(1);
+    m_renderGraph.UpdateElement(sceneColorBuffer1, 0, pSceneColorBuffers1);
+
+    auto depthStencilBuffer = m_renderGraph.GetRGTexture("DepthStencilBuffer");
+    m_renderGraph.UpdateElement(depthStencilBuffer, 0, {m_depthStencilBuffer.Get()});
+
+    auto gBuffer = m_renderGraph.GetRGTexture("GBuffer");
+    for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
+    {
+        std::vector<ID3D12Resource*> pGBuffers(FrameCount);
+        for (UINT i = 0; i < FrameCount; ++i)
+            pGBuffers[i] = m_frameResources[i].GetGBuffer(static_cast<GBufferSlot>(slot));
+        m_renderGraph.UpdateElement(gBuffer, slot, pGBuffers);
+    }
+
+    auto selectionMask = m_renderGraph.GetRGTexture("SelectionMask");
+    std::vector<ID3D12Resource*> pSelectionMasks(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pSelectionMasks[i] = m_frameResources[i].GetSelectionMask();
+    m_renderGraph.UpdateElement(selectionMask, 0, pSelectionMasks);
+
+    auto horizontalDilatedMask = m_renderGraph.GetRGTexture("HorizontalDilatedMask");
+    std::vector<ID3D12Resource*> pHorizontalDilatedMasks(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pHorizontalDilatedMasks[i] = m_frameResources[i].GetHorizontalDilatedMask();
+    m_renderGraph.UpdateElement(horizontalDilatedMask, 0, pHorizontalDilatedMasks);
+
+    auto toneMappedBuffer = m_renderGraph.GetRGTexture("ToneMappedBuffer");
+    std::vector<ID3D12Resource*> pToneMappedBuffers(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pToneMappedBuffers[i] = m_frameResources[i].GetToneMappedBuffer();
+    m_renderGraph.UpdateElement(toneMappedBuffer, 0, pToneMappedBuffers);
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE Renderer::GetSceneGpuHandle() const
+{
+    return m_frameResources[m_frameIndex].GetToneMappedBufferSrvHandle();
+}
+
+bool Renderer::GetVSync() const
+{
+    return m_vSync;
+}
+
+void Renderer::SetVSync(bool value)
+{
+    m_vSync = value;
+}
+
+void Renderer::SetFpsCap(std::string fps)
+{
+    if (fps == "Unlimited")
+    {
+        m_fpsCap = -1;
+    }
+    else
+    {
+        m_fpsCap = std::stoi(fps);
+        m_deadLine = m_clock.now();
+
+        auto temp = std::chrono::duration<double, std::nano>(1e9 / m_fpsCap);
+        m_targetPeriod = std::chrono::duration_cast<std::chrono::nanoseconds>(temp);
+    }
+}
+
+void Renderer::SetTextureFiltering(TextureFiltering filtering)
+{
+    m_currentTextureFiltering = filtering;
+    for (auto& material : m_sceneManager.GetMaterials())
+    {
+        material.BuildSamplerIndices(m_currentTextureFiltering);
+    }
+}
+
+UINT Renderer::GetVisibleCount() const
+{
+    return m_visibleCount;
+}
+
+std::chrono::time_point<std::chrono::steady_clock> Renderer::GetCurrentTimePoint() const
+{
+    return m_prevTime;
+}
+
+std::chrono::nanoseconds Renderer::GetDeltaTime() const
+{
+    return m_deltaTime;
 }
 
 void Renderer::LoadPipeline()
@@ -1441,61 +1226,6 @@ void Renderer::LoadAssets()
     m_renderGraph.Compile(defaultOrder);
 }
 
-// Setup Dear ImGui context
-void Renderer::InitImGui()
-{
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
-
-    ImGui_ImplWin32_Init(Win32Application::GetHwnd());
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplDX12_InitInfo init_info = {};
-    init_info.Device = m_device.Get();
-    init_info.CommandQueue = m_commandQueue.GetCommandQueue();
-    init_info.NumFramesInFlight = FrameCount;
-    init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-    init_info.DSVFormat = DXGI_FORMAT_UNKNOWN;
-    init_info.SrvDescriptorHeap = m_imguiDescriptorAllocator.GetDescriptorHeap();
-    init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
-    {
-        return ImGuiSrvDescriptorAllocate(out_cpu_handle, out_gpu_handle);
-    };
-    init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
-    {
-        return ImGuiSrvDescriptorFree(cpu_handle, gpu_handle);
-    };
-    ImGui_ImplDX12_Init(&init_info);
-
-    ImGui::GetStyle().FontScaleMain = m_dpiScale;
-
-    // Create config directory in LocalAppData if not exists
-    PWSTR localAppDataPath = nullptr;
-    SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_DEFAULT, nullptr, &localAppDataPath);
-
-    std::filesystem::path configPath = std::filesystem::path(localAppDataPath) / "D3D12Renderer";
-    CoTaskMemFree(localAppDataPath);
-
-    bool configPathReady = false;
-    if (CreateDirectoryW(configPath.c_str(), nullptr))
-        configPathReady = true;
-    else
-    {
-        DWORD attr = GetFileAttributesW(configPath.c_str());
-        configPathReady = (attr != INVALID_FILE_ATTRIBUTES) && (attr & FILE_ATTRIBUTE_DIRECTORY);
-    }
-
-    // Set ImGui ini file in LocalAppData
-    if (configPathReady)
-    {
-        m_imguiIniPath = (configPath / "imgui.ini").u8string();
-        io.IniFilename = m_imguiIniPath.c_str();
-    }
-    // else: use ImGui default setting ("imgui.ini" in CWD)
-}
-
 void Renderer::CreateRootSignature()
 {
     m_rootSignature.Init(13, 2);
@@ -1692,202 +1422,6 @@ void Renderer::BeginOrbit()
     XMVECTOR camPos = m_camera.GetCurrentPosition();
     XMStoreFloat3(&m_orbitPivot, camPos + m_camera.GetForward() * m_orbitDistance);
     m_orbiting = true;
-}
-
-void Renderer::ResizeSceneResolution(UINT width, UINT height)
-{
-    WaitForGpu();
-
-    m_sceneWidth = width;
-    m_sceneHeight = height;
-
-    m_viewport = {0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
-    m_scissorRect = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
-
-    m_camera.SetAspectRatio(static_cast<float>(width) / static_cast<float>(height));
-
-    for (UINT i = 0; i < FrameCount; i++)
-    {
-        auto& frameResource = m_frameResources[i];
-        frameResource.CreateSceneColorBuffers(width, height);
-        frameResource.CreateGBuffers(width, height);
-        frameResource.CreateMasks(width, height);
-        frameResource.CreateToneMappedBuffer(width, height);
-    }
-
-    // Recreate depth-stencil buffer, DSV, and SRV
-    auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
-    m_depthStencilBuffer = Texture(
-        m_device.Get(),
-        GetTexture2DDesc(width, height, 1, 1, DXGI_FORMAT_R24G8_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
-        D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
-        &clearValue);
-    m_dsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT));
-    m_readOnlyDsv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetDsvDesc(DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_DSV_FLAG_READ_ONLY_DEPTH));
-    m_depthSrv.Init(m_device.Get(), m_depthStencilBuffer.Get(), GetSrvDesc(DXGI_FORMAT_R24_UNORM_X8_TYPELESS, 1));
-
-    // Update registered info
-    auto sceneColorBuffer0 = m_renderGraph.GetRGTexture("SceneColorBuffer0");
-    std::vector<ID3D12Resource*> pSceneColorBuffers0(FrameCount);
-    for (UINT i = 0; i < FrameCount; ++i)
-        pSceneColorBuffers0[i] = m_frameResources[i].GetSceneColorBuffer(0);
-    m_renderGraph.UpdateElement(sceneColorBuffer0, 0, pSceneColorBuffers0);
-
-    auto sceneColorBuffer1 = m_renderGraph.GetRGTexture("SceneColorBuffer1");
-    std::vector<ID3D12Resource*> pSceneColorBuffers1(FrameCount);
-    for (UINT i = 0; i < FrameCount; ++i)
-        pSceneColorBuffers1[i] = m_frameResources[i].GetSceneColorBuffer(1);
-    m_renderGraph.UpdateElement(sceneColorBuffer1, 0, pSceneColorBuffers1);
-
-    auto depthStencilBuffer = m_renderGraph.GetRGTexture("DepthStencilBuffer");
-    m_renderGraph.UpdateElement(depthStencilBuffer, 0, {m_depthStencilBuffer.Get()});
-
-    auto gBuffer = m_renderGraph.GetRGTexture("GBuffer");
-    for (UINT slot = 0; slot < static_cast<UINT>(GBufferSlot::NUM_GBUFFER_SLOTS); ++slot)
-    {
-        std::vector<ID3D12Resource*> pGBuffers(FrameCount);
-        for (UINT i = 0; i < FrameCount; ++i)
-            pGBuffers[i] = m_frameResources[i].GetGBuffer(static_cast<GBufferSlot>(slot));
-        m_renderGraph.UpdateElement(gBuffer, slot, pGBuffers);
-    }
-
-    auto selectionMask = m_renderGraph.GetRGTexture("SelectionMask");
-    std::vector<ID3D12Resource*> pSelectionMasks(FrameCount);
-    for (UINT i = 0; i < FrameCount; ++i)
-        pSelectionMasks[i] = m_frameResources[i].GetSelectionMask();
-    m_renderGraph.UpdateElement(selectionMask, 0, pSelectionMasks);
-
-    auto horizontalDilatedMask = m_renderGraph.GetRGTexture("HorizontalDilatedMask");
-    std::vector<ID3D12Resource*> pHorizontalDilatedMasks(FrameCount);
-    for (UINT i = 0; i < FrameCount; ++i)
-        pHorizontalDilatedMasks[i] = m_frameResources[i].GetHorizontalDilatedMask();
-    m_renderGraph.UpdateElement(horizontalDilatedMask, 0, pHorizontalDilatedMasks);
-
-    auto toneMappedBuffer = m_renderGraph.GetRGTexture("ToneMappedBuffer");
-    std::vector<ID3D12Resource*> pToneMappedBuffers(FrameCount);
-    for (UINT i = 0; i < FrameCount; ++i)
-        pToneMappedBuffers[i] = m_frameResources[i].GetToneMappedBuffer();
-    m_renderGraph.UpdateElement(toneMappedBuffer, 0, pToneMappedBuffers);
-}
-
-void Renderer::SetFpsCap(std::string fps)
-{
-    if (fps == "Unlimited")
-    {
-        m_fpsCap = -1;
-    }
-    else
-    {
-        m_fpsCap = std::stoi(fps);
-        m_deadLine = m_clock.now();
-
-        auto temp = std::chrono::duration<double, std::nano>(1e9 / m_fpsCap);
-        m_targetPeriod = std::chrono::duration_cast<std::chrono::nanoseconds>(temp);
-    }
-}
-
-void Renderer::SetTextureFiltering(TextureFiltering filtering)
-{
-    m_currentTextureFiltering = filtering;
-    for (auto& material : m_sceneManager.GetMaterials())
-    {
-        material.BuildSamplerIndices(m_currentTextureFiltering);
-    }
-}
-
-void Renderer::RenderEntityNode(const Entity& entity, bool& del, std::vector<EntityHandle>& visibleOrder)
-{
-    bool isSelected = m_selected.find(entity.selfHandle) != m_selected.end();
-
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth;
-    if (entity.children.empty())
-        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-    if (isSelected)
-        flags |= ImGuiTreeNodeFlags_Selected;
-
-    UINT64 id = (static_cast<UINT64>(entity.selfHandle.index) << 32) | entity.selfHandle.generation;
-
-    visibleOrder.push_back(entity.selfHandle);
-    ImGui::SetNextItemSelectionUserData(ToSelectionUserData(entity.selfHandle));
-    bool isExpanded = ImGui::TreeNodeEx(reinterpret_cast<void*>(id), flags, "%s", entity.name.c_str());
-
-    if (ImGui::BeginPopupContextItem())
-    {
-        if (ImGui::MenuItem("Delete"))
-            del = true;
-        ImGui::EndPopup();
-    }
-    if (!(flags & ImGuiTreeNodeFlags_NoTreePushOnOpen) && isExpanded)
-    {
-        for (auto c : entity.children)
-            RenderEntityNode(*m_sceneManager.Get(c), del, visibleOrder);
-        ImGui::TreePop();
-    }
-}
-
-// Apply ImGui multi-select requests to m_selected, resolving ranges through the visible tree order
-void Renderer::ApplySelectionRequests(ImGuiMultiSelectIO* ms, const std::vector<EntityHandle>& visibleOrder)
-{
-    if (ms->Requests.empty())
-        return;
-
-    const auto before = m_selected;
-
-    for (const ImGuiSelectionRequest& req : ms->Requests)
-    {
-        if (req.Type == ImGuiSelectionRequestType_SetAll)
-        {
-            m_selected.clear();
-            if (req.Selected)
-                for (const auto& entity : m_sceneManager.GetEntities())
-                    m_selected.insert(entity.selfHandle);
-        }
-        else if (req.Type == ImGuiSelectionRequestType_SetRange)
-        {
-            auto first = std::find(visibleOrder.begin(), visibleOrder.end(), FromSelectionUserData(req.RangeFirstItem));
-            auto last = std::find(visibleOrder.begin(), visibleOrder.end(), FromSelectionUserData(req.RangeLastItem));
-            if (first == visibleOrder.end() || last == visibleOrder.end())
-                continue;
-            if (first > last)
-                std::swap(first, last);
-
-            for (auto it = first; it != std::next(last); ++it)
-            {
-                if (req.Selected)
-                    m_selected.insert(*it);
-                else
-                    m_selected.erase(*it);
-            }
-        }
-    }
-    // TODO: The current logic for detecting changes is quite naive and can be optimized.
-    if (m_selected != before)
-        m_selectionChanged = true;
-}
-
-void Renderer::ClearSelection()
-{
-    if (m_selected.empty()) return;
-
-    m_selected.clear();
-    m_selectionChanged = true;
-}
-
-void Renderer::SelectSingle(EntityHandle handle)
-{
-    if (m_selected.size() == 1 && *m_selected.begin() == handle) return;
-
-    m_selected.clear();
-    m_selected.insert(handle);
-    m_selectionChanged = true;
-}
-
-void Renderer::ToggleSelect(EntityHandle handle)
-{
-    if (!m_selected.insert(handle).second)
-        m_selected.erase(handle);
-
-    m_selectionChanged = true;
 }
 
 void Renderer::FixedUpdate(std::chrono::nanoseconds fixedDt)
@@ -2189,7 +1723,8 @@ void Renderer::UploadInstanceData()
     std::unordered_map<MeshHandle, std::vector<UINT32>> grouped;
 
     // Get indices of each selected entry
-    for (const auto& handle : m_selected)
+    const auto& selection = m_editorUI.GetSelection();
+    for (const auto& handle : selection)
     {
         auto* pEntity = m_sceneManager.Get(handle);
         if (!pEntity->meshRenderer.has_value())
@@ -2864,19 +2399,6 @@ MaterialHandle Renderer::CloneMaterial(MaterialHandle src)
     auto* pDst = m_sceneManager.GetMaterial(hDst);
     pDst->CopyDataFrom(*pSrc);
     return hDst;
-}
-
-EntityHandle Renderer::SpawnPrimitive(const AssetID& meshId, const std::string& name)
-{
-    auto hMesh = m_sceneManager.GetMeshHandle(meshId);
-    auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
-    auto hMat = CloneMaterial(hTemplateMat);
-
-    auto hEntity = m_sceneManager.AddEntity(name);
-    m_sceneManager.SetMesh(hEntity, hMesh);
-    m_sceneManager.SetMaterial(hEntity, hMat);
-
-    return hEntity;
 }
 
 DirectionalLightHandle Renderer::CreateDirectionalLight()

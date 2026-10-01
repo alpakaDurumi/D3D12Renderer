@@ -4,7 +4,6 @@
 #include <chrono>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -23,6 +22,7 @@
 #include "ConstantData.h"
 #include "DescriptorAllocator.h"
 #include "DynamicDescriptorHeap.h"
+#include "EditorUI.h"
 #include "FrameResource.h"
 #include "ImGuiDescriptorAllocator.h"
 #include "InputManager.h"
@@ -35,8 +35,6 @@
 #include "UploadAllocation.h"
 #include "View.h"
 #include "VisibleRange.h"
-
-struct ImGuiMultiSelectIO;
 
 class Renderer
 {
@@ -58,9 +56,9 @@ public:
     void SetWindowResolution(UINT width, UINT height);
 
     void Init(UINT dpi);
-    void BeginFrameTiming();
+    void BeginFrame();
     void ProcessInput();
-    void BuildImGuiFrame();
+    void PrepareUI();
     void Update();
     void Render();
     void EndFrameTiming();
@@ -76,6 +74,17 @@ public:
     void OnResize(UINT width, UINT height);
     void OnDpiChanged(UINT dpi);
 
+    EntityHandle SpawnPrimitive(const AssetID& meshId, const std::string& name);
+    void ResizeSceneResolution(UINT width, UINT height);
+    D3D12_GPU_DESCRIPTOR_HANDLE GetSceneGpuHandle() const;
+    bool GetVSync() const;
+    void SetVSync(bool value);
+    void SetFpsCap(std::string fps);
+    void SetTextureFiltering(TextureFiltering filtering);
+    UINT GetVisibleCount() const;
+    std::chrono::time_point<std::chrono::steady_clock> GetCurrentTimePoint() const;
+    std::chrono::nanoseconds GetDeltaTime() const;
+
     static void ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle);
     static void ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle);
 
@@ -88,20 +97,14 @@ private:
     bool m_tearingSupported = false;
     bool m_fullScreen = false;
     int m_fpsCap = -1;
-    float m_dpiScale;
     RECT m_windowRect;
 
-    // ImGui (scene window, ini, etc.)
+    // UI
+    EditorUI m_editorUI;
     UINT m_sceneWidth = m_windowWidth;
     UINT m_sceneHeight = m_windowHeight;
-    UINT m_pendingSceneWidth = 0;
-    UINT m_pendingSceneHeight = 0;
-    std::chrono::time_point<std::chrono::steady_clock> m_lastResizeRequestTime;
     D3D12_VIEWPORT m_viewport;
     D3D12_RECT m_scissorRect;
-
-    std::string m_imguiIniPath; // UTF-8
-    bool m_resetLayout = false;
 
     // Device & swap chain
     Microsoft::WRL::ComPtr<ID3D12Device10> m_device;
@@ -147,9 +150,7 @@ private:
 
     // Scene control
     SceneManager m_sceneManager;
-    std::unordered_set<EntityHandle> m_selected;
     std::unordered_map<MeshHandle, VisibleRange> m_selectedVisibleIndexRange;
-    bool m_selectionChanged = false;
 
     std::vector<EntityHandle> m_previewRotations;
 
@@ -179,7 +180,6 @@ private:
     // Init
     void LoadPipeline();
     void LoadAssets();
-    void InitImGui();
     void CreateRootSignature();
     void PrepareRenderGraph();
 
@@ -187,17 +187,6 @@ private:
     void ToggleFullScreen();
     void SetFullScreen(bool fullScreen);
     void BeginOrbit();
-
-    // BuildImGuiFrame
-    void ResizeSceneResolution(UINT width, UINT height);
-    void SetFpsCap(std::string fps);
-    void SetTextureFiltering(TextureFiltering filtering);
-    void RenderEntityNode(const Entity& entity, bool& del, std::vector<EntityHandle>& visibleOrder);
-    void ApplySelectionRequests(ImGuiMultiSelectIO* ms, const std::vector<EntityHandle>& visibleOrder);
-
-    void ClearSelection();
-    void SelectSingle(EntityHandle handle);
-    void ToggleSelect(EntityHandle handle);
 
     // Update
     void FixedUpdate(std::chrono::nanoseconds fixedDt);
@@ -222,7 +211,6 @@ private:
     MaterialHandle CreateMaterial();
     MaterialHandle CreateMaterial(const AssetID& id);
     MaterialHandle CloneMaterial(MaterialHandle src);
-    EntityHandle SpawnPrimitive(const AssetID& meshId, const std::string& name);
 
     DirectionalLightHandle CreateDirectionalLight();
     PointLightHandle CreatePointLight();
