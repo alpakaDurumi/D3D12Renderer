@@ -374,25 +374,9 @@ void Renderer::BuildImGuiFrame()
         if (ImGui::BeginMenu("Add"))
         {
             if (ImGui::MenuItem("Cube"))
-            {
-                auto hMesh = m_sceneManager.GetMeshHandle("builtin://mesh/cube");
-                auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
-                auto hMat = CloneMaterial(hTemplateMat);
-
-                auto hCube = m_sceneManager.AddEntity("New Cube");
-                m_sceneManager.SetMesh(hCube, hMesh);
-                m_sceneManager.SetMaterial(hCube, hMat);
-            }
+                SpawnPrimitive("builtin://mesh/cube", "New Cube");
             if (ImGui::MenuItem("Sphere"))
-            {
-                auto hMesh = m_sceneManager.GetMeshHandle("builtin://mesh/sphere");
-                auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
-                auto hMat = CloneMaterial(hTemplateMat);
-
-                auto hSphere = m_sceneManager.AddEntity("New Sphere");
-                m_sceneManager.SetMesh(hSphere, hMesh);
-                m_sceneManager.SetMaterial(hSphere, hMat);
-            }
+                SpawnPrimitive("builtin://mesh/sphere", "New Sphere");
             ImGui::EndMenu();
         }
         ImGui::EndMainMenuBar();
@@ -2880,6 +2864,19 @@ MaterialHandle Renderer::CloneMaterial(MaterialHandle src)
     auto* pDst = m_sceneManager.GetMaterial(hDst);
     pDst->CopyDataFrom(*pSrc);
     return hDst;
+}
+
+EntityHandle Renderer::SpawnPrimitive(const AssetID& meshId, const std::string& name)
+{
+    auto hMesh = m_sceneManager.GetMeshHandle(meshId);
+    auto hTemplateMat = m_sceneManager.GetMaterialHandle("PavingStones150");
+    auto hMat = CloneMaterial(hTemplateMat);
+
+    auto hEntity = m_sceneManager.AddEntity(name);
+    m_sceneManager.SetMesh(hEntity, hMesh);
+    m_sceneManager.SetMaterial(hEntity, hMat);
+
+    return hEntity;
 }
 
 DirectionalLightHandle Renderer::CreateDirectionalLight()

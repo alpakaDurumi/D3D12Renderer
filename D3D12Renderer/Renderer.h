@@ -222,6 +222,7 @@ private:
     MaterialHandle CreateMaterial();
     MaterialHandle CreateMaterial(const AssetID& id);
     MaterialHandle CloneMaterial(MaterialHandle src);
+    EntityHandle SpawnPrimitive(const AssetID& meshId, const std::string& name);
 
     DirectionalLightHandle CreateDirectionalLight();
     PointLightHandle CreatePointLight();
