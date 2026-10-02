@@ -36,6 +36,7 @@ public:
 
     void BeginFrame();
     void BuildImGuiFrame();
+    void PopulateCommandList(ID3D12GraphicsCommandList* pCommandList);
 
     void RenderEntityNode(const Entity& entity, bool& del, std::vector<EntityHandle>& visibleOrder);
     void ApplySelectionRequests(ImGuiMultiSelectIO* ms, const std::vector<EntityHandle>& visibleOrder);
@@ -58,6 +59,7 @@ private:
     bool m_resetLayout = false;
 
     ID3D12Device10* m_pDevice = nullptr;
+    ID3D12DescriptorHeap* m_pHeap = nullptr;
     Renderer* m_pRenderer = nullptr;
     SceneManager* m_pSceneManager = nullptr;
 

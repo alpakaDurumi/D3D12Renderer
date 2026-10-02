@@ -93,6 +93,7 @@ void EditorUI::Init(
     // else: use ImGui default setting ("imgui.ini" in CWD)
 
     m_pDevice = pDevice;
+    m_pHeap = pDescriptorAllocator->GetDescriptorHeap();
     m_pRenderer = pRenderer;
     m_pSceneManager = pSceneManager;
 }
@@ -471,6 +472,19 @@ void EditorUI::BuildImGuiFrame()
         ImGui::End();
     }
     m_selectionChanged = false;
+}
+
+void EditorUI::PopulateCommandList(ID3D12GraphicsCommandList* pCommandList)
+{
+    // End the ImGui frame and finalize the draw data
+    ImGui::Render();
+
+    // ImGui uses its dedicated descriptor heap for now, so calling SetDescriptorHeaps is mandatory
+    ID3D12DescriptorHeap* ppHeaps[] = {m_pHeap};
+    pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+    // Populate commands for ImGui
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), pCommandList);
 }
 
 void EditorUI::RenderEntityNode(const Entity& entity, bool& del, std::vector<EntityHandle>& visibleOrder)

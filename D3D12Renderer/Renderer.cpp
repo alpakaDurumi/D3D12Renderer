@@ -12,9 +12,6 @@
 #endif // ENGINE_DEBUG_LAYER
 #include <shlobj.h>
 
-#include <imgui.h>
-#include <imgui_impl_dx12.h>
-
 #include "D3DHelper.h"
 #include "DescriptorAllocation.h"
 #include "GeometryGenerator.h"
@@ -372,11 +369,6 @@ void Renderer::Render()
 
     m_dynamicDescriptorHeapForCbvSrvUav.Reset();
 
-    // Populate commands for ImGui
-    // ImGui uses its dedicated descriptor heap for now, so calling SetDescriptorHeaps is mandatory
-    ImGui::Render();
-    ID3D12DescriptorHeap* ppHeaps[] = {m_imguiDescriptorAllocator.GetDescriptorHeap()};
-    pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
     auto rtvHandle = m_frameResources[m_frameIndex].GetBackBufferRtvHandle();
     pCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
@@ -396,7 +388,7 @@ void Renderer::Render()
         pCommandList->Barrier(1, barrierGroups);
     }
 
-    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), pCommandList);
+    m_editorUI.PopulateCommandList(pCommandList);
 
     // Change layout of tonemappedbuffer and backbuffer after ImGui Render
     {
