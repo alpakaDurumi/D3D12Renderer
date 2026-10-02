@@ -11,7 +11,7 @@
 
 class Renderer;
 class SceneManager;
-struct ImGui_ImplDX12_InitInfo;
+class ImGuiDescriptorAllocator;
 struct ImGuiMultiSelectIO;
 
 class EditorUI
@@ -29,9 +29,7 @@ public:
         ID3D12Device10* pDevice,
         ID3D12CommandQueue* pCommandQueue,
         int numFramesInFlight,
-        ID3D12DescriptorHeap* pSrvDescriptorHeap,
-        void (*SrvDescriptorAllocFn)(ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_desc_handle),
-        void (*SrvDescriptorFreeFn)(ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_desc_handle),
+        ImGuiDescriptorAllocator* pDescriptorAllocator,
         float dpiScale,
         Renderer* pRenderer,
         SceneManager* pSceneManager);

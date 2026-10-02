@@ -49,7 +49,6 @@ public:
 
     std::pair<UINT, UINT> GetWindowResolution() const;
     const WCHAR* GetTitle() const;
-    static Renderer* GetInstance();
 
     void SetWarp(bool value);
     void SetPix();
@@ -84,9 +83,6 @@ public:
     UINT GetVisibleCount() const;
     std::chrono::time_point<std::chrono::steady_clock> GetCurrentTimePoint() const;
     std::chrono::nanoseconds GetDeltaTime() const;
-
-    static void ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle);
-    static void ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle);
 
 private:
     // Window
@@ -173,9 +169,6 @@ private:
     std::chrono::time_point<std::chrono::steady_clock> m_deadLine;
     std::chrono::nanoseconds m_deltaTime;
     std::chrono::nanoseconds m_targetPeriod;
-
-    // Singleton
-    inline static Renderer* sm_instance = nullptr;
 
     // Init
     void LoadPipeline();

@@ -140,24 +140,11 @@ static D3D12_SAMPLER_DESC GetSamplerDesc(
     return desc;
 }
 
-// Wrappers of callback functions for ImGui SRV descriptor
-void Renderer::ImGuiSrvDescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
-{
-    Renderer::GetInstance()->m_imguiDescriptorAllocator.Allocate(outCpuHandle, outGpuHandle);
-}
-
-void Renderer::ImGuiSrvDescriptorFree(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle)
-{
-    Renderer::GetInstance()->m_imguiDescriptorAllocator.Free(cpuHandle, gpuHandle);
-}
-
 Renderer::Renderer(std::wstring name)
     : m_title(name)
     , m_frameIndex(0)
     , m_camera({0.0f, 0.0f, -5.0f})
 {
-    // Set instance pointer
-    sm_instance = this;
 }
 
 Renderer::~Renderer() = default;
@@ -170,11 +157,6 @@ std::pair<UINT, UINT> Renderer::GetWindowResolution() const
 const WCHAR* Renderer::GetTitle() const
 {
     return m_title.c_str();
-}
-
-Renderer* Renderer::GetInstance()
-{
-    return sm_instance;
 }
 
 void Renderer::SetWarp(bool value)
@@ -213,15 +195,7 @@ void Renderer::Init(UINT dpi)
         m_device.Get(),
         m_commandQueue.GetCommandQueue(),
         FrameCount,
-        m_imguiDescriptorAllocator.GetDescriptorHeap(),
-        [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
-        {
-            return ImGuiSrvDescriptorAllocate(out_cpu_handle, out_gpu_handle);
-        },
-        [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
-        {
-            return ImGuiSrvDescriptorFree(cpu_handle, gpu_handle);
-        },
+        &m_imguiDescriptorAllocator,
         static_cast<float>(dpi) / USER_DEFAULT_SCREEN_DPI,
         this,
         &m_sceneManager);

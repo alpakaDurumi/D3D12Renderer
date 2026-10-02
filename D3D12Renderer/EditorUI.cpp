@@ -13,6 +13,7 @@
 #include <imgui_impl_win32.h>
 #include <imgui_internal.h>
 
+#include "ImGuiDescriptorAllocator.h"
 #include "Renderer.h"
 #include "SceneManager.h"
 #include "Win32Application.h"
@@ -37,9 +38,7 @@ void EditorUI::Init(
     ID3D12Device10* pDevice,
     ID3D12CommandQueue* pCommandQueue,
     int numFramesInFlight,
-    ID3D12DescriptorHeap* pSrvDescriptorHeap,
-    void (*SrvDescriptorAllocFn)(ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_desc_handle),
-    void (*SrvDescriptorFreeFn)(ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_desc_handle),
+    ImGuiDescriptorAllocator* pDescriptorAllocator,
     float dpiScale,
     Renderer* pRenderer,
     SceneManager* pSceneManager)
@@ -58,9 +57,13 @@ void EditorUI::Init(
     init_info.NumFramesInFlight = numFramesInFlight;
     init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
     init_info.DSVFormat = DXGI_FORMAT_UNKNOWN;
-    init_info.SrvDescriptorHeap = pSrvDescriptorHeap;
-    init_info.SrvDescriptorAllocFn = SrvDescriptorAllocFn;
-    init_info.SrvDescriptorFreeFn = SrvDescriptorFreeFn;
+    init_info.UserData = pDescriptorAllocator;
+    init_info.SrvDescriptorHeap = pDescriptorAllocator->GetDescriptorHeap();
+    // set callback functions for ImGui SRV descriptor
+    init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
+        { return static_cast<ImGuiDescriptorAllocator*>(info->UserData)->Allocate(out_cpu_handle, out_gpu_handle); };
+    init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
+        { return static_cast<ImGuiDescriptorAllocator*>(info->UserData)->Free(cpu_handle, gpu_handle); };
     ImGui_ImplDX12_Init(&init_info);
 
     ImGui::GetStyle().FontScaleMain = dpiScale;
