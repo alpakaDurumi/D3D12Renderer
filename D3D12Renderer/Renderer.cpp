@@ -573,7 +573,7 @@ void Renderer::ResizeSceneResolution(UINT width, UINT height)
 
         pToneMappedBuffers[i] = frameResource.GetToneMappedBuffer();
     }
-    m_editorUI.UpdateToneMappedBuffersSrvs(pToneMappedBuffers);
+    m_editorUI.UpdateToneMappedBuffersSrvs(m_device.Get(), pToneMappedBuffers);
 
     // Recreate depth-stencil buffer, DSV, and SRV
     auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);

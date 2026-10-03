@@ -27,7 +27,7 @@ public:
     ~EditorUI() = default;
 
     void Init(
-        ID3D12Device10* pDevice,
+        ID3D12Device* pDevice,
         ID3D12CommandQueue* pCommandQueue,
         const std::vector<ID3D12Resource*>& pToneMappedBuffers,
         float dpiScale,
@@ -37,7 +37,7 @@ public:
     void BeginFrame();
     void BuildImGuiFrame(UINT frameIndex);
     void PopulateCommandList(ID3D12GraphicsCommandList* pCommandList);
-    void UpdateToneMappedBuffersSrvs(const std::vector<ID3D12Resource*>& pToneMappedBuffers);
+    void UpdateToneMappedBuffersSrvs(ID3D12Device* pDevice, const std::vector<ID3D12Resource*>& pToneMappedBuffers);
 
     void RenderEntityNode(const Entity& entity, bool& del, std::vector<EntityHandle>& visibleOrder);
     void ApplySelectionRequests(ImGuiMultiSelectIO* ms, const std::vector<EntityHandle>& visibleOrder);
@@ -59,7 +59,6 @@ private:
     std::string m_imguiIniPath; // UTF-8
     bool m_resetLayout = false;
 
-    ID3D12Device10* m_pDevice = nullptr;
     Renderer* m_pRenderer = nullptr;
     SceneManager* m_pSceneManager = nullptr;
 

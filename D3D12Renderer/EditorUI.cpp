@@ -35,7 +35,7 @@ static EntityHandle FromSelectionUserData(ImGuiSelectionUserData v)
 }
 
 void EditorUI::Init(
-    ID3D12Device10* pDevice,
+    ID3D12Device* pDevice,
     ID3D12CommandQueue* pCommandQueue,
     const std::vector<ID3D12Resource*>& pToneMappedBuffers,
     float dpiScale,
@@ -94,18 +94,14 @@ void EditorUI::Init(
     }
     // else: use ImGui default setting ("imgui.ini" in CWD)
 
-    m_pDevice = pDevice;
     m_pRenderer = pRenderer;
     m_pSceneManager = pSceneManager;
 
     // init toneMappedBufferSrvs
-    const auto format = DXGI_FORMAT_R8G8B8A8_UNORM;
     m_toneMappedBufferSrvs.resize(FrameCount);
     for (UINT i = 0; i < FrameCount; i++)
-    {
         m_toneMappedBufferSrvs[i] = ImGuiShaderResourceView(m_imguiDescriptorAllocator.Allocate());
-        m_toneMappedBufferSrvs[i].Init(m_pDevice, pToneMappedBuffers[i], D3DHelper::GetSrvDesc(format, 1));
-    }
+    UpdateToneMappedBuffersSrvs(pDevice, pToneMappedBuffers);
 }
 
 // Start the Dear ImGui frame
@@ -481,12 +477,12 @@ void EditorUI::PopulateCommandList(ID3D12GraphicsCommandList* pCommandList)
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), pCommandList);
 }
 
-void EditorUI::UpdateToneMappedBuffersSrvs(const std::vector<ID3D12Resource*>& pToneMappedBuffers)
+void EditorUI::UpdateToneMappedBuffersSrvs(ID3D12Device* pDevice, const std::vector<ID3D12Resource*>& pToneMappedBuffers)
 {
     const auto format = DXGI_FORMAT_R8G8B8A8_UNORM;
 
     for (UINT i = 0; i < FrameCount; ++i)
-        m_toneMappedBufferSrvs[i].Init(m_pDevice, pToneMappedBuffers[i], D3DHelper::GetSrvDesc(format, 1));
+        m_toneMappedBufferSrvs[i].Init(pDevice, pToneMappedBuffers[i], D3DHelper::GetSrvDesc(format, 1));
 }
 
 void EditorUI::RenderEntityNode(const Entity& entity, bool& del, std::vector<EntityHandle>& visibleOrder)
