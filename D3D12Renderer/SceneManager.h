@@ -712,6 +712,17 @@ public:
         return m_assetTextures.GetDense();
     }
 
+    UINT GetShadowMapResolution(LightHandle handle)
+    {
+        UINT resolution = 0;
+        std::visit(
+            [&](auto&& lightHandle)
+            { resolution = Get(lightHandle)->GetShadowMapResolution(); },
+            handle);
+
+        return resolution;
+    }
+
     void SetShadowMapResolution(LightHandle handle, UINT resolution)
     {
         std::visit(

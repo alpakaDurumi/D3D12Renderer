@@ -3,7 +3,6 @@
 #include "EditorUI.h"
 
 #include <filesystem>
-#include <variant>
 
 #include <DirectXMath.h>
 #include <shlobj.h>
@@ -412,12 +411,7 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
             {
                 auto getResolution = [&](EntityHandle handle)
                 {
-                    UINT resolution = 0;
-                    std::visit(
-                        [&](auto&& lh)
-                        { resolution = m_pSceneManager->Get(lh)->GetShadowMapResolution(); },
-                        m_pSceneManager->Get(handle)->light.value());
-                    return resolution;
+                    return m_pSceneManager->GetShadowMapResolution(m_pSceneManager->Get(handle)->light.value());
                 };
 
                 // Take the first value as representative and check whether the selection is mixed
