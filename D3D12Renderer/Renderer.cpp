@@ -188,11 +188,14 @@ void Renderer::Init(UINT dpi)
     LoadPipeline();
     LoadAssets();
 
+    std::vector<ID3D12Resource*> pToneMappedBuffers(FrameCount);
+    for (UINT i = 0; i < FrameCount; ++i)
+        pToneMappedBuffers[i] = m_frameResources[i].GetToneMappedBuffer();
+
     m_editorUI.Init(
         m_device.Get(),
         m_commandQueue.GetCommandQueue(),
-        FrameCount,
-        &m_imguiDescriptorAllocator,
+        pToneMappedBuffers,
         static_cast<float>(dpi) / USER_DEFAULT_SCREEN_DPI,
         this,
         &m_sceneManager);
@@ -335,7 +338,7 @@ void Renderer::ProcessInput()
 
 void Renderer::PrepareUI()
 {
-    m_editorUI.BuildImGuiFrame();
+    m_editorUI.BuildImGuiFrame(m_frameIndex);
 }
 
 void Renderer::Update()
@@ -559,6 +562,7 @@ void Renderer::ResizeSceneResolution(UINT width, UINT height)
 
     m_camera.SetAspectRatio(static_cast<float>(width) / static_cast<float>(height));
 
+    std::vector<ID3D12Resource*> pToneMappedBuffers(FrameCount);
     for (UINT i = 0; i < FrameCount; i++)
     {
         auto& frameResource = m_frameResources[i];
@@ -566,7 +570,10 @@ void Renderer::ResizeSceneResolution(UINT width, UINT height)
         frameResource.CreateGBuffers(width, height);
         frameResource.CreateMasks(width, height);
         frameResource.CreateToneMappedBuffer(width, height);
+
+        pToneMappedBuffers[i] = frameResource.GetToneMappedBuffer();
     }
+    m_editorUI.UpdateToneMappedBuffersSrvs(pToneMappedBuffers);
 
     // Recreate depth-stencil buffer, DSV, and SRV
     auto clearValue = CreateClearValue(DXGI_FORMAT_D24_UNORM_S8_UINT, 0.0f, 0);
@@ -617,15 +624,7 @@ void Renderer::ResizeSceneResolution(UINT width, UINT height)
     m_renderGraph.UpdateElement(horizontalDilatedMask, 0, pHorizontalDilatedMasks);
 
     auto toneMappedBuffer = m_renderGraph.GetRGTexture("ToneMappedBuffer");
-    std::vector<ID3D12Resource*> pToneMappedBuffers(FrameCount);
-    for (UINT i = 0; i < FrameCount; ++i)
-        pToneMappedBuffers[i] = m_frameResources[i].GetToneMappedBuffer();
     m_renderGraph.UpdateElement(toneMappedBuffer, 0, pToneMappedBuffers);
-}
-
-D3D12_GPU_DESCRIPTOR_HANDLE Renderer::GetSceneGpuHandle() const
-{
-    return m_frameResources[m_frameIndex].GetToneMappedBufferSrvHandle();
 }
 
 bool Renderer::GetVSync() const
@@ -778,9 +777,6 @@ void Renderer::LoadPipeline()
     // Dependency injections
     m_commandQueue.SetDescriptorHeaps(&m_dynamicDescriptorHeapForCbvSrvUav, m_samplerDescriptorHeap.Get());
 
-    // For ImGui
-    m_imguiDescriptorAllocator.Init(m_device.Get());
-
     // Check for Variable Refresh Rate(VRR)
     m_tearingSupported = CheckTearingSupport();
 
@@ -834,8 +830,7 @@ void Renderer::LoadPipeline()
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(),
             m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV].Allocate(),
-            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate(),
-            m_imguiDescriptorAllocator.Allocate());
+            m_descriptorAllocators[D3D12_DESCRIPTOR_HEAP_TYPE_RTV].Allocate());
     }
 
     CreateRootSignature();

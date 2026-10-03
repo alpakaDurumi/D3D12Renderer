@@ -4,7 +4,6 @@
 
 #include "D3DHelper.h"
 #include "DescriptorAllocation.h"
-#include "ImGuiDescriptorAllocation.h"
 #include "InstanceData.h"
 #include "UploadAllocation.h"
 #include "Utility.h"
@@ -35,8 +34,7 @@ void FrameResource::Init(
     DescriptorAllocation&& selectionMaskSrvAllocation,
     DescriptorAllocation&& horizontalDilatedMaskRtvAllocation,
     DescriptorAllocation&& horizontalDilatedMaskSrvAllocation,
-    DescriptorAllocation&& toneMappedBufferRtvAllocation,
-    ImGuiDescriptorAllocation&& toneMappedBufferSrvAllocation)
+    DescriptorAllocation&& toneMappedBufferRtvAllocation)
 {
     m_pDevice = pDevice;
 
@@ -78,7 +76,6 @@ void FrameResource::Init(
     CreateMasks(sceneWidth, sceneHeight);
 
     // ToneMappedBuffer
-    m_toneMappedBufferSrv = ImGuiShaderResourceView(std::move(toneMappedBufferSrvAllocation));
     m_toneMappedBufferRtv = RenderTargetView(std::move(toneMappedBufferRtvAllocation));
     CreateToneMappedBuffer(sceneWidth, sceneHeight);
 
@@ -273,7 +270,6 @@ void FrameResource::CreateToneMappedBuffer(UINT64 width, UINT height)
         &clearValue);
 
     m_toneMappedBufferRtv.Init(m_pDevice, m_toneMappedBuffer.Get(), GetRtvDesc(format, 0));
-    m_toneMappedBufferSrv.Init(m_pDevice, m_toneMappedBuffer.Get(), GetSrvDesc(format, 1));
 }
 
 ID3D12Resource* FrameResource::GetToneMappedBuffer() const
@@ -284,11 +280,6 @@ ID3D12Resource* FrameResource::GetToneMappedBuffer() const
 D3D12_CPU_DESCRIPTOR_HANDLE FrameResource::GetToneMappedBufferRtvHandle() const
 {
     return m_toneMappedBufferRtv.GetHandle();
-}
-
-D3D12_GPU_DESCRIPTOR_HANDLE FrameResource::GetToneMappedBufferSrvHandle() const
-{
-    return m_toneMappedBufferSrv.GetGpuHandle();
 }
 
 // Instance buffers

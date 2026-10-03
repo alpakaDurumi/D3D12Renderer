@@ -24,7 +24,6 @@
 #include "DynamicDescriptorHeap.h"
 #include "EditorUI.h"
 #include "FrameResource.h"
-#include "ImGuiDescriptorAllocator.h"
 #include "InputManager.h"
 #include "RenderGraph.h"
 #include "RendererConfig.h"
@@ -75,7 +74,6 @@ public:
 
     EntityHandle SpawnPrimitive(const AssetID& meshId, const std::string& name);
     void ResizeSceneResolution(UINT width, UINT height);
-    D3D12_GPU_DESCRIPTOR_HANDLE GetSceneGpuHandle() const;
     bool GetVSync() const;
     void SetVSync(bool value);
     void SetFpsCap(std::string fps);
@@ -113,7 +111,6 @@ private:
     DynamicDescriptorHeap m_dynamicDescriptorHeapForCbvSrvUav;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_samplerDescriptorHeap;
     std::array<DescriptorAllocator, D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES> m_descriptorAllocators;
-    ImGuiDescriptorAllocator m_imguiDescriptorAllocator;
 
     std::array<FrameResource, FrameCount> m_frameResources;
 

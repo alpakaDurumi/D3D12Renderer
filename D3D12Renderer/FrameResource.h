@@ -10,14 +10,12 @@
 #include <minwindef.h>
 
 #include "Buffer.h"
-#include "ImGuiShaderResourceView.h"
 #include "SharedConfig.h"
 #include "Texture.h"
 #include "TransientUploadAllocator.h"
 #include "View.h"
 
 class DescriptorAllocation;
-class ImGuiDescriptorAllocation;
 struct InstanceData;
 struct UploadAllocation;
 
@@ -48,8 +46,7 @@ public:
         DescriptorAllocation&& selectionMaskSrvAllocation,
         DescriptorAllocation&& horizontalDilatedMaskRtvAllocation,
         DescriptorAllocation&& horizontalDilatedMaskSrvAllocation,
-        DescriptorAllocation&& toneMappedBufferRtvAllocation,
-        ImGuiDescriptorAllocation&& toneMappedBufferSrvAllocation);
+        DescriptorAllocation&& toneMappedBufferRtvAllocation);
 
     // Back buffer
     void AcquireBackBuffer(IDXGISwapChain* pSwapChain, UINT frameIndex);
@@ -83,7 +80,6 @@ public:
     void CreateToneMappedBuffer(UINT64 width, UINT height);
     ID3D12Resource* GetToneMappedBuffer() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetToneMappedBufferRtvHandle() const;
-    D3D12_GPU_DESCRIPTOR_HANDLE GetToneMappedBufferSrvHandle() const;
 
     // Instance buffers
     void ResetInstanceOffsetBytes();
@@ -128,7 +124,6 @@ private:
 
     Texture m_toneMappedBuffer;
     RenderTargetView m_toneMappedBufferRtv;
-    ImGuiShaderResourceView m_toneMappedBufferSrv;
 
     Buffer m_instanceDataUploadBuffer;
     UINT8* m_instanceDataBegin = nullptr;

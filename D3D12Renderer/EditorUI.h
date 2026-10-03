@@ -7,11 +7,12 @@
 
 #include <d3d12.h>
 
+#include "ImGuiDescriptorAllocator.h"
+#include "ImGuiShaderResourceView.h"
 #include "SceneHandles.h"
 
 class Renderer;
 class SceneManager;
-class ImGuiDescriptorAllocator;
 struct ImGuiMultiSelectIO;
 
 class EditorUI
@@ -28,15 +29,15 @@ public:
     void Init(
         ID3D12Device10* pDevice,
         ID3D12CommandQueue* pCommandQueue,
-        int numFramesInFlight,
-        ImGuiDescriptorAllocator* pDescriptorAllocator,
+        const std::vector<ID3D12Resource*>& pToneMappedBuffers,
         float dpiScale,
         Renderer* pRenderer,
         SceneManager* pSceneManager);
 
     void BeginFrame();
-    void BuildImGuiFrame();
+    void BuildImGuiFrame(UINT frameIndex);
     void PopulateCommandList(ID3D12GraphicsCommandList* pCommandList);
+    void UpdateToneMappedBuffersSrvs(const std::vector<ID3D12Resource*>& pToneMappedBuffers);
 
     void RenderEntityNode(const Entity& entity, bool& del, std::vector<EntityHandle>& visibleOrder);
     void ApplySelectionRequests(ImGuiMultiSelectIO* ms, const std::vector<EntityHandle>& visibleOrder);
@@ -59,11 +60,13 @@ private:
     bool m_resetLayout = false;
 
     ID3D12Device10* m_pDevice = nullptr;
-    ID3D12DescriptorHeap* m_pHeap = nullptr;
     Renderer* m_pRenderer = nullptr;
     SceneManager* m_pSceneManager = nullptr;
 
     UINT m_pendingSceneWidth = 0;
     UINT m_pendingSceneHeight = 0;
     std::chrono::time_point<std::chrono::steady_clock> m_lastResizeRequestTime;
+
+    ImGuiDescriptorAllocator m_imguiDescriptorAllocator;
+    std::vector<ImGuiShaderResourceView> m_toneMappedBufferSrvs;
 };

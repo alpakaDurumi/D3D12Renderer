@@ -13,8 +13,9 @@
 #include <imgui_impl_win32.h>
 #include <imgui_internal.h>
 
-#include "ImGuiDescriptorAllocator.h"
+#include "D3DHelper.h"
 #include "Renderer.h"
+#include "RendererConfig.h"
 #include "SceneManager.h"
 #include "Win32Application.h"
 
@@ -33,16 +34,17 @@ static EntityHandle FromSelectionUserData(ImGuiSelectionUserData v)
     return EntityHandle{static_cast<UINT>(u >> 32), static_cast<UINT>(u)};
 }
 
-// Setup Dear ImGui context
 void EditorUI::Init(
     ID3D12Device10* pDevice,
     ID3D12CommandQueue* pCommandQueue,
-    int numFramesInFlight,
-    ImGuiDescriptorAllocator* pDescriptorAllocator,
+    const std::vector<ID3D12Resource*>& pToneMappedBuffers,
     float dpiScale,
     Renderer* pRenderer,
     SceneManager* pSceneManager)
 {
+    m_imguiDescriptorAllocator.Init(pDevice);
+
+    // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -54,11 +56,11 @@ void EditorUI::Init(
     ImGui_ImplDX12_InitInfo init_info = {};
     init_info.Device = pDevice;
     init_info.CommandQueue = pCommandQueue;
-    init_info.NumFramesInFlight = numFramesInFlight;
+    init_info.NumFramesInFlight = FrameCount;
     init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
     init_info.DSVFormat = DXGI_FORMAT_UNKNOWN;
-    init_info.UserData = pDescriptorAllocator;
-    init_info.SrvDescriptorHeap = pDescriptorAllocator->GetDescriptorHeap();
+    init_info.UserData = &m_imguiDescriptorAllocator;
+    init_info.SrvDescriptorHeap = m_imguiDescriptorAllocator.GetDescriptorHeap();
     // set callback functions for ImGui SRV descriptor
     init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
         { return static_cast<ImGuiDescriptorAllocator*>(info->UserData)->Allocate(out_cpu_handle, out_gpu_handle); };
@@ -93,9 +95,17 @@ void EditorUI::Init(
     // else: use ImGui default setting ("imgui.ini" in CWD)
 
     m_pDevice = pDevice;
-    m_pHeap = pDescriptorAllocator->GetDescriptorHeap();
     m_pRenderer = pRenderer;
     m_pSceneManager = pSceneManager;
+
+    // init toneMappedBufferSrvs
+    const auto format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    m_toneMappedBufferSrvs.resize(FrameCount);
+    for (UINT i = 0; i < FrameCount; i++)
+    {
+        m_toneMappedBufferSrvs[i] = ImGuiShaderResourceView(m_imguiDescriptorAllocator.Allocate());
+        m_toneMappedBufferSrvs[i].Init(m_pDevice, pToneMappedBuffers[i], D3DHelper::GetSrvDesc(format, 1));
+    }
 }
 
 // Start the Dear ImGui frame
@@ -106,7 +116,7 @@ void EditorUI::BeginFrame()
     ImGui::NewFrame();
 }
 
-void EditorUI::BuildImGuiFrame()
+void EditorUI::BuildImGuiFrame(UINT frameIndex)
 {
     static UINT64 frameCounter = 0;
     static std::chrono::nanoseconds elapsed = std::chrono::nanoseconds::zero();
@@ -191,7 +201,7 @@ void EditorUI::BuildImGuiFrame()
             else if (std::chrono::duration<double>(now - m_lastResizeRequestTime).count() >= DEBOUNCE_DELAY)
                 m_pRenderer->ResizeSceneResolution(width, height);
 
-            ImGui::Image(static_cast<ImTextureID>(m_pRenderer->GetSceneGpuHandle().ptr), measured);
+            ImGui::Image(static_cast<ImTextureID>(m_toneMappedBufferSrvs[frameIndex].GetGpuHandle().ptr), measured);
         }
 
         ImGui::End();
@@ -480,11 +490,19 @@ void EditorUI::PopulateCommandList(ID3D12GraphicsCommandList* pCommandList)
     ImGui::Render();
 
     // ImGui uses its dedicated descriptor heap for now, so calling SetDescriptorHeaps is mandatory
-    ID3D12DescriptorHeap* ppHeaps[] = {m_pHeap};
+    ID3D12DescriptorHeap* ppHeaps[] = {m_imguiDescriptorAllocator.GetDescriptorHeap()};
     pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
     // Populate commands for ImGui
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), pCommandList);
+}
+
+void EditorUI::UpdateToneMappedBuffersSrvs(const std::vector<ID3D12Resource*>& pToneMappedBuffers)
+{
+    const auto format = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+    for (UINT i = 0; i < FrameCount; ++i)
+        m_toneMappedBufferSrvs[i].Init(m_pDevice, pToneMappedBuffers[i], D3DHelper::GetSrvDesc(format, 1));
 }
 
 void EditorUI::RenderEntityNode(const Entity& entity, bool& del, std::vector<EntityHandle>& visibleOrder)
