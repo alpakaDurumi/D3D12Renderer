@@ -38,21 +38,17 @@ public:
     void BuildImGuiFrame(UINT frameIndex);
     void PopulateCommandList(ID3D12GraphicsCommandList* pCommandList);
     void UpdateToneMappedBuffersSrvs(ID3D12Device* pDevice, const std::vector<ID3D12Resource*>& pToneMappedBuffers);
+    void SetDpiScale(float value);
+    const std::unordered_set<EntityHandle>& GetSelection() const;
+    void Destroy();
 
+private:
     void RenderEntityNode(const Entity& entity, bool& del, std::vector<EntityHandle>& visibleOrder);
     void ApplySelectionRequests(ImGuiMultiSelectIO* ms, const std::vector<EntityHandle>& visibleOrder);
-
     void ClearSelection();
     void SelectSingle(EntityHandle handle);
     void ToggleSelect(EntityHandle handle);
 
-    void SetDpiScale(float value);
-
-    const std::unordered_set<EntityHandle>& GetSelection() const;
-
-    void Destroy();
-
-private:
     std::unordered_set<EntityHandle> m_selected;
     bool m_selectionChanged = false;
 

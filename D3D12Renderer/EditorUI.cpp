@@ -479,6 +479,24 @@ void EditorUI::UpdateToneMappedBuffersSrvs(ID3D12Device* pDevice, const std::vec
         m_toneMappedBufferSrvs[i].Init(pDevice, pToneMappedBuffers[i], D3DHelper::GetSrvDesc(format, 1));
 }
 
+void EditorUI::SetDpiScale(float value)
+{
+    ImGui::GetStyle().FontScaleMain = value;
+}
+
+const std::unordered_set<EntityHandle>& EditorUI::GetSelection() const
+{
+    return m_selected;
+}
+
+void EditorUI::Destroy()
+{
+    // Shutdown ImGui
+    ImGui_ImplDX12_Shutdown();
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
+}
+
 void EditorUI::RenderEntityNode(const Entity& entity, bool& del, std::vector<EntityHandle>& visibleOrder)
 {
     bool isSelected = m_selected.find(entity.selfHandle) != m_selected.end();
@@ -574,22 +592,4 @@ void EditorUI::ToggleSelect(EntityHandle handle)
         m_selected.erase(handle);
 
     m_selectionChanged = true;
-}
-
-void EditorUI::SetDpiScale(float value)
-{
-    ImGui::GetStyle().FontScaleMain = value;
-}
-
-const std::unordered_set<EntityHandle>& EditorUI::GetSelection() const
-{
-    return m_selected;
-}
-
-void EditorUI::Destroy()
-{
-    // Shutdown ImGui
-    ImGui_ImplDX12_Shutdown();
-    ImGui_ImplWin32_Shutdown();
-    ImGui::DestroyContext();
 }
