@@ -452,24 +452,8 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
                         const UINT resolution = static_cast<UINT>(std::stoi(items[n]));
                         const bool isSelected = !mixed && resolution == common;
                         if (ImGui::Selectable(items[n], isSelected))
-                        {
                             for (const auto& handle : m_selected)
-                            {
-                                std::visit(
-                                    [&](auto&& lightHandle)
-                                    {
-                                        auto* pLight = m_pSceneManager->Get(lightHandle);
-
-                                        if (pLight->GetShadowMapResolution() == resolution)
-                                            return;
-
-                                        auto resources = pLight->TakeResources();
-                                        m_pSceneManager->EnqueueResourceDeletion(resources);
-                                        pLight->ChangeShadowMapResolution(m_pDevice, resolution);
-                                    },
-                                    m_pSceneManager->Get(handle)->light.value());
-                            }
-                        }
+                                m_pSceneManager->SetShadowMapResolution(m_pSceneManager->Get(handle)->light.value(), resolution);
 
                         // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
                         if (isSelected)

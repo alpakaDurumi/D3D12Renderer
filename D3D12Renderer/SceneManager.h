@@ -712,6 +712,21 @@ public:
         return m_assetTextures.GetDense();
     }
 
+    void SetShadowMapResolution(LightHandle handle, UINT resolution)
+    {
+        std::visit(
+            [&](auto&& lightHandle)
+            {
+                auto* pLight = Get(lightHandle);
+                if (pLight->GetShadowMapResolution() == resolution) return;
+
+                auto resources = pLight->TakeResources();
+                EnqueueResourceDeletion(resources);
+                pLight->ChangeShadowMapResolution(m_pDevice, resolution);
+            },
+            handle);
+    }
+
     // push resources to queue with signaledFenceValue
     void QueueDeferredDeletions(UINT64 signaledFenceValue)
     {
