@@ -334,7 +334,11 @@ void Renderer::ProcessInput()
 
     // Move
     static float cameraMoveSpeed = 50.0f;
-    const float frameDtSec = m_deltaTime.count() * 1e-9f;
+    // Cap the frame delta used for camera movement. Without the cap, a long frame (e.g. a hitch
+    // while flying) moves the camera a large distance in a single frame.
+    // 1.0 s is the upper bound used by Unreal's FEditorViewportClient (EditorMovementDeltaUpperBound).
+    static constexpr float maxCameraDtSec = 1.0f;
+    const float frameDtSec = std::min(m_deltaTime.count() * 1e-9f, maxCameraDtSec);
     float dist = cameraMoveSpeed * frameDtSec;
     if (m_inputManager.IsMouseButtonDown(1))
     {
@@ -361,9 +365,18 @@ void Renderer::PrepareUI()
 void Renderer::Update()
 {
     static constexpr std::chrono::nanoseconds fixedDt(1'000'000'000 / 60); // Target to 60Hz fixed time step
+    // Limit how much time a single frame can add to the accumulator.
+    // A long frame (loading, breakpoint, window drag) produces a large delta.
+    // Without this limit, all of it is simulated in one Update:
+    //  - the scene jumps ahead on screen.
+    //  - if the steps are expensive, this Update also takes long, so more time is missed
+    //    and the next Update has even more steps to run (spiral of death).
+    // Time over the limit is discarded, and the simulation lags behind real time.
+    // 0.25 s is the value used in Glenn Fiedler's "Fix Your Timestep!".
+    static constexpr std::chrono::nanoseconds maxFrameTime(250'000'000); // 0.25 s
     static std::chrono::nanoseconds accumulated = std::chrono::nanoseconds::zero();
 
-    accumulated += m_deltaTime;
+    accumulated += std::min(m_deltaTime, maxFrameTime);
     while (accumulated >= fixedDt)
     {
         FixedUpdate(fixedDt);
