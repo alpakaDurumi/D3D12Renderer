@@ -172,13 +172,16 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
     {
         ImGui::Begin("Scene");
 
-        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().KeyAlt)
-            ClearSelection();
-
         static constexpr double DEBOUNCE_DELAY = 0.15; // 0.15 sec
 
         ImVec2 measured = ImGui::GetContentRegionAvail();
-        if (measured.x >= 1.0f && measured.y >= 1.0f)
+
+        if (measured.x < 1.0f || measured.y < 1.0f)
+        {
+            m_sceneHovered = false;
+            m_sceneActive = false;
+        }
+        else
         {
             const UINT width = static_cast<UINT>(measured.x);
             const UINT height = static_cast<UINT>(measured.y);
@@ -196,7 +199,17 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
             else if (std::chrono::duration<double>(now - m_lastResizeRequestTime).count() >= DEBOUNCE_DELAY)
                 m_pRenderer->ResizeSceneResolution(width, height);
 
-            ImGui::Image(static_cast<ImTextureID>(m_toneMappedBufferSrvs[frameIndex].GetGpuHandle().ptr), measured);
+            ImGui::InvisibleButton("SceneViewport", measured, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
+
+            const ImVec2 rectMin = ImGui::GetItemRectMin();
+            const ImVec2 rectMax = ImGui::GetItemRectMax();
+            ImGui::GetWindowDrawList()->AddImage(static_cast<ImTextureID>(m_toneMappedBufferSrvs[frameIndex].GetGpuHandle().ptr), rectMin, rectMax);
+
+            m_sceneHovered = ImGui::IsItemHovered();
+            m_sceneActive = ImGui::IsItemActive();
+
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().KeyAlt)
+                ClearSelection();
         }
 
         ImGui::End();

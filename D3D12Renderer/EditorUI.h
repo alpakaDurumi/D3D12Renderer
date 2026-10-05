@@ -64,4 +64,7 @@ private:
 
     ImGuiDescriptorAllocator m_imguiDescriptorAllocator;
     std::vector<ImGuiShaderResourceView> m_toneMappedBufferSrvs;
+
+    bool m_sceneHovered = false;
+    bool m_sceneActive = false;
 };
