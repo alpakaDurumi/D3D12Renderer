@@ -7,18 +7,12 @@ namespace DirectX
 struct BoundingFrustum;
 }
 
-// Scene Editor Camera
-// Position uses fixed timestep interpolation for smoothness.
-// Rotation uses immediate input response for low latency.
 class Camera
 {
 public:
     Camera(DirectX::XMFLOAT3 initialPosition = {0.0f, 0.0f, 0.0f});
 
-    void UpdateRenderState(float alpha);
-
-    DirectX::XMVECTOR GetCurrentPosition() const;
-    DirectX::XMVECTOR GetRenderPosition() const;
+    DirectX::XMVECTOR GetPosition() const;
     DirectX::XMVECTOR GetForward() const;
     float GetNearPlane() const;
     float GetFarPlane() const;
@@ -26,11 +20,10 @@ public:
     DirectX::XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection = true) const;
     DirectX::BoundingFrustum GetWorldFrustum() const;
 
-    void SetCurrentPosition(const DirectX::XMVECTOR& pos);
+    void SetPosition(const DirectX::XMVECTOR& pos);
     void SetAspectRatio(float aspectRatio);
     void SetHorizontalFov(float horizontalFov);
 
-    void SnapshotState();
     void MoveForward(float speedScale);
     void MoveRight(float speedScale);
     void MoveUp(float speedScale);
@@ -41,9 +34,7 @@ public:
 private:
     float CalcVerticalFov(float horizontalFov);
 
-    DirectX::XMFLOAT3 m_prevPosition;
-    DirectX::XMFLOAT3 m_currPosition;
-    DirectX::XMFLOAT3 m_renderPosition;
+    DirectX::XMFLOAT3 m_position;
 
     float m_yaw;
     float m_pitch;

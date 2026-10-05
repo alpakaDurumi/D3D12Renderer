@@ -254,7 +254,7 @@ void Renderer::ProcessInput()
         }
 
         XMVECTOR center = XMVectorScale(acc, 1.0f / static_cast<float>(selection.size()));
-        m_camera.SetCurrentPosition(center - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
+        m_camera.SetPosition(center - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
 
         XMStoreFloat3(&m_orbitPivot, center);
         m_orbitDistance = DEFAULT_FOCUS_DIST;
@@ -268,7 +268,7 @@ void Renderer::ProcessInput()
         if (wheelStep != 0.0f)
         {
             m_camera.MoveForward(wheelStep * cameraDollySpeed);
-            XMVECTOR camPos = m_camera.GetCurrentPosition();
+            XMVECTOR camPos = m_camera.GetPosition();
             m_orbitDistance = XMVectorGetX(XMVector3Length(camPos - XMLoadFloat3(&m_orbitPivot)));
         }
     }
@@ -332,8 +332,25 @@ void Renderer::ProcessInput()
         }
     }
 
-    // Operations in ProcessInput are immediate, requiring no interpolation.
-    m_camera.SnapshotState();
+    // Move
+    static float cameraMoveSpeed = 50.0f;
+    const float frameDtSec = m_deltaTime.count() * 1e-9f;
+    float dist = cameraMoveSpeed * frameDtSec;
+    if (m_inputManager.IsMouseButtonDown(1))
+    {
+        if (m_inputManager.IsKeyDown('W'))
+            m_camera.MoveForward(dist);
+        if (m_inputManager.IsKeyDown('A'))
+            m_camera.MoveRight(-dist);
+        if (m_inputManager.IsKeyDown('S'))
+            m_camera.MoveForward(-dist);
+        if (m_inputManager.IsKeyDown('D'))
+            m_camera.MoveRight(dist);
+        if (m_inputManager.IsKeyDown('Q'))
+            m_camera.MoveUp(-dist);
+        if (m_inputManager.IsKeyDown('E'))
+            m_camera.MoveUp(dist);
+    }
 }
 
 void Renderer::PrepareUI()
@@ -1380,7 +1397,7 @@ void Renderer::SetFullScreen(bool fullScreen)
 
 void Renderer::BeginOrbit()
 {
-    XMVECTOR camPos = m_camera.GetCurrentPosition();
+    XMVECTOR camPos = m_camera.GetPosition();
     XMStoreFloat3(&m_orbitPivot, camPos + m_camera.GetForward() * m_orbitDistance);
     m_orbiting = true;
 }
@@ -1388,29 +1405,6 @@ void Renderer::BeginOrbit()
 void Renderer::FixedUpdate(std::chrono::nanoseconds fixedDt)
 {
     const float fixedDtSec = fixedDt.count() * 1e-9f;
-
-    // Camera
-    static float cameraMoveSpeed = 50.0f;
-
-    float dist = cameraMoveSpeed * fixedDtSec;
-
-    m_camera.SnapshotState();
-
-    if (m_inputManager.IsMouseButtonDown(1))
-    {
-        if (m_inputManager.IsKeyDown('W'))
-            m_camera.MoveForward(dist);
-        if (m_inputManager.IsKeyDown('A'))
-            m_camera.MoveRight(-dist);
-        if (m_inputManager.IsKeyDown('S'))
-            m_camera.MoveForward(-dist);
-        if (m_inputManager.IsKeyDown('D'))
-            m_camera.MoveRight(dist);
-        if (m_inputManager.IsKeyDown('Q'))
-            m_camera.MoveUp(-dist);
-        if (m_inputManager.IsKeyDown('E'))
-            m_camera.MoveUp(dist);
-    }
 
     // Transforms
     static float rotationSpeed = 1.0f; // unit : rad/s
@@ -1433,8 +1427,7 @@ void Renderer::PrepareConstantData(float alpha)
     m_sceneManager.UpdateWorldTransforms(alpha);
 
     // Main Camera
-    m_camera.UpdateRenderState(alpha);
-    m_cameraConstantData.SetPos(m_camera.GetRenderPosition());
+    m_cameraConstantData.SetPos(m_camera.GetPosition());
     m_cameraConstantData.SetView(m_camera.GetViewMatrix());
     m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());
 
@@ -1444,7 +1437,7 @@ void Renderer::PrepareConstantData(float alpha)
     UINT idx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        light.SetShadowContext(m_camera.GetRenderPosition(), m_camera.GetFarPlane(), cascadeSpheres);
+        light.SetShadowContext(m_camera.GetPosition(), m_camera.GetFarPlane(), cascadeSpheres);
         light.SetIdxInArray(idx);
         ++idx;
     }

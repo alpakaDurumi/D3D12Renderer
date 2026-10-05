@@ -7,10 +7,8 @@
 using namespace DirectX;
 
 Camera::Camera(XMFLOAT3 initialPosition)
+    : m_position(initialPosition)
 {
-    m_prevPosition = initialPosition;
-    m_currPosition = initialPosition;
-
     m_yaw = 0.0f;
     m_pitch = 0.0f;
 
@@ -20,22 +18,9 @@ Camera::Camera(XMFLOAT3 initialPosition)
     m_farPlane = 1000.0f;
 }
 
-void Camera::UpdateRenderState(float alpha)
+XMVECTOR Camera::GetPosition() const
 {
-    XMVECTOR prev = XMLoadFloat3(&m_prevPosition);
-    XMVECTOR curr = XMLoadFloat3(&m_currPosition);
-    XMVECTOR interpolated = XMVectorLerp(prev, curr, alpha);
-    XMStoreFloat3(&m_renderPosition, interpolated);
-}
-
-XMVECTOR Camera::GetCurrentPosition() const
-{
-    return XMVectorSetW(XMLoadFloat3(&m_currPosition), 1.0f);
-}
-
-XMVECTOR Camera::GetRenderPosition() const
-{
-    return XMVectorSetW(XMLoadFloat3(&m_renderPosition), 1.0f);
+    return XMVectorSetW(XMLoadFloat3(&m_position), 1.0f);
 }
 
 XMVECTOR Camera::GetForward() const
@@ -57,7 +42,7 @@ float Camera::GetFarPlane() const
 
 XMMATRIX Camera::GetViewMatrix() const
 {
-    XMVECTOR pos = XMLoadFloat3(&m_renderPosition);
+    XMVECTOR pos = XMLoadFloat3(&m_position);
     XMVECTOR rot = XMLoadFloat4(&m_rotation);
 
     XMVECTOR forward = XMVector3Rotate(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), rot);
@@ -86,9 +71,9 @@ BoundingFrustum Camera::GetWorldFrustum() const
     return boundingFrustum;
 }
 
-void Camera::SetCurrentPosition(const XMVECTOR& pos)
+void Camera::SetPosition(const XMVECTOR& pos)
 {
-    XMStoreFloat3(&m_currPosition, pos);
+    XMStoreFloat3(&m_position, pos);
 }
 
 void Camera::SetAspectRatio(float aspectRatio)
@@ -103,43 +88,38 @@ void Camera::SetHorizontalFov(float horizontalFov)
     m_verticalFov = CalcVerticalFov(horizontalFov);
 }
 
-void Camera::SnapshotState()
-{
-    m_prevPosition = m_currPosition;
-}
-
 void Camera::MoveForward(float speedScale)
 {
-    XMVECTOR pos = XMLoadFloat3(&m_currPosition);
+    XMVECTOR pos = XMLoadFloat3(&m_position);
     XMVECTOR rot = XMLoadFloat4(&m_rotation);
 
     XMVECTOR forward = XMVector3Rotate(XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), rot);
 
     pos += forward * speedScale;
 
-    XMStoreFloat3(&m_currPosition, pos);
+    XMStoreFloat3(&m_position, pos);
 }
 
 void Camera::MoveRight(float speedScale)
 {
-    XMVECTOR pos = XMLoadFloat3(&m_currPosition);
+    XMVECTOR pos = XMLoadFloat3(&m_position);
     XMVECTOR rot = XMLoadFloat4(&m_rotation);
 
     XMVECTOR right = XMVector3Rotate(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), rot);
 
     pos += right * speedScale;
 
-    XMStoreFloat3(&m_currPosition, pos);
+    XMStoreFloat3(&m_position, pos);
 }
 
 void Camera::MoveUp(float speedScale)
 {
-    XMVECTOR pos = XMLoadFloat3(&m_currPosition);
+    XMVECTOR pos = XMLoadFloat3(&m_position);
     XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
     pos += up * speedScale;
 
-    XMStoreFloat3(&m_currPosition, pos);
+    XMStoreFloat3(&m_position, pos);
 }
 
 void Camera::Rotate(XMINT2 mouseMove)
@@ -158,7 +138,7 @@ void Camera::Orbit(XMVECTOR pivot, float distance, XMINT2 mouseMove)
 {
     Rotate(mouseMove);
     XMVECTOR newPos = pivot - GetForward() * distance;
-    XMStoreFloat3(&m_currPosition, newPos);
+    XMStoreFloat3(&m_position, newPos);
 }
 
 void Camera::Pan(XMINT2 mouseMove)
@@ -167,13 +147,13 @@ void Camera::Pan(XMINT2 mouseMove)
 
     MoveRight(mouseMove.x * panSensitivity);
 
-    XMVECTOR pos = XMLoadFloat3(&m_currPosition);
+    XMVECTOR pos = XMLoadFloat3(&m_position);
     XMVECTOR rot = XMLoadFloat4(&m_rotation);
     XMVECTOR localUp = XMVector3Rotate(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), rot);
 
     pos += XMVectorScale(localUp, -mouseMove.y * panSensitivity);
 
-    XMStoreFloat3(&m_currPosition, pos);
+    XMStoreFloat3(&m_position, pos);
 }
 
 float Camera::CalcVerticalFov(float horizontalFov)
