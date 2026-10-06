@@ -7,6 +7,7 @@
 
 #include <d3d12.h>
 
+#include "Camera.h"
 #include "ImGuiDescriptorAllocator.h"
 #include "ImGuiShaderResourceView.h"
 #include "SceneHandles.h"
@@ -35,11 +36,14 @@ public:
         SceneManager* pSceneManager);
 
     void BeginFrame();
+    void ProcessInput();
     void BuildImGuiFrame(UINT frameIndex);
     void PopulateCommandList(ID3D12GraphicsCommandList* pCommandList);
     void UpdateToneMappedBuffersSrvs(ID3D12Device* pDevice, const std::vector<ID3D12Resource*>& pToneMappedBuffers);
     void SetDpiScale(float value);
     const std::unordered_set<EntityHandle>& GetSelection() const;
+    const Camera& GetCamera() const;
+    void AddMouseDelta(int dx, int dy);
     void Destroy();
 
 private:
@@ -67,4 +71,14 @@ private:
 
     bool m_sceneHovered = false;
     bool m_sceneActive = false;
+
+    Camera m_camera = Camera({0.0f, 0.0f, -5.0f});
+    inline static constexpr float DEFAULT_FOCUS_DIST = 30.0f;
+    bool m_cameraControl = false;
+    bool m_orbiting = false;
+    DirectX::XMFLOAT3 m_orbitPivot;
+    float m_orbitDistance = DEFAULT_FOCUS_DIST;
+    bool m_panning = false;
+
+    DirectX::XMINT2 m_mouseDelta = {0, 0};
 };

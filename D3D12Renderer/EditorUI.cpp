@@ -111,6 +111,146 @@ void EditorUI::BeginFrame()
     ImGui::NewFrame();
 }
 
+void EditorUI::ProcessInput()
+{
+    XMINT2 mouseMove = m_mouseDelta;
+    m_mouseDelta = {0, 0};
+
+    // ESC
+    if (ImGui::Shortcut(ImGuiKey_Escape, ImGuiInputFlags_RouteGlobal))
+    {
+        if (!PostMessageW(Win32Application::GetHwnd(), WM_CLOSE, 0, 0))
+        {
+            DWORD err = GetLastError();
+            WCHAR buf[128];
+            swprintf_s(buf, L"PostMessageW(WM_CLOSE) failed. GetLastError=%lu\n", err);
+            OutputDebugStringW(buf);
+
+            // fallback
+            PostQuitMessage(static_cast<int>(err));
+        }
+    }
+
+    if (ImGui::Shortcut(ImGuiKey_F11, ImGuiInputFlags_RouteGlobal) || ImGui::Shortcut(ImGuiMod_Alt | ImGuiKey_Enter, ImGuiInputFlags_RouteGlobal))
+        m_pRenderer->ToggleFullScreen();
+
+    if (ImGui::Shortcut(ImGuiKey_V, ImGuiInputFlags_RouteGlobal))
+        m_pRenderer->SetVSync(!m_pRenderer->GetVSync());
+
+    // Focus
+    if (ImGui::Shortcut(ImGuiKey_F, ImGuiInputFlags_RouteGlobal) && !m_selected.empty())
+    {
+        XMVECTOR acc = XMVectorZero();
+
+        for (const auto& handle : m_selected)
+        {
+            XMFLOAT4X4 world = m_pSceneManager->Get(handle)->transform.GetWorldRenderTransform();
+            acc += XMVectorSet(world._41, world._42, world._43, 0.0f);
+        }
+
+        XMVECTOR center = XMVectorScale(acc, 1.0f / static_cast<float>(m_selected.size()));
+        m_camera.SetPosition(center - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
+
+        XMStoreFloat3(&m_orbitPivot, center);
+        m_orbitDistance = DEFAULT_FOCUS_DIST;
+    }
+
+    // Dolly
+    {
+        static float cameraDollySpeed = 5.0f;
+
+        float wheelStep = ImGui::GetIO().MouseWheel;
+        if (wheelStep != 0.0f)
+        {
+            m_camera.MoveForward(wheelStep * cameraDollySpeed);
+            XMVECTOR camPos = m_camera.GetPosition();
+            m_orbitDistance = XMVectorGetX(XMVector3Length(camPos - XMLoadFloat3(&m_orbitPivot)));
+        }
+    }
+
+    // Camera control
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+    {
+        m_cameraControl = true;
+        Win32Application::HideCursor();
+    }
+    if (m_cameraControl)
+    {
+        if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
+        {
+            m_camera.Rotate(mouseMove);
+        }
+        else
+        {
+            m_cameraControl = false;
+            Win32Application::RestoreCursor();
+        }
+    }
+
+    // Orbit
+    if (ImGui::GetIO().KeyAlt && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    {
+        XMStoreFloat3(&m_orbitPivot, m_camera.GetPosition() + m_camera.GetForward() * m_orbitDistance);
+        m_orbiting = true;
+        Win32Application::HideCursor();
+    }
+    if (m_orbiting)
+    {
+        if (ImGui::GetIO().KeyAlt && ImGui::IsMouseDown(ImGuiMouseButton_Left))
+        {
+            m_camera.Orbit(XMLoadFloat3(&m_orbitPivot), m_orbitDistance, mouseMove);
+        }
+        else
+        {
+            m_orbiting = false;
+            Win32Application::RestoreCursor();
+        }
+    }
+
+    // Pan
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Middle))
+    {
+        m_panning = true;
+        Win32Application::HideCursor();
+    }
+    if (m_panning)
+    {
+        if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
+        {
+            m_camera.Pan(mouseMove);
+        }
+        else
+        {
+            m_panning = false;
+            Win32Application::RestoreCursor();
+        }
+    }
+
+    // Move
+    static float cameraMoveSpeed = 50.0f;
+    // Cap the frame delta used for camera movement. Without the cap, a long frame (e.g. a hitch
+    // while flying) moves the camera a large distance in a single frame.
+    // 1.0 s is the upper bound used by Unreal's FEditorViewportClient (EditorMovementDeltaUpperBound).
+    static constexpr float maxCameraDtSec = 1.0f;
+    const float frameDtSec = std::min(m_pRenderer->GetDeltaTime().count() * 1e-9f, maxCameraDtSec);
+    float dist = cameraMoveSpeed * frameDtSec;
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
+    {
+        if (ImGui::IsKeyDown(ImGuiKey_W))
+            m_camera.MoveForward(dist);
+        if (ImGui::IsKeyDown(ImGuiKey_A))
+            m_camera.MoveRight(-dist);
+        if (ImGui::IsKeyDown(ImGuiKey_S))
+            m_camera.MoveForward(-dist);
+        if (ImGui::IsKeyDown(ImGuiKey_D))
+            m_camera.MoveRight(dist);
+        if (ImGui::IsKeyDown(ImGuiKey_Q))
+            m_camera.MoveUp(-dist);
+        if (ImGui::IsKeyDown(ImGuiKey_E))
+            m_camera.MoveUp(dist);
+    }
+}
+
 void EditorUI::BuildImGuiFrame(UINT frameIndex)
 {
     static UINT64 frameCounter = 0;
@@ -197,7 +337,10 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
             }
             // If debounce delay has passed
             else if (std::chrono::duration<double>(now - m_lastResizeRequestTime).count() >= DEBOUNCE_DELAY)
+            {
                 m_pRenderer->ResizeSceneResolution(width, height);
+                m_camera.SetAspectRatio(static_cast<float>(width) / static_cast<float>(height));
+            }
 
             ImGui::InvisibleButton("SceneViewport", measured, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
 
@@ -500,6 +643,17 @@ void EditorUI::SetDpiScale(float value)
 const std::unordered_set<EntityHandle>& EditorUI::GetSelection() const
 {
     return m_selected;
+}
+
+const Camera& EditorUI::GetCamera() const
+{
+    return m_camera;
+}
+
+void EditorUI::AddMouseDelta(int dx, int dy)
+{
+    m_mouseDelta.x += dx;
+    m_mouseDelta.y += dy;
 }
 
 void EditorUI::Destroy()

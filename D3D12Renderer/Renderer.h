@@ -72,6 +72,7 @@ public:
     void OnResize(UINT width, UINT height);
     void OnDpiChanged(UINT dpi);
 
+    void ToggleFullScreen();
     EntityHandle SpawnPrimitive(const AssetID& meshId, const std::string& name);
     void ResizeSceneResolution(UINT width, UINT height);
     bool GetVSync() const;
@@ -127,16 +128,9 @@ private:
     DepthStencilView m_readOnlyDsv;
     ShaderResourceView m_depthSrv;
 
-    // Camera control
-    Camera m_camera;
+    // Camera
     CameraConstantData m_cameraConstantData;
     UploadAllocation m_cameraUploadAllocation;
-    inline static constexpr float DEFAULT_FOCUS_DIST = 30.0f;
-    bool m_cameraControl = false;
-    bool m_orbiting = false;
-    DirectX::XMFLOAT3 m_orbitPivot;
-    float m_orbitDistance = DEFAULT_FOCUS_DIST;
-    bool m_panning = false;
 
     // Input
     InputManager m_inputManager;
@@ -173,17 +167,14 @@ private:
     void CreateRootSignature();
     void PrepareRenderGraph();
 
-    // ProcessInput
-    void ToggleFullScreen();
     void SetFullScreen(bool fullScreen);
-    void BeginOrbit();
 
     // Update
     void FixedUpdate(std::chrono::nanoseconds fixedDt);
-    void PrepareConstantData(float alpha);
-    std::vector<DirectX::BoundingSphere> CalcCascadeSpheres();
+    void PrepareConstantData(float alpha, const Camera& camera);
+    std::vector<DirectX::BoundingSphere> CalcCascadeSpheres(const Camera& camera);
     void UpdateConstantBuffers();
-    void UploadInstanceData();
+    void UploadInstanceData(const Camera& camera);
 
     // Render
     void PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList);

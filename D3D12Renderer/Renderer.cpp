@@ -140,7 +140,6 @@ static D3D12_SAMPLER_DESC GetSamplerDesc(
 Renderer::Renderer(std::wstring name)
     : m_title(name)
     , m_frameIndex(0)
-    , m_camera({0.0f, 0.0f, -5.0f})
 {
 }
 
@@ -216,145 +215,7 @@ void Renderer::BeginFrame()
 
 void Renderer::ProcessInput()
 {
-    if (m_inputManager.IsKeyPressed(VK_ESCAPE))
-    {
-        if (!PostMessageW(Win32Application::GetHwnd(), WM_CLOSE, 0, 0))
-        {
-            DWORD err = GetLastError();
-            WCHAR buf[128];
-            swprintf_s(buf, L"PostMessageW(WM_CLOSE) failed. GetLastError=%lu\n", err);
-            OutputDebugStringW(buf);
-
-            // fallback
-            PostQuitMessage(static_cast<int>(err));
-        }
-    }
-
-    if (m_inputManager.IsKeyPressed(VK_F11) ||
-        (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsKeyPressed(VK_RETURN)))
-    {
-        ToggleFullScreen();
-    }
-
-    if (m_inputManager.IsKeyPressed('V'))
-    {
-        m_vSync = !m_vSync;
-    }
-
-    // Focus
-    const auto& selection = m_editorUI.GetSelection();
-    if (m_inputManager.IsKeyPressed('F') && !selection.empty())
-    {
-        XMVECTOR acc = XMVectorZero();
-
-        for (const auto& handle : selection)
-        {
-            XMFLOAT4X4 world = m_sceneManager.Get(handle)->transform.GetWorldRenderTransform();
-            acc += XMVectorSet(world._41, world._42, world._43, 0.0f);
-        }
-
-        XMVECTOR center = XMVectorScale(acc, 1.0f / static_cast<float>(selection.size()));
-        m_camera.SetPosition(center - m_camera.GetForward() * DEFAULT_FOCUS_DIST);
-
-        XMStoreFloat3(&m_orbitPivot, center);
-        m_orbitDistance = DEFAULT_FOCUS_DIST;
-    }
-
-    // Dolly
-    {
-        static float cameraDollySpeed = 5.0f;
-
-        float wheelStep = m_inputManager.GetAndResetMouseWheelStep();
-        if (wheelStep != 0.0f)
-        {
-            m_camera.MoveForward(wheelStep * cameraDollySpeed);
-            XMVECTOR camPos = m_camera.GetPosition();
-            m_orbitDistance = XMVectorGetX(XMVector3Length(camPos - XMLoadFloat3(&m_orbitPivot)));
-        }
-    }
-
-    XMINT2 mouseMove = m_inputManager.GetAndResetMouseMove();
-
-    // Camera control
-    if (m_inputManager.IsMouseButtonPressed(1))
-    {
-        m_cameraControl = true;
-        Win32Application::HideCursor();
-    }
-    if (m_cameraControl)
-    {
-        if (m_inputManager.IsMouseButtonDown(1))
-        {
-            m_camera.Rotate(mouseMove);
-        }
-        else
-        {
-            m_cameraControl = false;
-            Win32Application::RestoreCursor();
-        }
-    }
-
-    // Orbit
-    if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonPressed(0))
-    {
-        BeginOrbit();
-        Win32Application::HideCursor();
-    }
-    if (m_orbiting)
-    {
-        if (m_inputManager.IsKeyDown(VK_MENU) && m_inputManager.IsMouseButtonDown(0))
-        {
-            m_camera.Orbit(XMLoadFloat3(&m_orbitPivot), m_orbitDistance, mouseMove);
-        }
-        else
-        {
-            m_orbiting = false;
-            Win32Application::RestoreCursor();
-        }
-    }
-
-    // Pan
-    if (m_inputManager.IsMouseButtonPressed(2))
-    {
-        m_panning = true;
-        Win32Application::HideCursor();
-    }
-    if (m_panning)
-    {
-        if (m_inputManager.IsMouseButtonDown(2))
-        {
-            m_camera.Pan(mouseMove);
-        }
-        else
-        {
-            m_panning = false;
-            Win32Application::RestoreCursor();
-        }
-    }
-
-    // Move
-    static float cameraMoveSpeed = 50.0f;
-    // Cap the frame delta used for camera movement. Without the cap, a long frame (e.g. a hitch
-    // while flying) moves the camera a large distance in a single frame.
-    // 1.0 s is the upper bound used by Unreal's FEditorViewportClient (EditorMovementDeltaUpperBound).
-    static constexpr float maxCameraDtSec = 1.0f;
-    const float frameDtSec = std::min(m_deltaTime.count() * 1e-9f, maxCameraDtSec);
-    float dist = cameraMoveSpeed * frameDtSec;
-    if (m_inputManager.IsMouseButtonDown(1))
-    {
-        if (m_inputManager.IsKeyDown('W'))
-            m_camera.MoveForward(dist);
-        if (m_inputManager.IsKeyDown('A'))
-            m_camera.MoveRight(-dist);
-        if (m_inputManager.IsKeyDown('S'))
-            m_camera.MoveForward(-dist);
-        if (m_inputManager.IsKeyDown('D'))
-            m_camera.MoveRight(dist);
-        if (m_inputManager.IsKeyDown('Q'))
-            m_camera.MoveUp(-dist);
-        if (m_inputManager.IsKeyDown('E'))
-            m_camera.MoveUp(dist);
-    }
+    m_editorUI.ProcessInput();
 }
 
 void Renderer::PrepareUI()
@@ -384,13 +245,14 @@ void Renderer::Update()
     }
 
     float alpha = std::clamp(static_cast<float>(accumulated.count()) / fixedDt.count(), 0.0f, 1.0f);
+    const auto& camera = m_editorUI.GetCamera();
 
-    PrepareConstantData(alpha);
+    PrepareConstantData(alpha, camera);
     UpdateConstantBuffers();
 
     m_inputManager.ResetPressedFlags();
 
-    UploadInstanceData();
+    UploadInstanceData(camera);
 }
 
 // Render the scene.
@@ -516,6 +378,7 @@ void Renderer::OnMouseButtonUp(UINT button)
 
 void Renderer::OnMouseMove(int dx, int dy, int cx, int cy)
 {
+    m_editorUI.AddMouseDelta(dx, dy);
     m_inputManager.CalcMouseMove(dx, dy, cx, cy);
 }
 
@@ -589,8 +452,6 @@ void Renderer::ResizeSceneResolution(UINT width, UINT height)
 
     m_viewport = {0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f};
     m_scissorRect = {0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
-
-    m_camera.SetAspectRatio(static_cast<float>(width) / static_cast<float>(height));
 
     std::vector<ID3D12Resource*> pToneMappedBuffers(FrameCount);
     for (UINT i = 0; i < FrameCount; i++)
@@ -935,7 +796,6 @@ void Renderer::LoadAssets()
 
     m_viewport = {0.0f, 0.0f, static_cast<float>(m_sceneWidth), static_cast<float>(m_sceneHeight), 0.0f, 1.0f};
     m_scissorRect = {0, 0, static_cast<LONG>(m_sceneWidth), static_cast<LONG>(m_sceneHeight)};
-    m_camera.SetAspectRatio(static_cast<float>(m_sceneWidth) / static_cast<float>(m_sceneHeight));
 
     // Get command allocator and list for loading assets
     auto [pCommandAllocator, pCommandList] = m_commandQueue.GetAvailableCommandList();
@@ -1408,13 +1268,6 @@ void Renderer::SetFullScreen(bool fullScreen)
     }
 }
 
-void Renderer::BeginOrbit()
-{
-    XMVECTOR camPos = m_camera.GetPosition();
-    XMStoreFloat3(&m_orbitPivot, camPos + m_camera.GetForward() * m_orbitDistance);
-    m_orbiting = true;
-}
-
 void Renderer::FixedUpdate(std::chrono::nanoseconds fixedDt)
 {
     const float fixedDtSec = fixedDt.count() * 1e-9f;
@@ -1434,45 +1287,45 @@ void Renderer::FixedUpdate(std::chrono::nanoseconds fixedDt)
     }
 }
 
-void Renderer::PrepareConstantData(float alpha)
+void Renderer::PrepareConstantData(float alpha, const Camera& camera)
 {
     // Transforms
     m_sceneManager.UpdateWorldTransforms(alpha);
 
     // Main Camera
-    m_cameraConstantData.SetPos(m_camera.GetPosition());
-    m_cameraConstantData.SetView(m_camera.GetViewMatrix());
-    m_cameraConstantData.SetProjection(m_camera.GetProjectionMatrix());
+    m_cameraConstantData.SetPos(camera.GetPosition());
+    m_cameraConstantData.SetView(camera.GetViewMatrix());
+    m_cameraConstantData.SetProjection(camera.GetProjectionMatrix());
 
     // Pre-calculate common data for CSM.
-    std::vector<BoundingSphere> cascadeSpheres = CalcCascadeSpheres();
+    std::vector<BoundingSphere> cascadeSpheres = CalcCascadeSpheres(camera);
 
     UINT idx = 0;
     for (auto& light : m_sceneManager.GetDirectionalLights())
     {
-        light.SetShadowContext(m_camera.GetPosition(), m_camera.GetFarPlane(), cascadeSpheres);
+        light.SetShadowContext(camera.GetPosition(), camera.GetFarPlane(), cascadeSpheres);
         light.SetIdxInArray(idx);
         ++idx;
     }
     idx = 0;
     for (auto& light : m_sceneManager.GetPointLights())
     {
-        light.SetShadowContext(m_camera.GetNearPlane());
+        light.SetShadowContext(camera.GetNearPlane());
         light.SetIdxInArray(idx);
         ++idx;
     }
     idx = 0;
     for (auto& light : m_sceneManager.GetSpotLights())
     {
-        light.SetShadowContext(m_camera.GetNearPlane());
+        light.SetShadowContext(camera.GetNearPlane());
         light.SetIdxInArray(idx);
         ++idx;
     }
 }
 
-std::vector<BoundingSphere> Renderer::CalcCascadeSpheres()
+std::vector<BoundingSphere> Renderer::CalcCascadeSpheres(const Camera& camera)
 {
-    BoundingFrustum boundingFrustum = m_camera.GetWorldFrustum();
+    BoundingFrustum boundingFrustum = camera.GetWorldFrustum();
 
     // Get 8 corners of view frustum.
     //     Near    Far
@@ -1488,8 +1341,8 @@ std::vector<BoundingSphere> Renderer::CalcCascadeSpheres()
 
     // Practical Split Scheme
     // https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus
-    const float nearPlane = m_camera.GetNearPlane();
-    const float farPlane = m_camera.GetFarPlane();
+    const float nearPlane = camera.GetNearPlane();
+    const float farPlane = camera.GetFarPlane();
     const float lambda = 0.9f;
 
     float splitRatio[MAX_CASCADES];
@@ -1564,7 +1417,7 @@ void Renderer::UpdateConstantBuffers()
         processLight(light, SPOT_LIGHT_ARRAY_SIZE);
 }
 
-void Renderer::UploadInstanceData()
+void Renderer::UploadInstanceData(const Camera& camera)
 {
     FrameResource& frameResource = m_frameResources[m_frameIndex];
 
@@ -1602,7 +1455,7 @@ void Renderer::UploadInstanceData()
     };
 
     // Main camera
-    auto frustum = m_camera.GetWorldFrustum();
+    auto frustum = camera.GetWorldFrustum();
     XMVECTOR cameraPlanes[6] = {};
     frustum.GetPlanes(&cameraPlanes[0], &cameraPlanes[1], &cameraPlanes[2], &cameraPlanes[3], &cameraPlanes[4], &cameraPlanes[5]);
 
