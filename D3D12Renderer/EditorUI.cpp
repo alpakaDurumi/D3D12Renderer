@@ -216,11 +216,6 @@ void EditorUI::ProcessInput()
     }
 
     // Pan
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Middle))
-    {
-        m_panning = true;
-        Win32Application::HideCursor();
-    }
     if (m_panning)
     {
         if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
@@ -338,16 +333,25 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().KeyAlt)
                 ClearSelection();
 
+            // Camera control
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
             {
                 m_cameraControl = true;
                 Win32Application::HideCursor();
             }
 
+            // Orbit
             if (ImGui::GetIO().KeyAlt && ImGui::IsItemClicked(ImGuiMouseButton_Left))
             {
                 XMStoreFloat3(&m_orbitPivot, m_camera.GetPosition() + m_camera.GetForward() * m_orbitDistance);
                 m_orbiting = true;
+                Win32Application::HideCursor();
+            }
+
+            // Pan
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Middle))
+            {
+                m_panning = true;
                 Win32Application::HideCursor();
             }
         }
