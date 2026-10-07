@@ -155,19 +155,6 @@ void EditorUI::ProcessInput()
         m_orbitDistance = DEFAULT_FOCUS_DIST;
     }
 
-    // Dolly
-    {
-        static float cameraDollySpeed = 5.0f;
-
-        float wheelStep = ImGui::GetIO().MouseWheel;
-        if (wheelStep != 0.0f)
-        {
-            m_camera.MoveForward(wheelStep * cameraDollySpeed);
-            XMVECTOR camPos = m_camera.GetPosition();
-            m_orbitDistance = XMVectorGetX(XMVector3Length(camPos - XMLoadFloat3(&m_orbitPivot)));
-        }
-    }
-
     // Camera control
     static float cameraMoveSpeed = 50.0f;
     // Cap the frame delta used for camera movement. Without the cap, a long frame (e.g. a hitch
@@ -353,6 +340,20 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
             {
                 m_panning = true;
                 Win32Application::HideCursor();
+            }
+
+            // Dolly
+            if (ImGui::IsItemHovered())
+            {
+                static float cameraDollySpeed = 5.0f;
+
+                float wheelStep = ImGui::GetIO().MouseWheel;
+                if (wheelStep != 0.0f)
+                {
+                    m_camera.MoveForward(wheelStep * cameraDollySpeed);
+                    XMVECTOR camPos = m_camera.GetPosition();
+                    m_orbitDistance = XMVectorGetX(XMVector3Length(camPos - XMLoadFloat3(&m_orbitPivot)));
+                }
             }
         }
 
