@@ -202,12 +202,6 @@ void EditorUI::ProcessInput()
     }
 
     // Orbit
-    if (ImGui::GetIO().KeyAlt && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-    {
-        XMStoreFloat3(&m_orbitPivot, m_camera.GetPosition() + m_camera.GetForward() * m_orbitDistance);
-        m_orbiting = true;
-        Win32Application::HideCursor();
-    }
     if (m_orbiting)
     {
         if (ImGui::GetIO().KeyAlt && ImGui::IsMouseDown(ImGuiMouseButton_Left))
@@ -347,6 +341,13 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
             {
                 m_cameraControl = true;
+                Win32Application::HideCursor();
+            }
+
+            if (ImGui::GetIO().KeyAlt && ImGui::IsItemClicked(ImGuiMouseButton_Left))
+            {
+                XMStoreFloat3(&m_orbitPivot, m_camera.GetPosition() + m_camera.GetForward() * m_orbitDistance);
+                m_orbiting = true;
                 Win32Application::HideCursor();
             }
         }
