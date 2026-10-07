@@ -169,16 +169,30 @@ void EditorUI::ProcessInput()
     }
 
     // Camera control
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-    {
-        m_cameraControl = true;
-        Win32Application::HideCursor();
-    }
+    static float cameraMoveSpeed = 50.0f;
+    // Cap the frame delta used for camera movement. Without the cap, a long frame (e.g. a hitch
+    // while flying) moves the camera a large distance in a single frame.
+    // 1.0 s is the upper bound used by Unreal's FEditorViewportClient (EditorMovementDeltaUpperBound).
+    static constexpr float maxCameraDtSec = 1.0f;
+    const float frameDtSec = std::min(m_pRenderer->GetDeltaTime().count() * 1e-9f, maxCameraDtSec);
+    float dist = cameraMoveSpeed * frameDtSec;
     if (m_cameraControl)
     {
         if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
         {
             m_camera.Rotate(mouseMove);
+            if (ImGui::IsKeyDown(ImGuiKey_W))
+                m_camera.MoveForward(dist);
+            if (ImGui::IsKeyDown(ImGuiKey_A))
+                m_camera.MoveRight(-dist);
+            if (ImGui::IsKeyDown(ImGuiKey_S))
+                m_camera.MoveForward(-dist);
+            if (ImGui::IsKeyDown(ImGuiKey_D))
+                m_camera.MoveRight(dist);
+            if (ImGui::IsKeyDown(ImGuiKey_Q))
+                m_camera.MoveUp(-dist);
+            if (ImGui::IsKeyDown(ImGuiKey_E))
+                m_camera.MoveUp(dist);
         }
         else
         {
@@ -224,30 +238,6 @@ void EditorUI::ProcessInput()
             m_panning = false;
             Win32Application::RestoreCursor();
         }
-    }
-
-    // Move
-    static float cameraMoveSpeed = 50.0f;
-    // Cap the frame delta used for camera movement. Without the cap, a long frame (e.g. a hitch
-    // while flying) moves the camera a large distance in a single frame.
-    // 1.0 s is the upper bound used by Unreal's FEditorViewportClient (EditorMovementDeltaUpperBound).
-    static constexpr float maxCameraDtSec = 1.0f;
-    const float frameDtSec = std::min(m_pRenderer->GetDeltaTime().count() * 1e-9f, maxCameraDtSec);
-    float dist = cameraMoveSpeed * frameDtSec;
-    if (ImGui::IsMouseDown(ImGuiMouseButton_Right))
-    {
-        if (ImGui::IsKeyDown(ImGuiKey_W))
-            m_camera.MoveForward(dist);
-        if (ImGui::IsKeyDown(ImGuiKey_A))
-            m_camera.MoveRight(-dist);
-        if (ImGui::IsKeyDown(ImGuiKey_S))
-            m_camera.MoveForward(-dist);
-        if (ImGui::IsKeyDown(ImGuiKey_D))
-            m_camera.MoveRight(dist);
-        if (ImGui::IsKeyDown(ImGuiKey_Q))
-            m_camera.MoveUp(-dist);
-        if (ImGui::IsKeyDown(ImGuiKey_E))
-            m_camera.MoveUp(dist);
     }
 }
 
@@ -353,6 +343,12 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
 
             if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().KeyAlt)
                 ClearSelection();
+
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            {
+                m_cameraControl = true;
+                Win32Application::HideCursor();
+            }
         }
 
         ImGui::End();
