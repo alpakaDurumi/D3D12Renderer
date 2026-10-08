@@ -7,6 +7,11 @@ namespace DirectX
 struct BoundingFrustum;
 }
 
+struct Ray
+{
+    DirectX::XMVECTOR origin, dir;
+};
+
 class Camera
 {
 public:
@@ -30,6 +35,7 @@ public:
     void Rotate(DirectX::XMINT2 mouseMove);
     void Orbit(DirectX::XMVECTOR pivot, float distance, DirectX::XMINT2 mouseMove);
     void Pan(DirectX::XMINT2 mouseMove);
+    Ray GetRay(DirectX::XMFLOAT2 coord, DirectX::XMFLOAT2 resolution) const;
 
 private:
     float CalcVerticalFov(float horizontalFov);

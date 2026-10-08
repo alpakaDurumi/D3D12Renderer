@@ -1,6 +1,9 @@
 #pragma once
 
+#include <vector>
+
 #include <DirectXCollision.h>
+#include <DirectXMath.h>
 #include <d3d12.h>
 #include <minwindef.h>
 
@@ -28,6 +31,9 @@ public:
 
     const DirectX::BoundingSphere& GetBoundingSphere() const;
 
+    const std::vector<DirectX::XMFLOAT3>& GetPositions() const;
+    const std::vector<UINT32>& GetIndices() const;
+
 private:
     Buffer m_vertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vbv;
@@ -39,4 +45,7 @@ private:
     MaterialHandle m_material;
 
     DirectX::BoundingSphere m_boundingSphere;
+
+    std::vector<DirectX::XMFLOAT3> m_positions;
+    std::vector<UINT32> m_indices;
 };

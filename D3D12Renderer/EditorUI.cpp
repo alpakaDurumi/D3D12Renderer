@@ -2,8 +2,10 @@
 
 #include "EditorUI.h"
 
+#include <cfloat>
 #include <filesystem>
 
+#include <DirectXCollision.h>
 #include <DirectXMath.h>
 #include <shlobj.h>
 
@@ -317,9 +319,6 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
             m_sceneHovered = ImGui::IsItemHovered();
             m_sceneActive = ImGui::IsItemActive();
 
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().KeyAlt)
-                ClearSelection();
-
             // Camera control
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
             {
@@ -327,12 +326,30 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
                 Win32Application::HideCursor();
             }
 
-            // Orbit
-            if (ImGui::GetIO().KeyAlt && ImGui::IsItemClicked(ImGuiMouseButton_Left))
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
             {
-                XMStoreFloat3(&m_orbitPivot, m_camera.GetPosition() + m_camera.GetForward() * m_orbitDistance);
-                m_orbiting = true;
-                Win32Application::HideCursor();
+                // Orbit
+                if (ImGui::GetIO().KeyAlt)
+                {
+                    XMStoreFloat3(&m_orbitPivot, m_camera.GetPosition() + m_camera.GetForward() * m_orbitDistance);
+                    m_orbiting = true;
+                    Win32Application::HideCursor();
+                }
+                // Picking
+                else
+                {
+                    auto mousePos = ImGui::GetMousePos();
+
+                    auto coord = XMFLOAT2(mousePos.x - rectMin.x, mousePos.y - rectMin.y);
+                    auto resolution = XMFLOAT2(rectMax.x - rectMin.x, rectMax.y - rectMin.y);
+                    auto ray = m_camera.GetRay(coord, resolution);
+
+                    EntityHandle picked = PickEntity(ray);
+                    if (picked.Empty())
+                        ClearSelection();
+                    else
+                        SelectSingle(picked);
+                }
             }
 
             // Pan
@@ -761,4 +778,56 @@ void EditorUI::ToggleSelect(EntityHandle handle)
         m_selected.erase(handle);
 
     m_selectionChanged = true;
+}
+
+EntityHandle EditorUI::PickEntity(const Ray& ray)
+{
+    EntityHandle bestEntity;
+    float bestDist = FLT_MAX;
+
+    for (const auto& entity : m_pSceneManager->GetEntities())
+    {
+        if (!entity.meshRenderer.has_value()) continue;
+
+        // Get Mesh and world matrix
+        auto* pMesh = m_pSceneManager->GetMesh(entity.meshRenderer->mesh);
+        auto world = entity.transform.GetWorldRenderTransform();
+
+        // Check bounding sphere with ray first
+        BoundingSphere boundingSphere;
+        pMesh->GetBoundingSphere().Transform(boundingSphere, XMLoadFloat4x4(&world));
+        float sphereDist;
+        if (!boundingSphere.Intersects(ray.origin, ray.dir, sphereDist)) continue;
+
+        // Transform ray to object space
+        XMMATRIX invWorld = XMMatrixInverse(nullptr, XMLoadFloat4x4(&world));
+        XMVECTOR o = XMVector3TransformCoord(ray.origin, invWorld);
+        XMVECTOR d = XMVector3TransformNormal(ray.dir, invWorld);
+        // Object-space length of one world unit along the ray (reflects non-uniform scale too)
+        float len = XMVectorGetX(XMVector3Length(d));
+        d = XMVectorScale(d, 1.0f / len); // because of assert(XMVector3IsUnit) in Intersects
+
+        // Triangle loop
+        const auto& positions = pMesh->GetPositions();
+        const auto& indices = pMesh->GetIndices();
+        for (size_t i = 0; i < indices.size(); i += 3)
+        {
+            XMVECTOR v0 = XMLoadFloat3(&positions[indices[i + 0]]);
+            XMVECTOR v1 = XMLoadFloat3(&positions[indices[i + 1]]);
+            XMVECTOR v2 = XMLoadFloat3(&positions[indices[i + 2]]);
+            float dist;
+            // Möller–Trumbore Intersection Algorithm
+            if (TriangleTests::Intersects(o, d, v0, v1, v2, dist))
+            {
+                // dist is in object-space units; dist / len is the world distance, comparable across entities
+                if (dist / len < bestDist)
+                {
+                    bestEntity = entity.selfHandle;
+                    bestDist = dist / len;
+                }
+            }
+        }
+    }
+
+    return bestEntity;
 }

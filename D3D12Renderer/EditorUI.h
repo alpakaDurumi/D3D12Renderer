@@ -52,6 +52,7 @@ private:
     void ClearSelection();
     void SelectSingle(EntityHandle handle);
     void ToggleSelect(EntityHandle handle);
+    EntityHandle PickEntity(const Ray& ray);
 
     std::unordered_set<EntityHandle> m_selected;
     bool m_selectionChanged = false;

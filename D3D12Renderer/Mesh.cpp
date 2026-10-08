@@ -15,6 +15,7 @@ Mesh::Mesh(
     ID3D12GraphicsCommandList7* pCommandList,
     TransientUploadAllocator& allocator,
     const GeometryData& geometryData)
+    : m_positions(geometryData.vertices.size())
 {
     // Vertex Buffer
     const UINT64 vertexBufferSize = static_cast<UINT64>(geometryData.vertices.size()) * sizeof(Vertex);
@@ -72,6 +73,15 @@ Mesh::Mesh(
     m_ibv.Format = DXGI_FORMAT_R32_UINT;
 
     BoundingSphere::CreateFromPoints(m_boundingSphere, geometryData.vertices.size(), reinterpret_cast<const XMFLOAT3*>(geometryData.vertices.data()), sizeof(Vertex));
+
+    // Store positions and indices for mouse picking in EditorUI
+    UINT i = 0;
+    for (const auto& v : geometryData.vertices)
+    {
+        m_positions[i] = v.position;
+        ++i;
+    }
+    m_indices = geometryData.indices;
 }
 
 const D3D12_VERTEX_BUFFER_VIEW& Mesh::GetVbv() const
@@ -102,4 +112,14 @@ void Mesh::SetMaterial(MaterialHandle handle)
 const BoundingSphere& Mesh::GetBoundingSphere() const
 {
     return m_boundingSphere;
+}
+
+const std::vector<DirectX::XMFLOAT3>& Mesh::GetPositions() const
+{
+    return m_positions;
+}
+
+const std::vector<UINT32>& Mesh::GetIndices() const
+{
+    return m_indices;
 }

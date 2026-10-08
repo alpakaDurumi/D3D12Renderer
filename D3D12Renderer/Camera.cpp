@@ -156,6 +156,20 @@ void Camera::Pan(XMINT2 mouseMove)
     XMStoreFloat3(&m_position, pos);
 }
 
+Ray Camera::GetRay(XMFLOAT2 coord, XMFLOAT2 resolution) const
+{
+    // Screen space -> NDC -> world space
+    float ndcX = 2.0f * coord.x / resolution.x - 1.0f;
+    float ndcY = 1.0f - 2.0f * coord.y / resolution.y;
+
+    XMFLOAT4X4 proj;
+    XMStoreFloat4x4(&proj, GetProjectionMatrix());
+    XMVECTOR dirView = XMVectorSet(ndcX / proj._11, ndcY / proj._22, 1.0f, 0.0f);
+    XMVECTOR dirWorld = XMVector3Normalize(XMVector3Rotate(dirView, XMLoadFloat4(&m_rotation)));
+
+    return {XMLoadFloat3(&m_position), dirWorld};
+}
+
 float Camera::CalcVerticalFov(float horizontalFov)
 {
     assert(m_aspectRatio > 0.0f);
