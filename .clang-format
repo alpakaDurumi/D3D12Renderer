@@ -1,4 +1,3 @@
-# Using clang-format 22.1.5
 BasedOnStyle: Microsoft
 
 Language: Cpp
@@ -39,3 +38,4 @@ InsertNewlineAtEOF: true
 
 LambdaBodyIndentation: Signature
 AllowShortLambdasOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse
