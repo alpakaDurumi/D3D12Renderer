@@ -345,7 +345,13 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
                     auto ray = m_camera.GetRay(coord, resolution);
 
                     EntityHandle picked = PickEntity(ray);
-                    if (picked.Empty())
+
+                    if (ImGui::GetIO().KeyCtrl)
+                    {
+                        if (!picked.Empty())
+                            ToggleSelect(picked);
+                    }
+                    else if (picked.Empty())
                         ClearSelection();
                     else
                         SelectSingle(picked);
