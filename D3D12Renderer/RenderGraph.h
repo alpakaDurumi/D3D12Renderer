@@ -189,8 +189,7 @@ public:
             currentTextureUsages[i].assign(group.subresourceCount, {D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, group.initialLayout});
         }
 
-        auto processBufferBarriers = [&](RenderGraphNode& node, BarrierTiming timing)
-        {
+        auto processBufferBarriers = [&](RenderGraphNode& node, BarrierTiming timing) {
             const auto& src = timing == BarrierTiming::PRE_PASS ? node.bufferInputs : node.bufferOutputs;
             auto& dest = timing == BarrierTiming::PRE_PASS ? node.bufferPreBarriers : node.bufferPostBarriers;
 
@@ -202,8 +201,7 @@ public:
             }
         };
 
-        auto processTextureBarriers = [&](RenderGraphNode& node, BarrierTiming timing)
-        {
+        auto processTextureBarriers = [&](RenderGraphNode& node, BarrierTiming timing) {
             const auto& src = timing == BarrierTiming::PRE_PASS ? node.textureInputs : node.textureOutputs;
             auto& dest = timing == BarrierTiming::PRE_PASS ? node.texturePreBarriers : node.texturePostBarriers;
 

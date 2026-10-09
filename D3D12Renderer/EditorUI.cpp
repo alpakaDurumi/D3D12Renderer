@@ -63,10 +63,12 @@ void EditorUI::Init(
     init_info.UserData = &m_imguiDescriptorAllocator;
     init_info.SrvDescriptorHeap = m_imguiDescriptorAllocator.GetDescriptorHeap();
     // set callback functions for ImGui SRV descriptor
-    init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
-        { return static_cast<ImGuiDescriptorAllocator*>(info->UserData)->Allocate(out_cpu_handle, out_gpu_handle); };
-    init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
-        { return static_cast<ImGuiDescriptorAllocator*>(info->UserData)->Free(cpu_handle, gpu_handle); };
+    init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle) {
+        return static_cast<ImGuiDescriptorAllocator*>(info->UserData)->Allocate(out_cpu_handle, out_gpu_handle);
+    };
+    init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) {
+        return static_cast<ImGuiDescriptorAllocator*>(info->UserData)->Free(cpu_handle, gpu_handle);
+    };
     ImGui_ImplDX12_Init(&init_info);
 
     ImGui::GetStyle().FontScaleMain = dpiScale;
@@ -499,8 +501,7 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
 
             // get: Transform& -> XMFLOAT3
             // set: (Transform&, const XMFLOAT3&) -> void
-            auto drawTransform = [&](const char* label, auto&& get, auto&& set)
-            {
+            auto drawTransform = [&](const char* label, auto&& get, auto&& set) {
                 auto it = m_selected.begin();
                 XMFLOAT3 common = get(m_pSceneManager->Get(*it)->transform);
 
@@ -565,17 +566,9 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
                 ImGui::EndGroup();
             };
 
-            drawTransform("Scale", [](Transform& tr)
-                          { return tr.GetScale(); }, [](Transform& tr, const XMFLOAT3& v)
-                          { tr.SetScale(v); });
-
-            drawTransform("Rotation", [&](Transform& tr)
-                          { return tr.GetEulerCache(m_selectionChanged); }, [](Transform& tr, const XMFLOAT3& v)
-                          { tr.SetRotation(v); });
-
-            drawTransform("Translation", [](Transform& tr)
-                          { return tr.GetTranslation(); }, [](Transform& tr, const XMFLOAT3& v)
-                          { tr.SetTranslation(v); });
+            drawTransform("Scale", [](Transform& tr) { return tr.GetScale(); }, [](Transform& tr, const XMFLOAT3& v) { tr.SetScale(v); });
+            drawTransform("Rotation", [&](Transform& tr) { return tr.GetEulerCache(m_selectionChanged); }, [](Transform& tr, const XMFLOAT3& v) { tr.SetRotation(v); });
+            drawTransform("Translation", [](Transform& tr) { return tr.GetTranslation(); }, [](Transform& tr, const XMFLOAT3& v) { tr.SetTranslation(v); });
 
             // Light component
             bool allHaveLight = true;
@@ -590,8 +583,7 @@ void EditorUI::BuildImGuiFrame(UINT frameIndex)
 
             if (allHaveLight)
             {
-                auto getResolution = [&](EntityHandle handle)
-                {
+                auto getResolution = [&](EntityHandle handle) {
                     return m_pSceneManager->GetShadowMapResolution(m_pSceneManager->Get(handle)->light.value());
                 };
 

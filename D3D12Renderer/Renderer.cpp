@@ -1013,8 +1013,7 @@ void Renderer::LoadAssets()
         false,
         D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
         GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_defaultShadowMapResolution, m_defaultShadowMapResolution, MAX_CASCADES, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
-        [this]()
-        {
+        [this]() {
             auto& lights = m_sceneManager.GetDirectionalLights();
             const UINT count = static_cast<UINT>(lights.size());
             std::vector<ID3D12Resource*> pResources(count);
@@ -1028,8 +1027,7 @@ void Renderer::LoadAssets()
         false,
         D3D12_BARRIER_LAYOUT_RENDER_TARGET,
         GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_defaultShadowMapResolution, m_defaultShadowMapResolution, POINT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET)),
-        [this]()
-        {
+        [this]() {
             auto& lights = m_sceneManager.GetPointLights();
             const UINT count = static_cast<UINT>(lights.size());
             std::vector<ID3D12Resource*> pResources(count);
@@ -1043,8 +1041,7 @@ void Renderer::LoadAssets()
         false,
         D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
         GetSubresourceCount(m_device.Get(), GetTexture2DDesc(m_defaultShadowMapResolution, m_defaultShadowMapResolution, SPOT_LIGHT_ARRAY_SIZE, 1, DXGI_FORMAT_R32_TYPELESS, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)),
-        [this]()
-        {
+        [this]() {
             auto& lights = m_sceneManager.GetSpotLights();
             const UINT count = static_cast<UINT>(lights.size());
             std::vector<ID3D12Resource*> pResources(count);
@@ -1398,8 +1395,7 @@ void Renderer::UpdateConstantBuffers()
         mat.InitCbv(m_device.Get(), alloc.gpuPtr);
     }
 
-    auto processLight = [&](Light& light, UINT arraySize)
-    {
+    auto processLight = [&](Light& light, UINT arraySize) {
         for (UINT i = 0; i < arraySize; ++i)
         {
             auto alloc = frameResource.PushConstantData(light.GetCameraConstantDataPtr(i), sizeof(CameraConstantData));
@@ -1432,8 +1428,7 @@ void Renderer::UploadInstanceData(const Camera& camera)
 
     const auto& worldBoundingSpheres = m_sceneManager.GetWorldBoundingSpheres();
 
-    auto cullRange = [&worldBoundingSpheres, &frameResource](UINT begin, UINT end, const auto& tester)
-    {
+    auto cullRange = [&worldBoundingSpheres, &frameResource](UINT begin, UINT end, const auto& tester) {
         std::vector<UINT32> indices;
 
         for (UINT i = begin; i < end; ++i)
@@ -1449,8 +1444,7 @@ void Renderer::UploadInstanceData(const Camera& camera)
         return range;
     };
 
-    auto frustumSphereTester = [](const XMVECTOR* pPlanes, const BoundingSphere& sphere)
-    {
+    auto frustumSphereTester = [](const XMVECTOR* pPlanes, const BoundingSphere& sphere) {
         return sphere.ContainedBy(pPlanes[0], pPlanes[1], pPlanes[2], pPlanes[3], pPlanes[4], pPlanes[5]) != DirectX::DISJOINT;
     };
 
@@ -1463,8 +1457,7 @@ void Renderer::UploadInstanceData(const Camera& camera)
 
     m_visibleCount = 0;
 
-    auto cameraTester = [&](const BoundingSphere& sphere)
-    {
+    auto cameraTester = [&](const BoundingSphere& sphere) {
         return frustumSphereTester(cameraPlanes, sphere);
     };
 
@@ -1491,8 +1484,7 @@ void Renderer::UploadInstanceData(const Camera& camera)
             {
                 const UINT base = instanceRange.baseIndex;
 
-                VisibleRange visibleRange = cullRange(base, base + instanceRange.forwardCount + instanceRange.deferredCount, [&](const BoundingSphere& sphere)
-                                                      { return lightBoundingVolumes[arrayIndex].Intersects(sphere); });
+                VisibleRange visibleRange = cullRange(base, base + instanceRange.forwardCount + instanceRange.deferredCount, [&](const BoundingSphere& sphere) { return lightBoundingVolumes[arrayIndex].Intersects(sphere); });
                 light.SetVisibleRange(meshHandle, visibleRange, arrayIndex);
             }
         }
@@ -1508,8 +1500,7 @@ void Renderer::UploadInstanceData(const Camera& camera)
         {
             const UINT base = instanceRange.baseIndex;
 
-            VisibleRange visibleRange = cullRange(base, base + instanceRange.forwardCount + instanceRange.deferredCount, [&](const BoundingSphere& sphere)
-                                                  { return lightBoundingVolume.Intersects(sphere); });
+            VisibleRange visibleRange = cullRange(base, base + instanceRange.forwardCount + instanceRange.deferredCount, [&](const BoundingSphere& sphere) { return lightBoundingVolume.Intersects(sphere); });
             light.SetVisibleRange(meshHandle, visibleRange);
         }
     }
@@ -1523,8 +1514,7 @@ void Renderer::UploadInstanceData(const Camera& camera)
         XMVECTOR spotPlanes[6] = {};
         lightBoundingVolume.GetPlanes(&spotPlanes[0], &spotPlanes[1], &spotPlanes[2], &spotPlanes[3], &spotPlanes[4], &spotPlanes[5]);
 
-        auto spotLightTester = [&](const BoundingSphere& sphere)
-        {
+        auto spotLightTester = [&](const BoundingSphere& sphere) {
             return frustumSphereTester(spotPlanes, sphere);
         };
 
@@ -1644,16 +1634,14 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
     BindDescriptorTables(pCommandList);
 
-    auto executePass = [&](PassType passType, const wchar_t* passName, auto&& draw)
-    {
+    auto executePass = [&](PassType passType, const wchar_t* passName, auto&& draw) {
         PIX_SCOPED_EVENT(pCommandList, PIX_COLOR_DEFAULT, passName);
         ApplyPassBarriers(passType, BarrierTiming::PRE_PASS, pCommandList);
         draw();
         ApplyPassBarriers(passType, BarrierTiming::POST_PASS, pCommandList);
     };
 
-    executePass(PassType::SHADOW_MAP, L"Shadow map pass", [&]
-                {
+    executePass(PassType::SHADOW_MAP, L"Shadow map pass", [&] {
         // Pre-query PSOs
         m_currentPSOKey.passType = PassType::SHADOW_MAP;
         m_currentPSOKey.vsName = L"MeshVS.hlsl";
@@ -1717,8 +1705,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         for (auto& light : m_sceneManager.GetSpotLights())
             processLight(&light); });
 
-    executePass(PassType::GBUFFER, L"GBuffer pass", [&]
-                {
+    executePass(PassType::GBUFFER, L"GBuffer pass", [&] {
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -1753,8 +1740,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), visibleRange);
         } });
 
-    executePass(PassType::DEFERRED_LIGHTING, L"Deferred Lighting pass", [&]
-                {
+    executePass(PassType::DEFERRED_LIGHTING, L"Deferred Lighting pass", [&] {
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -1782,8 +1768,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
         pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         pCommandList->DrawInstanced(3, 1, 0, 0); });
 
-    executePass(PassType::FORWARD_COLORING, L"Forward coloring pass", [&]
-                {
+    executePass(PassType::FORWARD_COLORING, L"Forward coloring pass", [&] {
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -1810,8 +1795,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
 
     bool needToDrawOutline = !m_selectedVisibleIndexRange.empty();
 
-    executePass(PassType::SELECTION_MASK, L"Selection mask pass", [&]
-                {
+    executePass(PassType::SELECTION_MASK, L"Selection mask pass", [&] {
         if (needToDrawOutline)
         {
             pCommandList->RSSetViewports(1, &m_viewport);
@@ -1837,8 +1821,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
                 DrawMesh(pCommandList, meshHandle, frameResource.GetInstanceIndexVA(), m_selectedVisibleIndexRange[meshHandle]);
         } });
 
-    executePass(PassType::HORIZONTAL_DILATE, L"Horizontal dilate pass", [&]
-                {
+    executePass(PassType::HORIZONTAL_DILATE, L"Horizontal dilate pass", [&] {
         if (needToDrawOutline)
         {
             pCommandList->RSSetViewports(1, &m_viewport);
@@ -1862,8 +1845,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             pCommandList->DrawInstanced(3, 1, 0, 0);
         } });
 
-    executePass(PassType::OUTLINE_DRAWING, L"Outline drawing pass", [&]
-                {
+    executePass(PassType::OUTLINE_DRAWING, L"Outline drawing pass", [&] {
         if (needToDrawOutline)
         {
             pCommandList->RSSetViewports(1, &m_viewport);
@@ -1883,8 +1865,7 @@ void Renderer::PopulateCommandList(ID3D12GraphicsCommandList7* pCommandList)
             pCommandList->DrawInstanced(3, 1, 0, 0);
         } });
 
-    executePass(PassType::TONEMAP, L"Tone mapping pass", [&]
-                {
+    executePass(PassType::TONEMAP, L"Tone mapping pass", [&] {
         pCommandList->RSSetViewports(1, &m_viewport);
         pCommandList->RSSetScissorRects(1, &m_scissorRect);
 

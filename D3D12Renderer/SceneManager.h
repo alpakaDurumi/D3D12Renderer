@@ -126,8 +126,7 @@ public:
         {
             auto lightHandle = pEntity->light.value();
             std::visit(
-                [&](auto&& handle)
-                {
+                [&](auto&& handle) {
                     auto resources = Get(handle)->TakeResources();
                     EnqueueResourceDeletion(resources);
                     Remove(handle);
@@ -716,8 +715,7 @@ public:
     {
         UINT resolution = 0;
         std::visit(
-            [&](auto&& lightHandle)
-            { resolution = Get(lightHandle)->GetShadowMapResolution(); },
+            [&](auto&& lightHandle) { resolution = Get(lightHandle)->GetShadowMapResolution(); },
             handle);
 
         return resolution;
@@ -726,8 +724,7 @@ public:
     void SetShadowMapResolution(LightHandle handle, UINT resolution)
     {
         std::visit(
-            [&](auto&& lightHandle)
-            {
+            [&](auto&& lightHandle) {
                 auto* pLight = Get(lightHandle);
                 if (pLight->GetShadowMapResolution() == resolution) return;
 
@@ -783,8 +780,7 @@ private:
             auto lightHandle = entity.light.value();
 
             std::visit(
-                [&](auto&& handle)
-                {
+                [&](auto&& handle) {
                     Get(handle)->SetWorldTransform(world);
                 },
                 lightHandle);

@@ -7,7 +7,10 @@ UseTab: Never
 ColumnLimit: 0
 
 PointerAlignment: Left
-BreakBeforeBraces: Allman
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: true
+  AfterUnion: true
 AccessModifierOffset: -4
 
 IncludeBlocks: Regroup
@@ -37,5 +40,5 @@ BreakConstructorInitializers: BeforeComma
 InsertNewlineAtEOF: true
 
 LambdaBodyIndentation: Signature
-AllowShortLambdasOnASingleLine: All
+AllowShortLambdasOnASingleLine: Inline
 AllowShortIfStatementsOnASingleLine: WithoutElse

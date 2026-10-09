@@ -12,7 +12,7 @@ struct ConstantData
 {
 private:
     friend T;
-    
+
     // static_assert must be in a member function (like the constructor)
     // because the derived class T is an incomplete type at the point of inheritance
     ConstantData()
