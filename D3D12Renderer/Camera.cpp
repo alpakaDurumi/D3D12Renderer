@@ -71,7 +71,7 @@ BoundingFrustum Camera::GetWorldFrustum() const
     return boundingFrustum;
 }
 
-void Camera::SetPosition(const XMVECTOR& pos)
+void XM_CALLCONV Camera::SetPosition(FXMVECTOR pos)
 {
     XMStoreFloat3(&m_position, pos);
 }
@@ -134,7 +134,7 @@ void Camera::Rotate(XMINT2 mouseMove)
     XMStoreFloat4(&m_rotation, q);
 }
 
-void Camera::Orbit(XMVECTOR pivot, float distance, XMINT2 mouseMove)
+void XM_CALLCONV Camera::Orbit(FXMVECTOR pivot, float distance, XMINT2 mouseMove)
 {
     Rotate(mouseMove);
     XMVECTOR newPos = pivot - GetForward() * distance;

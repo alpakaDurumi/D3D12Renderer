@@ -96,7 +96,7 @@ UINT Light::GetIdxInArray() const
     return m_lightConstantData.idxInArray;
 }
 
-void Light::SetViewProjection(XMMATRIX view, XMMATRIX projection, UINT idx)
+void XM_CALLCONV Light::SetViewProjection(FXMMATRIX view, CXMMATRIX projection, UINT idx)
 {
     m_cameraConstantData[idx].SetView(view);
     m_cameraConstantData[idx].SetProjection(projection);
@@ -177,7 +177,7 @@ void Light::ChangeShadowMapResolution(ID3D12Device10* pDevice, UINT shadowMapRes
     CreateDepthStencilBuffers(pDevice);
 }
 
-void Light::SetPositionConstants(XMVECTOR pos)
+void XM_CALLCONV Light::SetPositionConstants(FXMVECTOR pos)
 {
     for (auto& cd : m_cameraConstantData)
         cd.SetPos(pos);
@@ -185,7 +185,7 @@ void Light::SetPositionConstants(XMVECTOR pos)
     m_lightConstantData.SetPos(pos);
 }
 
-void Light::SetDirectionConstants(XMVECTOR dir)
+void XM_CALLCONV Light::SetDirectionConstants(FXMVECTOR dir)
 {
     m_lightConstantData.SetLightDir(dir);
 }
@@ -223,12 +223,12 @@ DirectionalLight::DirectionalLight(
     m_srv.Init(pDevice, m_depthBuffer.Get(), GetSrvDesc2DArray(DXGI_FORMAT_R32_FLOAT, 1, MAX_CASCADES));
 }
 
-void DirectionalLight::SetWorldTransform(XMMATRIX world)
+void XM_CALLCONV DirectionalLight::SetWorldTransform(FXMMATRIX world)
 {
     SetDirectionConstants(XMVector3Normalize(world.r[2]));
 }
 
-void DirectionalLight::SetShadowContext(XMVECTOR cameraPos, float cameraFar, const std::vector<BoundingSphere>& cascadeSpheres)
+void XM_CALLCONV DirectionalLight::SetShadowContext(FXMVECTOR cameraPos, float cameraFar, const std::vector<BoundingSphere>& cascadeSpheres)
 {
     static XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
@@ -307,7 +307,7 @@ PointLight::PointLight(
     CreateRenderTargets(pDevice);
 }
 
-void PointLight::SetWorldTransform(XMMATRIX world)
+void XM_CALLCONV PointLight::SetWorldTransform(FXMMATRIX world)
 {
     SetPositionConstants(world.r[3]);
 }
@@ -345,7 +345,7 @@ void PointLight::SetShadowContext(float cameraNear)
     m_boundingSphere = BoundingSphere(m_lightConstantData.lightPos, m_lightConstantData.range);
 }
 
-void PointLight::SetViewProjection(XMMATRIX view, XMMATRIX projection, UINT idx)
+void XM_CALLCONV PointLight::SetViewProjection(FXMMATRIX view, CXMMATRIX projection, UINT idx)
 {
     m_cameraConstantData[idx].SetView(view);
     m_cameraConstantData[idx].SetProjection(projection);
@@ -418,7 +418,7 @@ SpotLight::SpotLight(
     SetAngles(45.0f, 20.0f); // Set default angle
 }
 
-void SpotLight::SetWorldTransform(XMMATRIX world)
+void XM_CALLCONV SpotLight::SetWorldTransform(FXMMATRIX world)
 {
     SetPositionConstants(world.r[3]);
     SetDirectionConstants(XMVector3Normalize(world.r[2]));

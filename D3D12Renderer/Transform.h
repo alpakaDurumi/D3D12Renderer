@@ -81,7 +81,7 @@ public:
         return m_localRenderTransform;
     }
 
-    void SetWorldRenderTransform(const DirectX::XMMATRIX& transform)
+    void XM_CALLCONV SetWorldRenderTransform(DirectX::FXMMATRIX transform)
     {
         DirectX::XMStoreFloat4x4(&m_worldRenderTransform, transform);
     }

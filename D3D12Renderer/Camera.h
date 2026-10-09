@@ -25,7 +25,7 @@ public:
     DirectX::XMMATRIX GetProjectionMatrix(bool usePerspectiveProjection = true) const;
     DirectX::BoundingFrustum GetWorldFrustum() const;
 
-    void SetPosition(const DirectX::XMVECTOR& pos);
+    void XM_CALLCONV SetPosition(DirectX::FXMVECTOR pos);
     void SetAspectRatio(float aspectRatio);
     void SetHorizontalFov(float horizontalFov);
 
@@ -33,7 +33,7 @@ public:
     void MoveRight(float speedScale);
     void MoveUp(float speedScale);
     void Rotate(DirectX::XMINT2 mouseMove);
-    void Orbit(DirectX::XMVECTOR pivot, float distance, DirectX::XMINT2 mouseMove);
+    void XM_CALLCONV Orbit(DirectX::FXMVECTOR pivot, float distance, DirectX::XMINT2 mouseMove);
     void Pan(DirectX::XMINT2 mouseMove);
     Ray GetRay(DirectX::XMFLOAT2 coord, DirectX::XMFLOAT2 resolution) const;
 

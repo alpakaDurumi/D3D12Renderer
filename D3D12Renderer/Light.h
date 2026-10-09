@@ -49,8 +49,8 @@ public:
 
     UINT GetIdxInArray() const;
 
-    virtual void SetWorldTransform(DirectX::XMMATRIX world) = 0;
-    virtual void SetViewProjection(DirectX::XMMATRIX view, DirectX::XMMATRIX projection, UINT idx);
+    virtual void XM_CALLCONV SetWorldTransform(DirectX::FXMMATRIX world) = 0;
+    virtual void XM_CALLCONV SetViewProjection(DirectX::FXMMATRIX view, DirectX::CXMMATRIX projection, UINT idx);
 
     void SetIdxInArray(UINT idxInArray);
 
@@ -72,8 +72,8 @@ public:
     virtual void ChangeShadowMapResolution(ID3D12Device10* pDevice, UINT shadowMapResolution);
 
 protected:
-    void SetPositionConstants(DirectX::XMVECTOR pos);
-    void SetDirectionConstants(DirectX::XMVECTOR dir);
+    void XM_CALLCONV SetPositionConstants(DirectX::FXMVECTOR pos);
+    void XM_CALLCONV SetDirectionConstants(DirectX::FXMVECTOR dir);
     void SetRangeConstants(float range);
 
     std::vector<CameraConstantData> m_cameraConstantData;
@@ -106,8 +106,8 @@ public:
         DescriptorAllocation&& cbvAllocation,
         UINT shadowMapResolution);
 
-    void SetWorldTransform(DirectX::XMMATRIX world) override;
-    void SetShadowContext(DirectX::XMVECTOR cameraPos, float cameraFar, const std::vector<DirectX::BoundingSphere>& cascadeSpheres);
+    void XM_CALLCONV SetWorldTransform(DirectX::FXMMATRIX world) override;
+    void XM_CALLCONV SetShadowContext(DirectX::FXMVECTOR cameraPos, float cameraFar, const std::vector<DirectX::BoundingSphere>& cascadeSpheres);
 
     const std::array<DirectX::BoundingOrientedBox, MAX_CASCADES>& GetBoundingBoxes() const;
 
@@ -128,10 +128,10 @@ public:
         DescriptorAllocation&& rtvAllocation,
         UINT shadowMapResolution);
 
-    void SetWorldTransform(DirectX::XMMATRIX world) override;
+    void XM_CALLCONV SetWorldTransform(DirectX::FXMMATRIX world) override;
     void SetShadowContext(float cameraNear);
 
-    void SetViewProjection(DirectX::XMMATRIX view, DirectX::XMMATRIX projection, UINT idx) override;
+    void XM_CALLCONV SetViewProjection(DirectX::FXMMATRIX view, DirectX::CXMMATRIX projection, UINT idx) override;
 
     ID3D12Resource* GetRenderTarget() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle(UINT index) const;
@@ -164,7 +164,7 @@ public:
         DescriptorAllocation&& cbvAllocation,
         UINT shadowMapResolution);
 
-    void SetWorldTransform(DirectX::XMMATRIX world) override;
+    void XM_CALLCONV SetWorldTransform(DirectX::FXMMATRIX world) override;
     void SetShadowContext(float cameraNear);
 
     const DirectX::BoundingFrustum& GetBoundingFrustum() const;

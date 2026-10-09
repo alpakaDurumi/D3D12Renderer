@@ -769,7 +769,7 @@ private:
         m_spotLights.Remove(handle);
     }
 
-    void UpdateWorldTransform(Entity& entity, DirectX::XMMATRIX& accumulated, float alpha)
+    void XM_CALLCONV UpdateWorldTransform(Entity& entity, DirectX::FXMMATRIX accumulated, float alpha)
     {
         entity.transform.UpdateLocalRenderState(alpha);
         DirectX::XMMATRIX localRenderTransform = DirectX::XMLoadFloat4x4(&entity.transform.GetLocalRenderTransform());

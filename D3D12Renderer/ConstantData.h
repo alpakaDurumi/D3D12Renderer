@@ -31,9 +31,9 @@ struct CameraConstantData : public ConstantData<CameraConstantData>
     DirectX::XMFLOAT4X4 invProj;
     float padding[60];
 
-    void SetPos(DirectX::XMVECTOR pos);
-    void SetView(DirectX::XMMATRIX view);
-    void SetProjection(DirectX::XMMATRIX projection);
+    void XM_CALLCONV SetPos(DirectX::FXMVECTOR pos);
+    void XM_CALLCONV SetView(DirectX::FXMMATRIX view);
+    void XM_CALLCONV SetProjection(DirectX::FXMMATRIX projection);
 };
 
 struct LightConstantData : public ConstantData<LightConstantData>
@@ -50,9 +50,9 @@ struct LightConstantData : public ConstantData<LightConstantData>
     float lightIntensity = 1.0f;
     float padding[49];
 
-    void SetPos(DirectX::XMVECTOR pos);
-    void SetLightDir(DirectX::XMVECTOR lightDir);
-    void SetViewProjection(DirectX::XMMATRIX viewProjection, UINT idx);
+    void XM_CALLCONV SetPos(DirectX::FXMVECTOR pos);
+    void XM_CALLCONV SetLightDir(DirectX::FXMVECTOR lightDir);
+    void XM_CALLCONV SetViewProjection(DirectX::FXMMATRIX viewProjection, UINT idx);
 };
 
 struct MaterialConstantData : public ConstantData<MaterialConstantData>
