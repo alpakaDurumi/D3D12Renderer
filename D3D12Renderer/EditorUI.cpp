@@ -18,6 +18,7 @@
 #include "Renderer.h"
 #include "RendererConfig.h"
 #include "SceneManager.h"
+#include "Transform.h"
 #include "Win32Application.h"
 
 using namespace DirectX;

@@ -19,6 +19,7 @@
 #include "Material.h"
 #include "Mesh.h"
 #include "SharedConfig.h"
+#include "Transform.h"
 #include "TransientUploadAllocator.h"
 #include "Win32Application.h"
 
