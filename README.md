@@ -88,3 +88,8 @@ cmake --preset default -DENGINE_DEBUG_LAYER=ON -DENGINE_PIX=ON
 - Detail about
     - The wiki page of DirectXTK repo has good explanations.
     - [ComPtr](https://github.com/Microsoft/DirectXTK/wiki/ComPtr)
+
+## Code style
+
+- C++: formatted with [clang-format](https://clang.llvm.org/docs/ClangFormat.html) using `.clang-format`
+- CMake: formatted with [gersemi](https://github.com/BlankSpruce/gersemi)

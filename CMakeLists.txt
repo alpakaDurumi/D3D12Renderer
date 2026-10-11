@@ -3,10 +3,7 @@
 # ==============================================================================
 cmake_minimum_required(VERSION 3.26)
 
-project(
-    D3D12Renderer
-    LANGUAGES CXX
-)
+project(D3D12Renderer LANGUAGES CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -17,11 +14,13 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND WIN32)
         set(OpenMP_libomp_LIBRARY "${_compiler_bin}/../lib/libomp.lib")
     endif()
     if(NOT EXISTS "${OpenMP_libomp_LIBRARY}")
-        message(FATAL_ERROR
+        message(
+            FATAL_ERROR
             "libomp.lib not found at ${OpenMP_libomp_LIBRARY}. "
             "This assumes the standard LLVM install layout, where the compiler is in "
             "<LLVM>/bin and libomp.lib is in the sibling <LLVM>/lib. "
-            "If your environment differs, set -DOpenMP_libomp_LIBRARY=<path-to-libomp.lib> manually.")
+            "If your environment differs, set -DOpenMP_libomp_LIBRARY=<path-to-libomp.lib> manually."
+        )
     endif()
 endif()
 find_package(OpenMP REQUIRED)
@@ -34,14 +33,16 @@ include(FetchContent)
 FetchContent_Declare(
     DirectXMath
     URL https://github.com/microsoft/DirectXMath/archive/refs/tags/oct2024.zip
-    URL_HASH SHA256=b215087ddd085381839c6fc6f51185579f3a1c55804190b2ccc5969e9520b0bd
+    URL_HASH
+        SHA256=b215087ddd085381839c6fc6f51185579f3a1c55804190b2ccc5969e9520b0bd
     SYSTEM
 )
 
 FetchContent_Declare(
     DirectXTex
     URL https://github.com/microsoft/DirectXTex/archive/refs/tags/oct2025.zip
-    URL_HASH SHA256=e2204b0532c2df2cfa80f6550726d07905bc5107c40b31291c7b84a3522192cb
+    URL_HASH
+        SHA256=e2204b0532c2df2cfa80f6550726d07905bc5107c40b31291c7b84a3522192cb
     SYSTEM
 )
 set(BUILD_TOOLS OFF)
@@ -51,23 +52,34 @@ set(BC_USE_OPENMP ON)
 
 FetchContent_Declare(
     DirectX12Agility
-    URL https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/1.717.1-preview
-    URL_HASH SHA256=f052df9437c7e47cdb428ffb597481fe55a480c8968b0056159fe3a195c277e4
+    URL
+        https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/1.717.1-preview
+    URL_HASH
+        SHA256=f052df9437c7e47cdb428ffb597481fe55a480c8968b0056159fe3a195c277e4
 )
 
 FetchContent_Declare(
     DXC
-    URL https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2505.1/dxc_2025_07_14.zip
-    URL_HASH SHA256=9ad895a6b039e3a8f8c22a1009f866800b840a74b50db9218d13319e215ea8a4
+    URL
+        https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2505.1/dxc_2025_07_14.zip
+    URL_HASH
+        SHA256=9ad895a6b039e3a8f8c22a1009f866800b840a74b50db9218d13319e215ea8a4
 )
 
 FetchContent_Declare(
     WinPixEventRuntime
     URL https://www.nuget.org/api/v2/package/WinPixEventRuntime/1.0.240308001
-    URL_HASH SHA256=726acc93d6968e2146261a1e415521747d50ad69894c2b42b5d0d4c29fd66ec4
+    URL_HASH
+        SHA256=726acc93d6968e2146261a1e415521747d50ad69894c2b42b5d0d4c29fd66ec4
 )
 
-FetchContent_MakeAvailable(DirectXMath DirectXTex DirectX12Agility DXC WinPixEventRuntime)
+FetchContent_MakeAvailable(
+    DirectXMath
+    DirectXTex
+    DirectX12Agility
+    DXC
+    WinPixEventRuntime
+)
 
 # DirectXTex builds with /Wall, which makes clang emit -Wpadded.
 # The #pragma warning(disable: 4820) that hides it is MSVC-only, and
@@ -78,7 +90,13 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_options(DirectXTex PRIVATE -Wno-padded)
 endif()
 
-find_program(DXC_EXE NAMES dxc PATHS ${dxc_SOURCE_DIR}/bin/x64 NO_DEFAULT_PATH REQUIRED)
+find_program(
+    DXC_EXE
+    NAMES dxc
+    PATHS ${dxc_SOURCE_DIR}/bin/x64
+    NO_DEFAULT_PATH
+    REQUIRED
+)
 
 # ==============================================================================
 # Third-party libraries
@@ -88,21 +106,20 @@ find_program(DXC_EXE NAMES dxc PATHS ${dxc_SOURCE_DIR}/bin/x64 NO_DEFAULT_PATH R
 add_library(
     ImGui
     STATIC
+    #[[gersemi: sort]]
+    D3D12Renderer/imgui/backends/imgui_impl_dx12.cpp
+    D3D12Renderer/imgui/backends/imgui_impl_win32.cpp
+    D3D12Renderer/imgui/imgui.cpp
     D3D12Renderer/imgui/imgui_demo.cpp
     D3D12Renderer/imgui/imgui_draw.cpp
     D3D12Renderer/imgui/imgui_tables.cpp
     D3D12Renderer/imgui/imgui_widgets.cpp
-    D3D12Renderer/imgui/imgui.cpp
-    D3D12Renderer/imgui/backends/imgui_impl_dx12.cpp
-    D3D12Renderer/imgui/backends/imgui_impl_win32.cpp
 )
 
 target_include_directories(
     ImGui
     SYSTEM
-    PUBLIC
-    D3D12Renderer/imgui
-    D3D12Renderer/imgui/backends
+    PUBLIC D3D12Renderer/imgui D3D12Renderer/imgui/backends
 )
 
 # DDSTextureLoader
@@ -116,9 +133,9 @@ target_include_directories(
     DDSTextureLoader
     SYSTEM
     PUBLIC
-    D3D12Renderer/DDSTextureLoader
-    ${directx12agility_SOURCE_DIR}/build/native/include
-    ${directx12agility_SOURCE_DIR}/build/native/include/d3dx12
+        D3D12Renderer/DDSTextureLoader
+        ${directx12agility_SOURCE_DIR}/build/native/include
+        ${directx12agility_SOURCE_DIR}/build/native/include/d3dx12
 )
 
 # ==============================================================================
@@ -129,6 +146,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/bin)
 add_executable(
     D3D12Renderer
     WIN32
+    #[[gersemi: sort]]
     D3D12Renderer/Buffer.cpp
     D3D12Renderer/CacheKeys.cpp
     D3D12Renderer/Camera.cpp
@@ -145,10 +163,8 @@ add_executable(
     D3D12Renderer/ImGuiDescriptorAllocation.cpp
     D3D12Renderer/ImGuiDescriptorAllocator.cpp
     D3D12Renderer/Light.cpp
-    D3D12Renderer/main.cpp
     D3D12Renderer/Material.cpp
     D3D12Renderer/Mesh.cpp
-    D3D12Renderer/pch.cpp
     D3D12Renderer/Renderer.cpp
     D3D12Renderer/RootSignature.cpp
     D3D12Renderer/SceneHandles.cpp
@@ -159,19 +175,13 @@ add_executable(
     D3D12Renderer/Utility.cpp
     D3D12Renderer/View.cpp
     D3D12Renderer/Win32Application.cpp
+    D3D12Renderer/main.cpp
+    D3D12Renderer/pch.cpp
 )
 
-target_precompile_headers(
-    D3D12Renderer
-    PRIVATE
-    D3D12Renderer/pch.h
-)
+target_precompile_headers(D3D12Renderer PRIVATE D3D12Renderer/pch.h)
 
-target_compile_features(
-    D3D12Renderer
-    PRIVATE
-    cxx_std_17
-)
+target_compile_features(D3D12Renderer PRIVATE cxx_std_17)
 
 if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     # MSVC and clang-cl
@@ -186,39 +196,32 @@ target_include_directories(
     SYSTEM
     BEFORE
     PRIVATE
-    ${directx12agility_SOURCE_DIR}/build/native/include
-    ${directx12agility_SOURCE_DIR}/build/native/include/d3dx12
+        ${directx12agility_SOURCE_DIR}/build/native/include
+        ${directx12agility_SOURCE_DIR}/build/native/include/d3dx12
 )
 
-target_compile_definitions(
-    D3D12Renderer
-    PRIVATE
-    UNICODE
-    _UNICODE
-)
+target_compile_definitions(D3D12Renderer PRIVATE UNICODE _UNICODE)
 
 target_link_libraries(
     D3D12Renderer
     PRIVATE
-    d3d12
-    dxgi
-    winmm
-    OpenMP::OpenMP_CXX
-    
-    DirectXMath
-    DirectXTex
-
-    ImGui
-    DDSTextureLoader
+        d3d12
+        dxgi
+        winmm
+        OpenMP::OpenMP_CXX
+        DirectXMath
+        DirectXTex
+        ImGui
+        DDSTextureLoader
 )
 
 # ==============================================================================
 # Options
 # ==============================================================================
-set(ENGINE_DEBUG_LAYER          OFF CACHE BOOL "D3D12/DXGI debug layer")
+set(ENGINE_DEBUG_LAYER OFF CACHE BOOL "D3D12/DXGI debug layer")
 set(ENGINE_GPU_BASED_VALIDATION OFF CACHE BOOL "GPU Based Validation")
-set(ENGINE_SHADER_DEBUG         OFF CACHE BOOL "DXC shader debug flags")
-set(ENGINE_PIX                  OFF CACHE BOOL "WinPixEventRuntime")
+set(ENGINE_SHADER_DEBUG OFF CACHE BOOL "DXC shader debug flags")
+set(ENGINE_PIX OFF CACHE BOOL "WinPixEventRuntime")
 
 if(ENGINE_DEBUG_LAYER)
     target_compile_definitions(D3D12Renderer PRIVATE ENGINE_DEBUG_LAYER)
@@ -226,7 +229,10 @@ if(ENGINE_DEBUG_LAYER)
 endif()
 
 if(ENGINE_GPU_BASED_VALIDATION)
-    target_compile_definitions(D3D12Renderer PRIVATE ENGINE_GPU_BASED_VALIDATION)
+    target_compile_definitions(
+        D3D12Renderer
+        PRIVATE ENGINE_GPU_BASED_VALIDATION
+    )
 endif()
 
 if(ENGINE_SHADER_DEBUG)
@@ -241,14 +247,12 @@ if(ENGINE_PIX)
     target_include_directories(
         D3D12Renderer
         SYSTEM
-        PRIVATE
-        ${winpixeventruntime_SOURCE_DIR}/Include/WinPixEventRuntime
+        PRIVATE ${winpixeventruntime_SOURCE_DIR}/Include/WinPixEventRuntime
     )
 
     target_link_libraries(
         D3D12Renderer
-        PRIVATE
-        ${winpixeventruntime_SOURCE_DIR}/bin/x64/WinPixEventRuntime.lib
+        PRIVATE ${winpixeventruntime_SOURCE_DIR}/bin/x64/WinPixEventRuntime.lib
     )
 endif()
 
@@ -260,7 +264,9 @@ set(SHADER_CSO_OUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders)
 set(SHADER_PDB_OUT ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/intermediate/pdb)
 set(SHADER_DEP_OUT ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/intermediate/dep)
 
-set(DXC_COMMON -nologo -HV 2016 -I ${SHADER_SRC})
+set(DXC_COMMON
+    #[[gersemi: command_line]] -nologo -HV 2016 -I ${SHADER_SRC}
+)
 
 function(compile_shader)
     cmake_parse_arguments(ARG "" "SOURCE;OUTPUT;PROFILE" "DEFINES" ${ARGN})
@@ -280,26 +286,28 @@ function(compile_shader)
     add_custom_command(
         OUTPUT ${SHADER_CSO_OUT}/${ARG_OUTPUT}.cso
         BYPRODUCTS ${pdb_byproduct}
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADER_CSO_OUT} ${SHADER_PDB_OUT} ${SHADER_DEP_OUT}
-        COMMAND ${DXC_EXE} ${SHADER_SRC}/${ARG_SOURCE}.hlsl
-            -E main -T ${ARG_PROFILE}
-            ${define_flags}
-            ${DXC_COMMON}
-            ${DXC_CONFIG}
-            ${pdb_flags}
-            -Fo ${SHADER_CSO_OUT}/${ARG_OUTPUT}.cso
-        COMMAND ${DXC_EXE} ${SHADER_SRC}/${ARG_SOURCE}.hlsl
-            -E main -T ${ARG_PROFILE}
-            ${define_flags}
-            ${DXC_COMMON}
-            -MF ${SHADER_DEP_OUT}/${ARG_OUTPUT}.d
+        COMMAND
+            ${CMAKE_COMMAND} -E make_directory ${SHADER_CSO_OUT}
+            ${SHADER_PDB_OUT} ${SHADER_DEP_OUT}
+        COMMAND
+            ${DXC_EXE} ${SHADER_SRC}/${ARG_SOURCE}.hlsl -E main -T
+            ${ARG_PROFILE} ${define_flags} ${DXC_COMMON} ${DXC_CONFIG}
+            ${pdb_flags} -Fo ${SHADER_CSO_OUT}/${ARG_OUTPUT}.cso
+        COMMAND
+            ${DXC_EXE} ${SHADER_SRC}/${ARG_SOURCE}.hlsl -E main -T
+            ${ARG_PROFILE} ${define_flags} ${DXC_COMMON} -MF
+            ${SHADER_DEP_OUT}/${ARG_OUTPUT}.d
         DEPENDS ${SHADER_SRC}/${ARG_SOURCE}.hlsl
         DEPFILE ${SHADER_DEP_OUT}/${ARG_OUTPUT}.d
         COMMENT "DXC: ${ARG_SOURCE}.hlsl -> ${ARG_OUTPUT}.cso"
         VERBATIM
     )
 
-    set_property(GLOBAL APPEND PROPERTY SHADER_OUTPUTS ${SHADER_CSO_OUT}/${ARG_OUTPUT}.cso)
+    set_property(
+        GLOBAL
+        APPEND
+        PROPERTY SHADER_OUTPUTS ${SHADER_CSO_OUT}/${ARG_OUTPUT}.cso
+    )
 endfunction()
 
 compile_shader(SOURCE MeshVS               OUTPUT MeshVS               PROFILE vs_6_0)
@@ -316,11 +324,7 @@ compile_shader(SOURCE HorizontalDilatePS   OUTPUT HorizontalDilatePS   PROFILE p
 
 get_property(shader_outputs GLOBAL PROPERTY SHADER_OUTPUTS)
 
-add_custom_target(
-    Shaders
-    DEPENDS
-    ${shader_outputs}
-)
+add_custom_target(Shaders DEPENDS ${shader_outputs})
 
 add_dependencies(D3D12Renderer Shaders)
 
@@ -328,17 +332,23 @@ add_dependencies(D3D12Renderer Shaders)
 # Post-build
 # ==============================================================================
 add_custom_command(
-    TARGET D3D12Renderer POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+    TARGET D3D12Renderer
+    POST_BUILD
+    COMMAND
+        ${CMAKE_COMMAND} -E copy_directory_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/assets
         $<TARGET_FILE_DIR:D3D12Renderer>/assets
     COMMENT "Copying assets"
 )
 
 add_custom_command(
-    TARGET D3D12Renderer POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:D3D12Renderer>/D3D12
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    TARGET D3D12Renderer
+    POST_BUILD
+    COMMAND
+        ${CMAKE_COMMAND} -E make_directory
+        $<TARGET_FILE_DIR:D3D12Renderer>/D3D12
+    COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different
         ${directx12agility_SOURCE_DIR}/build/native/bin/x64/D3D12Core.dll
         ${directx12agility_SOURCE_DIR}/build/native/bin/x64/d3d12SDKLayers.dll
         $<TARGET_FILE_DIR:D3D12Renderer>/D3D12
@@ -346,17 +356,20 @@ add_custom_command(
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND WIN32)
     add_custom_command(
-        TARGET D3D12Renderer POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${_compiler_bin}/libomp.dll
+        TARGET D3D12Renderer
+        POST_BUILD
+        COMMAND
+            ${CMAKE_COMMAND} -E copy_if_different ${_compiler_bin}/libomp.dll
             $<TARGET_FILE_DIR:D3D12Renderer>
     )
 endif()
 
 if(ENGINE_PIX)
     add_custom_command(
-        TARGET D3D12Renderer POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        TARGET D3D12Renderer
+        POST_BUILD
+        COMMAND
+            ${CMAKE_COMMAND} -E copy_if_different
             ${winpixeventruntime_SOURCE_DIR}/bin/x64/WinPixEventRuntime.dll
             $<TARGET_FILE_DIR:D3D12Renderer>
     )
