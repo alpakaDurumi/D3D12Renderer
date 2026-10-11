@@ -152,6 +152,7 @@ add_executable(
     D3D12Renderer/Renderer.cpp
     D3D12Renderer/RootSignature.cpp
     D3D12Renderer/SceneHandles.cpp
+    D3D12Renderer/SceneManager.cpp
     D3D12Renderer/Texture.cpp
     D3D12Renderer/Transform.cpp
     D3D12Renderer/TransientUploadAllocator.cpp
